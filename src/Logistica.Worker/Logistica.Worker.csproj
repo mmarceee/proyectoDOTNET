@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <UserSecretsId>dotnet-Logistica.Worker-87efdafe-20f2-4906-ad46-110b435118b3</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modules\Administracion\Logistica.Modules.Administracion.Contracts\Logistica.Modules.Administracion.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Envios\Logistica.Modules.Envios.Contracts\Logistica.Modules.Envios.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Planificacion\Logistica.Modules.Planificacion.Contracts\Logistica.Modules.Planificacion.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Ejecucion\Logistica.Modules.Ejecucion.Contracts\Logistica.Modules.Ejecucion.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Seguimiento\Logistica.Modules.Seguimiento.Contracts\Logistica.Modules.Seguimiento.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Deposito\Logistica.Modules.Deposito.Contracts\Logistica.Modules.Deposito.Contracts.csproj" />
+  </ItemGroup>
+</Project>

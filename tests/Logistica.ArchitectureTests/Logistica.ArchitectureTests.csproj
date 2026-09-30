@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Administracion\Logistica.Modules.Administracion\Logistica.Modules.Administracion.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Envios\Logistica.Modules.Envios\Logistica.Modules.Envios.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Planificacion\Logistica.Modules.Planificacion\Logistica.Modules.Planificacion.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Ejecucion\Logistica.Modules.Ejecucion\Logistica.Modules.Ejecucion.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Seguimiento\Logistica.Modules.Seguimiento\Logistica.Modules.Seguimiento.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Deposito\Logistica.Modules.Deposito\Logistica.Modules.Deposito.csproj" />
+    <ProjectReference Include="..\..\src\Logistica.Api\Logistica.Api.csproj" />
+    <ProjectReference Include="..\..\src\Logistica.Worker\Logistica.Worker.csproj" />
+  </ItemGroup>
+
+</Project>

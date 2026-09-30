@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Logistica.Modules.Planificacion.Contracts\Logistica.Modules.Planificacion.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

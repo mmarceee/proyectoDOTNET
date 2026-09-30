@@ -1,0 +1,40 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Logistica.Api/Logistica.Api.csproj" />
+    <Project Path="src/Logistica.Backoffice/Logistica.Backoffice.csproj" />
+    <Project Path="src/Logistica.PortalComercio/Logistica.PortalComercio.csproj" />
+    <Project Path="src/Logistica.Repartidor.Pwa/Logistica.Repartidor.Pwa.csproj" />
+    <Project Path="src/Logistica.SeguimientoPublico/Logistica.SeguimientoPublico.csproj" />
+    <Project Path="src/Logistica.Worker/Logistica.Worker.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Administracion/">
+    <Project Path="src/Modules/Administracion/Logistica.Modules.Administracion.Contracts/Logistica.Modules.Administracion.Contracts.csproj" />
+    <Project Path="src/Modules/Administracion/Logistica.Modules.Administracion/Logistica.Modules.Administracion.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Deposito/">
+    <Project Path="src/Modules/Deposito/Logistica.Modules.Deposito.Contracts/Logistica.Modules.Deposito.Contracts.csproj" />
+    <Project Path="src/Modules/Deposito/Logistica.Modules.Deposito/Logistica.Modules.Deposito.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Ejecucion/">
+    <Project Path="src/Modules/Ejecucion/Logistica.Modules.Ejecucion.Contracts/Logistica.Modules.Ejecucion.Contracts.csproj" />
+    <Project Path="src/Modules/Ejecucion/Logistica.Modules.Ejecucion/Logistica.Modules.Ejecucion.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Envios/">
+    <Project Path="src/Modules/Envios/Logistica.Modules.Envios.Contracts/Logistica.Modules.Envios.Contracts.csproj" />
+    <Project Path="src/Modules/Envios/Logistica.Modules.Envios/Logistica.Modules.Envios.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Planificacion/">
+    <Project Path="src/Modules/Planificacion/Logistica.Modules.Planificacion.Contracts/Logistica.Modules.Planificacion.Contracts.csproj" />
+    <Project Path="src/Modules/Planificacion/Logistica.Modules.Planificacion/Logistica.Modules.Planificacion.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Seguimiento/">
+    <Project Path="src/Modules/Seguimiento/Logistica.Modules.Seguimiento.Contracts/Logistica.Modules.Seguimiento.Contracts.csproj" />
+    <Project Path="src/Modules/Seguimiento/Logistica.Modules.Seguimiento/Logistica.Modules.Seguimiento.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Logistica.ArchitectureTests/Logistica.ArchitectureTests.csproj" />
+    <Project Path="tests/Logistica.IntegrationTests/Logistica.IntegrationTests.csproj" />
+    <Project Path="tests/Logistica.UnitTests/Logistica.UnitTests.csproj" />
+  </Folder>
+</Solution>
