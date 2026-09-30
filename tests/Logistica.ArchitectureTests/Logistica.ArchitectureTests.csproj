@@ -27,6 +27,11 @@
     <ProjectReference Include="..\..\src\Logistica.Worker\Logistica.Worker.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\Logistica.SharedKernel\Logistica.SharedKernel.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Logistica.Backoffice\Logistica.Backoffice.csproj" />
+    <ProjectReference Include="..\..\src\Logistica.PortalComercio\Logistica.PortalComercio.csproj" />
+    <ProjectReference Include="..\..\src\Logistica.SeguimientoPublico\Logistica.SeguimientoPublico.csproj" />
+    <ProjectReference Include="..\..\src\Logistica.Repartidor.Pwa\Logistica.Repartidor.Pwa.csproj" />
+    <ProjectReference Include="..\..\src\Logistica.Http.Contracts\Logistica.Http.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

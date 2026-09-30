@@ -1,12 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
   <PropertyGroup>
-    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <!-- La sirve Logistica.Api en /portal/ (ADR-0001, addendum 5). Sin OverrideHtmlAssetPlaceholders:
+         en .NET 10 publica el index.html fuera de StaticWebAssetBasePath y choca con las otras apps. -->
+    <StaticWebAssetBasePath>portal</StaticWebAssetBasePath>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Logistica.Http.Contracts\Logistica.Http.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

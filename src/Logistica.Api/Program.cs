@@ -9,6 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 
+// Backoffice: las páginas viven en Logistica.Backoffice y en Presentation/Features de cada módulo.
+// La raíz "/" permite descubrirlas fuera de la carpeta Pages; cada página declara su ruta absoluta
+// con @page "/backoffice/..." (ADR-0001, addendum 4).
+builder.Services.AddRazorPages(options => options.RootDirectory = "/");
+
 builder.Services
     .AddAdministracionModule(builder.Configuration)
     .AddEnviosModule(builder.Configuration)
@@ -19,7 +24,17 @@ builder.Services
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseWebAssemblyDebugging();
+}
+
+app.MapStaticAssets();
+
 app.MapHealthChecks("/health");
+
+app.MapRazorPages()
+    .WithStaticAssets();
 
 app.MapAdministracionEndpoints()
     .MapEnviosEndpoints()
@@ -27,5 +42,11 @@ app.MapAdministracionEndpoints()
     .MapEjecucionEndpoints()
     .MapSeguimientoEndpoints()
     .MapDepositoEndpoints();
+
+// Aplicaciones Blazor WebAssembly servidas desde el mismo origen que la API (ADR-0001, addendum 5).
+// Cada ruta sin extensión de archivo cae en el index.html de su aplicación, que resuelve la navegación.
+app.MapFallbackToFile("/portal/{*path:nonfile}", "portal/index.html");
+app.MapFallbackToFile("/seguimiento/{*path:nonfile}", "seguimiento/index.html");
+app.MapFallbackToFile("/repartidor/{*path:nonfile}", "repartidor/index.html");
 
 app.Run();

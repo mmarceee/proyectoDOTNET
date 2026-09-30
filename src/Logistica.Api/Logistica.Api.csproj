@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <!-- Compartido con Logistica.Worker: scripts/configurar-secretos.sh carga ambos desde .env. -->
+    <UserSecretsId>logistica-local</UserSecretsId>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Modules\Administracion\Logistica.Modules.Administracion\Logistica.Modules.Administracion.csproj" />
     <ProjectReference Include="..\Modules\Envios\Logistica.Modules.Envios\Logistica.Modules.Envios.csproj" />
@@ -8,6 +13,14 @@
     <ProjectReference Include="..\Modules\Seguimiento\Logistica.Modules.Seguimiento\Logistica.Modules.Seguimiento.csproj" />
     <ProjectReference Include="..\Modules\Deposito\Logistica.Modules.Deposito\Logistica.Modules.Deposito.csproj" />
     <ProjectReference Include="..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\Logistica.Backoffice\Logistica.Backoffice.csproj" />
+    <ProjectReference Include="..\Logistica.PortalComercio\Logistica.PortalComercio.csproj" />
+    <ProjectReference Include="..\Logistica.SeguimientoPublico\Logistica.SeguimientoPublico.csproj" />
+    <ProjectReference Include="..\Logistica.Repartidor.Pwa\Logistica.Repartidor.Pwa.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
   </ItemGroup>
 
   <PropertyGroup>

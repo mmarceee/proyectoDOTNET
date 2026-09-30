@@ -1,5 +1,6 @@
 # Servicios de soporte para desarrollo local (Propuesta de stack, sección 4.2).
-# Las aplicaciones .NET se ejecutan desde Visual Studio o con dotnet run.
+# Las aplicaciones .NET se ejecutan desde Visual Studio o con dotnet run; para levantar también
+# la Api y el Worker como contenedores: docker compose --profile app up -d --build
 name: logistica
 
 services:
@@ -54,6 +55,34 @@ services:
       - "${ASPIRE_DASHBOARD_PORT:-18888}:18888"
       - "${OTLP_GRPC_PORT:-4317}:18889"
       - "${OTLP_HTTP_PORT:-4318}:18890"
+
+  api:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: src/Logistica.Api/Dockerfile
+    environment: &app-environment
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__Valkey: valkey:6379
+      ConnectionStrings__RabbitMQ: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on: &app-depends-on
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: src/Logistica.Worker/Dockerfile
+    environment: *app-environment
+    depends_on: *app-depends-on
 
 volumes:
   postgres-data:

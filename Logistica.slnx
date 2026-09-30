@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Logistica.Api/Logistica.Api.csproj" />
     <Project Path="src/Logistica.Backoffice/Logistica.Backoffice.csproj" />
+    <Project Path="src/Logistica.Http.Contracts/Logistica.Http.Contracts.csproj" />
     <Project Path="src/Logistica.PortalComercio/Logistica.PortalComercio.csproj" />
     <Project Path="src/Logistica.Repartidor.Pwa/Logistica.Repartidor.Pwa.csproj" />
     <Project Path="src/Logistica.SeguimientoPublico/Logistica.SeguimientoPublico.csproj" />

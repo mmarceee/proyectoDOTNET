@@ -131,7 +131,7 @@ Es una alternativa válida y funcional; se descarta por menor cohesión y menor 
 ## **4.2 Negativas y riesgos**
 
 •  El proyecto de cada módulo tiene disponible ASP.NET Core, por lo que la separación entre Presentation y las demás capas depende de las pruebas de arquitectura y no de las referencias entre proyectos.  
-•  Las páginas del Backoffice (Razor Pages) no se ven afectadas por esta decisión; cómo invocan los casos de uso de los módulos queda como decisión abierta.
+•  Las páginas del Backoffice siguen el mismo criterio: viven en la capa `Presentation` de cada módulo (ver addendum 4).
 
 # **5\. Verificación**
 
@@ -153,7 +153,7 @@ Los puntos 1 a 4 ya están implementados en el esqueleto de la solución (`tests
 
 | Tema | Por qué importa |
 | :---- | :---- |
-| Cómo invoca el Backoffice los casos de uso | Si el Backoffice llama a la API por HTTP, o si se ejecuta en el mismo proceso y usa directamente los módulos, cambia qué proyectos referencia y cómo se resuelve el inquilino. |
+| ~~Cómo invoca el Backoffice los casos de uso~~ | Resuelta en el addendum 4: el Backoffice se ejecuta en el mismo proceso que la API y sus páginas viven en la capa `Presentation` de cada módulo. |
 
 # **7\. Historial de versiones**
 
@@ -161,3 +161,4 @@ Los puntos 1 a 4 ya están implementados en el esqueleto de la solución (`tests
 | :---: | :---: | :---- | :---- |
 | 0.1 | 30/09/2026 | Propuesta inicial del addendum. | Ezequiel Marcenal |
 | 0.2 | 30/09/2026 | Se incorpora la estructura de los proyectos Contracts (sección 2.6 y alternativa 3.4). | Ezequiel Marcenal |
+| 0.3 | 30/09/2026 | Se da por resuelta la decisión abierta sobre el Backoffice (addendum 4). | Ezequiel Marcenal |

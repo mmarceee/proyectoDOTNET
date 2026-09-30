@@ -1,6 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- Biblioteca Razor cargada por Logistica.Api: layout, menú y páginas comunes del Backoffice (ADR-0001, addendum 4). -->
 
   <PropertyGroup>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 
 </Project>

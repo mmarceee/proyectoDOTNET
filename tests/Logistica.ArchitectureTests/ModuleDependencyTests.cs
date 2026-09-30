@@ -1,5 +1,4 @@
 using ArchUnitNET.xUnit;
-using static ArchUnitNET.Fluent.Slices.SliceRuleDefinition;
 using static Logistica.ArchitectureTests.LogisticaArchitecture;
 
 namespace Logistica.ArchitectureTests;
@@ -61,12 +60,14 @@ public class ModuleDependencyTests
             .Check(Architecture);
     }
 
-    // Cada módulo es un slice; como los Contracts no están cargados, usarlos está permitido.
-    [Fact]
-    public void Los_modulos_no_dependen_entre_si()
+    // Los Contracts de otro módulo quedan permitidos porque no están en la lista de namespaces prohibidos.
+    [Theory]
+    [MemberData(nameof(ModuleNames))]
+    public void Un_modulo_solo_usa_los_Contracts_de_otro_modulo(string module)
     {
-        Slices().Matching("Logistica.Modules.(*)..")
-            .Should().NotDependOnEachOther()
+        InNamespace($"Logistica.Modules.{module}")
+            .Should().NotDependOnAny(InAnyNamespace(InternalsOfOtherModules(module)))
+            .WithoutRequiringPositiveResults()
             .Check(Architecture);
     }
 }

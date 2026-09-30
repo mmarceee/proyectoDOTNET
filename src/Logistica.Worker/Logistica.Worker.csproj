@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <UserSecretsId>dotnet-Logistica.Worker-87efdafe-20f2-4906-ad46-110b435118b3</UserSecretsId>
+    <!-- Compartido con Logistica.Api: scripts/configurar-secretos.sh carga ambos desde .env. -->
+    <UserSecretsId>logistica-local</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

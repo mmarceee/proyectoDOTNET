@@ -30,7 +30,7 @@ El ADR-0001 eligió NetArchTest.Rules. Al revisar el estado de ambas bibliotecas
 | NetArchTest.Rules | 1.3.2 | 23 de mayo de 2021 |
 | TngTech.ArchUnitNET y TngTech.ArchUnitNET.xUnit | 0.13.4 | 20 de agosto de 2026 |
 
-NetArchTest.Rules no publica versiones desde hace más de cinco años. ArchUnitNET se mantiene activamente y ofrece reglas más expresivas, en particular reglas de *slices* que verifican en una sola declaración que un conjunto de módulos no dependa entre sí.
+NetArchTest.Rules no publica versiones desde hace más de cinco años. ArchUnitNET se mantiene activamente y ofrece reglas más expresivas sobre tipos, namespaces, ensamblados y miembros.
 
 Las pruebas de arquitectura estaban implementadas con NetArchTest.Rules desde el esqueleto de la solución, pero los módulos todavía no tienen código, por lo que el costo del cambio se limita a reescribir dos archivos de pruebas.
 
@@ -57,7 +57,9 @@ Se mantienen sin cambios las demás reglas de la sección 2.4: no se usan llamad
 
 Las reglas de dependencias se verificarán mediante un proyecto de pruebas con **xUnit y ArchUnitNET** (`TngTech.ArchUnitNET.xUnit`), ejecutado con `dotnet test` en el pipeline de integración continua.
 
-El aislamiento entre módulos se verifica con una regla de slices sobre `Logistica.Modules.(*)`. Los proyectos `Contracts` no se cargan en la arquitectura analizada, de modo que usar el `Contracts` de otro módulo está permitido y usar cualquier otra parte de ese módulo hace fallar la prueba.
+El aislamiento entre módulos se verifica con una regla por módulo: los tipos de `Logistica.Modules.<Modulo>` no pueden depender de los namespaces `Domain`, `Application`, `Infrastructure` ni `Presentation` de ningún otro módulo. Los proyectos `Contracts` no se cargan en la arquitectura analizada, de modo que usar el `Contracts` de otro módulo está permitido y usar cualquier otra parte de ese módulo hace fallar la prueba.
+
+Se evaluó expresar esta regla con las reglas de *slices* de ArchUnitNET (`Slices().Matching("Logistica.Modules.(*)..")`), pero en la versión 0.13.4 el patrón agrupa cada sub-namespace como un slice distinto: una página de `Presentation` que usa un handler de `Application` del mismo módulo se reportaba como dependencia entre módulos. Se detectó al verificar el Backoffice (addendum 4) y se reemplazó por la regla explícita por módulo.
 
 # **3\. Alternativas consideradas**
 
@@ -71,7 +73,7 @@ El aislamiento entre módulos se verifica con una regla de slices sobre `Logisti
 
 ## **3.3 Mantener NetArchTest.Rules**
 
-**Motivo de descarte:** cubre las reglas básicas, pero no publica versiones desde 2021 y no ofrece reglas de slices. Siendo bajo el costo del cambio en este momento, se prefiere una biblioteca mantenida activamente.
+**Motivo de descarte:** cubre las reglas básicas, pero no publica versiones desde 2021. Siendo bajo el costo del cambio en este momento, se prefiere una biblioteca mantenida activamente.
 
 # **4\. Consecuencias**
 
@@ -80,7 +82,7 @@ El aislamiento entre módulos se verifica con una regla de slices sobre `Logisti
 •  Cada interacción entre módulos tiene un criterio explícito para elegir su mecanismo.  
 •  Las reacciones imprescindibles no se pierden ante fallos.  
 •  RabbitMQ se usa donde aporta durabilidad, no por defecto.  
-•  La biblioteca de pruebas de arquitectura está mantenida, y la regla de aislamiento entre módulos se expresa en una sola declaración.
+•  La biblioteca de pruebas de arquitectura está mantenida activamente.
 
 ## **4.2 Negativas y riesgos**
 
@@ -109,3 +111,4 @@ Los puntos 1 a 3 ya están implementados. Se verificó con pruebas de mutación 
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 30/09/2026 | Propuesta inicial del addendum. | Ezequiel Marcenal |
+| 0.2 | 30/09/2026 | La regla de aislamiento entre módulos pasa de slices a una regla explícita por módulo (sección 2.2). | Ezequiel Marcenal |

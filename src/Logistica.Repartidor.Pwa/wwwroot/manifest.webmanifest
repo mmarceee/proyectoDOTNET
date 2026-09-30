@@ -1,8 +1,9 @@
 {
-  "name": "Logistica.Repartidor.Pwa",
-  "short_name": "Logistica.Repartidor.Pwa",
+  "name": "Logística · Repartidor",
+  "short_name": "Repartidor",
   "id": "./",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#03173d",

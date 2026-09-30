@@ -25,3 +25,16 @@ jobs:
 
       - name: Test
         run: dotnet test Logistica.slnx --no-build --configuration Release
+
+  docker-images:
+    # Verifica que las imágenes que despliega App Platform sigan compilando.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Api image
+        run: docker build -f src/Logistica.Api/Dockerfile .
+
+      - name: Build Worker image
+        run: docker build -f src/Logistica.Worker/Dockerfile .
