@@ -1,4 +1,4 @@
-# **ADR-0001 · Addendum 2 · Ubicación de los endpoints y de los casos de uso**
+# **ADR-0001 · Addendum 2 · Ubicación de los endpoints, los casos de uso y los contratos**
 
 | Estado | Propuesto — pendiente de revisión por el responsable del ADR-0001 |
 | :---- | :---- |
@@ -6,17 +6,18 @@
 | **Autor** | Ezequiel Marcenal |
 | **Responsable del ADR-0001** | Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
-| **Modifica** | ADR-0001, sección 2.2 (Organización interna), sección 2.3 (Vertical slices) y sección 2.4 (Regla de dependencias) |
-| **Relacionado con** | ADR-0001 · Addendum 1 · Código compartido; Guía de decisiones tecnológicas, secciones 2.3 y 3.2 |
+| **Modifica** | ADR-0001, sección 2.2 (Organización interna y estructura de Contracts), sección 2.3 (Vertical slices) y sección 2.4 (Regla de dependencias) |
+| **Relacionado con** | ADR-0001 · Addendum 1 · Código compartido; ADR-0001 · Addendum 3 · Comunicación entre módulos; Guía de decisiones tecnológicas, secciones 2.3 y 3.2 |
 
-**Este addendum resuelve dos inconsistencias entre el ADR-0001 y la Guía de decisiones tecnológicas: los endpoints de cada caso de uso se ubican dentro del módulo, en una capa `Presentation`, y los casos de uso se agrupan bajo una carpeta `Features`. El proyecto `Logistica.Api` queda como anfitrión que compone los módulos.**
+**Este addendum resuelve tres inconsistencias de estructura: los endpoints de cada caso de uso se ubican dentro del módulo, en una capa `Presentation`; los casos de uso se agrupan bajo una carpeta `Features`; y los proyectos `Contracts` se organizan según los mecanismos de comunicación del addendum 3. El proyecto `Logistica.Api` queda como anfitrión que compone los módulos.**
 
 # **1\. Contexto**
 
-Al crear el esqueleto de la solución se detectaron dos diferencias entre documentos aceptados:
+Al crear el esqueleto de la solución se detectaron tres diferencias entre documentos aceptados, o entre ellos y las decisiones posteriores:
 
 •  **Ubicación de los endpoints.** El ADR-0001, sección 2.2, establece que los endpoints se ubican *"en el proyecto anfitrión y organizados por módulo"*. La Guía de decisiones tecnológicas, sección 2.3, muestra en cambio el endpoint dentro de la carpeta del caso de uso (`CrearEnvio/CrearEnvioEndpoint.cs`), junto al command y el handler.  
-•  **Carpeta de los casos de uso.** El ADR-0001, sección 2.3, ubica los casos de uso directamente bajo `Application/` (`Application/CrearEnvio/`), mientras que la estructura creada por el equipo usa `Application/Features/`.
+•  **Carpeta de los casos de uso.** El ADR-0001, sección 2.3, ubica los casos de uso directamente bajo `Application/` (`Application/CrearEnvio/`), mientras que la estructura creada por el equipo usa `Application/Features/`.  
+•  **Estructura de Contracts.** El ADR-0001, sección 2.2, organiza cada proyecto `Contracts` en `Commands/`, `Queries/`, `Results/` y `Events/`. Esa estructura supone que los módulos se envían commands y queries a través de un mediador, algo que no se decidió, y no prevé un lugar para las interfaces de comunicación síncrona que define el addendum 3.
 
 La primera diferencia no se puede resolver adoptando literalmente la Guía: colocar el endpoint dentro de `Application/` haría que la capa Application dependa de ASP.NET Core, lo que viola la regla de dependencias del ADR-0001, sección 2.4.
 
@@ -73,6 +74,25 @@ El proyecto de cada módulo incorpora una referencia al framework ASP.NET Core (
 •  Sólo `Presentation` y la clase de entrada `<Modulo>Module` pueden usar ASP.NET Core.  
 •  Un módulo no puede depender de Domain, Application, Infrastructure ni Presentation de otro módulo.
 
+## **2.6 Estructura de los proyectos Contracts (reemplaza la estructura de Contracts de la sección 2.2 del ADR-0001)**
+
+El proyecto `Contracts` es la única parte de un módulo que los demás módulos pueden usar. Su contenido se corresponde con los mecanismos de comunicación del addendum 3:
+
+Logistica.Modules.Envios.Contracts/  
+  IEnviosModuleApi.cs  
+  Results/  
+    EnvioResumen.cs  
+  Events/  
+    EnvioEntregado.cs
+
+•  **`I<Modulo>ModuleApi`**: interfaz con las consultas y acciones que otros módulos pueden invocar de forma síncrona y en memoria. La implementa una clase `internal` de la capa Application del módulo, registrada en `Add<Modulo>Module()`. Se evita el nombre `I<Modulo>Module` para no confundirla con la clase de entrada `<Modulo>Module` de la sección 2.2.  
+•  **`Results/`**: tipos de datos, preferentemente `record` inmutables, que la interfaz recibe o devuelve. Nunca se exponen entidades del dominio.  
+•  **`Events/`**: eventos de integración que el módulo publica para que otros reaccionen. Derivan del tipo base definido en `Logistica.SharedKernel` (addendum 1).
+
+No se crean las carpetas `Commands/` ni `Queries/`: los módulos no se envían commands ni queries entre sí, sino que invocan los métodos de `I<Modulo>ModuleApi`. Los commands y queries de cada caso de uso siguen existiendo, pero son internos al módulo (`Application/Features/`).
+
+Las carpetas se crean cuando se agrega el primer archivo que las necesita; no se versionan carpetas vacías.
+
 # **3\. Alternativas consideradas**
 
 ## **3.1 Endpoints en el proyecto Logistica.Api (texto original del ADR-0001)**
@@ -94,6 +114,10 @@ Es una alternativa válida y funcional; se descarta por menor cohesión y menor 
 ## **3.3 Un proyecto de presentación separado por módulo (Logistica.Modules.X.Presentation)**
 
 **Motivo de descarte:** separaría físicamente ASP.NET Core del resto del módulo, pero agrega seis proyectos más a la solución y obliga a volver públicos los handlers para que el proyecto de presentación pueda invocarlos, con lo que se pierde el beneficio de la sección 2.3. La separación entre capas ya queda garantizada por las pruebas de arquitectura.
+
+## **3.4 Mantener Commands/, Queries/, Results/ y Events/ en Contracts (estructura original del ADR-0001)**
+
+**Motivo de descarte:** las carpetas `Commands/` y `Queries/` sólo tienen sentido si los módulos se comunican enviándose commands y queries a través de un mediador, lo que obligaría a incorporar una biblioteca adicional o a construir ese mecanismo. Una interfaz por módulo resuelve la comunicación síncrona con código más simple, más fácil de explicar y con el mismo aislamiento.
 
 # **4\. Consecuencias**
 
@@ -121,7 +145,9 @@ La decisión se considera verificada cuando:
 
 4\.  Las pruebas se ejecutan en el pipeline de integración continua.
 
-Los puntos 1 a 4 ya están implementados en el esqueleto de la solución (`tests/Logistica.ArchitectureTests/ModuleDependencyTests.cs`).
+5\.  Los proyectos `Contracts` sólo contienen la interfaz `I<Modulo>ModuleApi` y las carpetas `Results/` y `Events/`, a medida que se necesitan.
+
+Los puntos 1 a 4 ya están implementados en el esqueleto de la solución (`tests/Logistica.ArchitectureTests/ModuleDependencyTests.cs`). El punto 5 se verifica en la revisión de código al agregar el primer contrato de cada módulo.
 
 # **6\. Decisiones abiertas**
 
@@ -134,3 +160,4 @@ Los puntos 1 a 4 ya están implementados en el esqueleto de la solución (`tests
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 30/09/2026 | Propuesta inicial del addendum. | Ezequiel Marcenal |
+| 0.2 | 30/09/2026 | Se incorpora la estructura de los proyectos Contracts (sección 2.6 y alternativa 3.4). | Ezequiel Marcenal |

@@ -40,7 +40,7 @@ src/
     Logistica.BuildingBlocks.Infrastructure/  Multitenancy (filtros, interceptor) y Outbox con EF Core
   Modules/<Modulo>/
     Logistica.Modules.<Modulo>/            Domain, Application/Features, Infrastructure, Presentation/Features
-    Logistica.Modules.<Modulo>.Contracts/  Tipos públicos para otros módulos
+    Logistica.Modules.<Modulo>.Contracts/  Lo único visible para otros módulos: I<Modulo>ModuleApi, Results/, Events/
 tests/
   Logistica.UnitTests/
   Logistica.IntegrationTests/
