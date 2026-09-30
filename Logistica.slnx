@@ -7,6 +7,10 @@
     <Project Path="src/Logistica.SeguimientoPublico/Logistica.SeguimientoPublico.csproj" />
     <Project Path="src/Logistica.Worker/Logistica.Worker.csproj" />
   </Folder>
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Logistica.BuildingBlocks.Infrastructure/Logistica.BuildingBlocks.Infrastructure.csproj" />
+    <Project Path="src/BuildingBlocks/Logistica.SharedKernel/Logistica.SharedKernel.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/Administracion/">
     <Project Path="src/Modules/Administracion/Logistica.Modules.Administracion.Contracts/Logistica.Modules.Administracion.Contracts.csproj" />

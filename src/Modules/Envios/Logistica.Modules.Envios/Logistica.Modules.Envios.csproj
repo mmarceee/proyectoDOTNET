@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Logistica.Modules.Envios.Contracts\Logistica.Modules.Envios.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.SharedKernel\Logistica.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

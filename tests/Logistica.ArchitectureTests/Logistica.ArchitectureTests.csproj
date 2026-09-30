@@ -25,6 +25,8 @@
     <ProjectReference Include="..\..\src\Modules\Deposito\Logistica.Modules.Deposito\Logistica.Modules.Deposito.csproj" />
     <ProjectReference Include="..\..\src\Logistica.Api\Logistica.Api.csproj" />
     <ProjectReference Include="..\..\src\Logistica.Worker\Logistica.Worker.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks\Logistica.SharedKernel\Logistica.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

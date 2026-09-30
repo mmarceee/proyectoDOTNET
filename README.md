@@ -35,6 +35,9 @@ src/
   Logistica.SeguimientoPublico/  Blazor WebAssembly
   Logistica.Repartidor.Pwa/      Blazor WebAssembly PWA
   Logistica.Worker/              Worker independiente (consume RabbitMQ)
+  BuildingBlocks/
+    Logistica.SharedKernel/                   Tipos base y contratos, sin frameworks
+    Logistica.BuildingBlocks.Infrastructure/  Multitenancy (filtros, interceptor) y Outbox con EF Core
   Modules/<Modulo>/
     Logistica.Modules.<Modulo>/            Domain, Application, Infrastructure
     Logistica.Modules.<Modulo>.Contracts/  Tipos públicos para otros módulos
