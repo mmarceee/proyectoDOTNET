@@ -1,0 +1,14 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Compilación de .NET
+**/bin/
+**/obj/
+
+# Configuración local
+.env
+
+# Contexto local para chats de Codex (no versionar)
+/contexto-proyecto.md
