@@ -1,4 +1,4 @@
-# **ADR 001 Estilo arquitectónico interno y organización del código**
+# **ADR-0001 · Estilo arquitectónico interno y organización del código**
 
 | Estado | Aceptado |
 | :---- | :---- |

@@ -1,19 +1,19 @@
-# **ADR 001 · Addendum 1 · Código compartido entre módulos (BuildingBlocks)**
+# **ADR-0001 · Addendum 1 · Código compartido entre módulos (BuildingBlocks)**
 
-| Estado | Propuesto — pendiente de revisión por el responsable del ADR-001 |
+| Estado | Propuesto — pendiente de revisión por el responsable del ADR-0001 |
 | :---- | :---- |
 | **Fecha** | 30 de septiembre de 2026 |
 | **Autor** | Ezequiel Marcenal |
-| **Responsable del ADR-001** | Lucas Ottonello |
+| **Responsable del ADR-0001** | Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
-| **Modifica** | ADR-001, sección 2.2 (Organización interna) y sección 2.4 (Regla de dependencias) |
+| **Modifica** | ADR-0001, sección 2.2 (Organización interna) y sección 2.4 (Regla de dependencias) |
 | **Relacionado con** | ADR-0002 · Estrategia de multitenancy |
 
-**Este addendum incorpora a la estructura del ADR-001 dos proyectos de código compartido, `Logistica.SharedKernel` y `Logistica.BuildingBlocks.Infrastructure`, para alojar los mecanismos técnicos que todos los módulos necesitan de forma idéntica, en particular el aislamiento entre inquilinos exigido por el ADR-0002.**
+**Este addendum incorpora a la estructura del ADR-0001 dos proyectos de código compartido, `Logistica.SharedKernel` y `Logistica.BuildingBlocks.Infrastructure`, para alojar los mecanismos técnicos que todos los módulos necesitan de forma idéntica, en particular el aislamiento entre inquilinos exigido por el ADR-0002.**
 
 # **1\. Contexto**
 
-El ADR-001 define que cada módulo se implementa con dos proyectos (el módulo y su `Contracts`) y que un módulo sólo puede referenciar el proyecto `Contracts` de otro. No define dónde ubicar el código técnico que **todos** los módulos necesitan por igual.
+El ADR-0001 define que cada módulo se implementa con dos proyectos (el módulo y su `Contracts`) y que un módulo sólo puede referenciar el proyecto `Contracts` de otro. No define dónde ubicar el código técnico que **todos** los módulos necesitan por igual.
 
 El ADR-0002 introduce justamente ese tipo de código:
 
@@ -64,7 +64,7 @@ Las implementaciones concretas de `ICurrentTenant` **no** se ubican en el códig
 
 De este modo el código compartido no depende de ASP.NET Core.
 
-## **2.4 Regla de dependencias (agrega a la sección 2.4 del ADR-001)**
+## **2.4 Regla de dependencias (agrega a la sección 2.4 del ADR-0001)**
 
 | Proyecto | Puede referenciar |
 | :---- | :---- |
@@ -72,7 +72,7 @@ De este modo el código compartido no depende de ASP.NET Core.
 | Logistica.BuildingBlocks.Infrastructure | Logistica.SharedKernel y Entity Framework Core |
 | Logistica.Modules.X | Su propio `Contracts`, `SharedKernel` y `BuildingBlocks.Infrastructure` |
 | Logistica.Modules.X.Contracts | `SharedKernel` |
-| Logistica.Api y Logistica.Worker | Los proyectos que ya definía el ADR-001 y `BuildingBlocks.Infrastructure` |
+| Logistica.Api y Logistica.Worker | Los proyectos que ya definía el ADR-0001 y `BuildingBlocks.Infrastructure` |
 
 Además:
 
@@ -99,11 +99,11 @@ Regla práctica: si una clase del código compartido menciona envíos, rutas, co
 
 ## **3.2 Tres proyectos (BuildingBlocks.Domain, .Application e .Infrastructure)**
 
-**Motivo de descarte:** replica las capas de Clean Architecture en el código compartido sin un beneficio concreto para el alcance actual. Agrega ceremonia, contra lo indicado en el ADR-001, sección 4.2. Si en el futuro aparecieran abstracciones de aplicación compartidas con dependencias propias, se podrá separar un tercer proyecto mediante un nuevo addendum.
+**Motivo de descarte:** replica las capas de Clean Architecture en el código compartido sin un beneficio concreto para el alcance actual. Agrega ceremonia, contra lo indicado en el ADR-0001, sección 4.2. Si en el futuro aparecieran abstracciones de aplicación compartidas con dependencias propias, se podrá separar un tercer proyecto mediante un nuevo addendum.
 
 ## **3.3 Ubicar el código compartido dentro del módulo de Administración**
 
-**Motivo de descarte:** todos los módulos pasarían a depender de la implementación interna de Administración, lo que contradice la regla del ADR-001 según la cual un módulo sólo puede referenciar el proyecto `Contracts` de otro.
+**Motivo de descarte:** todos los módulos pasarían a depender de la implementación interna de Administración, lo que contradice la regla del ADR-0001 según la cual un módulo sólo puede referenciar el proyecto `Contracts` de otro.
 
 ## **3.4 Implementar los mecanismos en cada módulo**
 

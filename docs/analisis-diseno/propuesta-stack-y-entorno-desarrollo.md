@@ -34,7 +34,7 @@ La propuesta adopta un stack alineado con los requerimientos obligatorios del la
 | Mensajería | **RabbitMQ** | Comunicación asíncrona entre la API y el worker, con reintentos y cola de fallidos. |
 | Tiempo real | **ASP.NET Core SignalR** | Actualización del tablero operativo y posiciones de la flota, exigida por la letra. |
 | Observabilidad | **Serilog, OpenTelemetry y Aspire Dashboard** | Logs estructurados, métricas, trazas y visualización centralizada. |
-| Pruebas | **xUnit, WebApplicationFactory, Testcontainers y Respawn** | Pruebas unitarias, de integración, aislamiento y arquitectura. La biblioteca de arquitectura se confirmará al implementar. |
+| Pruebas | **xUnit, ArchUnitNET, WebApplicationFactory, Testcontainers y Respawn** | Pruebas unitarias, de integración, aislamiento y arquitectura. La prueba de arquitectura usa ArchUnitNET, según el ADR-0001, addendum 3. |
 | Contenedores | **Docker Desktop y Docker Compose** | Entorno local reproducible con todos los servicios de soporte. |
 | Integración continua | **GitHub Actions** | Compilación y pruebas obligatorias en pull requests. |
 | Despliegue | **DigitalOcean App Platform** | Despliegue automático desde main para la API, web, PWA y worker. |
@@ -44,7 +44,7 @@ La propuesta adopta un stack alineado con los requerimientos obligatorios del la
 
 ## **3.1 Arquitectura y organización**
 
-La solución mantendrá la arquitectura de monolito modular definida en el ADR-001. Cada módulo tendrá un proyecto principal con carpetas Domain, Application e Infrastructure, y un proyecto Contracts separado para los mensajes que otros módulos pueden consumir. Los casos de uso se organizarán como vertical slices.
+La solución mantendrá la arquitectura de monolito modular definida en el ADR-0001. Cada módulo tendrá un proyecto principal con carpetas Domain, Application e Infrastructure, y un proyecto Contracts separado para los mensajes que otros módulos pueden consumir. Los casos de uso se organizarán como vertical slices.
 
 | API \-\> Endpoint \-\> Command o Query \-\> Handler \-\> Dominio                                      \-\> Puertos de infraestructuraInfrastructure \-\> EF Core, Valkey, RabbitMQ y servicios externos |
 | :---- |
@@ -69,7 +69,7 @@ ASP.NET Core Identity administrará usuarios, contraseñas, roles, claims, bloqu
 
 ## **3.5 Persistencia y multitenancy**
 
-PostgreSQL será la base principal. Entity Framework Core se conectará mediante Npgsql. La instancia será compartida, pero cada módulo será dueño de sus tablas y utilizará su propio DbContext. El aislamiento por fila se aplicará con OperadorId y, cuando corresponda, ComercioId, conforme al ADR-002.
+PostgreSQL será la base principal. Entity Framework Core se conectará mediante Npgsql. La instancia será compartida, pero cada módulo será dueño de sus tablas y utilizará su propio DbContext. El aislamiento por fila se aplicará con OperadorId y, cuando corresponda, ComercioId, conforme al ADR-0002.
 
 Se utilizarán migraciones controladas y pruebas automatizadas para impedir filtraciones entre inquilinos. Las entidades susceptibles de modificaciones simultáneas incorporarán control de concurrencia optimista.
 
@@ -142,7 +142,7 @@ App Platform administrará el enrutamiento público y HTTPS, por lo que no se in
 * Alojamiento definitivo de RabbitMQ en producción: servicio administrado o instancia separada.  
 * Contratación de DigitalOcean Managed Valkey y PostgreSQL según el costo disponible.  
 * Despliegue y protección del Aspire Dashboard en el ambiente remoto.  
-* Biblioteca cliente de RabbitMQ y biblioteca de pruebas de arquitectura.  
+* Biblioteca cliente de RabbitMQ.  
 * Almacenamiento de fotografías, firmas y otros archivos de evidencia.
 
 Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cerrarán antes de implementar o desplegar el componente correspondiente.

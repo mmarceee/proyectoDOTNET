@@ -50,12 +50,21 @@ El endpoint recibe HTTP, el command representa la intención y el handler coordi
 
 ## **2.4 Comunicación entre módulos**
 
-Un módulo no puede leer las tablas, entidades o DbContext internos de otro. Si necesita información inmediata, utilizará un contrato público del módulo propietario. Si el efecto puede ocurrir después, publicará o consumirá un evento.
+Un módulo no puede leer las tablas, entidades o DbContext internos de otro. La comunicación sigue la regla del ADR-0001, addendum 3:
+
+* La comunicación síncrona entre módulos se realiza mediante contratos públicos, en memoria.
+* Los eventos de dominio internos se despachan en memoria.
+* Los eventos de integración que requieran procesamiento durable, ejecución en el Worker o comunicación con sistemas externos se registran mediante el patrón Outbox y se publican en RabbitMQ.
+* RabbitMQ no se utiliza para todas las interacciones internas del monolito, y entre módulos nunca se usan llamadas HTTP.
+
+Regla práctica: **si perder la reacción deja datos inconsistentes, va por Outbox**. Si puede perderse sin consecuencias, puede ser un evento en memoria.
 
 | Necesidad | Mecanismo | Ejemplo |
 | ----- | ----- | ----- |
-| Respuesta inmediata | **Contrato interno** | Planificación consulta si un envío puede asignarse a una ruta. |
-| Reacción posterior | **Evento por RabbitMQ** | Al cambiar el estado de un envío, el worker prepara notificaciones. |
+| Consulta o respuesta inmediata | **Contrato síncrono en memoria** | Planificación consulta si un envío puede asignarse a una ruta. |
+| Reacción que puede perderse sin dejar datos inconsistentes | **Evento de dominio en memoria** | Al cambiar el estado de un envío se invalida la caché del seguimiento público; si falla, la caché expira sola. |
+| Reacción que no puede perderse | **Outbox y RabbitMQ** | Cuando Envíos registra una entrega, Depósito y liquidaciones incorpora el envío a la liquidación del comercio. |
+| Trabajo en el Worker o con sistemas externos | **Outbox, RabbitMQ y Worker** | Notificaciones al destinatario y webhooks a los comercios. |
 | Datos propios | **Repositorio del módulo** | Envíos consulta solamente sus propias tablas. |
 
 # **3 Presentación y API**
@@ -172,7 +181,7 @@ xUnit será el framework de pruebas. No intentaremos probar cada línea: cubrire
 | Handler | **Coordinación del caso de uso con fakes sencillos.** | xUnit |
 | Integración | **Flujo HTTP crítico con PostgreSQL real.** | WebApplicationFactory y Testcontainers |
 | Multitenancy | **Que un operador o comercio no lea datos de otro.** | xUnit e integración |
-| Arquitectura | **Que Domain no dependa de Infrastructure y que se respeten los módulos.** | NetArchTest o ArchUnitNET, a confirmar |
+| Arquitectura | **Que Domain no dependa de Infrastructure y que se respeten los módulos.** | xUnit y ArchUnitNET (ADR-0001, addendum 3) |
 
 No incorporaremos inicialmente pruebas de navegador con Playwright ni una biblioteca de mocks. Son opcionales y aumentarían el trabajo sin ser necesarias para el alcance mínimo acordado.
 
@@ -222,7 +231,7 @@ App Platform manejará HTTPS y el enrutamiento público. Por eso no necesitaremo
 
 * Política de sincronización y resolución de conflictos de la PWA, que tendrá su propio ADR.  
 * Alojamiento definitivo de RabbitMQ y contratación de Valkey en producción según costos.  
-* Biblioteca concreta para RabbitMQ y para pruebas de arquitectura.  
+* Biblioteca cliente concreta para RabbitMQ.  
 * Almacenamiento de fotografías, firmas y documentos de prueba de entrega.  
 * Protección y persistencia de la observabilidad en el ambiente remoto.
 

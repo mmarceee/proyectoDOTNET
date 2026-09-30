@@ -39,11 +39,11 @@ src/
     Logistica.SharedKernel/                   Tipos base y contratos, sin frameworks
     Logistica.BuildingBlocks.Infrastructure/  Multitenancy (filtros, interceptor) y Outbox con EF Core
   Modules/<Modulo>/
-    Logistica.Modules.<Modulo>/            Domain, Application, Infrastructure
+    Logistica.Modules.<Modulo>/            Domain, Application/Features, Infrastructure, Presentation/Features
     Logistica.Modules.<Modulo>.Contracts/  Tipos públicos para otros módulos
 tests/
   Logistica.UnitTests/
   Logistica.IntegrationTests/
-  Logistica.ArchitectureTests/   Reglas de dependencia del ADR-001
+  Logistica.ArchitectureTests/   Reglas de dependencia del ADR-0001
 infra/terraform/
 ```

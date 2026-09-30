@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- C# puro: este proyecto no debe referenciar paquetes NuGet ni frameworks (ADR-001, addendum 1). -->
+  <!-- C# puro: este proyecto no debe referenciar paquetes NuGet ni frameworks (ADR-0001, addendum 1). -->
 
 </Project>
