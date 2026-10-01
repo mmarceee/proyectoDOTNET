@@ -17,5 +17,6 @@
     <ProjectReference Include="..\Modules\Seguimiento\Logistica.Modules.Seguimiento.Contracts\Logistica.Modules.Seguimiento.Contracts.csproj" />
     <ProjectReference Include="..\Modules\Deposito\Logistica.Modules.Deposito.Contracts\Logistica.Modules.Deposito.Contracts.csproj" />
     <ProjectReference Include="..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Seguimiento\Logistica.Modules.Seguimiento\Logistica.Modules.Seguimiento.csproj" />
   </ItemGroup>
 </Project>

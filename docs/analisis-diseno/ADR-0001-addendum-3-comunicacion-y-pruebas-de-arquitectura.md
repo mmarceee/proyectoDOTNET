@@ -51,6 +51,8 @@ Para decidir entre un evento en memoria y uno durable se aplica esta regla:
 | Reacción que no puede perderse | Outbox y RabbitMQ | Cuando Envíos registra una entrega, Depósito y liquidaciones incorpora el envío a la liquidación del comercio. |
 | Trabajo en el Worker o con sistemas externos | Outbox, RabbitMQ y Worker | Notificaciones al destinatario y webhooks a los comercios. |
 
+**Transacción única en las llamadas síncronas.** Cuando un caso de uso invoca a otro módulo mediante su contrato síncrono y ambos modifican datos, los dos cambios se guardan en una sola transacción: los `DbContext` de los módulos comparten la conexión a la misma base PostgreSQL. Si cualquiera de los dos falla, se revierten ambos.
+
 Se mantienen sin cambios las demás reglas de la sección 2.4: no se usan llamadas HTTP entre módulos, y un módulo sólo puede usar el proyecto `Contracts` de otro.
 
 ## **2.2 Biblioteca de pruebas de arquitectura (reemplaza la mención a NetArchTest.Rules en las secciones 2.4 y 6 del ADR-0001)**
@@ -112,3 +114,4 @@ Los puntos 1 a 3 ya están implementados. Se verificó con pruebas de mutación 
 | :---: | :---: | :---- | :---- |
 | 0.1 | 30/09/2026 | Propuesta inicial del addendum. | Ezequiel Marcenal |
 | 0.2 | 30/09/2026 | La regla de aislamiento entre módulos pasa de slices a una regla explícita por módulo (sección 2.2). | Ezequiel Marcenal |
+| 0.3 | 30/09/2026 | Se agrega la transacción única en las llamadas síncronas entre módulos (sección 2.1). | Ezequiel Marcenal |

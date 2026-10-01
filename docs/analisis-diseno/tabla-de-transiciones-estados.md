@@ -23,7 +23,7 @@ TABLA DE TRANSICIONES:
 | T3 | EnDeposito  | AsignarARuta  | AsignadoARuta  | Despachador  | La ruta cumple restricciones (paradas, peso, volumen, franja). El envío no está en otra ruta (RF 15\)  | EnvioAsignadoARuta  |
 | T4 | AsignadoARuta  | DesasignarDeRuta  | EnDeposito  | Despachador  | La ruta **aún no fue despachada**  | EnvioDesasignadoDeRuta  |
 | T5 | AsignadoARuta  | ConfirmarCarga  | EnTransito  | Repartidor  | Escaneo de bultos contra la hoja de ruta; faltantes/sobrantes generan aviso (RF 19\)  | EnvioEnTransito  |
-| T6 | EnTransito  | RegistrarEntrega  | Entregado  | Repartidor  | Prueba de entrega según la regla **vigente** del operador; posición y hora del dispositivo (RF 20\)  | EnvioEntregado  |
+| T6 | EnTransito  | RegistrarEntrega  | Entregado  | Repartidor  | Firma del receptor, siempre obligatoria, más las pruebas adicionales que exija la versión de reglas **del envío** (sección 6.6); posición y hora del dispositivo (RF 20\)  | EnvioEntregado  |
 | T7 | EnTransito  | RegistrarIntentoFallido  | NoEntregado  | Repartidor  | Motivo del catálogo del operador \+ evidencia. Incrementa el contador de intentos (RF 21\)  | IntentoFallidoRegistrado  |
 | T8 | EnTransito  | ReintegrarADeposito  | EnDeposito  | Operario de depósito  | Rendición de un envío que salió pero **no llegó a intentarse**  | EnvioReintegradoADeposito  |
 | T9 | NoEntregado  | Reprogramar  | Reprogramado  | Despachador / Sistema  | Intentos \< máximo del operador; se respeta el plazo entre intentos  | EnvioReprogramado  |

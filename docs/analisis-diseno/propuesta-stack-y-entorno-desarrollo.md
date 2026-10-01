@@ -143,7 +143,7 @@ App Platform administrará el enrutamiento público y HTTPS, por lo que no se in
 * Contratación de DigitalOcean Managed Valkey y PostgreSQL según el costo disponible.  
 * Despliegue y protección del Aspire Dashboard en el ambiente remoto.  
 * Biblioteca cliente de RabbitMQ.  
-* Almacenamiento de fotografías, firmas y otros archivos de evidencia.
+* ~~Almacenamiento de fotografías, firmas y otros archivos de evidencia.~~ Resuelto: en PostgreSQL (casos de uso, sección 3).  
 
 Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cerrarán antes de implementar o desplegar el componente correspondiente.
 

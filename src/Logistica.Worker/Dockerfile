@@ -7,7 +7,8 @@ COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/ src/
 RUN dotnet publish src/Logistica.Worker/Logistica.Worker.csproj -c Release -o /app
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0
+# aspnet y no runtime: ejecuta el módulo Seguimiento, que usa ASP.NET Core en su capa Presentation.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
 USER $APP_UID

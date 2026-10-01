@@ -29,7 +29,7 @@ El patrón **Outbox** resuelve este problema: el evento se guarda como una fila 
 •  La letra (RNF 6.8) exige el patrón Outbox, idempotencia, reintentos con espera creciente y una cola de mensajes fallidos visible y reprocesable.  
 •  El addendum 3 del ADR-0001 define qué va por Outbox: toda reacción cuya pérdida deja datos inconsistentes, y todo trabajo del Worker o con sistemas externos. Los eventos de dominio que pueden perderse sin consecuencias se despachan en memoria.  
 •  Cada módulo tiene su propio `DbContext` y es dueño de sus tablas (ADR-0001, Guía sección 5.1).  
-•  El Worker se comunica con el resto de la solución sólo mediante la cola, y sólo referencia los proyectos `Contracts` de los módulos.  
+•  El Worker se comunica con los demás módulos sólo mediante la cola. Ejecuta el código del módulo Seguimiento (notificaciones y avisos a comercios), que es dueño de sus tablas; de los demás módulos sólo referencia los proyectos `Contracts`.  
 •  El Worker resuelve el inquilino a partir de los metadatos del mensaje (ADR-0001, addendum 1, sección 2.3).  
 •  Un mismo identificador de correlación debe acompañar una operación desde la API, pasando por RabbitMQ, hasta el Worker (Guía, sección 7.2).  
 •  La API se ejecuta en una sola instancia (exención del escalado horizontal).

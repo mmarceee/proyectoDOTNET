@@ -232,7 +232,7 @@ App Platform manejará HTTPS y el enrutamiento público. Por eso no necesitaremo
 * Política de sincronización y resolución de conflictos de la PWA, que tendrá su propio ADR.  
 * Alojamiento definitivo de RabbitMQ y contratación de Valkey en producción según costos.  
 * Biblioteca cliente concreta para RabbitMQ.  
-* Almacenamiento de fotografías, firmas y documentos de prueba de entrega.  
+* ~~Almacenamiento de fotografías, firmas y documentos de prueba de entrega.~~ Resuelto: en PostgreSQL (casos de uso, sección 3).  
 * Protección y persistencia de la observabilidad en el ambiente remoto.
 
 Estas decisiones se tomarán cuando corresponda implementarlas. No modifican el stack central acordado ni impiden iniciar la solución.

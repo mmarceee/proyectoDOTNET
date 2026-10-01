@@ -11,31 +11,37 @@ Laboratorio .NET 2026 · Equipo 1. La documentación de análisis y diseño est�
 ## Puesta en marcha local
 
 1. Copiar `.env.example` como `.env` y completar las claves. Si un puerto ya está en uso en tu máquina (por ejemplo el 5432), cambialo en `.env`.
-2. Levantar los servicios de soporte (PostgreSQL, Valkey, RabbitMQ y Aspire Dashboard):
+2. Levantar el entorno completo: servicios de soporte (PostgreSQL, Valkey, RabbitMQ, Aspire Dashboard y Mailpit), Api y Worker:
    ```bash
-   docker compose up -d --wait
+   docker compose up -d --build --wait
    ```
-3. Cargar las cadenas de conexión en `dotnet user-secrets` a partir de `.env` (compartidas por la Api y el Worker):
+   La aplicación queda en http://localhost:8080 (ver [Rutas](#rutas)).
+
+### Desarrollo desde Visual Studio
+
+Para depurar la Api o el Worker, levantar sólo los servicios de soporte y ejecutar la aplicación desde Visual Studio o con `dotnet run`:
+
+1. Levantar los servicios de soporte:
+   ```bash
+   docker compose up -d --wait postgres valkey rabbitmq aspire-dashboard mailpit
+   ```
+2. Cargar las cadenas de conexión en `dotnet user-secrets` a partir de `.env` (compartidas por la Api y el Worker):
    ```bash
    bash scripts/configurar-secretos.sh
    ```
-4. Ejecutar `Logistica.Api` desde Visual Studio o con `dotnet run --project src/Logistica.Api`. La Api sirve también el Backoffice y las tres aplicaciones Blazor WebAssembly; no hace falta ejecutarlas por separado.
-5. Compilar y probar:
-   ```bash
-   dotnet build Logistica.slnx
-   dotnet test Logistica.slnx
-   ```
-   Si Windows (Smart App Control) bloquea los DLL compilados y las pruebas no cargan, ejecutarlas en un contenedor Linux, igual que el CI:
-   ```bash
-   bash scripts/test-en-docker.sh
-   ```
+3. Ejecutar `Logistica.Api` desde Visual Studio o con `dotnet run --project src/Logistica.Api`. La Api sirve también el Backoffice y las tres aplicaciones Blazor WebAssembly; no hace falta ejecutarlas por separado.
 
-### Entorno completo en contenedores
-
-Para levantar también la Api y el Worker como contenedores, con las mismas imágenes que se despliegan:
+### Compilar y probar
 
 ```bash
-docker compose --profile app up -d --build --wait
+dotnet build Logistica.slnx
+dotnet test Logistica.slnx
+```
+
+Si Windows (Smart App Control) bloquea los DLL compilados y las pruebas no cargan, ejecutarlas en un contenedor Linux, igual que el CI:
+
+```bash
+bash scripts/test-en-docker.sh
 ```
 
 ## Rutas
@@ -53,6 +59,7 @@ docker compose --profile app up -d --build --wait
 | --- | --- |
 | RabbitMQ Management | http://localhost:15672 |
 | Aspire Dashboard | http://localhost:18888 |
+| Mailpit (correos de desarrollo) | http://localhost:8025 |
 
 ## Estructura
 

@@ -19,6 +19,7 @@ internal static class LogisticaArchitecture
     public static readonly Assembly BuildingBlocksInfrastructure = Assembly.Load("Logistica.BuildingBlocks.Infrastructure");
     public static readonly Assembly BackofficeAssembly = Assembly.Load("Logistica.Backoffice");
     public static readonly Assembly HttpContractsAssembly = Assembly.Load("Logistica.Http.Contracts");
+    public static readonly Assembly WorkerAssembly = Assembly.Load("Logistica.Worker");
 
     public static readonly Assembly[] WebAssemblyApps =
     [
@@ -50,6 +51,7 @@ internal static class LogisticaArchitecture
             BuildingBlocksInfrastructure,
             BackofficeAssembly,
             HttpContractsAssembly,
+            WorkerAssembly,
             .. WebAssemblyApps,
         ])
         .Build();

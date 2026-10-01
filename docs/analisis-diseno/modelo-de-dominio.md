@@ -58,9 +58,7 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 
 * razonSocial: string
 
-* documentoFiscal: string
-
-* emailContacto: string
+* documentoFiscal: string (no se modifica)
 
 * activo: bool
 
@@ -79,6 +77,8 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 * operadorId: Guid
 
 * comercioId: Guid
+
+* emailContacto: string (cada operador tiene el suyo para el comercio)
 
 * estado: EstadoRelacion
 
@@ -280,6 +280,10 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 
 * politicaDevolucion: PoliticaDevolucion
 
+* anticipacionReprogramacionHoras: int (anticipación mínima para que el destinatario reprograme — RF 26)
+
+* maxParadasPorRuta: int (RF 14)
+
 **Métodos**
 
 * publicar(desde: DateTimeOffset): void
@@ -294,7 +298,7 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 
 **Atributos**
 
-* exigeFirma: bool
+* (la firma del receptor es siempre obligatoria: no se configura)
 
 * exigeFoto: bool
 
@@ -399,6 +403,8 @@ Activa, Suspendida, Baja
 * estado: EstadoEnvio
 
 * creadoEn: DateTimeOffset
+
+* esPrueba: bool (creado con una clave de prueba de la API pública; nunca llega a la operación real)
 
 **Métodos**
 
@@ -586,7 +592,7 @@ Admitido, EnDeposito, AsignadoARuta, EnTransito, Entregado, NoEntregado, Reprogr
 
 **OrigenEvento**  *«enum»*
 
-PortalComercio, Backoffice, AppRepartidor, Sistema, SeguimientoPublico
+PortalComercio, Backoffice, AppRepartidor, Sistema, SeguimientoPublico, Api
 
 **ResultadoIntento**  *«enum»*
 

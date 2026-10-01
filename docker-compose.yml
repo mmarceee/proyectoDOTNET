@@ -1,6 +1,6 @@
-# Servicios de soporte para desarrollo local (Propuesta de stack, sección 4.2).
-# Las aplicaciones .NET se ejecutan desde Visual Studio o con dotnet run; para levantar también
-# la Api y el Worker como contenedores: docker compose --profile app up -d --build
+# Entorno completo: servicios de soporte, Api y Worker (letra, sección 8.3: "docker compose up levanta el entorno completo").
+# Para depurar la Api o el Worker desde Visual Studio, levantar sólo los servicios de soporte:
+#   docker compose up -d --wait postgres valkey rabbitmq aspire-dashboard mailpit
 name: logistica
 
 services:
@@ -56,8 +56,14 @@ services:
       - "${OTLP_GRPC_PORT:-4317}:18889"
       - "${OTLP_HTTP_PORT:-4318}:18890"
 
+  mailpit:
+    # Captura los correos de desarrollo; no envía nada a direcciones reales.
+    image: axllent/mailpit:v1.28
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
   api:
-    profiles: [app]
     build:
       context: .
       dockerfile: src/Logistica.Api/Dockerfile
@@ -66,6 +72,7 @@ services:
       ConnectionStrings__Valkey: valkey:6379
       ConnectionStrings__RabbitMQ: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
       OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+      ConnectionStrings__Smtp: smtp://mailpit:1025
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on: &app-depends-on
@@ -77,7 +84,6 @@ services:
         condition: service_healthy
 
   worker:
-    profiles: [app]
     build:
       context: .
       dockerfile: src/Logistica.Worker/Dockerfile

@@ -108,7 +108,7 @@ Esto reemplaza la ubicación de `CrearEnvioRequest.cs` en `Presentation/Features
 
 2\.  `tests/Logistica.ArchitectureTests/ClientDependencyTests.cs` verifica las reglas de la sección 2.5.
 
-3\.  La imagen publicada de la API (`docker compose --profile app up`) se verificó en un navegador Chromium: las tres aplicaciones arrancan; el service worker de la PWA se activa con alcance `/repartidor/`; controla la PWA y no el portal; y con la red desconectada la PWA vuelve a cargar desde la caché.
+3\.  La imagen publicada de la API (`docker compose up`) se verificó en un navegador Chromium: las tres aplicaciones arrancan; el service worker de la PWA se activa con alcance `/repartidor/`; controla la PWA y no el portal; y con la red desconectada la PWA vuelve a cargar desde la caché.
 
 # **6\. Historial de versiones**
 

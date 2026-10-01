@@ -23,5 +23,6 @@ secreto() {
 secreto "ConnectionStrings:Postgres" "Host=localhost;Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
 secreto "ConnectionStrings:Valkey" "localhost:${VALKEY_PORT}"
 secreto "ConnectionStrings:RabbitMQ" "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@localhost:${RABBITMQ_PORT}/"
+secreto "ConnectionStrings:Smtp" "smtp://localhost:${MAILPIT_SMTP_PORT:-1025}"
 
 echo "Secretos cargados para Logistica.Api y Logistica.Worker (UserSecretsId: logistica-local)."
