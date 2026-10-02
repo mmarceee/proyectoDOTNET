@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <!-- Compartido con Logistica.Api: scripts/configurar-secretos.sh carga ambos desde .env. -->
+    <UserSecretsId>logistica-local</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modules\Administracion\Logistica.Modules.Administracion.Contracts\Logistica.Modules.Administracion.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Envios\Logistica.Modules.Envios.Contracts\Logistica.Modules.Envios.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Planificacion\Logistica.Modules.Planificacion.Contracts\Logistica.Modules.Planificacion.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Ejecucion\Logistica.Modules.Ejecucion.Contracts\Logistica.Modules.Ejecucion.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Seguimiento\Logistica.Modules.Seguimiento.Contracts\Logistica.Modules.Seguimiento.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Deposito\Logistica.Modules.Deposito.Contracts\Logistica.Modules.Deposito.Contracts.csproj" />
+    <ProjectReference Include="..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Seguimiento\Logistica.Modules.Seguimiento\Logistica.Modules.Seguimiento.csproj" />
+  </ItemGroup>
+</Project>

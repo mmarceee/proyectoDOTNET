@@ -1,0 +1,46 @@
+# Estilo de código común del equipo. Visual Studio y dotnet format lo aplican automáticamente.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,props,csproj,slnx,xml,webmanifest}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Namespaces por archivo y usings fuera del namespace, como en el código generado por las plantillas.
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+
+# var cuando el tipo es evidente.
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+
+# Llaves siempre, en línea nueva.
+csharp_prefer_braces = true:warning
+csharp_new_line_before_open_brace = all
+
+# Nombres: interfaces con prefijo I, campos privados con _camelCase.
+dotnet_naming_rule.interfaces_con_i.severity = warning
+dotnet_naming_rule.interfaces_con_i.symbols = interfaces
+dotnet_naming_rule.interfaces_con_i.style = prefijo_i
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.prefijo_i.required_prefix = I
+dotnet_naming_style.prefijo_i.capitalization = pascal_case
+
+dotnet_naming_rule.campos_privados.severity = suggestion
+dotnet_naming_rule.campos_privados.symbols = campos_privados
+dotnet_naming_rule.campos_privados.style = guion_bajo
+dotnet_naming_symbols.campos_privados.applicable_kinds = field
+dotnet_naming_symbols.campos_privados.applicable_accessibilities = private
+dotnet_naming_style.guion_bajo.required_prefix = _
+dotnet_naming_style.guion_bajo.capitalization = camel_case
