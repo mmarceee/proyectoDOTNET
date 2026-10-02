@@ -1,6 +1,6 @@
 # **ADR-0001 · Addendum 3 · Comunicación entre módulos y biblioteca de pruebas de arquitectura**
 
-| Estado | Propuesto — pendiente de revisión por el responsable del ADR-0001 |
+| Estado | Aceptado |
 | :---- | :---- |
 | **Fecha** | 30 de septiembre de 2026 |
 | **Autor** | Ezequiel Marcenal |
@@ -115,3 +115,4 @@ Los puntos 1 a 3 ya están implementados. Se verificó con pruebas de mutación 
 | 0.1 | 30/09/2026 | Propuesta inicial del addendum. | Ezequiel Marcenal |
 | 0.2 | 30/09/2026 | La regla de aislamiento entre módulos pasa de slices a una regla explícita por módulo (sección 2.2). | Ezequiel Marcenal |
 | 0.3 | 30/09/2026 | Se agrega la transacción única en las llamadas síncronas entre módulos (sección 2.1). | Ezequiel Marcenal |
+| 0.4 | 02/10/2026 | Revisado y aceptado por el responsable del ADR-0001. | Lucas Ottonello |

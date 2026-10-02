@@ -1,6 +1,6 @@
 # **ADR-0001 · Addendum 5 · Aplicaciones Blazor WebAssembly en el mismo host y DTOs HTTP compartidos**
 
-| Estado | Propuesto — pendiente de revisión por el responsable del ADR-0001 |
+| Estado | Aceptado |
 | :---- | :---- |
 | **Fecha** | 30 de septiembre de 2026 |
 | **Autor** | Ezequiel Marcenal |
@@ -115,3 +115,4 @@ Esto reemplaza la ubicación de `CrearEnvioRequest.cs` en `Presentation/Features
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 30/09/2026 | Propuesta inicial del addendum. | Ezequiel Marcenal |
+| 0.2 | 02/10/2026 | Revisado y aceptado por el responsable del ADR-0001. | Lucas Ottonello |

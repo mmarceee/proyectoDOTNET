@@ -1,6 +1,6 @@
 # **ADR-0001 · Addendum 4 · Ejecución del Backoffice y ubicación de sus páginas**
 
-| Estado | Propuesto — pendiente de revisión por el responsable del ADR-0001 |
+| Estado | Aceptado |
 | :---- | :---- |
 | **Fecha** | 30 de septiembre de 2026 |
 | **Autor** | Ezequiel Marcenal |
@@ -147,3 +147,4 @@ Los puntos 1 a 3 ya están implementados. Además se verificó, en una copia tem
 | :---: | :---: | :---- | :---- |
 | 0.1 | 30/09/2026 | Propuesta inicial del addendum. | Ezequiel Marcenal |
 | 0.2 | 30/09/2026 | Se da por resuelta la decisión pendiente sobre las aplicaciones WebAssembly (addendum 5). | Ezequiel Marcenal |
+| 0.3 | 02/10/2026 | Revisado y aceptado por el responsable del ADR-0001. | Lucas Ottonello |

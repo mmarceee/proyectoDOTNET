@@ -1,6 +1,6 @@
 # **ADR-0001 · Addendum 2 · Ubicación de los endpoints, los casos de uso y los contratos**
 
-| Estado | Propuesto — pendiente de revisión por el responsable del ADR-0001 |
+| Estado | Aceptado |
 | :---- | :---- |
 | **Fecha** | 30 de septiembre de 2026 |
 | **Autor** | Ezequiel Marcenal |
@@ -162,3 +162,4 @@ Los puntos 1 a 4 ya están implementados en el esqueleto de la solución (`tests
 | 0.1 | 30/09/2026 | Propuesta inicial del addendum. | Ezequiel Marcenal |
 | 0.2 | 30/09/2026 | Se incorpora la estructura de los proyectos Contracts (sección 2.6 y alternativa 3.4). | Ezequiel Marcenal |
 | 0.3 | 30/09/2026 | Se da por resuelta la decisión abierta sobre el Backoffice (addendum 4). | Ezequiel Marcenal |
+| 0.4 | 02/10/2026 | Revisado y aceptado por el responsable del ADR-0001. | Lucas Ottonello |
