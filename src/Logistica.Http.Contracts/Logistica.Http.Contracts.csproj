@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- DTOs de request y response de la API HTTP, compartidos por los endpoints de los módulos
+       y las aplicaciones Blazor WebAssembly. Sin dependencias: debe compilar para el navegador (ADR-0001, addendum 5). -->
+
+</Project>

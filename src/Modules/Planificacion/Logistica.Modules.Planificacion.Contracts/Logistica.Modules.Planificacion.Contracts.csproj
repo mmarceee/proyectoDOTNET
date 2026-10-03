@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.SharedKernel\Logistica.SharedKernel.csproj" />
+  </ItemGroup>
+</Project>

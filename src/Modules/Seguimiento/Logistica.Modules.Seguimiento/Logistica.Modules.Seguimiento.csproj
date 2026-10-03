@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Solo para la capa Presentation: endpoints y páginas del Backoffice (ADR-0001, addenda 2 y 4). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Logistica.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Logistica.Modules.Seguimiento.Contracts\Logistica.Modules.Seguimiento.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.SharedKernel\Logistica.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Logistica.Http.Contracts\Logistica.Http.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>
