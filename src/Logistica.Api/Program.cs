@@ -1,3 +1,4 @@
+using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Administracion;
 using Logistica.Modules.Deposito;
 using Logistica.Modules.Ejecucion;
@@ -23,6 +24,12 @@ builder.Services
     .AddDepositoModule(builder.Configuration);
 
 var app = builder.Build();
+
+// En Docker Compose la API aplica las migraciones de todos los módulos al iniciar (docker-compose.yml).
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await app.Services.MigrateModuleDatabasesAsync();
+}
 
 if (app.Environment.IsDevelopment())
 {

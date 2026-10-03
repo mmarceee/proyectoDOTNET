@@ -1,3 +1,6 @@
+using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.Modules.Envios.Domain.Envios;
+using Logistica.Modules.Envios.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -11,7 +14,9 @@ public static class EnviosModule
 {
     public static IServiceCollection AddEnviosModule(this IServiceCollection services, IConfiguration configuration)
     {
-        // Registrar acá handlers, DbContext y adaptadores del módulo.
+        services.AddModuleDbContext<EnviosDbContext>(configuration.GetConnectionString("Postgres"), EnviosDbContext.Schema);
+        services.AddScoped<IEnvioRepository, EnvioRepository>();
+
         return services;
     }
 
