@@ -2,7 +2,7 @@
 
 *Qué vamos a construir, cómo se conectan las piezas y por qué elegimos cada herramienta*
 
-| Fecha | 25 de septiembre de 2026 |
+| Fecha | 25 de septiembre de 2026 (actualizado el 3 de octubre de 2026) |
 | :---- | :---- |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Propósito** | Alinear al equipo antes de comenzar la implementación |
@@ -182,8 +182,9 @@ xUnit será el framework de pruebas. No intentaremos probar cada línea: cubrire
 | Integración | **Flujo HTTP crítico con PostgreSQL real.** | WebApplicationFactory y Testcontainers |
 | Multitenancy | **Que un operador o comercio no lea datos de otro.** | xUnit e integración |
 | Arquitectura | **Que Domain no dependa de Infrastructure y que se respeten los módulos.** | xUnit y ArchUnitNET (ADR-0001, addendum 3) |
+| Extremo a extremo | **Los flujos críticos, desde el navegador.** | Playwright, integrado al pipeline (requerimiento opcional 7.2) |
 
-No incorporaremos inicialmente pruebas de navegador con Playwright ni una biblioteca de mocks. Son opcionales y aumentarían el trabajo sin ser necesarias para el alcance mínimo acordado.
+No incorporaremos una biblioteca de mocks. Las pruebas de extremo a extremo con Playwright forman parte de los requerimientos opcionales elegidos por el equipo, junto con la cobertura superior al 70 % y las pruebas de resiliencia (Plan de casos de uso por hito, sección 4). Cada opcional se implementa completo o no otorga puntos.
 
 # **9 Desarrollo, integración y despliegue**
 
@@ -231,7 +232,7 @@ App Platform manejará HTTPS y el enrutamiento público. Por eso no necesitaremo
 
 * Política de sincronización y resolución de conflictos de la PWA, que tendrá su propio ADR.  
 * Alojamiento definitivo de RabbitMQ y contratación de Valkey en producción según costos.  
-* Biblioteca cliente concreta para RabbitMQ.  
+* ~~Biblioteca cliente concreta para RabbitMQ.~~ Propuesta en el ADR-0003: RabbitMQ.Client.  
 * ~~Almacenamiento de fotografías, firmas y documentos de prueba de entrega.~~ Resuelto: en PostgreSQL (casos de uso, sección 3).  
 * Protección y persistencia de la observabilidad en el ambiente remoto.
 
