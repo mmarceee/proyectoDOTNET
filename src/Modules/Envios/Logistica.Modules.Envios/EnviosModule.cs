@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
 
 namespace Logistica.Modules.Envios;
 
@@ -16,6 +17,9 @@ public static class EnviosModule
     {
         services.AddModuleDbContext<EnviosDbContext>(configuration.GetConnectionString("Postgres"), EnviosDbContext.Schema);
         services.AddScoped<IEnvioRepository, EnvioRepository>();
+
+        services.AddScoped<IEnviosListadoReader, EnviosListadoReader>();
+        services.AddScoped<ConsultarEnviosHandler>();
 
         return services;
     }

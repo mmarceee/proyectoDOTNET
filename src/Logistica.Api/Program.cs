@@ -5,6 +5,8 @@ using Logistica.Modules.Ejecucion;
 using Logistica.Modules.Envios;
 using Logistica.Modules.Planificacion;
 using Logistica.Modules.Seguimiento;
+using Logistica.Api.Infrastructure;
+using Logistica.SharedKernel;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +24,8 @@ builder.Services
     .AddEjecucionModule(builder.Configuration)
     .AddSeguimientoModule(builder.Configuration)
     .AddDepositoModule(builder.Configuration);
+
+builder.Services.AddScoped<ICurrentTenant, TenantProvisorio>();
 
 var app = builder.Build();
 
