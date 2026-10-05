@@ -1,7 +1,7 @@
 # Entorno completo: servicios de soporte, Api y Worker (letra, sección 8.3: "docker compose up levanta el entorno completo").
 # Para depurar la Api o el Worker desde Visual Studio, levantar sólo los servicios de soporte:
 #   docker compose up -d --wait postgres valkey rabbitmq aspire-dashboard mailpit
-name: logistica
+name: voluptasexpress
 
 # Variables comunes de la Api y el Worker.
 x-app-environment: &app-environment
