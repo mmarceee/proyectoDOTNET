@@ -1,3 +1,5 @@
+using Logistica.Api.Errores;
+using Logistica.Api.Tenancy;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Administracion;
 using Logistica.Modules.Deposito;
@@ -5,10 +7,28 @@ using Logistica.Modules.Ejecucion;
 using Logistica.Modules.Envios;
 using Logistica.Modules.Planificacion;
 using Logistica.Modules.Seguimiento;
+using Logistica.SharedKernel;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
+
+// Errores como ProblemDetails; las reglas de negocio violadas responden 400.
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<DomainExceptionHandler>();
+
+// Un body sin un campo obligatorio, o con null donde el DTO no lo admite, responde 400 antes de llegar al endpoint.
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.RespectNullableAnnotations = true;
+    options.SerializerOptions.RespectRequiredConstructorParameters = true;
+});
+
+// Reloj del sistema: los handlers lo reciben inyectado para que las pruebas puedan fijar la fecha.
+builder.Services.AddSingleton(TimeProvider.System);
+
+// Inquilino de cada request. Provisorio hasta Identity (15/10).
+builder.Services.AddScoped<ICurrentTenant, TenantProvisorio>();
 
 // Backoffice: las páginas viven en Logistica.Backoffice y en Presentation/Features de cada módulo.
 // La raíz "/" permite descubrirlas fuera de la carpeta Pages; cada página declara su ruta absoluta
@@ -30,6 +50,8 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await app.Services.MigrateModuleDatabasesAsync();
 }
+
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
