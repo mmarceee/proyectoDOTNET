@@ -15,7 +15,7 @@ Este documento lista los casos de uso que se desprenden de los requerimientos fu
 | :---- | :---- |
 | **Tipo** | **C**: command, modifica estado. **Q**: query, sólo lectura. |
 | **App** | **BO**: Backoffice (Razor Pages). **PC**: Portal del comercio. **SP**: Seguimiento público. **PWA**: aplicación del repartidor. **API**: integración de sistemas de comercios. **W**: Worker. |
-| **Transición** | Identificador de la tabla de transiciones (T1 a T17). |
+| **Transición** | Identificador de la tabla de transiciones (T1 a T19; T11 se eliminó). |
 | **Eventos** | Eventos que publica. **(M)**: en memoria. **(O)**: por Outbox. Criterio del addendum 3: si perder la reacción deja datos inconsistentes, o la procesa el Worker, va por Outbox. |
 | **Hito** | Monitoreo en el que debe estar funcionando, según la sección 8.3 de la letra. |
 
@@ -93,22 +93,22 @@ Todas las transiciones pasan por `Envio.Transicionar`, que aplica la tabla de tr
 | ID | Caso de uso | Actor | App | Tipo | Transición | Eventos | RF | Hito |
 | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- |
 | CU-60 | Consultar el seguimiento de un envío por enlace público | Destinatario | SP | Q | — | — | 25, 6.7 | 22/10 |
-| CU-61 | Solicitar la reprogramación de un envío, también antes del primer intento | Destinatario | SP | C | T11, T18*, T19* (en Admitido, sin transición) | EnvioReprogramado (O) | 26 | 29/10 |
+| CU-61 | Solicitar la reprogramación de un envío, también antes del primer intento | Destinatario | SP | C | T18, T19 (en Admitido, sin transición) | EnvioReprogramado (O) | 26 | 29/10 |
 | CU-62 | Notificar al destinatario los cambios de estado relevantes | Sistema | W | C | — | — | 27 | 29/10 |
 | CU-63 | Configurar las suscripciones de avisos del comercio | Usuario de comercio | PC | C/Q | — | — | 28, 6.9 | 29/10 |
 | CU-64 | Entregar los avisos a los sistemas de los comercios, firmados y con reintentos | Sistema | W | C | — | — | 28, 6.9 | 29/10 |
 | CU-65 | Consultar el historial de avisos y reenviar los fallidos | Usuario de comercio | PC | C/Q | — | — | 6.9 | 29/10 |
 | CU-66 | Ver el tablero de operación en vivo | Despachador | BO | Q | — | — | 29, 6.10 | 29/10 |
 
-**Reprogramación antes del primer intento (CU-61).** Decisión del equipo: el destinatario puede pedir la reprogramación antes del primer intento. Esto requiere ampliar la tabla de transiciones; las marcadas con \* son **propuestas pendientes de confirmación por el responsable de la máquina de estados** (Cristian Reyes):
+**Reprogramación antes del primer intento (CU-61).** Decisión del equipo: el destinatario puede pedir la reprogramación antes del primer intento. Esto amplió la tabla de transiciones con T18 y T19, confirmadas por el responsable de la máquina de estados (Cristian Reyes):
 
 | Estado actual | ¿Se puede reprogramar? | Efecto |
 | :---- | :---- | :---- |
 | Admitido | Sí | Sin cambio de estado: se registra la nueva fecha o franja, porque el envío todavía no llegó al operador. |
-| EnDeposito | Sí | **T18\***: EnDeposito → Reprogramado. |
-| AsignadoARuta, con la ruta no despachada | Sí | **T19\***: AsignadoARuta → Reprogramado, y el envío sale de la ruta. |
+| EnDeposito | Sí | **T18**: EnDeposito → Reprogramado. |
+| AsignadoARuta, con la ruta no despachada | Sí | **T19**: AsignadoARuta → Reprogramado, y el envío sale de la ruta. |
 | EnTransito | No | El repartidor ya salió con el envío. |
-| NoEntregado | Sí | T11, sin cambios. |
+| NoEntregado | No aplica | Es un estado transitorio: CU-18 reprograma o devuelve en la misma operación. Por eso se eliminó T11. |
 | EnDevolucion y estados terminales | No | — |
 
 En todos los casos se aplican las reglas del operador (RF 26), por ejemplo el plazo mínimo de anticipación.
@@ -158,19 +158,15 @@ Es el flujo de extremo a extremo que el ADR-0001 (sección 5, punto 5) pide para
 
 | Tema | Estado | Detalle |
 | :---- | :---- | :---- |
-| Reprogramación pedida por el destinatario antes del primer intento | **Resuelta** | Se permite. Transiciones propuestas en la sección 2.6, pendientes de confirmación del responsable de la máquina de estados. |
-| Alta de envíos por API (CU-12) | **Resuelta** | Se implementa la API pública documentada del opcional 7.4 (sección 2.7). Falta definir el ambiente de pruebas. |
+| Reprogramación pedida por el destinatario antes del primer intento | **Resuelta** | Se permite. Se agregaron T18 y T19 a la tabla de transiciones (sección 2.6). |
+| Alta de envíos por API (CU-12) | **Resuelta** | Se implementa la API pública documentada del opcional 7.4 (sección 2.7). El ambiente de pruebas se resuelve con claves de prueba, que marcan los envíos con `EsPrueba` (casos de uso, sección 3). |
 | Módulo propietario del tablero en vivo y de los reportes | **Resuelta** | El tablero (RF 29) y los reportes de cumplimiento (RF 30) combinan datos de Envíos, Planificación y Ejecución. Los resuelve **Seguimiento**, que ya escucha todos los cambios de estado para las notificaciones y los avisos (RF 27 y 28), manteniendo su propia tabla de lectura alimentada por esos eventos. La liquidación por comercio queda en Depósito y liquidaciones. |
 | Quién registra la entrega y el intento fallido | **Resuelta** | **Envíos** registra la entrega y el intento (es dueño de `IntentoEntrega` y el RF 11 exige un único punto de cambio de estado). **Ejecución** recibe la sincronización de la PWA (CU-52), aplica la política de conflictos y llama a Envíos mediante `IEnviosModuleApi`. **Planificación** marca la parada como completada o fallida reaccionando al evento de Envíos por Outbox. |
 | Actor de la rendición | **Resuelta** | Se divide en dos casos: el repartidor la inicia desde la PWA declarando qué vuelve (CU-54) y el operario de depósito la confirma escaneando lo que llegó (CU-55); recién la confirmación dispara T8. Queda un control cruzado entre lo declarado y lo recibido. |
 
 # **5\. Próximos pasos**
 
-1\.  Revisar este catálogo con el equipo y cerrar las preguntas abiertas.
-
-2\.  Revisar el detalle de cada caso de uso en [casos-de-uso.md](casos-de-uso.md) y cerrar sus preguntas abiertas (sección 3).
-
-3\.  Asignar los casos de uso compartidos del plan de trabajo a cada integrante, por hito.
+Los tres pasos previstos se completaron: las preguntas abiertas del catálogo están resueltas (sección 4), las del detalle también ([casos-de-uso.md](casos-de-uso.md), sección 3), y cada caso de uso tiene hito, nivel y responsable en el [plan de casos de uso por hito](plan-casos-de-uso-por-hito.md).
 
 # **6\. Historial de versiones**
 
@@ -179,3 +175,5 @@ Es el flujo de extremo a extremo que el ADR-0001 (sección 5, punto 5) pide para
 | 0.1 | 30/09/2026 | Borrador inicial a partir de la letra. | Ezequiel Marcenal |
 | 0.2 | 30/09/2026 | Se resuelven la reprogramación antes del primer intento (T18 y T19 propuestas) y la API pública (sección 2.7); sugerencias para el tablero, los reportes y el registro de entregas. | Ezequiel Marcenal |
 | 0.3 | 30/09/2026 | Se aceptan las sugerencias sobre el tablero, los reportes y el registro de entregas; la rendición se divide en CU-54 y CU-55. | Ezequiel Marcenal |
+| 0.4 | 02/10/2026 | T18 y T19 confirmadas y T11 eliminada en la tabla de transiciones; se actualiza CU-61. | Ezequiel Marcenal |
+| 0.5 | 03/10/2026 | Se actualizan las preguntas abiertas (T18 y T19 confirmadas, ambiente de pruebas de la API pública) y los próximos pasos. | Ezequiel Marcenal |

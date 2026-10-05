@@ -15,8 +15,8 @@ internal static class LogisticaArchitecture
     public static readonly string[] AllModules =
         ["Administracion", "Envios", "Planificacion", "Ejecucion", "Seguimiento", "Deposito"];
 
-    public static readonly Assembly SharedKernel = Assembly.Load("Logistica.SharedKernel");
-    public static readonly Assembly BuildingBlocksInfrastructure = Assembly.Load("Logistica.BuildingBlocks.Infrastructure");
+    public static readonly Assembly SharedKernelAssembly = Assembly.Load("Logistica.SharedKernel");
+    public static readonly Assembly BuildingBlocksInfrastructureAssembly = Assembly.Load("Logistica.BuildingBlocks.Infrastructure");
     public static readonly Assembly BackofficeAssembly = Assembly.Load("Logistica.Backoffice");
     public static readonly Assembly HttpContractsAssembly = Assembly.Load("Logistica.Http.Contracts");
     public static readonly Assembly WorkerAssembly = Assembly.Load("Logistica.Worker");
@@ -47,8 +47,8 @@ internal static class LogisticaArchitecture
         .LoadAssemblies(
         [
             .. AllModules.Select(ModuleAssembly),
-            SharedKernel,
-            BuildingBlocksInfrastructure,
+            SharedKernelAssembly,
+            BuildingBlocksInfrastructureAssembly,
             BackofficeAssembly,
             HttpContractsAssembly,
             WorkerAssembly,

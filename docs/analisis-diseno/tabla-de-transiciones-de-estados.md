@@ -6,7 +6,7 @@ ESTADOS:
 | EnDeposito | Intermedio  | Recibido y escaneado en depósito, disponible para planificar.  | Depósito  |
 | AsignadoARuta | Intermedio  | Incluido en una hoja de ruta aún no salida a la calle.  | Depósito  |
 | EnTransito | Intermedio  | El repartidor confirmó la carga y salió con el envío.  | Vehículo  |
-| NoEntregado | Intermedio  | Hubo un intento fallido; falta decidir reprogramar o devolver.  | Vehículo / regreso a depósito  |
+| NoEntregado | Intermedio  | Hubo un intento fallido; falta decidir reprogramar o devolver. Estado transitorio: el sistema decide en la misma operación si se reprograma o se devuelve (CU-18)  | Vehículo / regreso a depósito  |
 | Reprogramado | Intermedio  | Tiene nueva fecha/franja de entrega, a la espera de ser asignado.  | Depósito  |
 | EnDevolucion | Intermedio  | Se decidió devolverlo al comercio.  | Depósito / en camino al comercio  |
 | Entregado | Terminal  | Entrega exitosa con prueba registrada.  | Destinatario  |
@@ -23,17 +23,25 @@ TABLA DE TRANSICIONES:
 | T3 | EnDeposito  | AsignarARuta  | AsignadoARuta  | Despachador  | La ruta cumple restricciones (paradas, peso, volumen, franja). El envío no está en otra ruta (RF 15\)  | EnvioAsignadoARuta  |
 | T4 | AsignadoARuta  | DesasignarDeRuta  | EnDeposito  | Despachador  | La ruta **aún no fue despachada**  | EnvioDesasignadoDeRuta  |
 | T5 | AsignadoARuta  | ConfirmarCarga  | EnTransito  | Repartidor  | Escaneo de bultos contra la hoja de ruta; faltantes/sobrantes generan aviso (RF 19\)  | EnvioEnTransito  |
-| T6 | EnTransito  | RegistrarEntrega  | Entregado  | Repartidor  | Firma del receptor, siempre obligatoria, más las pruebas adicionales que exija la versión de reglas **del envío** (sección 6.6); posición y hora del dispositivo (RF 20\)  | EnvioEntregado  |
+| T6 | EnTransito  | RegistrarEntrega  | Entregado  | Repartidor  | firma siempre obligatoria más las pruebas de la versión de reglas **del envío** (RF 20\)  | EnvioEntregado  |
 | T7 | EnTransito  | RegistrarIntentoFallido  | NoEntregado  | Repartidor  | Motivo del catálogo del operador \+ evidencia. Incrementa el contador de intentos (RF 21\)  | IntentoFallidoRegistrado  |
-| T8 | EnTransito  | ReintegrarADeposito  | EnDeposito  | Operario de depósito  | Rendición de un envío que salió pero **no llegó a intentarse**  | EnvioReintegradoADeposito  |
-| T9 | NoEntregado  | Reprogramar  | Reprogramado  | Despachador / Sistema  | Intentos \< máximo del operador; se respeta el plazo entre intentos  | EnvioReprogramado  |
-| T10 | NoEntregado  | IniciarDevolucion  | EnDevolucion  | Despachador / Sistema  | Intentos \= máximo, o política de devolución del operador  | DevolucionIniciada  |
-| T11 | NoEntregado  | Reprogramar  | Reprogramado  | Despachador (a pedido del destinatario, RF 26\)  | La solicitud cumple las reglas del operador  | EnvioReprogramado  |
+| T8 | EnTransito  | ReintegrarADeposito  | EnDeposito  | Operario de depósito  | Rendición de un envío que salió pero **no llegó a intentarse**    | EnvioReintegradoADeposito  |
+| T9 | NoEntregado  | Reprogramar  | Reprogramado  | Despachador / Sistema  | Intentos \< máximo del operador; se respeta el plazo entre intentos  y el motivo es reprogramable   | EnvioReprogramado  |
+| T10 | NoEntregado  | IniciarDevolucion  | EnDevolucion  | Despachador / Sistema  | Intentos \= máximo, o política de devolución del operador o el motivo no es reprogramable   | DevolucionIniciada  |
+| ~~T11~~ | ~~NoEntregado~~  | ~~Reprogramar~~  | ~~Reprogramado~~  | ~~Despachador (a pedido del destinatario, RF 26\)~~  | ~~La solicitud cumple las reglas del operador~~  | ~~EnvioReprogramado~~  |
 | T12 | EnDeposito  | IniciarDevolucion  | EnDevolucion  | Despachador / Comercio  | El comercio o el operador deciden no entregar  | DevolucionIniciada  |
 | T13 | Reprogramado  | AsignarARuta  | AsignadoARuta  | Despachador  | Mismas validaciones que T3, para la nueva fecha  | EnvioAsignadoARuta  |
 | T14 | Reprogramado  | IniciarDevolucion  | EnDevolucion  | Sistema (worker) / Despachador  | Venció el plazo sin poder reasignarse  | DevolucionIniciada  |
 | T15 | EnDevolucion  | ConfirmarDevolucion  | Devuelto  | Operario de depósito  | El comercio recibió el envío  | EnvioDevuelto  |
 | T16 | EnDeposito, EnTransito, EnDevolucion  | DeclararExtravio  | Extraviado  | Administrador / Despachador  | Motivo obligatorio  | EnvioExtraviado  |
 | T17 | Admitido  | CancelarEnvio  | Cancelado  | Comercio  | El envío **todavía no fue recibido en depósito** (no existe el evento `EnvioRecibidoEnDeposito`)  | EnvioCancelado  |
+| T18 | EnDeposito  | Reprogramar  | Reprogramado  | Destinatario (seguimiento público)  | Se respeta la anticipación mínima del operador (`anticipacionReprogramacionHoras`) y la franja elegida se ofrece en la zona del envío (RF 26\)  | EnvioReprogramado  |
+| T19 | AsignadoARuta  | Reprogramar  | Reprogramado  | Destinatario (seguimiento público)  | La ruta **aún no fue despachada**; misma anticipación y franja que T18. El envío sale de la ruta: se elimina su parada, como en T4  | EnvioReprogramado  |
+
+| **T11** | ***Eliminada*** Inalcanzable: CU-18 aplica T7 y T9 o T10 en la misma transacción, así que el envío nunca queda en NoEntregado. | 
 
 **Cualquier combinación estado \+ acción que no esté en la tabla se rechaza** con un error de dominio explícito (por ejemplo `TransicionInvalidaException`). Ejemplos que deben fallar: `Entregado → EnTransito`, `Admitido → Entregado`, `Devuelto → Reprogramado`, `EnDeposito → Cancelado` (una vez recibido en depósito la cancelación ya no está disponible con las reglas actuales.
+
+* `EnTransito → Reprogramado`: el envío ya salió.  
+* `AsignadoARuta → Reprogramado` con la ruta despachada
+

@@ -2,7 +2,7 @@
 
 | Estado | Aceptado |
 | :---- | :---- |
-| **Fecha** | 25 de septiembre de 2026 (actualizado el 1 de octubre de 2026) |
+| **Fecha** | 25 de septiembre de 2026 (actualizado el 3 de octubre de 2026) |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Alcance** | Entrega de análisis y diseño del 4 de octubre de 2026 |
 
@@ -36,7 +36,7 @@ La propuesta adopta un stack alineado con los requerimientos obligatorios del la
 | Observabilidad | **Serilog, OpenTelemetry y Aspire Dashboard** | Logs estructurados, métricas, trazas y visualización centralizada. |
 | Correo | **SMTP: Mailpit y Brevo** | Invitaciones a usuarios y notificaciones al destinatario. Mailpit captura los correos en desarrollo; Brevo (plan gratuito, 300 correos por día) los envía en el ambiente desplegado. |
 | Archivos | **PostgreSQL** | Logos, fotos y firmas de entrega en una tabla de archivos, con límite de 1 MB y acceso detrás de una interfaz de Infrastructure. |
-| Pruebas | **xUnit, ArchUnitNET, WebApplicationFactory, Testcontainers y Respawn** | Pruebas unitarias, de integración, aislamiento y arquitectura. La prueba de arquitectura usa ArchUnitNET, según el ADR-0001, addendum 3. |
+| Pruebas | **xUnit, ArchUnitNET, WebApplicationFactory, Testcontainers, Respawn y Playwright** | Pruebas unitarias, de integración, aislamiento y arquitectura. La prueba de arquitectura usa ArchUnitNET, según el ADR-0001, addendum 3. Playwright, para las pruebas de extremo a extremo del requerimiento opcional 7.2. |
 | Contenedores | **Docker Desktop y Docker Compose** | Entorno completo reproducible: servicios de soporte, API y worker. |
 | Integración continua | **GitHub Actions** | Compilación, pruebas y construcción de las imágenes Docker en cada pull request. |
 | Despliegue | **DigitalOcean App Platform** | Despliegue automático desde main de dos servicios: la API, que sirve también el Backoffice y las aplicaciones WebAssembly, y el worker. |
@@ -92,7 +92,9 @@ Serilog producirá logs estructurados. OpenTelemetry generará métricas y traza
 
 ## **3.8 Estrategia de pruebas**
 
-xUnit será el framework único. Se escribirán pruebas unitarias para reglas de dominio y handlers, pruebas de integración con WebApplicationFactory y PostgreSQL real mediante Testcontainers, pruebas de aislamiento multitenant y pruebas automatizadas de arquitectura con ArchUnitNET. No se incorporarán inicialmente Playwright ni una biblioteca de mocks.
+xUnit será el framework único. Se escribirán pruebas unitarias para reglas de dominio y handlers, pruebas de integración con WebApplicationFactory y PostgreSQL real mediante Testcontainers, pruebas de aislamiento multitenant y pruebas automatizadas de arquitectura con ArchUnitNET. No se incorporará una biblioteca de mocks.
+
+Además, el equipo eligió tres requerimientos opcionales de pruebas (Plan de casos de uso por hito, sección 4): pruebas de extremo a extremo con **Playwright** sobre los flujos críticos, integradas al pipeline; cobertura superior al 70 % en las capas de dominio y aplicación, con reporte publicado por el pipeline; y pruebas de resiliencia que interrumpen deliberadamente la caché, la cola, la base de datos y un servicio externo.
 
 ## **3.9 Correo y archivos**
 
@@ -225,3 +227,4 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | :---: | :---: | :---- |
 | 1.0 | 25/09/2026 | Propuesta inicial aceptada. |
 | 1.1 | 01/10/2026 | Se incorporan las decisiones de los addenda 1 a 5 del ADR-0001 (host único, código compartido, endpoints en los módulos, comunicación entre módulos, ArchUnitNET), el ADR-0003 propuesto, el correo y el almacenamiento de archivos; se actualizan el entorno local, la organización del repositorio y el despliegue. |
+| 1.2 | 03/10/2026 | Se incorporan Playwright y los requerimientos opcionales de pruebas elegidos por el equipo (sección 3.8). |

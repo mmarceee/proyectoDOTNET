@@ -55,6 +55,7 @@ Cada entidad del [modelo de dominio](analisis-diseno/modelo-de-dominio.md) tiene
 Domain/
   Operadores/      Operador.cs, IdentidadVisual.cs
   Comercios/       Comercio.cs, RelacionComercial.cs, EstadoRelacion.cs
+  ClavesApi/       ClaveApi.cs, TipoClaveApi.cs
   Zonas/           Zona.cs, FranjaHoraria.cs
   Tarifas/         VersionTarifario.cs, ReglaTarifa.cs, AjusteTarifa.cs, TipoAjuste.cs
   Reglas/          VersionReglas.cs, MotivoNoEntrega.cs, PruebaExigida.cs,
@@ -89,7 +90,7 @@ Domain/
 
 ```
 Domain/
-  Rutas/           Ruta.cs, Parada.cs, EstadoRuta.cs, EstadoParada.cs, CriterioOrden.cs
+  Rutas/           Ruta.cs, Parada.cs, EstadoRuta.cs, EstadoParada.cs
 ```
 
 ### 2.5 Ejecución de rutas — `Logistica.Modules.Ejecucion/Domain/`

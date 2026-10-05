@@ -25,6 +25,12 @@ Del 1/10 al 12/11 quedan unas 6 semanas: 3 integrantes × 12 horas × 6 semanas 
 
 Todos los casos se implementan: la letra exige cubrir todos los requerimientos funcionales (sección 5). La diferencia está en la profundidad.
 
+**Dos reglas que los niveles nunca cambian:**
+
+1\.  **Las condiciones explícitas de cada RF se cumplen siempre**, sea cual sea el nivel. Por ejemplo, la importación es idempotente (RF 7) aunque sea mínima, y el cuadro tarifario contempla recargos y bonificaciones (RF 3). Lo que un nivel menor recorta son validaciones adicionales, terminación de la interfaz y casos borde.
+
+2\.  **Los requerimientos opcionales se implementan completos o no se implementan.** La letra (sección 7) establece que *"un requerimiento implementado parcialmente no otorga puntos parciales: se evalúa contra las condiciones indicadas en cada caso"*. Por eso los casos de un opcional son siempre de nivel Completo (sección 4).
+
 ## **1.3 Qué significa ser responsable de un caso de uso**
 
 **Todo el equipo trabaja en todos los casos de uso.** El responsable no es quien lo programa en solitario, sino quien:
@@ -43,7 +49,7 @@ Cada integrante responde por bloques coherentes, alineados con su área del plan
 | :---- | :---- | :---- | :---: | :---: |
 | **Cristian Reyes** | Administración, usuarios, Identity, multitenancy y máquina de estados | **Administración y configuración** (CU-01 a CU-08) · **transiciones de estado** (CU-16, CU-19, CU-20, CU-21, CU-22) · **seguimiento público y tablero** (CU-60, CU-61, CU-66) | 16 | 5 |
 | **Ezequiel Marcenal** | Modelado de dominio, infraestructura, Docker, CI, pruebas, Terraform y despliegue | **Núcleo de Envíos** (CU-10, CU-11, CU-17, CU-18) · **Depósito y liquidaciones** (CU-30 a CU-33, CU-55) · **mensajería, Worker y reportes** (CU-09, CU-52, CU-62, CU-64, CU-70, CU-71, CU-72) | 16 | 6 |
-| **Lucas Ottonello** | Arquitectura, comunicación entre módulos, documentación y presentación | **Planificación** (CU-40 a CU-43) · **Ejecución en la PWA** (CU-50, CU-51, CU-53, CU-54) · **consultas y avisos del Portal** (CU-13, CU-14, CU-15, CU-63, CU-65) · **API pública** (CU-80 a CU-83) | 17 | 5 |
+| **Lucas Ottonello** | Arquitectura, comunicación entre módulos, documentación y presentación | **Planificación** (CU-40 a CU-43) · **Ejecución en la PWA** (CU-50, CU-51, CU-53, CU-54) · **consultas y avisos del Portal** (CU-13, CU-14, CU-15, CU-63, CU-65) · **API pública** (CU-80 a CU-83) | 17 | 9 |
 
 # **2\. Plan por hito**
 
@@ -111,7 +117,7 @@ Cada integrante responde por bloques coherentes, alineados con su área del plan
 | CU-66 | Ver el tablero de operación en vivo | C | Cristian | SignalR con aislamiento por inquilino. |
 | CU-09 | Consultar y reintentar los mensajes fallidos | M | Ezequiel | Exigido por la sección 6.8. |
 | CU-53 | Reportar la posición del vehículo | M | Lucas | Alimenta el tablero. |
-| CU-61 | Solicitar la reprogramación | M | Cristian | T18 y T19, a confirmar. |
+| CU-61 | Solicitar la reprogramación | M | Cristian | T18 y T19, confirmadas en la tabla de transiciones. |
 | CU-20 | Iniciar la devolución | M | Cristian | |
 | CU-21 | Declarar un envío como extraviado | M | Cristian | |
 | CU-31 | Confirmar la devolución al comercio | M | Ezequiel | |
@@ -139,14 +145,14 @@ Cada integrante responde por bloques coherentes, alineados con su área del plan
 
 | CU | Caso de uso | Nivel | Responsable | Nota |
 | :---- | :---- | :---- | :---- | :---- |
-| CU-80 a CU-83 | API pública para comercios | M | Lucas | Opcional 7.4 (3 puntos). Ver sección 4. |
+| CU-80 a CU-83 | API pública para comercios | C | Lucas | Opcional 7.4 (3 puntos): completo o no suma. Ver sección 4. |
 | CU-15 | Imprimir las etiquetas | B | Lucas | |
 | CU-22 | Gestionar incidencias | B | Cristian | |
 | CU-70 | Ejecutar el cierre diario | B | Ezequiel | |
 | CU-71 | Recalcular los indicadores de cumplimiento | B | Ezequiel | |
 | CU-72 | Consultar reportes de gestión | B | Ezequiel | Tablas, sin gráficos. |
 
-**Trabajo transversal:** opcionales restantes hasta llegar a 8 puntos; corrección de errores; documentación final, bitácora de IA y registro de horas; ensayo de la presentación (todo el equipo).
+**Trabajo transversal:** cerrar los cuatro opcionales de la sección 4 con todas sus condiciones; corrección de errores; documentación final, bitácora de IA y registro de horas; ensayo de la presentación (todo el equipo).
 
 # **3\. Resumen**
 
@@ -157,28 +163,45 @@ Cada integrante responde por bloques coherentes, alineados con su área del plan
 | 22/10 | 12 | 8 | 4 | 0 |
 | 29/10 | 11 | 5 | 6 | 0 |
 | 5/11 | 6 | 0 | 3 | 3 |
-| 12/11 | 9 | 0 | 4 | 5 |
-| **Total** | **49** | **16** | **25** | **8** |
+| 12/11 | 9 | 4 | 0 | 5 |
+| **Total** | **49** | **20** | **21** | **8** |
 
 | Responsable | Casos | Completos |
 | :---- | :---: | :---: |
-| Lucas Ottonello | 17 | 5 |
+| Lucas Ottonello | 17 | 9 |
 | Ezequiel Marcenal | 16 | 6 |
 | Cristian Reyes | 16 | 5 |
 
-La cantidad de casos está equilibrada. Ezequiel concentra los de mayor complejidad (sincronización y avisos) además de la infraestructura y el despliegue, por lo que su carga en horas es mayor en los hitos del 22/10 y el 5/11. Si hiciera falta compensarla, la opción natural es que Lucas tome CU-52, ya que es responsable del resto de la PWA.
+La cantidad de casos está equilibrada. Lucas suma cuatro casos completos por la API pública, que se concentran en el último hito. Ezequiel concentra los de mayor complejidad (sincronización y avisos) además de la infraestructura y el despliegue, por lo que su carga en horas es mayor en los hitos del 22/10 y el 5/11. Si hiciera falta compensarla, la opción natural es que Lucas tome CU-52, ya que es responsable del resto de la PWA.
 
-# **4\. Decisiones abiertas del plan**
+# **4\. Requerimientos opcionales**
+
+Los equipos de 3 integrantes deben cubrir al menos **8 puntos** (letra, sección 7). Combinación elegida:
+
+| Opcional | Puntos | Condiciones de la letra (todas obligatorias) | Responsable | Hito |
+| :---- | :---: | :---- | :---- | :---- |
+| **API pública para comercios** (7.4) | 3 | API documentada y versionada; claves por comercio; ambiente de pruebas; limitación de tasa diferenciada; documentación navegable. Casos CU-80 a CU-83. | Lucas | 12/11 |
+| **Cobertura de pruebas** (7.2) | 2 | Cobertura verificable superior al 70 % en las capas de dominio y aplicación, con reporte publicado por el pipeline. | Ezequiel | Reporte en el pipeline desde el 15/10; 70 % al 12/11 |
+| **Pruebas de resiliencia** (7.4) | 2 | Interrumpir deliberadamente dependencias (caché, cola, base de datos y un servicio externo) y documentar el comportamiento degradado esperado y el observado. | Ezequiel | 12/11 |
+| **Pruebas de extremo a extremo** (7.2) | 2 | Playwright o equivalente sobre los flujos críticos, integradas al pipeline. | Cristian | 12/11 |
+| **Total** | **9** | | | |
+
+**Sin margen:** si cualquiera de los cuatro no cumple todas sus condiciones, el total baja a 7 o menos y no se alcanza el mínimo, que es condición de aprobación (sección 9.6). Cada opcional se da por terminado sólo cuando se verifica su lista de condiciones completa.
+
+**Por qué esta combinación:** la cobertura y la resiliencia aprovechan lo que ya existe (pruebas en el pipeline, Docker Compose con todas las dependencias); las pruebas de extremo a extremo con Playwright ya se usaron para verificar la PWA. Las banderas de funcionalidad (7.4, 2 puntos) quedan como reemplazo si alguno de los anteriores se complica.
+
+# **5\. Decisiones abiertas del plan**
 
 | Tema | Por qué importa |
 | :---- | :---- |
-| API pública (opcional 7.4) | Vale 3 puntos, pero es de los opcionales más costosos (claves, ambiente de pruebas, limitación de tasa, documentación). Hay opcionales de 2 puntos que salen casi solos con lo que ya está armado: **cobertura de pruebas superior al 70 %** y **pruebas de resiliencia**. Conviene definir qué combinación llega a los 8 puntos antes del 29/10. |
 | Hito del 22/10 | Es el más cargado (12 casos, 8 completos). Si el 15/10 se atrasa, conviene pasar CU-04 y CU-54 al 29/10. |
 | Responsables | Acordados con el responsable del plan de trabajo. Se pueden ajustar según el avance, como prevé el plan de trabajo. |
 
-# **5\. Historial de versiones**
+# **6\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 01/10/2026 | Propuesta inicial. | Ezequiel Marcenal |
 | 0.2 | 02/10/2026 | Responsable = dueño que responde por el caso, no único que lo programa. Reparto equilibrado por bloques (16, 16 y 17 casos), acordado con Lucas Ottonello. | Ezequiel Marcenal |
+| 0.3 | 02/10/2026 | Reglas de los niveles (condiciones de los RF y opcionales completos o nada). API pública pasa a nivel Completo. Nueva sección 4 con los opcionales elegidos (9 puntos). | Ezequiel Marcenal |
+| 0.4 | 02/10/2026 | CU-61: T18 y T19 confirmadas. | Ezequiel Marcenal |
