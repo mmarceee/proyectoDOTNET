@@ -1,6 +1,6 @@
 # **ADR-0001 · Estilo arquitectónico interno y organización del código**
 
-| Estado | Aceptado (versión 1.0). La versión 2.0 incorpora los addenda 1 a 5, pendientes de revisión |
+| Estado | Aceptado (versión 2.0). Incluye las decisiones de los addenda 1 a 5, revisadas y aceptadas por Lucas Ottonello el 2 de octubre de 2026 |
 | :---- | :---- |
 | **Versión** | 2.0 |
 | **Fecha** | 24 de septiembre de 2026 (versión 1.0) · 1 de octubre de 2026 (versión 2.0) |
@@ -441,5 +441,5 @@ Los puntos 1, 3, 6 y 7 ya están implementados en el esqueleto de la solución (
 | Versión | Fecha | Descripción | Responsable |
 | :---- | :---- | :---- | :---- |
 | 1.0 | 24/09/2026 | Versión inicial aceptada. | Lucas Ottonello |
-| 2.0 | 01/10/2026 | Incorpora en el texto los addenda 1 a 5: código compartido, ubicación de endpoints y contratos, comunicación entre módulos, ArchUnitNET, Backoffice y aplicaciones WebAssembly en el mismo host. | Ezequiel Marcenal |
+| 2.0 | 01/10/2026 | Incorpora en el texto los addenda 1 a 5: código compartido, ubicación de endpoints y contratos, comunicación entre módulos, ArchUnitNET, Backoffice y aplicaciones WebAssembly en el mismo host. Decisiones revisadas y aceptadas por Lucas Ottonello el 02/10/2026. | Ezequiel Marcenal |
 

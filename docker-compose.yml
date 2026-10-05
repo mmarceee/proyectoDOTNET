@@ -3,6 +3,14 @@
 #   docker compose up -d --wait postgres valkey rabbitmq aspire-dashboard mailpit
 name: logistica
 
+# Variables comunes de la Api y el Worker.
+x-app-environment: &app-environment
+  ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+  ConnectionStrings__Valkey: valkey:6379
+  ConnectionStrings__RabbitMQ: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+  ConnectionStrings__Smtp: smtp://mailpit:1025
+
 services:
   postgres:
     image: postgres:17.6
@@ -67,12 +75,10 @@ services:
     build:
       context: .
       dockerfile: src/Logistica.Api/Dockerfile
-    environment: &app-environment
-      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-      ConnectionStrings__Valkey: valkey:6379
-      ConnectionStrings__RabbitMQ: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
-      ConnectionStrings__Smtp: smtp://mailpit:1025
+    environment:
+      <<: *app-environment
+      # Sólo la Api aplica las migraciones al iniciar; el Worker no toca el esquema.
+      Database__MigrateOnStartup: "true"
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on: &app-depends-on
