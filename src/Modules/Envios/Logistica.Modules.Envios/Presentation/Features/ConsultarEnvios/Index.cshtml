@@ -1,0 +1,118 @@
+@page "/backoffice/envios"
+@model Logistica.Modules.Envios.Presentation.Features.ConsultarEnvios.IndexModel
+@using Logistica.Modules.Envios.Domain.Envios
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Envíos";
+}
+
+<h1>Envíos</h1>
+<div asp-validation-summary="All" class="text-danger"></div>
+<form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-3">
+    <input type="hidden" name="Pagina" value="1" />
+    <input type="hidden"
+           name="TamanoPagina"
+           value="@Model.Resultado.TamanoPagina" />
+
+    <div>
+        <label asp-for="Estado" class="form-label">Estado</label>
+        <select asp-for="Estado" class="form-select" onchange="this.form.requestSubmit()">
+            <option value="">Todos los estados</option>
+
+            @foreach (var estado in Enum.GetValues<EstadoEnvio>())
+            {
+                <option value="@estado">@estado</option>
+            }
+        </select>
+    </div>
+
+    <div>
+        <label asp-for="FechaDesde" class="form-label">Fecha desde</label>
+        <input asp-for="FechaDesde"
+               type="date"
+               class="form-control"
+               onchange="this.form.requestSubmit()" />
+    </div>
+
+    <div>
+        <label asp-for="FechaHasta" class="form-label">Fecha hasta</label>
+        <input asp-for="FechaHasta"
+               type="date"
+               class="form-control"
+               onchange="this.form.requestSubmit()" />
+    </div>
+
+    <a href="/backoffice/envios" class="btn btn-outline-secondary">
+        Limpiar filtros
+    </a>
+</form>
+@if (ViewData.ModelState.IsValid)
+{
+    <p>Total de envíos: @Model.Resultado.TotalRegistros</p>
+}
+@if (!ViewData.ModelState.IsValid)
+{
+    <p>Corregí los filtros para consultar los envíos.</p>
+}
+else if (Model.Resultado.Envios.Count == 0)
+{
+    <p>No hay envíos para mostrar.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Número</th>
+                    <th scope="col">Destinatario</th>
+                    <th scope="col">Localidad</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Fecha de alta</th>
+                    <th scope="col">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var envio in Model.Resultado.Envios)
+                {
+                    <tr>
+                        <td>@envio.Numero</td>
+                        <td>@envio.DestinatarioNombre</td>
+                        <td>@envio.Localidad</td>
+                        <td>@envio.Estado</td>
+                        <td>@envio.CreadoEn.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@envio.MontoTarifa.ToString("0.00")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (Model.Resultado.TotalRegistros > 0)
+        {
+            <nav aria-label="Paginación de envíos"
+                 class="d-flex align-items-center gap-3">
+
+                @if (Model.Resultado.Pagina > 1)
+                {
+                    <a class="btn btn-outline-primary"
+                       href="?Pagina=@(Model.Resultado.Pagina - 1)&amp;TamanoPagina=@Model.Resultado.TamanoPagina&amp;Estado=@Model.Estado&amp;FechaDesde=@(Model.FechaDesde?.ToString("yyyy-MM-dd"))&amp;FechaHasta=@(Model.FechaHasta?.ToString("yyyy-MM-dd"))">
+                        Anterior
+                    </a>
+                }
+
+                <span>
+                    Página @Model.Resultado.Pagina
+                    de @Model.Resultado.TotalPaginas
+                </span>
+
+                @if (Model.Resultado.Pagina < Model.Resultado.TotalPaginas)
+                {
+                    <a class="btn btn-outline-primary"
+                       href="?Pagina=@(Model.Resultado.Pagina + 1)&amp;TamanoPagina=@Model.Resultado.TamanoPagina&amp;Estado=@Model.Estado&amp;FechaDesde=@(Model.FechaDesde?.ToString("yyyy-MM-dd"))&amp;FechaHasta=@(Model.FechaHasta?.ToString("yyyy-MM-dd"))">
+                        Siguiente
+                    </a>
+                }
+            </nav>
+        }
+    </div>
+}
