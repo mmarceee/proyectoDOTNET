@@ -51,7 +51,14 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     await app.Services.MigrateModuleDatabasesAsync();
 }
 
-app.UseExceptionHandler();
+// En Development las Minimal APIs lanzan BadHttpRequestException ante un body inválido, en lugar de
+// responder 400. Se respeta su código para que no termine en un 500.
+app.UseExceptionHandler(new ExceptionHandlerOptions
+{
+    StatusCodeSelector = exception => exception is BadHttpRequestException badRequest
+        ? badRequest.StatusCode
+        : StatusCodes.Status500InternalServerError,
+});
 
 if (app.Environment.IsDevelopment())
 {
