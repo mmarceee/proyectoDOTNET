@@ -58,6 +58,21 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         return envio;
     }
 
+    // Único punto que cambia el estado (RF 11) y registra el EventoEnvio (RF 12).
+    // Las condiciones propias de cada caso de uso (bultos escaneados, ruta sin despachar...) las
+    // controla quien llama; acá sólo se valida que la transición exista en la tabla.
+    public void Transicionar(EstadoEnvio nuevo, OrigenEvento origen, Guid? responsableId, DateTimeOffset ahora)
+    {
+        if (!TablaTransiciones.Permite(Estado, nuevo))
+        {
+            throw new TransicionInvalidaException(Estado, nuevo);
+        }
+
+        var anterior = Estado;
+        Estado = nuevo;
+        _eventos.Add(new EventoEnvio(this, anterior, nuevo, ahora, origen, responsableId));
+    }
+
     // La tarifa del envío es la suma de sus bultos (CU-10).
     private void AgregarBulto(DatosBulto datos)
     {

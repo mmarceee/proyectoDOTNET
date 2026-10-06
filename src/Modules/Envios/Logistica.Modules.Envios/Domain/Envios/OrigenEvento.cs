@@ -4,7 +4,7 @@ namespace Logistica.Modules.Envios.Domain.Envios;
 internal enum OrigenEvento
 {
     PortalComercio,
-    BackOffice,
+    Backoffice,
     AppRepartidor,
     Sistema,
     SeguimientoPublico,

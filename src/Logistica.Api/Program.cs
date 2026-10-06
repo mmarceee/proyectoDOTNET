@@ -16,6 +16,7 @@ builder.Services.AddHealthChecks();
 // Errores como ProblemDetails; las reglas de negocio violadas responden 400.
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
+builder.Services.AddExceptionHandler<ConcurrenciaExceptionHandler>();
 
 // Un body sin un campo obligatorio, o con null donde el DTO no lo admite, responde 400 antes de llegar al endpoint.
 builder.Services.ConfigureHttpJsonOptions(options =>

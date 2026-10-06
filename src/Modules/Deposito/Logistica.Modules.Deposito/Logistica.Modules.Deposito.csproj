@@ -15,6 +15,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Logistica.Modules.Deposito.Contracts\Logistica.Modules.Deposito.Contracts.csproj" />
+    <!-- Depósito usa Envíos sólo a través de su contrato (CU-30, ADR-0001, addendum 3). -->
+    <ProjectReference Include="..\..\Envios\Logistica.Modules.Envios.Contracts\Logistica.Modules.Envios.Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.SharedKernel\Logistica.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Logistica.Http.Contracts\Logistica.Http.Contracts.csproj" />

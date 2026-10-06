@@ -1,5 +1,7 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.Modules.Envios.Application;
 using Logistica.Modules.Envios.Application.Features.CrearEnvio;
+using Logistica.Modules.Envios.Contracts;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
 using Logistica.Modules.Envios.Presentation.Features.CrearEnvio;
@@ -23,6 +25,9 @@ public static class EnviosModule
         services.AddScoped<IEnviosListadoReader, EnviosListadoReader>();
         services.AddScoped<ConsultarEnviosHandler>();
         services.AddScoped<CrearEnvioHandler>();
+
+        // Contrato para los otros módulos (ADR-0001, addendum 3).
+        services.AddScoped<IEnviosModuleApi, EnviosModuleApi>();
 
         return services;
     }
