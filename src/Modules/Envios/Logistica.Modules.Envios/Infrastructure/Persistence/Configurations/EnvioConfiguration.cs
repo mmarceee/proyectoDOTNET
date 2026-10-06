@@ -21,5 +21,9 @@ internal sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
 
         builder.HasMany(e => e.Bultos).WithOne().HasForeignKey(b => b.EnvioId);
         builder.HasMany(e => e.Eventos).WithOne().HasForeignKey(ev => ev.EnvioId);
+
+        // Índices para el listado y los filtros de CU-13.
+        builder.HasIndex(e => new { e.OperadorId, e.CreadoEn });
+        builder.HasIndex(e => new { e.OperadorId, e.Estado });
     }
 }
