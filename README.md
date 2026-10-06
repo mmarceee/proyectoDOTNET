@@ -17,7 +17,7 @@ Laboratorio .NET 2026 · Equipo 1. La documentación de análisis y diseño est�
    ```
    La aplicación queda en http://localhost:8080 (ver [Rutas](#rutas)).
 
-### Desarrollo desde Visual Studio
+### Desarrollo desde Visual 
 
 Para depurar la Api o el Worker, levantar sólo los servicios de soporte y ejecutar la aplicación desde Visual Studio o con `dotnet run`:
 
