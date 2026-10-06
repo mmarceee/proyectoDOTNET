@@ -7,4 +7,6 @@ internal sealed record ConsultarEnviosQuery(
     int TamanoPagina = 20,
     EstadoEnvio? Estado = null,
     DateOnly? FechaDesde = null,
-    DateOnly? FechaHasta = null);
+    DateOnly? FechaHasta = null,
+    string? Texto = null,
+    Guid? ComercioId = null);

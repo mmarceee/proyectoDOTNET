@@ -28,6 +28,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddSingleton(TimeProvider.System);
 
 // Inquilino de cada request. Provisorio hasta Identity (15/10).
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenant, TenantProvisorio>();
 
 // Backoffice: las páginas viven en Logistica.Backoffice y en Presentation/Features de cada módulo.

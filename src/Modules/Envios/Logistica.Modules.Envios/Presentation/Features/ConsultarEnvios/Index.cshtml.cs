@@ -23,6 +23,9 @@ internal sealed class IndexModel(
     [BindProperty(SupportsGet = true)]
     public DateOnly? FechaHasta { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? Texto { get; set; }
+
     public ConsultarEnviosResult Resultado { get; private set; } =
         new([], 1, 20, 0);
 
@@ -61,7 +64,8 @@ internal sealed class IndexModel(
             TamanoPagina,
             Estado,
             FechaDesde,
-            FechaHasta);
+            FechaHasta,
+            Texto);
 
         Resultado = await handler.HandleAsync(query, ct);
 

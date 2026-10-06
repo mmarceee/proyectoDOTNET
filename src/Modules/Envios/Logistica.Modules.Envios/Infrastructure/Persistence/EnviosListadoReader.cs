@@ -45,6 +45,24 @@ internal sealed class EnviosListadoReader(
 
             consulta = consulta.Where(e => e.CreadoEn < finExclusivo);
         }
+
+        if (!string.IsNullOrWhiteSpace(query.Texto))
+        {
+            var texto = query.Texto.Trim().ToLowerInvariant();
+
+            consulta = consulta.Where(e =>
+                e.Numero.ToLower().Contains(texto) ||
+                e.Destinatario.Nombre.ToLower().Contains(texto));
+        }
+
+        if (query.ComercioId.HasValue)
+        {
+            var comercioSeleccionado = query.ComercioId.Value;
+
+            consulta = consulta.Where(e =>
+                e.ComercioId == comercioSeleccionado);
+        }
+
         var total = await consulta.CountAsync(ct);
 
         var totalPaginas = Math.Max(1, (int)Math.Ceiling((double)total / query.TamanoPagina));

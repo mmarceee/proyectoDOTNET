@@ -43,6 +43,18 @@
                onchange="this.form.requestSubmit()" />
     </div>
 
+    <div>
+        <label asp-for="Texto" class="form-label">
+            Número o destinatario
+        </label>
+
+        <input asp-for="Texto"
+               type="search"
+               class="form-control"
+               placeholder="Escribe y presiona Enter" />
+    </div>
+    <button type="submit" hidden>Buscar</button>
+
     <a href="/backoffice/envios" class="btn btn-outline-secondary">
         Limpiar filtros
     </a>
@@ -95,7 +107,7 @@ else
                 @if (Model.Resultado.Pagina > 1)
                 {
                     <a class="btn btn-outline-primary"
-                       href="?Pagina=@(Model.Resultado.Pagina - 1)&amp;TamanoPagina=@Model.Resultado.TamanoPagina&amp;Estado=@Model.Estado&amp;FechaDesde=@(Model.FechaDesde?.ToString("yyyy-MM-dd"))&amp;FechaHasta=@(Model.FechaHasta?.ToString("yyyy-MM-dd"))">
+                       href="?Pagina=@(Model.Resultado.Pagina - 1)&amp;TamanoPagina=@Model.Resultado.TamanoPagina&amp;Estado=@Model.Estado&amp;FechaDesde=@(Model.FechaDesde?.ToString("yyyy-MM-dd"))&amp;FechaHasta=@(Model.FechaHasta?.ToString("yyyy-MM-dd"))&amp;Texto=@(Uri.EscapeDataString(Model.Texto ?? ""))">
                         Anterior
                     </a>
                 }
@@ -108,7 +120,7 @@ else
                 @if (Model.Resultado.Pagina < Model.Resultado.TotalPaginas)
                 {
                     <a class="btn btn-outline-primary"
-                       href="?Pagina=@(Model.Resultado.Pagina + 1)&amp;TamanoPagina=@Model.Resultado.TamanoPagina&amp;Estado=@Model.Estado&amp;FechaDesde=@(Model.FechaDesde?.ToString("yyyy-MM-dd"))&amp;FechaHasta=@(Model.FechaHasta?.ToString("yyyy-MM-dd"))">
+                       href="?Pagina=@(Model.Resultado.Pagina + 1)&amp;TamanoPagina=@Model.Resultado.TamanoPagina&amp;Estado=@Model.Estado&amp;FechaDesde=@(Model.FechaDesde?.ToString("yyyy-MM-dd"))&amp;FechaHasta=@(Model.FechaHasta?.ToString("yyyy-MM-dd"))&amp;Texto=@(Uri.EscapeDataString(Model.Texto ?? ""))">
                         Siguiente
                     </a>
                 }
