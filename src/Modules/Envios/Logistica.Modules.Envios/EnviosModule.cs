@@ -1,6 +1,8 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.Modules.Envios.Application.Features.CrearEnvio;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
+using Logistica.Modules.Envios.Presentation.Features.CrearEnvio;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -20,6 +22,7 @@ public static class EnviosModule
 
         services.AddScoped<IEnviosListadoReader, EnviosListadoReader>();
         services.AddScoped<ConsultarEnviosHandler>();
+        services.AddScoped<CrearEnvioHandler>();
 
         return services;
     }
@@ -28,7 +31,8 @@ public static class EnviosModule
     {
         var group = endpoints.MapGroup("/api/envios").WithTags("Envios");
 
-        // Mapear acá los endpoints de Presentation/Features, por ejemplo: CrearEnvioEndpoint.Map(group);
+        CrearEnvioEndpoint.Map(group);
+
         return endpoints;
     }
 }
