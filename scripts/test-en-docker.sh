@@ -8,7 +8,14 @@ cd "$(dirname "$0")/.."
 
 repo="$(pwd -W 2>/dev/null || pwd)"
 
-MSYS_NO_PATHCONV=1 docker run --rm -v "${repo}:/repo:ro" mcr.microsoft.com/dotnet/sdk:10.0 bash -c '
+# Las pruebas de integración usan Testcontainers: el contenedor de pruebas recibe el socket de Docker
+# para levantar PostgreSQL como contenedor hermano, y lo alcanza por el puerto publicado en el host.
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "${repo}:/repo:ro" \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  --add-host host.docker.internal:host-gateway \
+  -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+  mcr.microsoft.com/dotnet/sdk:10.0 bash -c '
   set -e
   mkdir /w
   cd /repo
