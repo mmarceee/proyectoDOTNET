@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Administracion.Infrastructure.Persistence;
 
-internal sealed class AdministracionDbContext(DbContextOptions<AdministracionDbContext> options)
-    : ModuleDbContext(options, Schema)
+internal sealed class AdministracionDbContext(DbContextOptions<AdministracionDbContext> options, UnidadDeTrabajo unidadDeTrabajo)
+    : ModuleDbContext(options, Schema, unidadDeTrabajo)
 {
     public const string Schema = "administracion";
 
