@@ -47,10 +47,12 @@ builder.Services
 
 var app = builder.Build();
 
-// En Docker Compose la API aplica las migraciones de todos los módulos al iniciar (docker-compose.yml).
+// En Docker Compose la API aplica las migraciones de todos los módulos al iniciar (docker-compose.yml),
+// y después carga los datos iniciales, que necesitan las tablas ya creadas.
 if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await app.Services.MigrateModuleDatabasesAsync();
+    await app.Services.SembrarDatosInicialesAsync();
 }
 
 // En Development las Minimal APIs lanzan BadHttpRequestException ante un body inválido, en lugar de

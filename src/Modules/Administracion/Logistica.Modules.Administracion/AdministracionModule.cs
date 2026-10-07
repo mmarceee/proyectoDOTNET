@@ -1,3 +1,5 @@
+using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -11,7 +13,11 @@ public static class AdministracionModule
 {
     public static IServiceCollection AddAdministracionModule(this IServiceCollection services, IConfiguration configuration)
     {
-        // Registrar acá handlers, DbContext y adaptadores del módulo.
+        services.AddModuleDbContext<AdministracionDbContext>(
+            configuration.GetConnectionString("Postgres"), AdministracionDbContext.Schema);
+
+        services.AddScoped<DatosIniciales>();
+
         return services;
     }
 
@@ -21,5 +27,13 @@ public static class AdministracionModule
 
         // Mapear acá los endpoints de Presentation/Features, por ejemplo: CrearEnvioEndpoint.Map(group);
         return endpoints;
+    }
+
+    // Carga los datos iniciales. La llama el host al iniciar, después de las migraciones (ADR-0002, sección 2.8).
+    public static async Task SembrarDatosInicialesAsync(this IServiceProvider services, CancellationToken ct = default)
+    {
+        using var scope = services.CreateScope();
+
+        await scope.ServiceProvider.GetRequiredService<DatosIniciales>().SembrarAsync(ct);
     }
 }
