@@ -1,3 +1,8 @@
+using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.Modules.Deposito.Application.Features.RecibirBulto;
+using Logistica.Modules.Deposito.Domain.Recepciones;
+using Logistica.Modules.Deposito.Infrastructure.Persistence;
+using Logistica.Modules.Deposito.Presentation.Features.RecibirBulto;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -11,7 +16,11 @@ public static class DepositoModule
 {
     public static IServiceCollection AddDepositoModule(this IServiceCollection services, IConfiguration configuration)
     {
-        // Registrar acá handlers, DbContext y adaptadores del módulo.
+        services.AddModuleDbContext<DepositoDbContext>(configuration.GetConnectionString("Postgres"), DepositoDbContext.Schema);
+        services.AddScoped<IRecepcionRepository, RecepcionRepository>();
+
+        services.AddScoped<RecibirBultoHandler>();
+
         return services;
     }
 
@@ -19,7 +28,8 @@ public static class DepositoModule
     {
         var group = endpoints.MapGroup("/api/deposito").WithTags("Deposito");
 
-        // Mapear acá los endpoints de Presentation/Features, por ejemplo: CrearEnvioEndpoint.Map(group);
+        RecibirBultoEndpoint.Map(group);
+
         return endpoints;
     }
 }

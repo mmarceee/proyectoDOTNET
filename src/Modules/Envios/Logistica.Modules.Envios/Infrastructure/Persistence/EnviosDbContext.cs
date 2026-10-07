@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
 
-internal sealed class EnviosDbContext(DbContextOptions<EnviosDbContext> options)
-    : ModuleDbContext(options, Schema)
+internal sealed class EnviosDbContext(DbContextOptions<EnviosDbContext> options, UnidadDeTrabajo unidadDeTrabajo)
+    : ModuleDbContext(options, Schema, unidadDeTrabajo)
 {
     public const string Schema = "envios";
 

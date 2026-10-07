@@ -965,11 +965,13 @@ Los agregados no se llaman entre sí directamente: la capa de aplicación (no el
 
 * id: Guid
 
-* bultoId: Guid
+* envioId: Guid (para saber qué bultos de un envío ya llegaron sin consultar las tablas de Envíos — CU-30)
+
+* bultoId: Guid (único: un bulto se recibe una sola vez — CU-30, A2)
 
 * recibidoEn: DateTimeOffset
 
-* resultado: ResultadoRecepcion
+* resultado: ResultadoRecepcion (ConDiscrepancia si alguna medida difiere de lo declarado en más de la tolerancia)
 
 * discrepancia: string (opcional)
 
@@ -1117,5 +1119,7 @@ Puntos del modelo que dependen de una decisión del equipo (o, en algún caso, d
 * Usuario y ClaveApi frente al filtro de inquilino: Usuario (Identity) no tiene filtro y la búsqueda de ClaveApi por hash es el único acceso que lo ignora (ADR-0002 v2.1, secciones 2.4 y 4).
 
 **Abiertos**
+
+* Tolerancia de la recepción en depósito: la implementación de CU-30 registra una discrepancia cuando el peso o una dimensión medida difiere más de un 5 % de lo declarado (`RecepcionDeposito.Tolerancia`). Falta confirmar el valor con el equipo y decidir si pasa a ser una regla operativa configurable (VersionReglas).
 
 * Correo único en Identity: por defecto el correo es único en toda la tabla, no por operador, así que una persona que trabaje para dos operadores necesita dos correos (ADR-0002 v2.1, sección 5).

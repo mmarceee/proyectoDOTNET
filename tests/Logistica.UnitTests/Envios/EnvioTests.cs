@@ -71,4 +71,48 @@ public class EnvioTests
     {
         Assert.Throws<DomainException>(() => new Destinatario(" ", "099123456"));
     }
+
+    [Fact]
+    public void Recibir_en_deposito_pasa_a_EnDeposito_y_agrega_el_evento_T2()
+    {
+        var envio = CrearEnvio(UnBulto);
+        var despues = Ahora.AddHours(2);
+
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId: null, despues);
+
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+        Assert.Equal(2, envio.Eventos.Count);
+        var evento = envio.Eventos[1];
+        Assert.Equal(EstadoEnvio.Admitido, evento.EstadoAnterior);
+        Assert.Equal(EstadoEnvio.EnDeposito, evento.EstadoNuevo);
+        Assert.Equal(OrigenEvento.Backoffice, evento.Origen);
+        Assert.Equal(despues, evento.OcurridoEn);
+    }
+
+    // Ejemplos que la tabla de transiciones exige rechazar. El estado va como texto porque
+    // EstadoEnvio es internal y una prueba pública no puede recibirlo como parámetro.
+    [Theory]
+    [InlineData("Entregado")]
+    [InlineData("EnTransito")]
+    [InlineData("Admitido")]
+    public void Una_transicion_que_no_esta_en_la_tabla_se_rechaza_sin_cambiar_nada(string destino)
+    {
+        var envio = CrearEnvio(UnBulto);
+
+        Assert.Throws<TransicionInvalidaException>(() =>
+            envio.Transicionar(Enum.Parse<EstadoEnvio>(destino), OrigenEvento.Backoffice, responsableId: null, Ahora));
+
+        Assert.Equal(EstadoEnvio.Admitido, envio.Estado);
+        Assert.Single(envio.Eventos);
+    }
+
+    [Fact]
+    public void Un_envio_recibido_en_deposito_ya_no_se_puede_cancelar()
+    {
+        var envio = CrearEnvio(UnBulto);
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId: null, Ahora);
+
+        Assert.Throws<TransicionInvalidaException>(() =>
+            envio.Transicionar(EstadoEnvio.Cancelado, OrigenEvento.PortalComercio, responsableId: null, Ahora));
+    }
 }

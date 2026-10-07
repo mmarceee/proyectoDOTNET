@@ -1,0 +1,205 @@
+@page "/envios/nuevo"
+@using System.Text.Json
+@using Logistica.Http.Contracts.Envios
+@inject HttpClient Http
+
+<PageTitle>Nuevo envío</PageTitle>
+
+<h1>Nuevo envío</h1>
+
+@if (_creado is not null)
+{
+    <div class="alert alert-success" role="status">
+        Se creó el envío <strong>@_creado.Numero</strong>. Ya figura como <em>Admitido</em>.
+    </div>
+
+    <button type="button" class="btn btn-primary" @onclick="NuevoFormulario">Crear otro envío</button>
+}
+else
+{
+    <EditForm Model="_formulario" OnValidSubmit="ConfirmarAsync">
+        <DataAnnotationsValidator />
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+
+        <fieldset class="mb-4">
+            <legend class="h5">Destinatario</legend>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="nombre">Nombre</label>
+                    <InputText id="nombre" class="form-control" @bind-Value="_formulario.Nombre" />
+                    <ValidationMessage For="() => _formulario.Nombre" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="telefono">Teléfono</label>
+                    <InputText id="telefono" class="form-control" @bind-Value="_formulario.Telefono" />
+                    <ValidationMessage For="() => _formulario.Telefono" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="email">Correo (opcional)</label>
+                    <InputText id="email" type="email" class="form-control" @bind-Value="_formulario.Email" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="documento">Documento (opcional)</label>
+                    <InputText id="documento" class="form-control" @bind-Value="_formulario.Documento" />
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-4">
+            <legend class="h5">Dirección de entrega</legend>
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label" for="calle">Calle</label>
+                    <InputText id="calle" class="form-control" @bind-Value="_formulario.Calle" />
+                    <ValidationMessage For="() => _formulario.Calle" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="numero-puerta">Número</label>
+                    <InputText id="numero-puerta" class="form-control" @bind-Value="_formulario.NumeroPuerta" />
+                    <ValidationMessage For="() => _formulario.NumeroPuerta" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="localidad">Localidad</label>
+                    <InputText id="localidad" class="form-control" @bind-Value="_formulario.Localidad" />
+                    <ValidationMessage For="() => _formulario.Localidad" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="departamento">Departamento</label>
+                    <InputSelect id="departamento" class="form-select" @bind-Value="_formulario.Departamento">
+                        @foreach (var departamento in Departamentos)
+                        {
+                            <option value="@departamento">@departamento</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="codigo-postal">Código postal</label>
+                    <InputText id="codigo-postal" class="form-control" @bind-Value="_formulario.CodigoPostal" />
+                    <ValidationMessage For="() => _formulario.CodigoPostal" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="referencia">Referencia (opcional)</label>
+                    <InputText id="referencia" class="form-control" placeholder="Por ejemplo: portón verde, timbre 2"
+                               @bind-Value="_formulario.Referencia" />
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-4">
+            <legend class="h5">Bultos</legend>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Peso (kg)</th>
+                            <th scope="col">Largo (cm)</th>
+                            <th scope="col">Ancho (cm)</th>
+                            <th scope="col">Alto (cm)</th>
+                            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < _formulario.Bultos.Count; i++)
+                        {
+                            var numero = i + 1;
+                            var bulto = _formulario.Bultos[i];
+                            <tr>
+                                <td>@numero</td>
+                                <td><InputNumber class="form-control" step="0.01" min="0" aria-label="@($"Peso del bulto {numero}")" @bind-Value="bulto.PesoKg" /></td>
+                                <td><InputNumber class="form-control" step="0.1" min="0" aria-label="@($"Largo del bulto {numero}")" @bind-Value="bulto.LargoCm" /></td>
+                                <td><InputNumber class="form-control" step="0.1" min="0" aria-label="@($"Ancho del bulto {numero}")" @bind-Value="bulto.AnchoCm" /></td>
+                                <td><InputNumber class="form-control" step="0.1" min="0" aria-label="@($"Alto del bulto {numero}")" @bind-Value="bulto.AltoCm" /></td>
+                                <td>
+                                    @if (_formulario.Bultos.Count > 1)
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => _formulario.Bultos.Remove(bulto)">
+                                            Quitar
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => _formulario.Bultos.Add(new BultoFormulario())">
+                Agregar bulto
+            </button>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary" disabled="@_enviando">
+            @(_enviando ? "Creando..." : "Confirmar")
+        </button>
+    </EditForm>
+}
+
+@code {
+    private static readonly string[] Departamentos =
+    [
+        "Artigas", "Canelones", "Cerro Largo", "Colonia", "Durazno", "Flores", "Florida",
+        "Lavalleja", "Maldonado", "Montevideo", "Paysandú", "Río Negro", "Rivera", "Rocha",
+        "Salto", "San José", "Soriano", "Tacuarembó", "Treinta y Tres",
+    ];
+
+    private NuevoEnvioFormulario _formulario = new();
+    private CrearEnvioResponse? _creado;
+    private string? _error;
+    private bool _enviando;
+
+    private async Task ConfirmarAsync()
+    {
+        _enviando = true;
+        _error = null;
+
+        try
+        {
+            // Ruta absoluta: la API está en /api, fuera de la base /portal/ del Portal.
+            var response = await Http.PostAsJsonAsync("/api/envios", _formulario.ARequest());
+
+            if (response.IsSuccessStatusCode)
+            {
+                _creado = await response.Content.ReadFromJsonAsync<CrearEnvioResponse>();
+            }
+            else
+            {
+                _error = await LeerMotivoAsync(response)
+                    ?? "No se pudo crear el envío. Revisá los datos e intentá de nuevo.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No se pudo conectar con el servidor. Intentá de nuevo.";
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
+    // Un 400 por regla de negocio trae un ProblemDetails con el motivo en "detail".
+    private static async Task<string?> LeerMotivoAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var problema = await response.Content.ReadFromJsonAsync<Problema>();
+            return problema?.Detail;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private void NuevoFormulario()
+    {
+        _formulario = new NuevoEnvioFormulario();
+        _creado = null;
+    }
+
+    private sealed record Problema(string? Title, string? Detail);
+}
