@@ -1,5 +1,7 @@
+using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Logistica.BuildingBlocks.Infrastructure.Persistence;
 
@@ -10,8 +12,12 @@ public static class PersistenceExtensions
         this IServiceCollection services, string? connectionString, string schema)
         where TContext : ModuleDbContext
     {
-        services.AddDbContext<TContext>(options => options.UseNpgsql(
-            connectionString,
+        // Una sola unidad de trabajo (y una sola conexión) por request, para todos los módulos.
+        services.TryAddScoped(_ => new UnidadDeTrabajo(connectionString));
+        services.TryAddScoped<IUnidadDeTrabajo>(sp => sp.GetRequiredService<UnidadDeTrabajo>());
+
+        services.AddDbContext<TContext>((sp, options) => options.UseNpgsql(
+            sp.GetRequiredService<UnidadDeTrabajo>().Conexion,
             npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", schema)));
 
         // Permite que el host migre todos los módulos sin conocer sus DbContext, que son internal.
@@ -22,7 +28,7 @@ public static class PersistenceExtensions
 
     public static async Task MigrateModuleDatabasesAsync(this IServiceProvider services)
     {
-        using var scope = services.CreateScope();
+        await using var scope = services.CreateAsyncScope();
 
         foreach (var db in scope.ServiceProvider.GetServices<ModuleDbContext>())
         {
