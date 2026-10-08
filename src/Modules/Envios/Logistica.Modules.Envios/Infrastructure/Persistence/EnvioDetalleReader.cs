@@ -28,9 +28,9 @@ internal sealed class EnvioDetalleReader(
         }
 
         // Consultas separadas para evitar multiplicar las filas de bultos por las de eventos.
-        return await consulta
+        var encontrado = await consulta
             .AsSplitQuery()
-            .Select(e => new EnvioDetalleDto(
+            .Select(e => new { e.Id, Detalle = new EnvioDetalleDto(
                 e.Numero,
                 e.ComercioId,
                 e.Estado.ToString(),
@@ -63,8 +63,47 @@ internal sealed class EnvioDetalleReader(
                         ev.EstadoNuevo.ToString(),
                         ev.OcurridoEn,
                         ev.Origen.ToString(),
-                        ev.ResponsableId))
-                    .ToList()))
+                        ev.ResponsableId,
+                        ev.Latitud,
+                        ev.Longitud,
+                        ev.Detalle))
+                    .ToList(),
+                e.VersionTarifarioId.HasValue && e.VersionTarifarioNumero.HasValue
+                    ? new VersionTarifarioDetalleDto(e.VersionTarifarioId.Value, e.VersionTarifarioNumero.Value) : null,
+                e.Intentos.OrderBy(i => i.NumeroIntento)
+                    .Select(i => new IntentoEntregaDetalleDto(
+                        i.NumeroIntento, i.FechaHora, i.Resultado.ToString(), i.MotivoNoEntregaId, i.Observaciones,
+                        i.Evidencia == null ? null : new PruebaEntregaDetalleDto(
+                            i.Evidencia.FirmaArchivoId, i.Evidencia.FotoArchivoId, i.Evidencia.NombreReceptor,
+                            i.Evidencia.DocumentoReceptor, i.Evidencia.Latitud, i.Evidencia.Longitud, i.Evidencia.CapturadaEn)))
+                    .ToList(),
+                new List<IncidenciaDetalleDto>(),
+                null) })
             .SingleOrDefaultAsync(ct);
+
+        if (encontrado is null)
+        {
+            return null;
+        }
+
+        var incidencias = db.Incidencias.AsNoTracking()
+            .Where(i => i.EnvioId == encontrado.Id && i.OperadorId == operadorId);
+        var devoluciones = db.Devoluciones.AsNoTracking()
+            .Where(d => d.EnvioId == encontrado.Id && d.OperadorId == operadorId);
+        if (tenant.ComercioId is Guid comercio)
+        {
+            incidencias = incidencias.Where(i => i.ComercioId == comercio);
+            devoluciones = devoluciones.Where(d => d.ComercioId == comercio);
+        }
+
+        return encontrado.Detalle with
+        {
+            Incidencias = await incidencias.OrderBy(i => i.CreadaEn).ThenBy(i => i.Id)
+                .Select(i => new IncidenciaDetalleDto(i.Tipo.ToString(), i.Descripcion, i.Estado.ToString(),
+                    i.CreadaEn, i.ResueltaEn, i.Resolucion)).ToListAsync(ct),
+            Devolucion = await devoluciones.Select(d => new DevolucionDetalleDto(d.Motivo, d.Estado.ToString(),
+                d.IniciadaEn, d.RecibidaEnDepositoEn, d.NombreReceptor, d.DocumentoReceptor,
+                d.EntregadaAlComercioEn)).SingleOrDefaultAsync(ct),
+        };
     }
 }

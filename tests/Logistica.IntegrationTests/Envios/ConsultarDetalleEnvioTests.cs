@@ -36,6 +36,10 @@ public sealed class ConsultarDetalleEnvioTests(PostgresApiFactory factory) : ICl
         Assert.Equal("11300", detalle.Direccion.CodigoPostal);
         Assert.Null(detalle.Direccion.Referencia);
         Assert.Equal(250m, detalle.MontoTarifa);
+        Assert.Null(detalle.VersionTarifario);
+        Assert.Empty(detalle.Intentos);
+        Assert.Empty(detalle.Incidencias);
+        Assert.Null(detalle.Devolucion);
         Assert.Collection(detalle.Bultos,
             b =>
             {

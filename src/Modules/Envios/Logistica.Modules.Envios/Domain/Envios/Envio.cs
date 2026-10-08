@@ -7,6 +7,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
 {
     private readonly List<Bulto> _bultos = [];
     private readonly List<EventoEnvio> _eventos = [];
+    private readonly List<IntentoEntrega> _intentos = [];
 
     public Guid OperadorId { get; private set; }
     public Guid ComercioId { get; private set; }
@@ -15,16 +16,20 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public Direccion Direccion { get; private set; } = null!;
     public EstadoEnvio Estado { get; private set; }
     public decimal MontoTarifa { get; private set; }
+    // Nullable para los envíos admitidos con la tarifa provisoria del esqueleto inicial.
+    public Guid? VersionTarifarioId { get; private set; }
+    public int? VersionTarifarioNumero { get; private set; }
     public DateTimeOffset CreadoEn { get; private set; }
 
     public IReadOnlyList<Bulto> Bultos => _bultos;
     public IReadOnlyList<EventoEnvio> Eventos => _eventos;
+    public IReadOnlyList<IntentoEntrega> Intentos => _intentos;
 
     private Envio() { } // para EF Core
 
     public static Envio Crear(Guid operadorId, Guid comercioId, string numero, Destinatario destinatario,
         Direccion direccion, IReadOnlyList<DatosBulto> bultos, OrigenEvento origen, Guid? responsableId,
-        DateTimeOffset ahora)
+        DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null)
     {
         if (string.IsNullOrWhiteSpace(numero))
         {
@@ -36,6 +41,11 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             throw new DomainException("Un envío debe tener al menos un bulto.");
         }
 
+        if (versionTarifario is not null && (versionTarifario.Id == Guid.Empty || versionTarifario.Numero < 1))
+        {
+            throw new DomainException("La versión tarifaria debe tener identificador y número válidos.");
+        }
+
         var envio = new Envio
         {
             OperadorId = operadorId,
@@ -45,6 +55,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             Direccion = direccion,
             Estado = EstadoEnvio.Admitido,
             CreadoEn = ahora,
+            VersionTarifarioId = versionTarifario?.Id,
+            VersionTarifarioNumero = versionTarifario?.Numero,
         };
 
         foreach (var datos in bultos)
@@ -61,7 +73,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // Único punto que cambia el estado (RF 11) y registra el EventoEnvio (RF 12).
     // Las condiciones propias de cada caso de uso (bultos escaneados, ruta sin despachar...) las
     // controla quien llama; acá sólo se valida que la transición exista en la tabla.
-    public void Transicionar(EstadoEnvio nuevo, OrigenEvento origen, Guid? responsableId, DateTimeOffset ahora)
+    public void Transicionar(EstadoEnvio nuevo, OrigenEvento origen, Guid? responsableId, DateTimeOffset ahora,
+        Ubicacion? ubicacion = null, string? detalle = null)
     {
         if (!TablaTransiciones.Permite(Estado, nuevo))
         {
@@ -70,7 +83,21 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
 
         var anterior = Estado;
         Estado = nuevo;
-        _eventos.Add(new EventoEnvio(this, anterior, nuevo, ahora, origen, responsableId));
+        _eventos.Add(new EventoEnvio(this, anterior, nuevo, ahora, origen, responsableId, ubicacion, detalle));
+    }
+
+    // Los CU-17/18 coordinarán este registro con la transición y las reglas de la versión aplicada.
+    public IntentoEntrega AgregarIntento(int numero, DateTimeOffset fechaHora, ResultadoIntento resultado,
+        Guid? motivoNoEntregaId, PruebaEntrega? evidencia, string? observaciones = null)
+    {
+        if (_intentos.Any(i => i.NumeroIntento == numero))
+        {
+            throw new DomainException("El número de intento ya existe en este envío.");
+        }
+
+        var intento = new IntentoEntrega(this, numero, fechaHora, resultado, motivoNoEntregaId, evidencia, observaciones);
+        _intentos.Add(intento);
+        return intento;
     }
 
     // La tarifa del envío es la suma de sus bultos (CU-10).

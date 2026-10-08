@@ -9,4 +9,8 @@ internal sealed record EnvioDetalleDto(
     DestinatarioDetalleDto Destinatario,
     DireccionDetalleDto Direccion,
     IReadOnlyList<BultoDetalleDto> Bultos,
-    IReadOnlyList<EventoEnvioDetalleDto> Eventos);
+    IReadOnlyList<EventoEnvioDetalleDto> Eventos,
+    VersionTarifarioDetalleDto? VersionTarifario,
+    IReadOnlyList<IntentoEntregaDetalleDto> Intentos,
+    IReadOnlyList<IncidenciaDetalleDto> Incidencias,
+    DevolucionDetalleDto? Devolucion);

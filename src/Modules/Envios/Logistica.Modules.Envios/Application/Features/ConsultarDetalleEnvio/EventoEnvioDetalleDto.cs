@@ -5,4 +5,7 @@ internal sealed record EventoEnvioDetalleDto(
     string EstadoNuevo,
     DateTimeOffset OcurridoEn,
     string Origen,
-    Guid? ResponsableId);
+    Guid? ResponsableId,
+    decimal? Latitud,
+    decimal? Longitud,
+    string? Detalle);

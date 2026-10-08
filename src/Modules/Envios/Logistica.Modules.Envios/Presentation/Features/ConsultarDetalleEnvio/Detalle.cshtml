@@ -79,6 +79,18 @@
     </div>
 </section>
 
+<section class="mb-4" aria-labelledby="tarifa-titulo">
+    <h2 id="tarifa-titulo" class="h4">Cuadro tarifario aplicado</h2>
+    @if (envio.VersionTarifario is { } version)
+    {
+        <p>Versión @version.Numero <span class="text-muted">(@version.Id)</span></p>
+    }
+    else
+    {
+        <p>No se registró una versión tarifaria al admitir este envío.</p>
+    }
+</section>
+
 <section aria-labelledby="historial-titulo">
     <h2 id="historial-titulo" class="h4">Historial de eventos</h2>
     @if (envio.Eventos.Count == 0)
@@ -96,6 +108,8 @@
                         <th scope="col">Estado nuevo</th>
                         <th scope="col">Origen</th>
                         <th scope="col">Responsable</th>
+                        <th scope="col">Ubicación</th>
+                        <th scope="col">Detalle</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -107,10 +121,117 @@
                             <td>@evento.EstadoNuevo</td>
                             <td>@evento.Origen</td>
                             <td class="text-break">@(evento.ResponsableId?.ToString() ?? "Sin informar")</td>
+                            <td>
+                                @if (evento.Latitud.HasValue && evento.Longitud.HasValue)
+                                {
+                                    <span>@evento.Latitud, @evento.Longitud</span>
+                                }
+                                else
+                                {
+                                    <span>Sin informar</span>
+                                }
+                            </td>
+                            <td>@(evento.Detalle ?? "Sin informar")</td>
                         </tr>
                     }
                 </tbody>
             </table>
         </div>
+    }
+</section>
+
+<section class="mt-4" aria-labelledby="intentos-titulo">
+    <h2 id="intentos-titulo" class="h4">Intentos de entrega</h2>
+    @if (envio.Intentos.Count == 0)
+    {
+        <p>No hay intentos de entrega registrados.</p>
+    }
+    @foreach (var intento in envio.Intentos)
+    {
+        <article class="card mb-3">
+            <div class="card-body">
+                <h3 class="h5">Intento @intento.NumeroIntento · @intento.Resultado</h3>
+                <p>Fecha: @Model.MostrarFecha(intento.FechaHora)</p>
+                @if (intento.MotivoNoEntregaId is { } motivo)
+                {
+                    <p>Motivo de no entrega (identificador): @motivo</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(intento.Observaciones))
+                {
+                    <p>@intento.Observaciones</p>
+                }
+                @if (intento.Evidencia is { } evidencia)
+                {
+                    <dl class="row">
+                        <dt class="col-sm-4">Receptor</dt><dd class="col-sm-8">@(evidencia.NombreReceptor ?? "Sin informar")</dd>
+                        <dt class="col-sm-4">Documento</dt><dd class="col-sm-8">@(evidencia.DocumentoReceptor ?? "Sin informar")</dd>
+                        <dt class="col-sm-4">Ubicación</dt><dd class="col-sm-8">@evidencia.Latitud, @evidencia.Longitud</dd>
+                        <dt class="col-sm-4">Capturada</dt><dd class="col-sm-8">@Model.MostrarFecha(evidencia.CapturadaEn)</dd>
+                    </dl>
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (evidencia.FirmaArchivoId is { } firmaId)
+                        {
+                            <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"
+                               href="/backoffice/envios/@Uri.EscapeDataString(envio.Numero)/evidencias/@firmaId">Ver firma del intento @intento.NumeroIntento</a>
+                        }
+                        @if (evidencia.FotoArchivoId is { } fotoId)
+                        {
+                            <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"
+                               href="/backoffice/envios/@Uri.EscapeDataString(envio.Numero)/evidencias/@fotoId">Ver foto del intento @intento.NumeroIntento</a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p>Sin evidencia registrada.</p>
+                }
+            </div>
+        </article>
+    }
+</section>
+
+<section class="mt-4" aria-labelledby="incidencias-titulo">
+    <h2 id="incidencias-titulo" class="h4">Incidencias</h2>
+    @if (envio.Incidencias.Count == 0)
+    {
+        <p>No hay incidencias registradas.</p>
+    }
+    @foreach (var incidencia in envio.Incidencias)
+    {
+        <article class="card mb-3">
+            <div class="card-body">
+                <h3 class="h5">@incidencia.Tipo · @incidencia.Estado</h3>
+                <p>@incidencia.Descripcion</p>
+                <p>Creada: @Model.MostrarFecha(incidencia.CreadaEn)</p>
+                @if (incidencia.ResueltaEn is { } resuelta)
+                {
+                    <p>Resuelta: @Model.MostrarFecha(resuelta)</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(incidencia.Resolucion))
+                {
+                    <p>Resolución: @incidencia.Resolucion</p>
+                }
+            </div>
+        </article>
+    }
+</section>
+
+<section class="mt-4" aria-labelledby="devolucion-titulo">
+    <h2 id="devolucion-titulo" class="h4">Devolución</h2>
+    @if (envio.Devolucion is { } devolucion)
+    {
+        <dl class="row">
+            <dt class="col-sm-4">Estado</dt><dd class="col-sm-8">@devolucion.Estado</dd>
+            <dt class="col-sm-4">Motivo</dt><dd class="col-sm-8">@devolucion.Motivo</dd>
+            <dt class="col-sm-4">Iniciada</dt><dd class="col-sm-8">@Model.MostrarFecha(devolucion.IniciadaEn)</dd>
+            <dt class="col-sm-4">Recibida en depósito</dt><dd class="col-sm-8">@(devolucion.RecibidaEnDepositoEn is { } recibida ? Model.MostrarFecha(recibida) : "Sin registrar")</dd>
+            <dt class="col-sm-4">Entregada al comercio</dt><dd class="col-sm-8">@(devolucion.EntregadaAlComercioEn is { } entregada ? Model.MostrarFecha(entregada) : "Sin registrar")</dd>
+            <dt class="col-sm-4">Receptor</dt><dd class="col-sm-8">@(devolucion.NombreReceptor ?? "Sin informar")</dd>
+            <dt class="col-sm-4">Documento</dt><dd class="col-sm-8">@(devolucion.DocumentoReceptor ?? "Sin informar")</dd>
+        </dl>
+    }
+    else
+    {
+        <p>No hay devolución registrada.</p>
     }
 </section>
