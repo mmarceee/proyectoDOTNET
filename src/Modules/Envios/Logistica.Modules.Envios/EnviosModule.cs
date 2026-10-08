@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
+using Logistica.Modules.Envios.Application.Features.ConsultarDetalleEnvio;
+using Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio;
 
 namespace Logistica.Modules.Envios;
 
@@ -24,6 +26,9 @@ public static class EnviosModule
 
         services.AddScoped<IEnviosListadoReader, EnviosListadoReader>();
         services.AddScoped<ConsultarEnviosHandler>();
+        services.AddScoped<IEnvioDetalleReader, EnvioDetalleReader>();
+        services.AddScoped<ConsultarDetalleEnvioHandler>();
+        services.AddScoped<IArchivoEvidenciaReader, ArchivoEvidenciaReader>();
         services.AddScoped<CrearEnvioHandler>();
 
         // Contrato para los otros módulos (ADR-0001, addendum 3).
@@ -37,6 +42,7 @@ public static class EnviosModule
         var group = endpoints.MapGroup("/api/envios").WithTags("Envios");
 
         CrearEnvioEndpoint.Map(group);
+        EvidenciaEndpoint.Map(endpoints);
 
         return endpoints;
     }

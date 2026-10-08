@@ -13,12 +13,16 @@ internal sealed class EventoEnvio : Entity, IOperadorOwned, IComercioOwned
     public DateTimeOffset OcurridoEn { get; private set; }
     public OrigenEvento Origen { get; private set; }
     public Guid? ResponsableId { get; private set; }
+    public decimal? Latitud { get; private set; }
+    public decimal? Longitud { get; private set; }
+    public string? Detalle { get; private set; }
 
     private EventoEnvio() { } // para EF Core
 
     // Sólo lo llama Envio, al crearse y en cada transición.
     public EventoEnvio(Envio envio, EstadoEnvio? estadoAnterior, EstadoEnvio estadoNuevo,
-        DateTimeOffset ocurridoEn, OrigenEvento origen, Guid? responsableId)
+        DateTimeOffset ocurridoEn, OrigenEvento origen, Guid? responsableId,
+        Ubicacion? ubicacion = null, string? detalle = null)
     {
         EnvioId = envio.Id;
         OperadorId = envio.OperadorId;
@@ -28,5 +32,8 @@ internal sealed class EventoEnvio : Entity, IOperadorOwned, IComercioOwned
         OcurridoEn = ocurridoEn;
         Origen = origen;
         ResponsableId = responsableId;
+        Latitud = ubicacion?.Latitud;
+        Longitud = ubicacion?.Longitud;
+        Detalle = detalle;
     }
 }
