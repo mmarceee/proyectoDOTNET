@@ -1,0 +1,116 @@
+@page "/backoffice/envios/{numero}"
+@model Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio.DetalleModel
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    var envio = Model.Detalle;
+    ViewData["Title"] = $"Envío {envio.Numero}";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1>Envío @envio.Numero</h1>
+        <span class="badge text-bg-secondary">@envio.Estado</span>
+        <span class="ms-2">Fecha de alta: @Model.MostrarFecha(envio.CreadoEn)</span>
+    </div>
+    <a href="@Model.UrlVolver" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <section class="col-12 col-lg-6" aria-labelledby="destinatario-titulo">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 id="destinatario-titulo" class="h4">Destinatario</h2>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Nombre</dt><dd class="col-sm-8">@envio.Destinatario.Nombre</dd>
+                    <dt class="col-sm-4">Teléfono</dt><dd class="col-sm-8">@envio.Destinatario.Telefono</dd>
+                    <dt class="col-sm-4">Email</dt><dd class="col-sm-8 text-break">@(envio.Destinatario.Email ?? "Sin informar")</dd>
+                    <dt class="col-sm-4">Documento</dt><dd class="col-sm-8">@(envio.Destinatario.Documento ?? "Sin informar")</dd>
+                </dl>
+            </div>
+        </div>
+    </section>
+    <section class="col-12 col-lg-6" aria-labelledby="direccion-titulo">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 id="direccion-titulo" class="h4">Dirección de entrega</h2>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Dirección</dt><dd class="col-sm-8">@envio.Direccion.Calle @envio.Direccion.Numero</dd>
+                    <dt class="col-sm-4">Localidad</dt><dd class="col-sm-8">@envio.Direccion.Localidad</dd>
+                    <dt class="col-sm-4">Departamento</dt><dd class="col-sm-8">@envio.Direccion.Departamento</dd>
+                    <dt class="col-sm-4">Código postal</dt><dd class="col-sm-8">@envio.Direccion.CodigoPostal</dd>
+                    <dt class="col-sm-4">Referencia</dt><dd class="col-sm-8">@(envio.Direccion.Referencia ?? "Sin informar")</dd>
+                </dl>
+            </div>
+        </div>
+    </section>
+</div>
+
+<section class="mb-4" aria-labelledby="bultos-titulo">
+    <h2 id="bultos-titulo" class="h4">Bultos (@envio.Bultos.Count)</h2>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Código</th>
+                    <th scope="col">Peso (kg)</th>
+                    <th scope="col">Largo × ancho × alto (cm)</th>
+                    <th scope="col" class="text-end">Tarifa</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var bulto in envio.Bultos)
+                {
+                    <tr>
+                        <td>@bulto.Codigo</td>
+                        <td>@bulto.PesoKg.ToString("0.##")</td>
+                        <td>@bulto.LargoCm.ToString("0.##") × @bulto.AnchoCm.ToString("0.##") × @bulto.AltoCm.ToString("0.##")</td>
+                        <td class="text-end">@bulto.MontoTarifa.ToString("0.00")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th scope="row" colspan="3">Tarifa total</th>
+                    <td class="text-end fw-bold">@envio.MontoTarifa.ToString("0.00")</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</section>
+
+<section aria-labelledby="historial-titulo">
+    <h2 id="historial-titulo" class="h4">Historial de eventos</h2>
+    @if (envio.Eventos.Count == 0)
+    {
+        <p>No hay eventos registrados.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">Fecha y hora</th>
+                        <th scope="col">Estado anterior</th>
+                        <th scope="col">Estado nuevo</th>
+                        <th scope="col">Origen</th>
+                        <th scope="col">Responsable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var evento in envio.Eventos)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@Model.MostrarFecha(evento.OcurridoEn)</td>
+                            <td>@(evento.EstadoAnterior ?? "Alta del envío")</td>
+                            <td>@evento.EstadoNuevo</td>
+                            <td>@evento.Origen</td>
+                            <td class="text-break">@(evento.ResponsableId?.ToString() ?? "Sin informar")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

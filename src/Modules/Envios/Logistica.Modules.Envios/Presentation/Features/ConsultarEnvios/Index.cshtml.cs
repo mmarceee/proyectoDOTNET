@@ -2,6 +2,7 @@ using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Logistica.Modules.Envios.Domain.Envios;
+using System.Globalization;
 
 namespace Logistica.Modules.Envios.Presentation.Features.ConsultarEnvios;
 
@@ -28,6 +29,17 @@ internal sealed class IndexModel(
 
     public ConsultarEnviosResult Resultado { get; private set; } =
         new([], 1, 20, 0);
+
+    public Dictionary<string, string?> ParametrosListado =>
+        new()
+        {
+            [nameof(Pagina)] = Resultado.Pagina == 1 ? null : Resultado.Pagina.ToString(CultureInfo.InvariantCulture),
+            [nameof(TamanoPagina)] = Resultado.TamanoPagina == 20 ? null : Resultado.TamanoPagina.ToString(CultureInfo.InvariantCulture),
+            [nameof(Estado)] = Estado?.ToString(),
+            [nameof(FechaDesde)] = FechaDesde?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            [nameof(FechaHasta)] = FechaHasta?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            [nameof(Texto)] = string.IsNullOrWhiteSpace(Texto) ? null : Texto,
+        };
 
     public async Task<IActionResult> OnGetAsync(CancellationToken ct)
     {

@@ -1,6 +1,7 @@
 @page "/backoffice/envios"
 @model Logistica.Modules.Envios.Presentation.Features.ConsultarEnvios.IndexModel
 @using Logistica.Modules.Envios.Domain.Envios
+@using Microsoft.AspNetCore.WebUtilities
 
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
@@ -83,6 +84,7 @@ else
                     <th scope="col">Estado</th>
                     <th scope="col">Fecha de alta</th>
                     <th scope="col">Monto</th>
+                    <th scope="col">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -95,6 +97,11 @@ else
                         <td>@envio.Estado</td>
                         <td>@envio.CreadoEn.ToString("dd/MM/yyyy HH:mm")</td>
                         <td>@envio.MontoTarifa.ToString("0.00")</td>
+                        <td>
+                            <a class="btn btn-outline-primary btn-sm text-nowrap"
+                               href="@QueryHelpers.AddQueryString($"/backoffice/envios/{Uri.EscapeDataString(envio.Numero)}", Model.ParametrosListado)"
+                               aria-label="Ver detalle del envío @envio.Numero">Ver detalle</a>
+                        </td>
                     </tr>
                 }
             </tbody>

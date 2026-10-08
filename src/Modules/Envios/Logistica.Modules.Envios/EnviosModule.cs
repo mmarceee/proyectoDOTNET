@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
+using Logistica.Modules.Envios.Application.Features.ConsultarDetalleEnvio;
 
 namespace Logistica.Modules.Envios;
 
@@ -24,6 +25,8 @@ public static class EnviosModule
 
         services.AddScoped<IEnviosListadoReader, EnviosListadoReader>();
         services.AddScoped<ConsultarEnviosHandler>();
+        services.AddScoped<IEnvioDetalleReader, EnvioDetalleReader>();
+        services.AddScoped<ConsultarDetalleEnvioHandler>();
         services.AddScoped<CrearEnvioHandler>();
 
         // Contrato para los otros módulos (ADR-0001, addendum 3).
