@@ -94,7 +94,7 @@ else
                         <td>@envio.Numero</td>
                         <td>@envio.DestinatarioNombre</td>
                         <td>@envio.Localidad</td>
-                        <td>@envio.Estado</td>
+                        <td><span class="badge @EstadoEnvioBadge.Clase(envio.Estado)">@envio.Estado</span></td>
                         <td>@envio.CreadoEn.ToString("dd/MM/yyyy HH:mm")</td>
                         <td>@envio.MontoTarifa.ToString("0.00")</td>
                         <td>
