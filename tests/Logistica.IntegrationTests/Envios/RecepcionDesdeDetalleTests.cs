@@ -5,6 +5,7 @@ using Logistica.Http.Contracts.Deposito;
 using Logistica.Http.Contracts.Envios;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
+using Logistica.BuildingBlocks.Infrastructure.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Logistica.IntegrationTests.Envios;
@@ -99,11 +100,16 @@ public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : ICl
         var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         var entidad = await db.Envios.FindAsync(envio.Id);
         entidad!.Transicionar(EstadoEnvio.Cancelado, OrigenEvento.PortalComercio, null, DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
         var ajeno = Envio.Crear(Guid.NewGuid(), Guid.NewGuid(), $"ENV-AJENO-{Guid.NewGuid():N}",
             new Destinatario("Ajeno", "099000000"), new Direccion("Calle", "1", "Montevideo", "Montevideo", "11200"),
             [new DatosBulto(2, 30, 20, 10, 200)], OrigenEvento.PortalComercio, null, DateTimeOffset.UtcNow);
-        db.Envios.Add(ajeno);
-        await db.SaveChangesAsync();
+        await using (var dbAjeno = ActivatorUtilities.CreateInstance<EnviosDbContext>(scope.ServiceProvider,
+            new InquilinoFijo(ajeno.OperadorId, ajeno.ComercioId)))
+        {
+            dbAjeno.Envios.Add(ajeno);
+            await dbAjeno.SaveChangesAsync();
+        }
 
         var detalle = await client.GetStringAsync($"/backoffice/envios/{envio.Numero}");
         Assert.DoesNotContain("Recepcionar</a>", detalle);

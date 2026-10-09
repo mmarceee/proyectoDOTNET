@@ -2,7 +2,7 @@
 
 Fecha: 09/10/2026. Responsable: Lucas. Estado: implementado para desarrollo, pendiente de integración y cierre.
 
-Lucas autorizó preparar CU-40 mientras Ezequiel termina el aislamiento por inquilino. Se verificó la implementación en origin/marce, commit ebea3bc, con 124 pruebas aprobadas; ver [revisión y ajustes de integración](revision-marce.md). Sus archivos todavía no están integrados en este checkout. La implementación no declara satisfecho ese requisito.
+Lucas autorizó preparar CU-40 mientras Ezequiel termina el aislamiento por inquilino. Se verificó la implementación en origin/marce, commit ebea3bc, con 124 pruebas aprobadas; ver [revisión y ajustes de integración](revision-marce.md). Al resolver el merge iniciado por Lucas se incorporó el aislamiento al CU-40, conservando su participación transaccional y extendiendo el filtro a Outbox. El cierre sigue pendiente de sesión real y las comprobaciones restantes.
 
 ## Disponible
 
@@ -48,10 +48,10 @@ El script copia el checkout dentro del contenedor y compila allí, evitando los 
 
 ## Integración pendiente
 
-1. Integrar ModuleDbContext, TenantSaveChangesInterceptor, InquilinoFijo y AislamientoTests de Ezequiel. Añadir ICurrentTenant al constructor de PlanificacionDbContext y adaptar los demás contextos conforme a esa versión. Conservar ParticiparEnTransaccionAsync, que CU-40 necesita antes del bloqueo SQL.
-2. Retirar las guardas temporales de consultas en AdministracionModuleApi, RutaRepository y DepositoModuleApi; adaptar EnvioRepository según el cambio transversal. Confirmar que el filtro Tenant cubra raíces, paradas, BultosValidacionRuta y OutboxMessage, todos marcados IOperadorOwned.
+1. Integración realizada: ModuleDbContext, TenantSaveChangesInterceptor, InquilinoFijo y AislamientoTests de Ezequiel. PlanificacionDbContext recibe ICurrentTenant. Se conserva ParticiparEnTransaccionAsync, que CU-40 necesita antes del bloqueo SQL.
+2. Guardas temporales retiradas de AdministracionModuleApi, RutaRepository, DepositoModuleApi y EnvioRepository. El filtro Tenant se aplica también a tipos IOperadorOwned que no heredan Entity, cubriendo OutboxMessage. Se agregaron pruebas A/B, sesión ausente y escrituras ajenas para rutas, paradas, evidencia y Outbox.
 3. Adaptar el seed a InquilinoFijo. No sembrar filas de varios operadores con el contexto del request. Resolver la combinación de snapshots/migraciones del trabajo paralelo y comprobar creación desde cero y actualización desde la base anterior.
-4. Ejecutar aislamiento A/B, sesión ausente, escritura ajena, cambio de propietario e hijos/historial. Revisar el SQL parametrizado del bloqueo: Operador es global y su ID se obtiene exclusivamente de ICurrentTenant.
+4. Ampliar las comprobaciones combinadas a recursos y operaciones HTTP con sesión real, además de las pruebas de aislamiento y concurrencia ya incorporadas. Revisar el SQL parametrizado del bloqueo: Operador es global y su ID se obtiene exclusivamente de ICurrentTenant.
 5. Integrar Identity del trabajo correspondiente: operador resuelto desde claims, perfil Despachador, responsable desde NameIdentifier y middleware del host. El filtro de acceso actual ya exige autenticación/perfil fuera de desarrollo, pero no instala Identity. Añadir pruebas con usuarios de distintos operadores, dos despachadores del mismo operador y usuario de comercio. Mantener las comprobaciones antiforgery.
 6. Conectar el publicador transversal del ADR-0003. EnvioAsignadoARuta.v1 ya queda en Outbox junto con la asignación; se conserva el mismo MessageId en fila y contenido. La publicación y el consumidor no se consideran implementados por guardar el mensaje.
 
@@ -61,8 +61,8 @@ CU-40 se mantiene pendiente de cierre hasta integrar aislamiento y sesión real,
 
 ## Verificación realizada
 
-La solución compiló en Release con cero errores y cero advertencias. Suite completa: **141 pruebas aprobadas**, ninguna fallida ni omitida: 40 unitarias, 42 de arquitectura y 59 de integración.
+La solución combinada con marce compiló en Release con cero errores y cero advertencias. Suite completa después de resolver el merge: **155 pruebas aprobadas**, ninguna fallida ni omitida: 40 unitarias, 42 de arquitectura y 73 de integración.
 
 La cobertura nueva comprueba límites exactos, sumas, encaje con rotación, fechas/franjas, historial independiente de las paradas, reservas y estados. En PostgreSQL verifica creación y T3/T13, recepción con respaldo parcial, capacidad acumulada, modificación fallida sin cambios, dos solicitudes por el mismo envío o recursos, dos agregados con igual revisión, revisión vencida, bloqueo por ruta EnCurso anterior y fallo inyectado después de guardar Envíos con reversión de eventos y Outbox. También comprueba el índice con SQL directo, prevalidación sin persistir, confirmación desde Razor, antiforgery, rechazo sin sesión y que la opción de desarrollo no habilita Production.
 
-Las pruebas de aislamiento transversal y autenticación con claims reales siguen pendientes de las integraciones indicadas. Estos resultados no certifican esas dependencias ni los flujos vecinos de CU-04/41/43/51/55.
+La suite incluye las pruebas transversales de Ezequiel y tres nuevas pruebas de aislamiento para Planificación y Outbox. Las pruebas HTTP con claims reales siguen pendientes de Identity. Estos resultados no certifican esa dependencia ni los flujos vecinos de CU-04/41/43/51/55.

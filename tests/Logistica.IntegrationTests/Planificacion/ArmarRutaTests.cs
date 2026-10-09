@@ -138,7 +138,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         {
             b.UseSetting("Planificacion:HabilitarDesarrolloSinIdentity", "true");
             b.ConfigureTestServices(s => s.AddScoped<IRutaRepository>(p => new RepositorioQueFalla(
-                new RutaRepository(p.GetRequiredService<PlanificacionDbContext>(), p.GetRequiredService<ICurrentTenant>()))));
+                new RutaRepository(p.GetRequiredService<PlanificacionDbContext>()))));
         });
         using var client = host.CreateClient();
         var response = await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(new(2035, 1, 7), envio.Id));

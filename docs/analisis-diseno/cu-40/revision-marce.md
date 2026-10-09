@@ -39,3 +39,11 @@ El filtro/interceptor están preparados para recibir un tenant real, pero no aut
 El publicador de Outbox y los consumidores siguen como dependencia transversal de mensajería; no forman parte del commit de aislamiento revisado.
 
 La base del trabajo de Ezequiel permite avanzar con la integración. El cierre del CU-40 sigue requiriendo las adaptaciones anteriores, sesión real y pruebas combinadas. Los resultados de la rama por separado no certifican la combinación con lukovski.
+
+## Resolución del merge iniciado por Lucas
+
+Se combinó EnvioRepository conservando las operaciones de planificación y registro de asignación, usando el filtro global en lugar de DelInquilino. Se adaptó PlanificacionDbContext al nuevo constructor y se retiraron las guardas temporales de consultas nuevas. ModuleDbContext mantiene ParticiparEnTransaccionAsync y aplica Tenant a todos los tipos con el marcador, incluido OutboxMessage.
+
+Se añadieron pruebas de aislamiento de rutas, paradas, evidencia y Outbox. La prueba existente de recepción que preparaba un envío ajeno usa ahora un contexto con InquilinoFijo, sin deshabilitar el interceptor. El conflicto se marcó resuelto en el índice de Git; no se generó el commit del merge.
+
+Verificación de la combinación: compilación sin errores ni advertencias y **155 pruebas aprobadas** (40 unitarias, 42 de arquitectura y 73 de integración), ninguna fallida ni omitida.

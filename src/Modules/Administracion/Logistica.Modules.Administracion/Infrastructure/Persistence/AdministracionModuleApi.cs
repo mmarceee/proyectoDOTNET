@@ -24,12 +24,10 @@ internal sealed class AdministracionModuleApi(AdministracionDbContext db, ICurre
     }
     public async Task<RecursosPlanificacion> ConsultarRecursosPlanificacionAsync(DateOnly fecha, CancellationToken ct)
     {
-        // Se retira la guarda explícita al integrar el filtro global de Ezequiel; no se crea otro interceptor.
-        var operador = Operador;
-        var repartidores = await db.Repartidores.AsNoTracking().Where(r => r.OperadorId == operador && r.Activo).OrderBy(r => r.Nombre).ToListAsync(ct);
-        var vehiculos = await db.Vehiculos.AsNoTracking().Where(v => v.OperadorId == operador && v.Activo).OrderBy(v => v.Matricula).ToListAsync(ct);
-        var zonas = await db.Zonas.AsNoTracking().Where(z => z.OperadorId == operador && z.Activa).ToListAsync(ct);
-        var franjas = await db.Franjas.AsNoTracking().Where(f => f.OperadorId == operador).ToListAsync(ct);
+        var repartidores = await db.Repartidores.AsNoTracking().Where(r => r.Activo).OrderBy(r => r.Nombre).ToListAsync(ct);
+        var vehiculos = await db.Vehiculos.AsNoTracking().Where(v => v.Activo).OrderBy(v => v.Matricula).ToListAsync(ct);
+        var zonas = await db.Zonas.AsNoTracking().Where(z => z.Activa).ToListAsync(ct);
+        var franjas = await db.Franjas.AsNoTracking().ToListAsync(ct);
         return new(repartidores.Select(r => new RepartidorPlanificacion(r.Id, r.Nombre, r.Activo)).ToList(),
             vehiculos.Select(v => new VehiculoPlanificacion(v.Id, v.Matricula, v.Activo, v.CapacidadPesoKg,
                 v.CapacidadVolumenM3, v.LargoCargaCm, v.AnchoCargaCm, v.AltoCargaCm)).ToList(),
@@ -38,17 +36,15 @@ internal sealed class AdministracionModuleApi(AdministracionDbContext db, ICurre
     }
     public async Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct)
     {
-        var operador = Operador;
-        var regla = await db.ReglasPlanificacion.AsNoTracking().Where(r => r.OperadorId == operador
-            && r.VigenteDesde <= ahora && (r.VigenteHasta == null || ahora < r.VigenteHasta)).OrderByDescending(r => r.VigenteDesde).FirstOrDefaultAsync(ct)
+        var regla = await db.ReglasPlanificacion.AsNoTracking().Where(r => r.VigenteDesde <= ahora
+            && (r.VigenteHasta == null || ahora < r.VigenteHasta)).OrderByDescending(r => r.VigenteDesde).FirstOrDefaultAsync(ct)
             ?? throw new DomainException("El operador no tiene reglas de planificación vigentes.");
         return new(regla.Id, regla.MaxParadasPorRuta);
     }
     public async Task<IReadOnlyList<FranjaPlanificacion>> ResolverFranjasAsync(IReadOnlyCollection<Guid> ids, DateOnly fecha, CancellationToken ct)
     {
-        var operador = Operador;
-        var zonasActivas = await db.Zonas.AsNoTracking().Where(z => z.OperadorId == operador && z.Activa).Select(z => z.Id).ToListAsync(ct);
-        var franjas = await db.Franjas.AsNoTracking().Where(f => f.OperadorId == operador).ToListAsync(ct);
+        var zonasActivas = await db.Zonas.AsNoTracking().Where(z => z.Activa).Select(z => z.Id).ToListAsync(ct);
+        var franjas = await db.Franjas.AsNoTracking().ToListAsync(ct);
         var resultado = new List<FranjaPlanificacion>();
         foreach (var id in ids.Distinct())
         {

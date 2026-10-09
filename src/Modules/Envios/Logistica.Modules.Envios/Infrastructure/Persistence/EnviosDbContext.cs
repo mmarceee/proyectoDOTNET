@@ -2,12 +2,13 @@ using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Domain.Incidencias;
 using Logistica.Modules.Envios.Domain.Devoluciones;
+using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
 
-internal sealed class EnviosDbContext(DbContextOptions<EnviosDbContext> options, UnidadDeTrabajo unidadDeTrabajo)
-    : ModuleDbContext(options, Schema, unidadDeTrabajo)
+internal sealed class EnviosDbContext(DbContextOptions<EnviosDbContext> options, UnidadDeTrabajo unidadDeTrabajo, ICurrentTenant tenant)
+    : ModuleDbContext(options, Schema, unidadDeTrabajo, tenant)
 {
     public const string Schema = "envios";
 
