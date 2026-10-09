@@ -2,7 +2,7 @@
 
 Fecha: 09/10/2026. Responsable: Lucas. Estado: implementado para desarrollo, pendiente de integración y cierre.
 
-Lucas autorizó preparar CU-40 mientras Ezequiel termina el aislamiento por inquilino. La guía compartida describe la infraestructura objetivo; sus archivos todavía no están integrados en este checkout. La implementación no declara satisfecho ese requisito.
+Lucas autorizó preparar CU-40 mientras Ezequiel termina el aislamiento por inquilino. Se verificó la implementación en origin/marce, commit ebea3bc, con 124 pruebas aprobadas; ver [revisión y ajustes de integración](revision-marce.md). Sus archivos todavía no están integrados en este checkout. La implementación no declara satisfecho ese requisito.
 
 ## Disponible
 
