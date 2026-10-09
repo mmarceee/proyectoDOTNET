@@ -4,10 +4,11 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Globalization;
+using Logistica.Modules.Deposito.Contracts;
 
 namespace Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio;
 
-internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler) : PageModel
+internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler, IDepositoModuleApi deposito) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public int Pagina { get; set; } = 1;
@@ -28,6 +29,10 @@ internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler) : PageM
     public string? Texto { get; set; }
 
     public EnvioDetalleDto Detalle { get; private set; } = null!;
+    public IReadOnlySet<Guid> BultosRecibidos { get; private set; } = new HashSet<Guid>();
+
+    public string UrlRecepcion(string codigoBulto) => QueryHelpers.AddQueryString(
+        "/backoffice/deposito/recepcion", "CodigoBulto", codigoBulto);
 
     // El destino siempre es el listado; sólo se conservan sus parámetros de navegación.
     public string UrlVolver => QueryHelpers.AddQueryString("/backoffice/envios",
@@ -55,6 +60,8 @@ internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler) : PageM
         }
 
         Detalle = detalle;
+        BultosRecibidos = (await deposito.BultosRecibidosAsync(
+            detalle.Bultos.Select(b => b.Id).ToArray(), ct)).ToHashSet();
         return Page();
     }
 

@@ -1,4 +1,5 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.Modules.Deposito.Contracts;
 using Logistica.Modules.Deposito.Application.Features.RecibirBulto;
 using Logistica.Modules.Deposito.Domain.Recepciones;
 using Logistica.Modules.Deposito.Infrastructure.Persistence;
@@ -18,6 +19,7 @@ public static class DepositoModule
     {
         services.AddModuleDbContext<DepositoDbContext>(configuration.GetConnectionString("Postgres"), DepositoDbContext.Schema);
         services.AddScoped<IRecepcionRepository, RecepcionRepository>();
+        services.AddScoped<IDepositoModuleApi, DepositoModuleApi>();
 
         services.AddScoped<RecibirBultoHandler>();
 
