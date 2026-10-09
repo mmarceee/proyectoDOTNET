@@ -50,6 +50,7 @@ internal sealed class EnvioDetalleReader(
                     e.Direccion.Referencia),
                 e.Bultos.OrderBy(b => b.Codigo)
                     .Select(b => new BultoDetalleDto(
+                        b.Id,
                         b.Codigo,
                         b.PesoKg,
                         b.LargoCm,

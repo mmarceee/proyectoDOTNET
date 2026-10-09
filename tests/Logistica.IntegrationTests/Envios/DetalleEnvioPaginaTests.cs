@@ -38,7 +38,7 @@ public sealed class DetalleEnvioPaginaTests(PostgresApiFactory factory) : IClass
         Assert.Contains("Tarifa total", html);
         Assert.Contains("Historial de eventos", html);
         Assert.Contains("Alta del envío", html);
-        Assert.Contains("PortalComercio", html);
+        Assert.Contains("Portal del comercio", html);
         Assert.Contains("No se registró una versión tarifaria", html);
         Assert.Contains("No hay intentos de entrega registrados", html);
         Assert.Contains("No hay incidencias registradas", html);

@@ -81,3 +81,18 @@ button.accept-policy {
   white-space: nowrap;
   line-height: 60px;
 }
+
+.badge-envio-transito {
+    background-color: #6f42c1;
+    color: #fff;
+}
+
+.badge-envio-en-devolucion {
+    background-color: #ffdab9;
+    color: #000;
+}
+
+.badge-envio-cancelado {
+    background-color: #800020;
+    color: #fff;
+}

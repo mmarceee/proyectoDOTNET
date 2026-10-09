@@ -4,11 +4,17 @@ internal static class EstadoEnvioBadge
 {
     public static string Clase(string estado) => estado switch
     {
+        "Admitido" => "text-bg-info",
+        "EnDeposito" => "text-bg-secondary",
+        "AsignadoARuta" => "text-bg-primary",
+        "EnTransito" => "badge-envio-transito",
         "Entregado" => "text-bg-success",
-        "Devuelto" or "EnDevolucion" => "badge-envio-devolucion",
-        "NoEntregado" or "Extraviado" or "Cancelado" => "text-bg-danger",
+        "NoEntregado" => "text-bg-danger",
         "Reprogramado" => "text-bg-warning",
-        "AsignadoARuta" or "EnTransito" => "text-bg-primary",
+        "EnDevolucion" => "badge-envio-en-devolucion",
+        "Devuelto" => "badge-envio-devolucion",
+        "Extraviado" => "text-bg-dark",
+        "Cancelado" => "badge-envio-cancelado",
         _ => "text-bg-secondary",
     };
 }

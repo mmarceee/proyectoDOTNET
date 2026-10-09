@@ -10,7 +10,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
         <h1>Envío @envio.Numero</h1>
-        <span class="badge @EstadoEnvioBadge.Clase(envio.Estado)">@envio.Estado</span>
+        <span class="badge @EstadoEnvioBadge.Clase(envio.Estado)">@EstadoEnvioTexto.Mostrar(envio.Estado)</span>
         <span class="ms-2">Fecha de alta: @Model.MostrarFecha(envio.CreadoEn)</span>
     </div>
     <a href="@Model.UrlVolver" class="btn btn-outline-secondary">Volver al listado</a>
@@ -56,6 +56,8 @@
                     <th scope="col">Peso (kg)</th>
                     <th scope="col">Largo × ancho × alto (cm)</th>
                     <th scope="col" class="text-end">Tarifa</th>
+                    <th scope="col">Recepción</th>
+                    <th scope="col">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -66,6 +68,14 @@
                         <td>@bulto.PesoKg.ToString("0.##")</td>
                         <td>@bulto.LargoCm.ToString("0.##") × @bulto.AnchoCm.ToString("0.##") × @bulto.AltoCm.ToString("0.##")</td>
                         <td class="text-end">@bulto.MontoTarifa.ToString("0.00")</td>
+                        <td>@(Model.BultosRecibidos.Contains(bulto.Id) ? "Recibido" : "Pendiente")</td>
+                        <td>
+                            @if (envio.Estado == "Admitido" && !Model.BultosRecibidos.Contains(bulto.Id))
+                            {
+                                <a href="@Model.UrlRecepcion(bulto.Codigo)" class="btn btn-outline-primary btn-sm"
+                                   aria-label="Recepcionar bulto @bulto.Codigo">Recepcionar</a>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -73,6 +83,7 @@
                 <tr>
                     <th scope="row" colspan="3">Tarifa total</th>
                     <td class="text-end fw-bold">@envio.MontoTarifa.ToString("0.00")</td>
+                    <td colspan="2"></td>
                 </tr>
             </tfoot>
         </table>
@@ -117,9 +128,9 @@
                     {
                         <tr>
                             <td class="text-nowrap">@Model.MostrarFecha(evento.OcurridoEn)</td>
-                            <td>@(evento.EstadoAnterior ?? "Alta del envío")</td>
-                            <td>@evento.EstadoNuevo</td>
-                            <td>@evento.Origen</td>
+                            <td>@(evento.EstadoAnterior is null ? "Alta del envío" : EstadoEnvioTexto.Mostrar(evento.EstadoAnterior))</td>
+                            <td>@EstadoEnvioTexto.Mostrar(evento.EstadoNuevo)</td>
+                            <td>@OrigenEventoTexto.Mostrar(evento.Origen)</td>
                             <td class="text-break">@(evento.ResponsableId?.ToString() ?? "Sin informar")</td>
                             <td>
                                 @if (evento.Latitud.HasValue && evento.Longitud.HasValue)

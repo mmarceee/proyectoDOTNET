@@ -8,6 +8,10 @@
 }
 
 <h1>Recepción en depósito</h1>
+@if (Model.UrlDetalle is { } urlDetalle)
+{
+    <a href="@urlDetalle" class="btn btn-outline-secondary mb-3">Volver al detalle del envío</a>
+}
 <p class="text-muted">
     Escaneá el código del bulto. El lector funciona como un teclado: escribe el código y presiona Enter.
     El peso y las medidas son opcionales.
@@ -33,7 +37,7 @@
 
         @if (resultado.EnvioEnDeposito)
         {
-            <div class="mt-2"><strong>Llegaron todos los bultos: el envío pasó a EnDeposito.</strong></div>
+            <div class="mt-2"><strong>Llegaron todos los bultos: el envío pasó a estado en Depósito.</strong></div>
         }
     </div>
 
