@@ -16,6 +16,10 @@ internal sealed class RecepcionDeposito : Entity, IOperadorOwned
     public DateTimeOffset RecibidoEn { get; private set; }
     public ResultadoRecepcion Resultado { get; private set; }
     public string? Discrepancia { get; private set; }
+    public decimal? PesoKg { get; private set; }
+    public decimal? LargoCm { get; private set; }
+    public decimal? AnchoCm { get; private set; }
+    public decimal? AltoCm { get; private set; }
 
     private RecepcionDeposito() { } // para EF Core
 
@@ -35,6 +39,10 @@ internal sealed class RecepcionDeposito : Entity, IOperadorOwned
             EnvioId = envioId,
             BultoId = bultoId,
             RecibidoEn = ahora,
+            PesoKg = medidas.PesoKg,
+            LargoCm = medidas.LargoCm,
+            AnchoCm = medidas.AnchoCm,
+            AltoCm = medidas.AltoCm,
             Resultado = diferencias.Count == 0 ? ResultadoRecepcion.Conforme : ResultadoRecepcion.ConDiscrepancia,
             Discrepancia = diferencias.Count == 0 ? null : string.Join("; ", diferencias),
         };

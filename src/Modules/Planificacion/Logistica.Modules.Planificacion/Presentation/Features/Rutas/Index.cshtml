@@ -1,0 +1,10 @@
+@page "/backoffice/rutas"
+@model IndexModel
+@{ ViewData["Title"] = "Rutas"; }
+<div class="d-flex justify-content-between align-items-center mb-3"><h1>Rutas</h1><a class="btn btn-primary" href="/backoffice/rutas/nueva">Nueva ruta</a></div>
+@if (Model.Desarrollo) { <div class="alert alert-warning">Modo de desarrollo. La integración del tenant y la autenticación está pendiente.</div> }
+<form method="get" class="d-flex gap-2 mb-3"><input asp-for="Fecha" type="date" class="form-control" aria-label="Fecha de ruta" onchange="this.form.requestSubmit()" /><button class="btn btn-outline-primary">Filtrar</button><a href="/backoffice/rutas" class="btn btn-outline-secondary text-nowrap">Limpiar filtros</a></form>
+<table class="table"><thead><tr><th>Fecha</th><th>Estado</th><th>Paradas</th><th>Revisión</th><th></th></tr></thead><tbody>
+@foreach (var ruta in Model.Rutas) { <tr><td>@ruta.Fecha.ToString("dd/MM/yyyy")</td><td>@ruta.Estado</td><td>@ruta.Paradas.Count</td><td>@ruta.Revision</td><td><a href="/backoffice/rutas/@ruta.Id">Abrir ruta</a></td></tr> }
+</tbody></table>
+@if (Model.Rutas.Count == 0) { <p>No hay rutas para mostrar.</p> }

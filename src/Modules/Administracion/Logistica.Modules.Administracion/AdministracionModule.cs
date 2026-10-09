@@ -17,6 +17,7 @@ public static class AdministracionModule
             configuration.GetConnectionString("Postgres"), AdministracionDbContext.Schema);
 
         services.AddScoped<DatosIniciales>();
+        services.AddScoped<Contracts.IAdministracionModuleApi, AdministracionModuleApi>();
 
         return services;
     }

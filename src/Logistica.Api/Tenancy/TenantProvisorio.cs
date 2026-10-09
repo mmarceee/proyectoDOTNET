@@ -21,7 +21,7 @@ internal sealed class TenantProvisorio(
                 return null;
             }
 
-            if (contexto.Request.Path.StartsWithSegments("/backoffice"))
+            if (contexto.Request.Path.StartsWithSegments("/backoffice") || contexto.Request.Path.StartsWithSegments("/api/planificacion"))
             {
                 return null;
             }

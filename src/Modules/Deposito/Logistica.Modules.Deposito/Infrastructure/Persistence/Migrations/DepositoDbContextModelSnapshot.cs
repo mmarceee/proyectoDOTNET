@@ -28,6 +28,12 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("AltoCm")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("AnchoCm")
+                        .HasColumnType("numeric");
+
                     b.Property<Guid>("BultoId")
                         .HasColumnType("uuid");
 
@@ -37,8 +43,14 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("EnvioId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("LargoCm")
+                        .HasColumnType("numeric");
+
                     b.Property<Guid>("OperadorId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PesoKg")
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset>("RecibidoEn")
                         .HasColumnType("timestamp with time zone");

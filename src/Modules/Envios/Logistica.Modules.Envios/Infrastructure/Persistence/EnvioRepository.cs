@@ -37,6 +37,21 @@ internal sealed class EnvioRepository(EnviosDbContext db, ICurrentTenant tenant)
         return db.SaveChangesAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct)
+    {
+        var consulta = DelInquilino().Include(e => e.Bultos).AsQueryable();
+        consulta = envioIds is null ? consulta.Where(e => e.Estado == EstadoEnvio.EnDeposito || e.Estado == EstadoEnvio.Reprogramado)
+            : consulta.Where(e => envioIds.Contains(e.Id));
+        return await consulta.OrderBy(e => e.Numero).ToListAsync(ct);
+    }
+    public void RegistrarAsignacion(Guid operadorId, Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
+    {
+        var messageId = Guid.CreateVersion7();
+        db.OutboxMessages.Add(Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage.Crear(operadorId,
+            "EnvioAsignadoARuta.v1", new { MessageId = messageId, OperadorId = operadorId, EnvioId = envioId,
+                RutaId = rutaId, ResponsableId = responsableId, OcurridoEn = ahora, Origen = "Backoffice", Version = 1 }, ahora, messageId));
+    }
+
     // Filtro de inquilino manual hasta que exista el filtro global "Tenant" (ADR-0002, 15/10).
     // Falla cerrado: sin operador no devuelve nada.
     private IQueryable<Envio> DelInquilino()

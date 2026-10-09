@@ -27,6 +27,8 @@ public abstract class ModuleDbContext(DbContextOptions options, string schema, U
     // Dentro de una unidad de trabajo, EF no abre su propia transacción: usa la compartida.
     // Cuando la unidad termina, se desengancha (UseTransaction(null)) para que los próximos
     // guardados vuelvan a tener su transacción propia.
+    public Task ParticiparEnTransaccionAsync(CancellationToken ct) => SumarseATransaccionCompartidaAsync(ct);
+
     private async Task SumarseATransaccionCompartidaAsync(CancellationToken ct)
     {
         var compartida = unidadDeTrabajo.Transaccion;

@@ -1,0 +1,55 @@
+@model RutaEditorModel
+@if (Model.Desarrollo) { <div class="alert alert-warning">Modo de desarrollo. Pendiente de integrar tenant y autenticación.</div> }
+<div asp-validation-summary="All" class="text-danger mb-3"></div>
+<form method="post" data-filtros-ruta>
+    <input asp-for="Id" type="hidden" /><input asp-for="RevisionEsperada" type="hidden" />
+    <div class="row g-3 mb-3">
+        <div class="col-md-4"><label asp-for="Fecha" class="form-label">Fecha</label><input asp-for="Fecha" type="date" class="form-control" required data-filtro-ruta /></div>
+        <div class="col-md-4"><label asp-for="RepartidorId" class="form-label">Repartidor</label><select asp-for="RepartidorId" class="form-select" required><option value="">Seleccionar</option>@foreach (var r in Model.Recursos.Repartidores) { <option value="@r.Id">@r.Nombre</option> }</select></div>
+        <div class="col-md-4"><label asp-for="VehiculoId" class="form-label">Vehículo</label><select asp-for="VehiculoId" class="form-select" required><option value="">Seleccionar</option>@foreach (var v in Model.Recursos.Vehiculos) { <option value="@v.Id">@v.Matricula · @v.CapacidadPesoKg kg · @v.CapacidadVolumenM3 m³</option> }</select></div>
+    </div>
+    @if (Model.Id is not null) { <button asp-page-handler="Modificar" class="btn btn-outline-primary mb-3">Confirmar cambio de fecha o recursos</button> }
+    <h2>Envíos disponibles</h2>
+    <p>@Model.TotalCandidatos envíos · Página @Model.Pagina</p>
+    <label asp-for="Pagina">Página de resultados</label><input asp-for="Pagina" type="number" min="1" class="form-control mb-2" data-filtro-ruta />
+    <div class="row g-2 mb-3">
+        <div class="col-md-3"><label asp-for="ZonaId" class="form-label">Zona</label><select asp-for="ZonaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var z in Model.Recursos.Zonas) { <option value="@z.Id">@z.Nombre</option> }</select></div>
+        <div class="col-md-3"><label asp-for="FranjaId" class="form-label">Franja</label><select asp-for="FranjaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var f in Model.Recursos.Franjas) { <option value="@f.Id">@f.Desde.ToString("HH:mm")–@f.Hasta.ToString("HH:mm")</option> }</select></div>
+        <div class="col-md-4"><label asp-for="Texto" class="form-label">Número o dirección</label><input asp-for="Texto" class="form-control" data-filtro-ruta /></div>
+        <div class="col-md-2 align-self-end d-flex flex-wrap gap-2">
+            <button asp-page-handler="Filtrar" class="btn btn-outline-secondary" formnovalidate data-filtrar-ruta>Filtrar</button>
+            <button asp-page-handler="LimpiarFiltros" class="btn btn-outline-secondary" formnovalidate>Limpiar filtros</button>
+        </div>
+    </div>
+    <table class="table"><thead><tr><th>Seleccionar</th><th>Envío</th><th>Dirección</th><th>Peso kg</th><th>Volumen m³</th></tr></thead><tbody>
+    @foreach (var e in Model.Candidatos)
+    {
+        <tr><td><input type="checkbox" name="Seleccion" value="@e.Id" checked="@Model.Seleccion.Contains(e.Id)" aria-label="Seleccionar @e.Numero" /></td><td>@e.Numero</td><td>@e.Direccion</td><td>@e.PesoKg</td><td>@e.VolumenM3.ToString("0.######")</td></tr>
+    }
+    </tbody></table>
+    @foreach (var id in Model.Seleccion.Where(id => Model.Candidatos.All(e => e.Id != id)))
+    {
+        <input type="hidden" name="Seleccion" value="@id" />
+        <p class="text-warning">Hay un envío seleccionado que no está disponible para este día. La confirmación volverá a comprobarlo.</p>
+    }
+    @if (Model.Evaluacion is { } evaluacion)
+    {
+        <div class="alert @(evaluacion.Valida ? "alert-success" : "alert-danger")">
+            <p>Peso: @evaluacion.PesoKg / @evaluacion.CapacidadPesoKg kg · Volumen: @evaluacion.VolumenM3.ToString("0.######") / @evaluacion.CapacidadVolumenM3 m³ · Paradas: @evaluacion.Paradas / @evaluacion.MaxParadas</p>
+            @foreach (var r in evaluacion.Restricciones) { <p class="mb-0">@r.Mensaje</p> }
+        </div>
+    }
+    <button asp-page-handler="Validar" class="btn btn-outline-primary">Validar selección</button>
+    @if (Model.Evaluacion?.Valida == true) { <button asp-page-handler="Confirmar" class="btn btn-primary">@(Model.Id is null ? "Confirmar ruta" : "Confirmar agregado de envíos")</button> }
+    <a href="/backoffice/rutas" class="btn btn-link">Cancelar</a>
+</form>
+<script>
+    (() => {
+        const formulario = document.querySelector('[data-filtros-ruta]');
+        formulario.addEventListener('change', evento => {
+            if (!evento.target.matches('[data-filtro-ruta]')) return;
+            if (evento.target.name !== 'Pagina') formulario.elements['Pagina'].value = '1';
+            formulario.requestSubmit(formulario.querySelector('[data-filtrar-ruta]'));
+        });
+    })();
+</script>

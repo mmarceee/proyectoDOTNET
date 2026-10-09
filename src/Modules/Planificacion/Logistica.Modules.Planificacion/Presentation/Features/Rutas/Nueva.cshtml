@@ -1,0 +1,5 @@
+@page "/backoffice/rutas/nueva"
+@model NuevaModel
+@{ ViewData["Title"] = "Nueva ruta"; }
+<h1>Nueva ruta</h1>
+@await Html.PartialAsync("~/Presentation/Features/Rutas/Formulario.cshtml", Model)

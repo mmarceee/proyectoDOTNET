@@ -26,6 +26,35 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
             modelBuilder.HasSequence("numero_envio");
 
+            modelBuilder.Entity("Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Contenido")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("OcurridoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PublicadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicadoEn", "OcurridoEn");
+
+                    b.ToTable("outbox_messages", "envios");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Envios.Domain.Devoluciones.Devolucion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -160,6 +189,12 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateOnly?>("FechaEntregaProgramada")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("FranjaHorariaId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("MontoTarifa")
                         .HasColumnType("numeric");
 
@@ -181,6 +216,9 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
                     b.Property<int?>("VersionTarifarioNumero")
                         .HasColumnType("integer");
+
+                    b.Property<Guid?>("ZonaId")
+                        .HasColumnType("uuid");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Destinatario", "Logistica.Modules.Envios.Domain.Envios.Envio.Destinatario#Destinatario", b1 =>
                         {

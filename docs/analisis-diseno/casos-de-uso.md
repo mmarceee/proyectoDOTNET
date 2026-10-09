@@ -75,6 +75,10 @@ Cada caso de uso se describe con los campos: caso de uso, descripción, pre-cond
 | **Flujos alternativos** | **A1 · Código de zona repetido (paso 6).** Ya existe una zona con ese código en el operador. El sistema lo informa.<br><br>**A2 · Código postal ya asignado (paso 6).** Un código postal ya pertenece a otra zona activa del operador. El sistema lo informa: cada código postal pertenece a una sola zona, para que el alta de envíos determine la zona sin ambigüedad.<br><br>**A3 · Franja inválida (paso 6).** La hora de inicio no es anterior a la de fin, o la franja se superpone con otra del mismo día. El sistema lo informa.<br><br>**A4 · Modificar.** El administrador cambia nombre, códigos postales o franjas de una zona. Los envíos ya admitidos conservan su zona.<br><br>**A5 · Desactivar.** La zona deja de aceptarse en nuevos envíos; los envíos existentes no se modifican. |
 | **Requerimientos especiales** | 1. Unicidad del código de zona por operador (índice compuesto con `OperadorId`, ADR-0002).<br>2. **Supuesto del modelo:** la cobertura se define por códigos postales, no por polígonos geográficos (modelo de dominio).<br>3. La caché de zonas se invalida al guardar (sección 6.7). |
 
+**Ampliación de CU-04 acordada al definir CU-40 (09/10/2026):** el Administrador del operador programa los cambios de franjas con una fecha de entrada en vigencia. Antes de esa fecha se atienden las franjas anteriores; desde esa fecha, las nuevas. El sistema identifica los envíos y rutas afectados, comprueba más de 24 horas de anticipación hasta el inicio más temprano entre el horario anterior y el nuevo, reprograma los compromisos afectados y revalida su planificación. No modifica rutas Despachadas o EnCurso; si un compromiso impide el cambio, propone una fecha posterior. Se conserva el historial y se notifica al destinatario y al comercio. Los nuevos pedidos utilizan las franjas correspondientes a su día de entrega y no postergan la vigencia ya programada. Para envíos sin fecha programada ni ruta que determine el día, la franja se resuelve al planificar según la fecha elegida, sin mantener horarios que la zona dejó de atender. La confirmación completa y transaccional se define a continuación; las firmas objetivo del flujo por lote y el tratamiento de las notificaciones se definen en la especificación técnica de CU-40. El tratamiento de envíos ya asignados mediante T19 se define en CU-40.
+
+**Confirmación completa del cambio de franjas (09/10/2026):** se comprueban todos los envíos y rutas afectados antes de confirmar. Si alguno impide el cambio, se informa cuál y por qué, y se mantienen la configuración y los compromisos anteriores. Las vigencias, las reprogramaciones, los cambios necesarios en la planificación y los mensajes de aviso en Outbox se guardan en una sola transacción, con protección ante solicitudes simultáneas. Las notificaciones se envían después de confirmar; los fallos de entrega se reintentan sin deshacer la operación.
+
 ### **CU-05 · Configurar el cuadro tarifario**
 
 | Campo | Contenido |
@@ -360,6 +364,10 @@ Se detalla como **CU-81** en la sección 2.7 (API pública para comercios).
 
 ### **CU-40 · Armar una hoja de ruta**
 
+**Estado de implementación (09/10/2026):** base disponible para desarrollo; cierre pendiente de integrar aislamiento por inquilino y sesión autenticada. Ver [avance y verificación del CU-40](cu-40/avance-cu-40.md). El nivel Completo expresa el detalle de la especificación, no certifica la integración pendiente.
+
+Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas y pruebas](cu-40/especificacion-tecnica-cu-40.md). Las decisiones funcionales y las integraciones con otros CU se detallan debajo.
+
 | Campo | Contenido |
 | :---- | :---- |
 | **Caso de uso** | CU-40 · Armar una hoja de ruta |
@@ -368,8 +376,74 @@ Se detalla como **CU-81** en la sección 2.7 (API pública para comercios).
 | **Post-Condición** | **Éxito:** existe una ruta *Planificada* con sus paradas. Cada envío asignado queda **AsignadoARuta** (T3 o T13) y se publica `EnvioAsignadoARuta` por Outbox.<br>**Fracaso:** la ruta y los envíos no cambian. |
 | **Actores** | **Principal:** despachador, desde el Backoffice.<br>**Secundario:** módulo de Envíos (transición mediante `IEnviosModuleApi`). |
 | **Flujo de evento principal** | 1. El despachador elige **Nueva ruta** e indica fecha, repartidor y vehículo.<br>2. El sistema muestra los envíos disponibles para la fecha, filtrables por zona y franja, con su peso y volumen.<br>3. El despachador selecciona envíos y los agrega a la ruta.<br>4. El sistema valida las restricciones y muestra la carga acumulada contra la capacidad del vehículo y la cantidad de paradas contra el máximo.<br>5. El despachador confirma.<br>6. El sistema crea las paradas y asigna los envíos a la ruta. |
-| **Flujos alternativos** | **A1 · Se excede la capacidad o el máximo de paradas (paso 4).** El sistema indica qué restricción se excede y no permite agregar el envío.<br><br>**A2 · Franja incompatible (paso 4).** La franja comprometida del envío no es compatible con la fecha de la ruta. El sistema lo indica.<br><br>**A3 · El envío ya fue asignado por otro despachador (paso 6).** El sistema informa qué envíos ya no están disponibles, los quita de la selección y pide confirmar el resto (RF 15).<br><br>**A4 · Repartidor o vehículo ocupado (paso 1).** Ya tiene una ruta no finalizada para esa fecha. El sistema lo informa.<br><br>**A5 · Agregar envíos a una ruta existente.** El despachador abre una ruta *Planificada* y repite los pasos 2 a 6. |
+| **Flujos alternativos** | **A1 · Se excede la capacidad o el máximo de paradas (paso 4).** El sistema indica qué restricción se excede y no permite agregar el envío.<br><br>**A2 · Franja incompatible (paso 4).** La franja comprometida del envío no es compatible con la fecha de la ruta. El sistema lo indica.<br><br>**A3 · El envío ya fue asignado por otro despachador (paso 6).** El sistema informa qué envíos ya no están disponibles, los quita de la selección y pide confirmar el resto (RF 15).<br><br>**A4 · Repartidor o vehículo ocupado (paso 1).** Tiene una ruta Planificada con paradas, Despachada o EnCurso para esa fecha, o una ruta Despachada o EnCurso de una fecha anterior que aún no finalizó. El sistema lo informa y vuelve a comprobarlo al confirmar. Una ruta Planificada vacía no reserva recursos.<br><br>**A5 · Agregar envíos a una ruta existente.** El despachador abre una ruta *Planificada* y repite los pasos 2 a 6.<br><br>**A6 · Modificar fecha, repartidor o vehículo.** El despachador abre una ruta *Planificada*, cambia los datos y confirma. El sistema revalida todos sus envíos y los recursos, y guarda los datos y el cambio de reservas en una sola transacción. Ante una restricción incumplida o un conflicto, se conservan los datos y reservas anteriores. Desde *Despachada* no se permite esta modificación. |
 | **Requerimientos especiales** | 1. **RF 15:** índice único filtrado que impide que un envío tenga dos paradas activas, más control de concurrencia optimista sobre la ruta (modelo de dominio, notas de Planificación).<br>2. Las validaciones las orquesta un servicio de dominio que usa la ruta, el vehículo (`Vehiculo.admiteCarga`) y los envíos candidatos (modelo de dominio).<br>3. El máximo de paradas por ruta sale de la versión de reglas vigente (`maxParadasPorRuta`, CU-06).<br>4. La ruta (Planificación) y las transiciones (Envíos) se guardan en la misma transacción, como en CU-30. |
+
+**Reglas de fecha y franja acordadas para CU-40 (09/10/2026)**
+
+* Un envío candidato debe estar **EnDeposito** o **Reprogramado** y no tener una parada activa en otra ruta.
+* Si tiene `fechaEntregaProgramada`, debe coincidir con la fecha de la ruta. Si no la tiene, el despachador elige el día operativo al asignarlo a una ruta.
+* Una franja horaria es el intervalo comprometido de entrega, con hora de inicio, hora de fin y días de la semana en los que se ofrece en la zona. Si el envío tiene una franja comprometida, debe ser válida para el día de la ruta; si no tiene franja, no agrega una restricción horaria.
+* Una ruta puede incluir envíos con distintas franjas. CU-40 valida su compatibilidad con el día de la ruta; el orden de las paradas corresponde a CU-42. Esta validación por sí sola no garantiza llegar dentro de cada intervalo: para comprobarlo se necesitan estimaciones de viaje y duración de las paradas.
+* La fecha operativa de la ruta y `fechaEntregaProgramada` son datos separados. Asignar o quitar un envío de una ruta no sobrescribe ni borra una fecha programada previamente.
+
+**Reglas de carga acordadas para CU-40 (09/10/2026)**
+
+* Para cada bulto se usa el peso y las dimensiones medidos en la recepción de depósito. Si una medida no se registró, se usa el valor declarado por el comercio para esa medida.
+* El peso total y el volumen total de las paradas existentes más los envíos candidatos no pueden superar las capacidades del vehículo. El volumen de cada bulto en m³ se calcula como `largoCm × anchoCm × altoCm / 1_000_000`, usando las dimensiones seleccionadas según la regla anterior. Igualar la capacidad está permitido.
+* Cada bulto debe entrar individualmente en la caja de carga del vehículo en al menos una orientación; se permite rotarlo, intercambiando largo, ancho y alto.
+* Estas comprobaciones no garantizan que todos los bultos puedan acomodarse juntos físicamente; CU-40 no incluye un algoritmo de distribución de la carga.
+
+**Pendiente de implementación:** la recepción actual compara las medidas con lo declarado y registra discrepancias, pero no conserva los valores numéricos medidos. Hay que persistirlos y exponerlos mediante un contrato del módulo Depósito para aplicar estas reglas.
+
+**Alcance de las dependencias acordado para CU-40 (09/10/2026)**
+
+* Se anticipan en Administración las entidades, persistencia y consultas básicas de repartidores, vehículos, zonas/franjas y versiones de reglas necesarias para planificar. Las pantallas de gestión corresponden a CU-08, CU-04 y CU-06, respectivamente.
+* Administración expone mediante sus contratos los repartidores y vehículos activos del operador, las capacidades y dimensiones de carga, las franjas de las zonas y el máximo de paradas de la versión de reglas vigente. Planificación no accede directamente a sus tablas ni a sus entidades internas.
+* Se incluyen datos iniciales para probar CU-40 con esa configuración persistida; los límites no se reemplazan por constantes provisorias dentro de Planificación.
+* La disponibilidad del repartidor y del vehículo para la fecha se comprueba en Planificación, que conoce sus rutas no finalizadas. También se protege esa reserva frente a solicitudes simultáneas.
+* Esta anticipación habilita CU-40 sin considerar completos los casos de uso de gestión de Administración.
+
+**Creación y ocupación de recursos acordadas para CU-40 (09/10/2026)**
+
+* La selección se arma en pantalla y la ruta se guarda al confirmar con al menos un envío. Abandonar el formulario no crea una ruta ni reserva recursos.
+* Una ruta Planificada con paradas reserva repartidor y vehículo para su fecha. Si CU-41 elimina todas sus paradas, permanece Planificada pero libera la reserva. Al agregar envíos nuevamente, se comprueba la disponibilidad y se recupera la reserva dentro de la misma transacción.
+* Una ruta Despachada o EnCurso mantiene ocupados sus recursos para su fecha. Si sigue sin finalizar desde una fecha anterior a la nueva ruta, también impide asignarlos a esa nueva ruta.
+* Completar o fallar las paradas conserva su historial y no libera por sí solo los recursos: la ruta debe pasar a Finalizada. Una ruta Finalizada no reserva recursos. La excepción de ruta vacía sólo aplica a Planificada.
+* A4 se aplica a las reservas anteriores y se comprueba también al confirmar, incluyendo solicitudes simultáneas.
+* El operador puede tener varios usuarios Despachadores (CU-02). La comprobación y reserva de repartidor/vehículo es indivisible: la primera confirmación válida obtiene la reserva y una confirmación competidora recibe el conflicto con el recurso afectado, sin crear rutas ni asignaciones parciales. El formulario conserva la selección para elegir otro recurso y reconfirmar. Se aplica también al modificar recursos y al recuperar la reserva de una ruta vacía.
+
+**Modificación de datos acordada para CU-40 (09/10/2026)**
+
+* El despachador puede modificar fecha, repartidor y vehículo únicamente mientras la ruta esté Planificada. Desde Despachada estos datos quedan bloqueados.
+* Antes de confirmar, se revalidan todos los envíos existentes: fecha programada, compatibilidad de franja, peso, volumen, dimensiones y máximo de paradas. También se comprueban la pertenencia al operador, el estado activo y la disponibilidad de los recursos, excluyendo la reserva de la propia ruta de la comprobación de ocupación.
+* Los nuevos datos y el cambio de reservas se guardan en una sola transacción con control de concurrencia. Si falla una validación o un recurso dejó de estar disponible, se conservan los datos y reservas anteriores. Una ruta Planificada vacía sigue sin reservar recursos.
+* Se conservan las paradas y los envíos asignados, sin repetir T3/T13 ni sobrescribir sus fechas programadas. No se retiran envíos automáticamente para hacer válida una modificación.
+
+**Evidencia de carga acordada para CU-40 (09/10/2026)**
+
+* La evidencia se representa mediante ValidacionRuta, vinculada a la ruta: fecha/hora, responsable y operación (creación, agregado, modificación o despacho), versión de reglas y máximo de paradas, vehículo y capacidades/dimensiones de carga, y detalle de envíos y bultos con los pesos y dimensiones evaluados. Conserva también la fecha de la ruta y el repartidor de la confirmación. Cada registro es inmutable y permanece aunque después se elimine una parada.
+* Cada confirmación exitosa conserva una copia del peso y las dimensiones utilizados para cada bulto de las paradas validadas, identificando ruta, envíos y momento de validación. El volumen se calcula a partir de esas dimensiones.
+* Al agregar envíos, modificar la ruta o despacharla (CU-43), se consultan las medidas actuales y se revalida la carga completa. Se mantienen la prioridad de las medidas de recepción y el respaldo de lo declarado por cada valor no medido.
+* La copia permite conocer con qué datos se aprobó la operación, pero no reemplaza la revalidación. Cada nueva confirmación conserva su evidencia sin sobrescribir la anterior.
+* El registro de evidencia y el cambio se guardan en la misma transacción. Si la operación falla, se conservan la ruta y la evidencia anteriores, sin registrar una nueva confirmación exitosa.
+
+**Reglas vigentes acordadas para CU-40 (09/10/2026)**
+
+* Al confirmar se usa la versión de reglas vigente en ese momento. La prevalidación no congela la versión: si cambia el máximo de paradas y la selección deja de cumplir, se rechaza la operación y se muestra el nuevo límite.
+* Cada confirmación exitosa conserva el identificador de la versión aplicada y el máximo de paradas utilizado junto con su evidencia de validación, dentro de la misma transacción.
+* Crear, agregar envíos, modificar fecha/repartidor/vehículo y despachar (CU-43) requieren revalidar con las reglas vigentes. Publicar nuevas reglas no modifica retroactivamente una ruta ya Despachada o EnCurso ni su evidencia de despacho.
+* La versión aplicada a la planificación no reemplaza la versión de reglas del envío para los demás casos de uso.
+
+**Vigencia de franjas acordada para CU-40 (09/10/2026)**
+
+* Cada franja tiene fecha de inicio de vigencia y fecha de fin opcional, ambas inclusivas. Un cambio crea una nueva franja y cierra la anterior el día previo al inicio de la nueva, conservando el historial. El Administrador indica explícitamente qué franja anterior de la misma zona se reemplaza; la nueva conserva esa referencia.
+* Las franjas de una zona cambian mediante una fecha de entrada en vigencia programada en CU-04. CU-40 consulta las franjas aplicables a la fecha de la ruta, no sólo las vigentes al abrir el formulario.
+* Un envío con fecha programada o ruta asignada tiene un día definido para comprobar el cambio. Los compromisos afectados desde la fecha de vigencia se reprograman, se revalidan y generan aviso al destinatario y al comercio, conservando el historial.
+* Un envío sin día definido recibe al planificar la franja correspondiente al día elegido. No queda asociado operativamente a una franja que la zona ya no atiende.
+* Para programar el cambio se exigen más de 24 horas de anticipación hasta el inicio más temprano entre la franja anterior y la nueva de cada compromiso afectado y no se modifican rutas Despachadas o EnCurso. Si no se cumple, se propone una fecha de vigencia posterior. Los nuevos pedidos no desplazan la vigencia programada ni crean compromisos con franjas que ya no se atienden para su fecha.
+* Programar el cambio confirma todo el conjunto afectado o no confirma nada: las franjas, los compromisos, los cambios necesarios en las rutas y los mensajes Outbox se guardan juntos. Las notificaciones se entregan después y se reintentan si fallan, sin deshacer el cambio confirmado.
+* Si un envío afectado está AsignadoARuta en una ruta Planificada, se aplica T19: recibe la nueva franja, pasa a Reprogramado y se elimina su parada. Conserva el día de entrega; si éste sólo estaba definido por la ruta, se registra como fecha programada al reprogramar. Queda disponible para reasignación manual mediante T13. Antes de confirmar se muestran los envíos que saldrán de sus rutas. Si una ruta queda vacía, libera sus recursos. La evidencia histórica se conserva aunque se elimine la parada.
 
 ### **CU-41 · Quitar un envío de una ruta**
 

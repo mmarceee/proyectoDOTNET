@@ -16,10 +16,14 @@ internal sealed class EnviosDbContext(DbContextOptions<EnviosDbContext> options,
     public DbSet<Incidencia> Incidencias => Set<Incidencia>();
     public DbSet<Devolucion> Devoluciones => Set<Devolucion>();
     public DbSet<ArchivoEvidencia> ArchivosEvidencia => Set<ArchivoEvidencia>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<OutboxMessage>().ToTable("outbox_messages");
+        modelBuilder.Entity<OutboxMessage>().Property(m => m.Id).ValueGeneratedNever();
+        modelBuilder.Entity<OutboxMessage>().HasIndex(m => new { m.PublicadoEn, m.OcurridoEn });
 
         // De acá sale el número de cada envío: único entre todos los operadores y, por lo tanto, en cada uno.
         modelBuilder.HasSequence<long>("numero_envio");
