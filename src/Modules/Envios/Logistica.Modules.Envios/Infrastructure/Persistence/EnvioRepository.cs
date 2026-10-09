@@ -1,10 +1,10 @@
 using Logistica.Modules.Envios.Domain.Envios;
-using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
 
-internal sealed class EnvioRepository(EnviosDbContext db, ICurrentTenant tenant) : IEnvioRepository
+// Las consultas pasan por el filtro global "Tenant" (ADR-0002): sólo ven los envíos de la sesión.
+internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
 {
     // SQL fijo, sin datos del usuario. "Value" es el nombre de columna que EF espera en SqlQueryRaw.
     private const string SiguienteNumeroSql = "SELECT nextval('envios.numero_envio') AS \"Value\"";
@@ -17,14 +17,14 @@ internal sealed class EnvioRepository(EnviosDbContext db, ICurrentTenant tenant)
 
     public Task<Envio?> ObtenerPorCodigoBultoAsync(string codigoBulto, CancellationToken ct)
     {
-        return DelInquilino()
+        return db.Envios
             .Include(e => e.Bultos)
             .SingleOrDefaultAsync(e => e.Bultos.Any(b => b.Codigo == codigoBulto), ct);
     }
 
     public Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct)
     {
-        return DelInquilino().SingleOrDefaultAsync(e => e.Id == id, ct);
+        return db.Envios.SingleOrDefaultAsync(e => e.Id == id, ct);
     }
 
     public void Agregar(Envio envio)
@@ -35,24 +35,5 @@ internal sealed class EnvioRepository(EnviosDbContext db, ICurrentTenant tenant)
     public Task GuardarCambiosAsync(CancellationToken ct)
     {
         return db.SaveChangesAsync(ct);
-    }
-
-    // Filtro de inquilino manual hasta que exista el filtro global "Tenant" (ADR-0002, 15/10).
-    // Falla cerrado: sin operador no devuelve nada.
-    private IQueryable<Envio> DelInquilino()
-    {
-        if (tenant.OperadorId is not Guid operadorId)
-        {
-            return db.Envios.Where(_ => false);
-        }
-
-        var envios = db.Envios.Where(e => e.OperadorId == operadorId);
-
-        if (tenant.ComercioId is Guid comercioId)
-        {
-            envios = envios.Where(e => e.ComercioId == comercioId);
-        }
-
-        return envios;
     }
 }

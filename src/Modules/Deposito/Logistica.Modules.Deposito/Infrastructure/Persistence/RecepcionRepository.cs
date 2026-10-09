@@ -1,21 +1,15 @@
 using Logistica.Modules.Deposito.Domain.Recepciones;
-using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Deposito.Infrastructure.Persistence;
 
-internal sealed class RecepcionRepository(DepositoDbContext db, ICurrentTenant tenant) : IRecepcionRepository
+internal sealed class RecepcionRepository(DepositoDbContext db) : IRecepcionRepository
 {
     public async Task<IReadOnlyList<Guid>> BultosRecibidosAsync(Guid envioId, CancellationToken ct)
     {
-        // Filtro de inquilino manual hasta el filtro global "Tenant" (ADR-0002, 15/10). Falla cerrado.
-        if (tenant.OperadorId is not Guid operadorId)
-        {
-            return [];
-        }
-
+        // El filtro global "Tenant" deja sólo las recepciones del operador de la sesión (ADR-0002).
         return await db.Recepciones
-            .Where(r => r.OperadorId == operadorId && r.EnvioId == envioId)
+            .Where(r => r.EnvioId == envioId)
             .Select(r => r.BultoId)
             .ToListAsync(ct);
     }

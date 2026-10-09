@@ -20,8 +20,8 @@ public sealed class DetalleEnvioAmpliadoTests(PostgresApiFactory factory) : ICla
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         var datos = await PrepararAsync(db);
-        db.ChangeTracker.Clear();
-        var reader = new EnvioDetalleReader(db, new Tenant(datos.Envio.OperadorId, datos.Envio.ComercioId));
+        await using var comercio = Contexto(scope, new Tenant(datos.Envio.OperadorId, datos.Envio.ComercioId));
+        var reader = new EnvioDetalleReader(comercio);
 
         var detalle = await reader.ConsultarAsync(new(datos.Envio.Numero), CancellationToken.None);
 
@@ -43,7 +43,7 @@ public sealed class DetalleEnvioAmpliadoTests(PostgresApiFactory factory) : ICla
         Assert.Equal(-34m, detalle.Eventos[1].Latitud);
         Assert.Equal(-56m, detalle.Eventos[1].Longitud);
         Assert.Equal("Recepción de prueba", detalle.Eventos[1].Detalle);
-        Assert.Empty(db.ChangeTracker.Entries());
+        Assert.Empty(comercio.ChangeTracker.Entries());
 
         var html = WebUtility.HtmlDecode(await factory.CreateClient().GetStringAsync($"/backoffice/envios/{datos.Envio.Numero}"));
         Assert.Contains("Versión 4", html);
@@ -75,12 +75,18 @@ public sealed class DetalleEnvioAmpliadoTests(PostgresApiFactory factory) : ICla
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(ruta + Guid.NewGuid())).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/backoffice/envios/OTRO/evidencias/{datos.Firma.Id}")).StatusCode);
 
-        var ajeno = new ArchivoEvidenciaReader(db, new Tenant(Guid.NewGuid(), null));
-        Assert.Null(await ajeno.ConsultarAsync(datos.Envio.Numero, datos.Firma.Id, CancellationToken.None));
-        var otroComercio = new ArchivoEvidenciaReader(db, new Tenant(datos.Envio.OperadorId, Guid.NewGuid()));
-        Assert.Null(await otroComercio.ConsultarAsync(datos.Envio.Numero, datos.Firma.Id, CancellationToken.None));
-        var sinOperador = new ArchivoEvidenciaReader(db, new Tenant(null, null));
-        Assert.Null(await sinOperador.ConsultarAsync(datos.Envio.Numero, datos.Firma.Id, CancellationToken.None));
+        Tenant[] ajenos =
+        [
+            new(Guid.NewGuid(), null),                     // otro operador
+            new(datos.Envio.OperadorId, Guid.NewGuid()),   // otro comercio del mismo operador
+            new(null, null),                               // sin operador
+        ];
+        foreach (var tenant in ajenos)
+        {
+            await using var contexto = Contexto(scope, tenant);
+            var reader = new ArchivoEvidenciaReader(contexto);
+            Assert.Null(await reader.ConsultarAsync(datos.Envio.Numero, datos.Firma.Id, CancellationToken.None));
+        }
     }
 
     [Fact]
@@ -93,10 +99,17 @@ public sealed class DetalleEnvioAmpliadoTests(PostgresApiFactory factory) : ICla
             new Destinatario("Otro", "099123456"), new Direccion("Calle", "1", "Montevideo", "Montevideo", "11300"),
             [new DatosBulto(1, 10, 10, 10, 0)], OrigenEvento.PortalComercio, null, DateTimeOffset.UtcNow);
         var archivoAjeno = ArchivoEvidencia.Crear(otro, "image/png", Imagen);
+
+        // El otro envío es de otro operador: se guarda con un contexto de ese operador, como lo haría él.
+        await using (var otroOperador = Contexto(scope, new Tenant(otro.OperadorId, null)))
+        {
+            otroOperador.Envios.Add(otro);
+            otroOperador.ArchivosEvidencia.Add(archivoAjeno);
+            await otroOperador.SaveChangesAsync();
+        }
+
         datos.Envio.AgregarIntento(3, DateTimeOffset.UtcNow, ResultadoIntento.Fallido, Guid.NewGuid(),
             new PruebaEntrega(null, archivoAjeno.Id, null, null, new Ubicacion(-34, -56), DateTimeOffset.UtcNow));
-        db.Envios.Add(otro);
-        db.ArchivosEvidencia.Add(archivoAjeno);
         await db.SaveChangesAsync();
 
         var response = await factory.CreateClient().GetAsync(
@@ -126,6 +139,13 @@ public sealed class DetalleEnvioAmpliadoTests(PostgresApiFactory factory) : ICla
         db.Devoluciones.Add(Devolucion.Crear(envio, "Solicitud de prueba", ahora));
         await db.SaveChangesAsync();
         return (envio, firma, sinVinculo);
+    }
+
+    // El filtro "Tenant" lee el inquilino del DbContext: para probar otro inquilino se arma otro contexto,
+    // con el resto de las dependencias (opciones, unidad de trabajo) tomadas de la API.
+    private static EnviosDbContext Contexto(IServiceScope scope, ICurrentTenant tenant)
+    {
+        return ActivatorUtilities.CreateInstance<EnviosDbContext>(scope.ServiceProvider, tenant);
     }
 
     private sealed record Tenant(Guid? OperadorId, Guid? ComercioId) : ICurrentTenant;

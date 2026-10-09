@@ -12,11 +12,9 @@ public sealed class ConsultarDetalleEnvioTests(PostgresApiFactory factory) : ICl
     public async Task Devuelve_datos_bultos_y_eventos_en_orden_sin_seguimiento()
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
-        var envio = await CrearEnvioAsync(db);
-        db.ChangeTracker.Clear();
-        var handler = new ConsultarDetalleEnvioHandler(
-            new EnvioDetalleReader(db, new Tenant(envio.OperadorId, envio.ComercioId)));
+        var envio = await CrearEnvioAsync(scope);
+        await using var db = Contexto(scope, new Tenant(envio.OperadorId, envio.ComercioId));
+        var handler = new ConsultarDetalleEnvioHandler(new EnvioDetalleReader(db));
 
         var detalle = await handler.HandleAsync(new($" {envio.Numero} "), CancellationToken.None);
 
@@ -79,11 +77,11 @@ public sealed class ConsultarDetalleEnvioTests(PostgresApiFactory factory) : ICl
     public async Task Personal_del_operador_puede_ver_envios_de_distintos_comercios()
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         var operadorId = Guid.NewGuid();
-        var primero = await CrearEnvioAsync(db, operadorId);
-        var segundo = await CrearEnvioAsync(db, operadorId);
-        var reader = new EnvioDetalleReader(db, new Tenant(operadorId, null));
+        var primero = await CrearEnvioAsync(scope, operadorId);
+        var segundo = await CrearEnvioAsync(scope, operadorId);
+        await using var db = Contexto(scope, new Tenant(operadorId, null));
+        var reader = new EnvioDetalleReader(db);
 
         Assert.NotNull(await reader.ConsultarAsync(new(primero.Numero), CancellationToken.None));
         Assert.NotNull(await reader.ConsultarAsync(new(segundo.Numero), CancellationToken.None));
@@ -97,8 +95,7 @@ public sealed class ConsultarDetalleEnvioTests(PostgresApiFactory factory) : ICl
     public async Task Devuelve_null_si_el_envio_no_es_visible_o_no_existe(string caso)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
-        var envio = await CrearEnvioAsync(db);
+        var envio = await CrearEnvioAsync(scope);
         var tenant = caso switch
         {
             "otro-operador" => new Tenant(Guid.NewGuid(), envio.ComercioId),
@@ -106,17 +103,28 @@ public sealed class ConsultarDetalleEnvioTests(PostgresApiFactory factory) : ICl
             "sin-operador" => new Tenant(null, envio.ComercioId),
             _ => new Tenant(envio.OperadorId, envio.ComercioId),
         };
-        var reader = new EnvioDetalleReader(db, tenant);
+        await using var db = Contexto(scope, tenant);
+        var reader = new EnvioDetalleReader(db);
         var numero = caso == "inexistente" ? $"INEXISTENTE-{Guid.NewGuid():N}" : envio.Numero;
 
         Assert.Null(await reader.ConsultarAsync(new(numero), CancellationToken.None));
     }
 
-    private static async Task<Envio> CrearEnvioAsync(EnviosDbContext db, Guid? operadorId = null)
+    // El filtro "Tenant" lee el inquilino del DbContext: cada prueba arma el suyo con el inquilino
+    // que quiere probar, y el resto de las dependencias (opciones, unidad de trabajo) sale de la API.
+    private static EnviosDbContext Contexto(IServiceScope scope, ICurrentTenant tenant)
+    {
+        return ActivatorUtilities.CreateInstance<EnviosDbContext>(scope.ServiceProvider, tenant);
+    }
+
+    // Lo guarda como personal del operador, que puede escribir envíos de cualquiera de sus comercios.
+    private static async Task<Envio> CrearEnvioAsync(IServiceScope scope, Guid? operadorId = null)
     {
         var ahora = new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.Zero);
+        var operador = operadorId ?? Guid.NewGuid();
+        await using var db = Contexto(scope, new Tenant(operador, null));
         var envio = Envio.Crear(
-            operadorId ?? Guid.NewGuid(), Guid.NewGuid(), $"ENV-{Guid.NewGuid():N}",
+            operador, Guid.NewGuid(), $"ENV-{Guid.NewGuid():N}",
             new Destinatario("Ana Pérez", "099123456"),
             new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "11300"),
             [new DatosBulto(2, 30, 20, 10, 100), new DatosBulto(3, 40, 30, 20, 150)],

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
+using Logistica.BuildingBlocks.Infrastructure.Tenancy;
 using Logistica.Http.Contracts.Envios;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
@@ -76,12 +77,15 @@ public sealed class DetalleEnvioPaginaTests(PostgresApiFactory factory) : IClass
     public async Task Un_envio_inexistente_o_de_otro_operador_responde_404()
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         var numero = $"ENV-{Guid.NewGuid():N}";
         var envio = Envio.Crear(Guid.NewGuid(), Guid.NewGuid(), numero,
             new Destinatario("Ajeno", "099123456"),
             new Direccion("Calle", "1", "Montevideo", "Montevideo", "11300"),
             [new DatosBulto(1, 10, 10, 10, 0)], OrigenEvento.PortalComercio, null, DateTimeOffset.UtcNow);
+
+        // Es de otro operador: se guarda con un contexto de ese operador, como lo haría él.
+        await using var db = ActivatorUtilities.CreateInstance<EnviosDbContext>(
+            scope.ServiceProvider, new InquilinoFijo(envio.OperadorId, null));
         db.Envios.Add(envio);
         await db.SaveChangesAsync();
         var client = factory.CreateClient();
