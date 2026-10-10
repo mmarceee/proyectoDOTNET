@@ -61,6 +61,12 @@
 }
 
 <form method="post" class="row g-3 align-items-end">
+    <input type="hidden" asp-for="Pagina" />
+    <input type="hidden" asp-for="TamanoPagina" />
+    <input type="hidden" asp-for="Estado" />
+    <input type="hidden" asp-for="FechaDesde" />
+    <input type="hidden" asp-for="FechaHasta" />
+    <input type="hidden" asp-for="Texto" />
     <div class="col-md-4">
         <label asp-for="CodigoBulto" class="form-label">Código del bulto</label>
         <input asp-for="CodigoBulto" class="form-control" autofocus autocomplete="off" />

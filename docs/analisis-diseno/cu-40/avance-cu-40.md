@@ -6,6 +6,8 @@ Lucas autorizó preparar CU-40 mientras Ezequiel termina el aislamiento por inqu
 
 ## Disponible
 
+Se revisó y corrigió la organización del código según ADR-0001: casos en `Application/Features` y `Presentation/Features`, APIs intermodulares internas en Application y datos públicos en `Contracts/Results`. Ver [revisión de arquitectura](revision-arquitectura.md). Tras la reorganización, la compilación Release terminó sin advertencias ni errores y pasaron 170 pruebas (40 unitarias, 54 de arquitectura y 76 de integración).
+
 | Área | Implementación |
 | :--- | :--- |
 | Dominio | Ruta y paradas; crear, agregar y modificar fecha/recursos en Planificada; Revision; ReservaActiva; evidencia histórica por confirmación. |
@@ -19,6 +21,10 @@ Lucas autorizó preparar CU-40 mientras Ezequiel termina el aislamiento por inqu
 | Persistencia | Migraciones PlanificacionCU40 en Administración, Depósito, Envíos y Planificación. |
 
 El seed incluye dos repartidores, dos vehículos, una zona de Montevideo, franjas de mañana/tarde y un máximo de 20 paradas. La configuración se consulta desde Administración; Planificación no reemplaza las capacidades ni las reglas por constantes.
+
+La fecha de una ruta nueva debe ser hoy o posterior, según la zona horaria del operador. El calendario de la pantalla limita las fechas y el servidor rechaza fechas pasadas al prevalidar y confirmar, incluso si se omite el control del navegador. Tampoco se permite mover la fecha de una ruta existente al pasado. Consultar rutas anteriores sigue permitido.
+
+Verificación de esta regla: compilación sin errores ni advertencias y 175 pruebas aprobadas (40 unitarias, 54 de arquitectura y 81 de integración). Incluye rechazo por API y formulario, cambio de fecha sin persistir ante rechazo y límite del día local cuando UTC ya avanzó al siguiente día.
 
 La franja comprometida se resuelve por fecha, siguiendo su cadena de reemplazos. Esto permite consumir el versionado de CU-04; no implementa su comando masivo, el control de 24 horas, T18/T19 ni los avisos. La selección de franja en el portal y los CRUD de Administración siguen siendo entregables de sus CU. Los envíos existentes sin franja no reciben una restricción inventada.
 

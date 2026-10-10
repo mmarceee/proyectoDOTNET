@@ -44,7 +44,7 @@ internal sealed class EnvioDetalleReader(EnviosDbContext db) : IEnvioDetalleRead
                         b.LargoCm,
                         b.AnchoCm,
                         b.AltoCm,
-                        b.MontoTarifa))
+                        b.MontoTarifa, false, false))
                     .ToList(),
                 e.Eventos.OrderBy(ev => ev.OcurridoEn).ThenBy(ev => ev.Id)
                     .Select(ev => new EventoEnvioDetalleDto(

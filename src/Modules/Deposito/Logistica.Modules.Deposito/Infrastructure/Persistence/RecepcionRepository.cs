@@ -14,6 +14,12 @@ internal sealed class RecepcionRepository(DepositoDbContext db) : IRecepcionRepo
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<RecepcionDeposito>> ConsultarPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct)
+    {
+        if (bultoIds.Count == 0) return [];
+        return await db.Recepciones.AsNoTracking().Where(r => bultoIds.Contains(r.BultoId)).ToListAsync(ct);
+    }
+
     public void Agregar(RecepcionDeposito recepcion)
     {
         db.Recepciones.Add(recepcion);

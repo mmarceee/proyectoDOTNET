@@ -12,6 +12,57 @@ namespace Logistica.IntegrationTests.Envios;
 
 public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : IClassFixture<PostgresApiFactory>
 {
+    [Fact]
+    public async Task Conserva_filtros_al_abrir_registrar_y_volver_desde_recepcion()
+    {
+        var client = factory.CreateClient();
+        var envio = await CrearAsync(client);
+        const string parametros = "Pagina=3&TamanoPagina=5&Estado=Admitido&FechaDesde=2026-10-01&FechaHasta=2026-10-15&Texto=Ana%20%26%20P%C3%A9rez";
+        var detalleUrl = $"/backoffice/envios/{envio.Numero}?{parametros}";
+        var detalle = await client.GetStringAsync(detalleUrl);
+        var enlace = Regex.Match(detalle, $"href=\"([^\"]+)\"[^>]+aria-label=\"Recepcionar bulto {envio.Numero}-1\"");
+        Assert.True(enlace.Success);
+        var recepcionUrl = WebUtility.HtmlDecode(enlace.Groups[1].Value);
+        Assert.Contains("CodigoBulto=" + envio.Numero + "-1", recepcionUrl);
+        var formulario = await client.GetStringAsync(recepcionUrl);
+        Assert.Contains($"href=\"{detalleUrl}\"", WebUtility.HtmlDecode(formulario));
+        Assert.DoesNotContain("value=\"2\"", Input(formulario, "PesoKg"));
+
+        var campos = new Dictionary<string, string> { ["CodigoBulto"] = envio.Numero + "-1" };
+        foreach (var nombre in new[] { "Pagina", "TamanoPagina", "Estado", "FechaDesde", "FechaHasta", "Texto", "__RequestVerificationToken" })
+        {
+            var valor = Regex.Match(Input(formulario, nombre), "value=\"([^\"]*)\"");
+            Assert.True(valor.Success);
+            campos[nombre] = WebUtility.HtmlDecode(valor.Groups[1].Value);
+        }
+        // POST sin querystring: el formulario debe transportar el contexto de navegación.
+        var response = await client.PostAsync("/backoffice/deposito/recepcion", new FormUrlEncodedContent(campos));
+        response.EnsureSuccessStatusCode();
+        var resultado = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+        Assert.Contains("Bulto recibido", resultado);
+        Assert.Contains($"href=\"{detalleUrl}\"", resultado);
+        var vuelta = WebUtility.HtmlDecode(await client.GetStringAsync(detalleUrl));
+        Assert.Contains($"href=\"/backoffice/envios?{parametros}\"", vuelta);
+        Assert.DoesNotContain($"aria-label=\"Recepcionar bulto {envio.Numero}-1\"", vuelta);
+    }
+
+    [Fact]
+    public async Task Transito_no_ofrece_recepcion_inicial_aunque_permite_la_transicion_de_reintegro()
+    {
+        var client = factory.CreateClient();
+        var envio = await CrearAsync(client);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var entidad = (await db.Envios.FindAsync(envio.Id))!;
+        foreach (var estado in new[] { EstadoEnvio.EnDeposito, EstadoEnvio.AsignadoARuta, EstadoEnvio.EnTransito })
+        {
+            entidad.Transicionar(estado, OrigenEvento.Backoffice, null, DateTimeOffset.UtcNow);
+        }
+        await db.SaveChangesAsync();
+        Assert.True(TablaTransiciones.Permite(EstadoEnvio.EnTransito, EstadoEnvio.EnDeposito));
+        Assert.DoesNotContain("Recepcionar</a>", await client.GetStringAsync($"/backoffice/envios/{envio.Numero}"));
+    }
+
     [Theory]
     [InlineData("/backoffice/deposito/recepcion")]
     [InlineData("/backoffice/deposito/recepcion?CodigoBulto=")]
@@ -20,7 +71,7 @@ public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : ICl
         var client = factory.CreateClient();
         var formulario = await client.GetStringAsync(url);
         Assert.DoesNotContain("alert-danger", formulario);
-        Assert.DoesNotContain("field is required", formulario);
+        Assert.DoesNotContain("The CodigoBulto field is required.", formulario);
         var token = Regex.Match(Input(formulario, "__RequestVerificationToken"), "value=\"([^\"]+)\"");
         Assert.True(token.Success);
         var response = await client.PostAsync("/backoffice/deposito/recepcion", new FormUrlEncodedContent(
@@ -32,7 +83,7 @@ public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : ICl
         response.EnsureSuccessStatusCode();
         var html = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
         Assert.Contains("Escaneá o escribí el código del bulto.", html);
-        Assert.DoesNotContain("field is required", html);
+        Assert.DoesNotContain("The CodigoBulto field is required.", html);
         Assert.DoesNotContain("Bulto recibido", html);
     }
 

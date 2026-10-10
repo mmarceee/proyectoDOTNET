@@ -7,4 +7,6 @@ internal sealed record BultoDetalleDto(
     decimal LargoCm,
     decimal AnchoCm,
     decimal AltoCm,
-    decimal MontoTarifa);
+    decimal MontoTarifa,
+    bool Recibido = false,
+    bool PuedeRecepcionar = false);

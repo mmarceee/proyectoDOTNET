@@ -4,11 +4,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Globalization;
-using Logistica.Modules.Deposito.Contracts;
 
 namespace Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio;
 
-internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler, IDepositoModuleApi deposito) : PageModel
+internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public int Pagina { get; set; } = 1;
@@ -29,14 +28,16 @@ internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler, IDeposi
     public string? Texto { get; set; }
 
     public EnvioDetalleDto Detalle { get; private set; } = null!;
-    public IReadOnlySet<Guid> BultosRecibidos { get; private set; } = new HashSet<Guid>();
-
     public string UrlRecepcion(string codigoBulto) => QueryHelpers.AddQueryString(
-        "/backoffice/deposito/recepcion", "CodigoBulto", codigoBulto);
+        "/backoffice/deposito/recepcion", new Dictionary<string, string?>(ParametrosNavegacion)
+        {
+            ["CodigoBulto"] = codigoBulto,
+        });
 
     // El destino siempre es el listado; sólo se conservan sus parámetros de navegación.
-    public string UrlVolver => QueryHelpers.AddQueryString("/backoffice/envios",
-        new Dictionary<string, string?>
+    public string UrlVolver => QueryHelpers.AddQueryString("/backoffice/envios", ParametrosNavegacion);
+
+    private Dictionary<string, string?> ParametrosNavegacion => new()
         {
             [nameof(Pagina)] = Pagina == 1 ? null : Pagina.ToString(CultureInfo.InvariantCulture),
             [nameof(TamanoPagina)] = TamanoPagina == 20 ? null : TamanoPagina.ToString(CultureInfo.InvariantCulture),
@@ -44,7 +45,7 @@ internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler, IDeposi
             [nameof(FechaDesde)] = FechaDesde?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             [nameof(FechaHasta)] = FechaHasta?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             [nameof(Texto)] = string.IsNullOrWhiteSpace(Texto) ? null : Texto,
-        });
+        };
 
     public async Task<IActionResult> OnGetAsync(string numero, CancellationToken ct)
     {
@@ -60,8 +61,6 @@ internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler, IDeposi
         }
 
         Detalle = detalle;
-        BultosRecibidos = (await deposito.BultosRecibidosAsync(
-            detalle.Bultos.Select(b => b.Id).ToArray(), ct)).ToHashSet();
         return Page();
     }
 

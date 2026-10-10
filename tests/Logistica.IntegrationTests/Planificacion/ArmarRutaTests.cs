@@ -22,6 +22,64 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     private static readonly Guid OtroVehiculo = Guid.Parse("52222222-2222-2222-2222-222222222222");
     private HttpClient Cliente() => factory.WithWebHostBuilder(b => b.UseSetting("Planificacion:HabilitarDesarrolloSinIdentity", "true")).CreateClient();
 
+    // En UTC ya es 2 de enero, pero en Montevideo todavía es el día 1.
+    private HttpClient ClienteConFechaFija() => factory.WithWebHostBuilder(b => b
+        .UseSetting("Planificacion:HabilitarDesarrolloSinIdentity", "true")
+        .ConfigureTestServices(s => s.AddSingleton<TimeProvider>(new RelojFijo())))
+        .CreateClient();
+
+    [Theory]
+    [InlineData(2029, 12, 31, false)]
+    [InlineData(2030, 1, 1, true)]
+    public async Task Crear_y_prevalidar_respetan_el_dia_local_del_operador(int anio, int mes, int dia, bool valida)
+    {
+        using var client = ClienteConFechaFija();
+        var envio = await RecibidoAsync(client);
+        var fecha = new DateOnly(anio, mes, dia);
+        var preview = await client.PostAsJsonAsync("/api/planificacion/rutas/prevalidacion",
+            new PrevalidarRutaRequest(fecha, Repartidor, Vehiculo, [envio.Id]));
+        Assert.Equal(valida ? HttpStatusCode.OK : HttpStatusCode.BadRequest, preview.StatusCode);
+        var creada = await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(fecha, envio.Id));
+        Assert.Equal(valida ? HttpStatusCode.Created : HttpStatusCode.BadRequest, creada.StatusCode);
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync("/backoffice/rutas/nueva"));
+        Assert.Contains("min=\"2030-01-01\"", html);
+        if (valida) return;
+
+        Assert.Contains("no puede ser anterior a hoy", await creada.Content.ReadAsStringAsync());
+        await ExigirSinAsignacionAsync(envio.Id);
+        var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+        Assert.True(token.Success);
+        var guardado = await client.PostAsync("/backoffice/rutas/nueva?handler=Confirmar", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token.Groups[1].Value,
+                ["Fecha"] = "2029-12-31", ["RepartidorId"] = Repartidor.ToString(),
+                ["VehiculoId"] = Vehiculo.ToString(), ["Seleccion"] = envio.Id.ToString(),
+            }));
+        Assert.Contains("no puede ser anterior a hoy", WebUtility.HtmlDecode(await guardado.Content.ReadAsStringAsync()));
+        await ExigirSinAsignacionAsync(envio.Id);
+    }
+
+    [Fact]
+    public async Task Cambiar_la_fecha_al_pasado_no_modifica_la_ruta()
+    {
+        using var client = ClienteConFechaFija();
+        var envio = await RecibidoAsync(client);
+        var ruta = await ExigirRutaAsync(await client.PostAsJsonAsync("/api/planificacion/rutas",
+            Pedido(new(2030, 1, 3), envio.Id)), HttpStatusCode.Created);
+        var respuesta = await client.PutAsJsonAsync($"/api/planificacion/rutas/{ruta.Id}/planificacion",
+            new ModificarRutaRequest(ruta.Revision, new(2029, 12, 31), Repartidor, Vehiculo));
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        var actual = (await client.GetFromJsonAsync<RutaResponse>($"/api/planificacion/rutas/{ruta.Id}"))!;
+        Assert.Equal(ruta.Fecha, actual.Fecha);
+        Assert.Equal(ruta.Revision, actual.Revision);
+    }
+
+    private sealed class RelojFijo : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(2030, 1, 2, 1, 0, 0, TimeSpan.Zero);
+    }
+
     [Fact]
     public async Task Crear_asigna_y_guarda_medidas_recibidas_historial_y_outbox()
     {
@@ -214,7 +272,11 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     {
         using var client = Cliente();
         var envio = await RecibidoAsync(client);
+        var otroEnvio = await RecibidoAsync(client);
         var html = await client.GetStringAsync("/backoffice/rutas/nueva");
+        var validarInicial = Regex.Match(html, "<button[^>]*data-validar-ruta[^>]*>", RegexOptions.None, TimeSpan.FromSeconds(1));
+        Assert.True(validarInicial.Success);
+        Assert.Contains("disabled", validarInicial.Value);
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"", RegexOptions.None, TimeSpan.FromSeconds(1));
         Assert.True(token.Success, html);
         var campos = new Dictionary<string, string>
@@ -226,14 +288,177 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         var preview = await client.PostAsync("/backoffice/rutas/nueva?handler=Validar", new FormUrlEncodedContent(campos));
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         Assert.Contains("Confirmar ruta", await preview.Content.ReadAsStringAsync());
+        var validarSeleccionado = Regex.Match(await preview.Content.ReadAsStringAsync(), "<button[^>]*data-validar-ruta[^>]*>", RegexOptions.None, TimeSpan.FromSeconds(1));
+        Assert.True(validarSeleccionado.Success);
+        Assert.DoesNotContain("disabled", validarSeleccionado.Value);
         await ExigirSinAsignacionAsync(envio.Id);
         var confirmado = await client.PostAsync("/backoffice/rutas/nueva?handler=Confirmar", new FormUrlEncodedContent(campos));
         Assert.Equal(HttpStatusCode.OK, confirmado.StatusCode);
         Assert.Contains("Historial de validaciones", await confirmado.Content.ReadAsStringAsync());
+        Assert.Contains("Ruta creada y envíos asignados correctamente.", WebUtility.HtmlDecode(await confirmado.Content.ReadAsStringAsync()));
         Assert.Equal("AsignadoARuta", await ScalarAsync<string>("""SELECT "Estado" FROM envios."Envios" WHERE "Id"=@id""", envio.Id));
         var sinToken = await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(new(2035, 2, 5), envio.Id));
         Assert.Equal(HttpStatusCode.BadRequest, sinToken.StatusCode);
         Assert.Contains("token válido", await sinToken.Content.ReadAsStringAsync());
+
+        var rutaId = await ScalarAsync<Guid>("""SELECT "RutaId" FROM planificacion."Paradas" WHERE "EnvioId"=@id""", envio.Id);
+        var detalle = $"/backoffice/rutas/{rutaId}";
+        campos["Id"] = rutaId.ToString();
+        campos["RevisionEsperada"] = (await client.GetFromJsonAsync<RutaResponse>($"/api/planificacion/rutas/{rutaId}"))!.Revision.ToString();
+        var datosFijos = await client.GetStringAsync(detalle);
+        Assert.Contains(">Agregar envíos</button>", WebUtility.HtmlDecode(datosFijos));
+        Assert.Contains("data-abrir=\"false\"", datosFijos);
+        var abrirEnvios = await client.PostAsync($"{detalle}?handler=AbrirEnvios", new FormUrlEncodedContent(campos));
+        Assert.Equal(HttpStatusCode.OK, abrirEnvios.StatusCode);
+        Assert.Contains("data-abrir=\"true\"", await abrirEnvios.Content.ReadAsStringAsync());
+        var botonSinSeleccion = Regex.Match(await abrirEnvios.Content.ReadAsStringAsync(), "<button[^>]*data-validar-ruta[^>]*>", RegexOptions.None, TimeSpan.FromSeconds(1));
+        Assert.True(botonSinSeleccion.Success);
+        Assert.Contains("disabled", botonSinSeleccion.Value);
+        campos["ModalEnvios"] = "true";
+        campos["Seleccion"] = otroEnvio.Id.ToString();
+        campos["Texto"] = otroEnvio.Numero;
+        foreach (var accionModal in new[] { "Filtrar", "LimpiarFiltros", "Validar" })
+        {
+            using var solicitudModal = new HttpRequestMessage(HttpMethod.Post, $"{detalle}?handler={accionModal}")
+            {
+                Content = new FormUrlEncodedContent(campos)
+            };
+            solicitudModal.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            var respuestaModal = await client.SendAsync(solicitudModal);
+            Assert.Equal(HttpStatusCode.OK, respuestaModal.StatusCode);
+            var contenidoModal = await respuestaModal.Content.ReadAsStringAsync();
+            Assert.Contains("data-contenido-envios", contenidoModal);
+            Assert.DoesNotContain("<html", contenidoModal);
+            Assert.DoesNotContain("modal-dialog", contenidoModal);
+            Assert.Contains($"value=\"{otroEnvio.Id}\" checked", contenidoModal);
+            var botonConSeleccion = Regex.Match(contenidoModal, "<button[^>]*data-validar-ruta[^>]*>", RegexOptions.None, TimeSpan.FromSeconds(1));
+            Assert.True(botonConSeleccion.Success);
+            Assert.DoesNotContain("disabled", botonConSeleccion.Value);
+            if (accionModal == "Validar")
+            {
+                Assert.Contains("Confirmar agregado de envíos", WebUtility.HtmlDecode(contenidoModal));
+                Assert.Contains("data-seleccion-validada=\"true\"", contenidoModal);
+                Assert.Contains("data-confirmacion-validada", contenidoModal);
+            }
+            await ExigirSinAsignacionAsync(otroEnvio.Id);
+        }
+        var cerrarEnvios = await client.PostAsync($"{detalle}?handler=CerrarEnvios", new FormUrlEncodedContent(campos));
+        var modalCerradoHtml = await cerrarEnvios.Content.ReadAsStringAsync();
+        Assert.Contains("data-abrir=\"false\"", modalCerradoHtml);
+        Assert.DoesNotContain($"value=\"{otroEnvio.Id}\" checked", modalCerradoHtml);
+        await ExigirSinAsignacionAsync(otroEnvio.Id);
+        campos["ModalEnvios"] = "false";
+        campos.Remove("Texto");
+        Assert.Contains(">Modificar</button>", datosFijos);
+        Assert.DoesNotContain(">Cancelar</button>", datosFijos);
+        var editar = await client.PostAsync($"{detalle}?handler=EditarDatos", new FormUrlEncodedContent(campos));
+        var editarHtml = await editar.Content.ReadAsStringAsync();
+        Assert.Contains("class=\"btn btn-success\"", editarHtml);
+        Assert.Contains(">Cancelar</button>", editarHtml);
+        Assert.DoesNotContain(">Validar selección</button>", editarHtml);
+        campos["EditandoDatos"] = "true";
+        campos["Fecha"] = "";
+        campos["RepartidorId"] = "";
+        campos["VehiculoId"] = OtroVehiculo.ToString();
+        campos["Seleccion"] = otroEnvio.Id.ToString();
+        var cancelado = await client.PostAsync($"{detalle}?handler=CancelarDatos", new FormUrlEncodedContent(campos));
+        var canceladoHtml = await cancelado.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, cancelado.StatusCode);
+        Assert.DoesNotContain("validation-summary-errors", canceladoHtml);
+        Assert.DoesNotContain(">Cancelar</button>", canceladoHtml);
+        Assert.Contains($"value=\"{otroEnvio.Id}\" checked", canceladoHtml);
+        var sinModificar = (await client.GetFromJsonAsync<RutaResponse>($"/api/planificacion/rutas/{rutaId}"))!;
+        Assert.Equal(new DateOnly(2035, 2, 4), sinModificar.Fecha);
+        Assert.Equal(Repartidor, sinModificar.RepartidorId);
+        Assert.Equal(Vehiculo, sinModificar.VehiculoId);
+        Assert.Equal(campos["RevisionEsperada"], sinModificar.Revision.ToString());
+        await ExigirSinAsignacionAsync(otroEnvio.Id);
+        campos["Fecha"] = "2035-02-04";
+        campos["RepartidorId"] = Repartidor.ToString();
+        campos["VehiculoId"] = Vehiculo.ToString();
+        campos["EditandoDatos"] = "false";
+        campos.Remove("Seleccion");
+        var sinSeleccion = await client.PostAsync($"{detalle}?handler=Validar", new FormUrlEncodedContent(campos));
+        var sinSeleccionHtml = WebUtility.HtmlDecode(await sinSeleccion.Content.ReadAsStringAsync());
+        Assert.Contains("Seleccioná al menos un envío para validar el agregado.", sinSeleccionHtml);
+        Assert.DoesNotContain("Confirmar agregado de envíos", sinSeleccionHtml);
+        Assert.Contains("data-resultado-ruta=\"errores-ruta\"", sinSeleccionHtml);
+        Assert.Contains("data-abrir=\"true\"", sinSeleccionHtml);
+
+        var sinCambios = await client.PostAsync($"{detalle}?handler=Modificar", new FormUrlEncodedContent(campos));
+        Assert.Contains("No hay cambios para guardar.", WebUtility.HtmlDecode(await sinCambios.Content.ReadAsStringAsync()));
+        Assert.Contains(">Cancelar</button>", await sinCambios.Content.ReadAsStringAsync());
+        campos["RepartidorId"] = OtroRepartidor.ToString();
+        campos["VehiculoId"] = OtroVehiculo.ToString();
+        var modificado = await client.PostAsync($"{detalle}?handler=Modificar", new FormUrlEncodedContent(campos));
+        Assert.Equal(HttpStatusCode.OK, modificado.StatusCode);
+        Assert.Contains("Fecha y recursos guardados correctamente.", await modificado.Content.ReadAsStringAsync());
+        Assert.DoesNotContain(">Cancelar</button>", await modificado.Content.ReadAsStringAsync());
+        var ruta = (await client.GetFromJsonAsync<RutaResponse>($"/api/planificacion/rutas/{rutaId}"))!;
+        Assert.Equal(OtroRepartidor, ruta.RepartidorId);
+        Assert.Equal(OtroVehiculo, ruta.VehiculoId);
+
+        campos["RevisionEsperada"] = ruta.Revision.ToString();
+        campos["Seleccion"] = otroEnvio.Id.ToString();
+        var agregarPreview = await client.PostAsync($"{detalle}?handler=Validar", new FormUrlEncodedContent(campos));
+        Assert.Contains("Confirmar agregado de envíos", WebUtility.HtmlDecode(await agregarPreview.Content.ReadAsStringAsync()));
+        Assert.Contains("data-abrir=\"false\"", await agregarPreview.Content.ReadAsStringAsync());
+        Assert.Contains("Selección validada", WebUtility.HtmlDecode(await agregarPreview.Content.ReadAsStringAsync()));
+        await ExigirSinAsignacionAsync(otroEnvio.Id);
+        var agregado = await client.PostAsync($"{detalle}?handler=Confirmar", new FormUrlEncodedContent(campos));
+        Assert.Equal(HttpStatusCode.OK, agregado.StatusCode);
+        Assert.Contains("Se agregaron 1 envíos a la ruta.", WebUtility.HtmlDecode(await agregado.Content.ReadAsStringAsync()));
+        Assert.Equal("AsignadoARuta", await ScalarAsync<string>("""SELECT "Estado" FROM envios."Envios" WHERE "Id"=@id""", otroEnvio.Id));
+        Assert.Equal(rutaId, await ScalarAsync<Guid>("""SELECT "RutaId" FROM planificacion."Paradas" WHERE "EnvioId"=@id""", otroEnvio.Id));
+    }
+
+    [Theory]
+    [InlineData("Filtrar")]
+    [InlineData("LimpiarFiltros")]
+    public async Task Formulario_filtra_sin_recursos_y_los_exige_al_validar_o_confirmar(string handler)
+    {
+        using var client = Cliente();
+        var envio = await RecibidoAsync(client);
+        var html = await client.GetStringAsync("/backoffice/rutas/nueva");
+        var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"", RegexOptions.None, TimeSpan.FromSeconds(1));
+        Assert.True(token.Success, html);
+        var campos = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = WebUtility.HtmlDecode(token.Groups[1].Value),
+            ["Fecha"] = "2035-02-04", ["RepartidorId"] = "", ["VehiculoId"] = "",
+            ["Seleccion"] = envio.Id.ToString(), ["RevisionEsperada"] = "0", ["Pagina"] = "1",
+        };
+        var filtrado = await client.PostAsync($"/backoffice/rutas/nueva?handler={handler}", new FormUrlEncodedContent(campos));
+        Assert.Equal(HttpStatusCode.OK, filtrado.StatusCode);
+        var resultado = WebUtility.HtmlDecode(await filtrado.Content.ReadAsStringAsync());
+        Assert.DoesNotContain("is invalid", resultado);
+        Assert.DoesNotContain("validation-summary-errors", resultado);
+        Assert.Contains("value=\"2035-02-04\"", resultado);
+        Assert.Contains(envio.Id.ToString(), resultado);
+        foreach (var accion in new[] { "Validar", "Confirmar", "Modificar" })
+        {
+            var rechazado = await client.PostAsync($"/backoffice/rutas/nueva?handler={accion}", new FormUrlEncodedContent(campos));
+            Assert.Equal(HttpStatusCode.OK, rechazado.StatusCode);
+            var errores = WebUtility.HtmlDecode(await rechazado.Content.ReadAsStringAsync());
+            Assert.Contains("Seleccioná un repartidor.", errores);
+            Assert.Contains("Seleccioná un vehículo.", errores);
+            Assert.DoesNotContain("Confirmar ruta", errores);
+            await ExigirSinAsignacionAsync(envio.Id);
+        }
+    }
+
+    [Fact]
+    public async Task Disponibles_busca_por_numero_de_envio_ignorando_espacios_y_mayusculas()
+    {
+        using var client = Cliente();
+        var envio = await RecibidoAsync(client);
+        var otro = await RecibidoAsync(client);
+        var texto = Uri.EscapeDataString($"  {envio.Numero.ToLowerInvariant()}  ");
+        var disponibles = (await client.GetFromJsonAsync<EnviosDisponiblesResponse>(
+            $"/api/planificacion/envios-disponibles?fecha=2035-04-20&texto={texto}"))!;
+        Assert.Equal(1, disponibles.Total);
+        Assert.Equal(envio.Id, Assert.Single(disponibles.Items).Id);
+        Assert.DoesNotContain(disponibles.Items, e => e.Id == otro.Id);
     }
 
     [Fact]

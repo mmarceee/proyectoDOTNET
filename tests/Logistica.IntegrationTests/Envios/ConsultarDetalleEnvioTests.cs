@@ -14,7 +14,9 @@ public sealed class ConsultarDetalleEnvioTests(PostgresApiFactory factory) : ICl
         using var scope = factory.Services.CreateScope();
         var envio = await CrearEnvioAsync(scope);
         await using var db = Contexto(scope, new Tenant(envio.OperadorId, envio.ComercioId));
-        var handler = new ConsultarDetalleEnvioHandler(new EnvioDetalleReader(db));
+        var handler = new ConsultarDetalleEnvioHandler(new EnvioDetalleReader(db),
+            scope.ServiceProvider.GetRequiredService<Logistica.Modules.Deposito.Contracts.IDepositoModuleApi>(),
+            new Tenant(envio.OperadorId, envio.ComercioId));
 
         var detalle = await handler.HandleAsync(new($" {envio.Numero} "), CancellationToken.None);
 

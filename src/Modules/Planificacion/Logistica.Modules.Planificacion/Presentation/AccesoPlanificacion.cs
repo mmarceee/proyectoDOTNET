@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using Logistica.Modules.Planificacion.Application.Rutas;
 using Logistica.SharedKernel;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
@@ -9,11 +7,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 namespace Logistica.Modules.Planificacion.Presentation;
-
-internal sealed class ResponsablePlanificacion(IHttpContextAccessor http) : IResponsablePlanificacion
-{
-    public Guid? Id => Guid.TryParse(http.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
-}
 
 internal sealed class AccesoPlanificacion(IHostEnvironment environment, IConfiguration configuration, ICurrentTenant tenant,
     IAntiforgery antiforgery) : IEndpointFilter, IAsyncPageFilter

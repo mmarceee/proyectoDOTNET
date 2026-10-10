@@ -1,3 +1,5 @@
+using Logistica.Modules.Deposito.Contracts.Results;
+
 namespace Logistica.Modules.Deposito.Contracts;
 
 public interface IDepositoModuleApi

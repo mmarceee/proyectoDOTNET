@@ -1,5 +1,7 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Deposito.Contracts;
+using Logistica.Modules.Deposito.Contracts.Results;
+using Logistica.Modules.Deposito.Application;
 using Logistica.Modules.Deposito.Application.Features.RecibirBulto;
 using Logistica.Modules.Deposito.Domain.Recepciones;
 using Logistica.Modules.Deposito.Infrastructure.Persistence;
@@ -22,6 +24,7 @@ public static class DepositoModule
         services.AddScoped<IDepositoModuleApi, DepositoModuleApi>();
 
         services.AddScoped<RecibirBultoHandler>();
+        services.AddScoped<ConsultarBultoParaRecepcionHandler>();
 
         return services;
     }

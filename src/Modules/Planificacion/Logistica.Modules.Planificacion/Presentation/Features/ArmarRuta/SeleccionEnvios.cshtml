@@ -1,0 +1,73 @@
+@model RutaEditorModel
+    <section class="card mb-4" aria-labelledby="envios-disponibles">
+    <div class="card-body p-4">
+    <h2 id="envios-disponibles" class="h5">Envíos disponibles</h2>
+    <p class="text-muted">Seleccioná los envíos que querés agregar a la ruta. Los filtros se actualizan al cambiarlos.</p>
+    <div class="row g-2 mb-3">
+        <div class="col-md-3"><label asp-for="ZonaId" class="form-label">Zona</label><select asp-for="ZonaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var z in Model.Recursos.Zonas) { <option value="@z.Id">@z.Nombre</option> }</select></div>
+        <div class="col-md-3"><label asp-for="FranjaId" class="form-label">Franja</label><select asp-for="FranjaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var f in Model.Recursos.Franjas) { <option value="@f.Id">@f.Desde.ToString("HH:mm")–@f.Hasta.ToString("HH:mm")</option> }</select></div>
+        <div class="col-md-4"><label asp-for="Texto" class="form-label">Número de envío o dirección</label><input asp-for="Texto" class="form-control" placeholder="ENV-000123 o Av. Italia 1234" data-filtro-ruta /></div>
+        <div class="col-md-2"><label asp-for="Pagina" class="form-label">Página</label><input asp-for="Pagina" type="number" min="1" class="form-control" data-filtro-ruta /></div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        <p class="text-muted mb-0">@Model.TotalCandidatos envíos · Página @Model.Pagina</p>
+        <div class="d-flex flex-wrap gap-2">
+            <button asp-page-handler="Filtrar" class="btn btn-outline-secondary" formnovalidate data-filtrar-ruta hidden="@(Model.Id is null)">Filtrar</button>
+            <button asp-page-handler="LimpiarFiltros" class="btn btn-outline-secondary" formnovalidate data-limpiar-filtros>Limpiar filtros</button>
+        </div>
+    </div>
+    <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0"><thead><tr><th>Seleccionar</th><th>Envío</th><th>Dirección</th><th>Peso kg</th><th>Volumen m³</th></tr></thead><tbody>
+    @foreach (var e in Model.Candidatos)
+    {
+        <tr><td><input type="checkbox" name="Seleccion" value="@e.Id" checked="@Model.Seleccion.Contains(e.Id)" aria-label="Seleccionar @e.Numero" /></td><td>@e.Numero</td><td>@e.Direccion</td><td>@e.PesoKg</td><td>@e.VolumenM3.ToString("0.######")</td></tr>
+    }
+    @if (Model.Candidatos.Count == 0)
+    {
+        <tr><td colspan="5" class="text-center text-muted py-4">No hay envíos disponibles para la fecha y los filtros elegidos.</td></tr>
+    }
+    </tbody></table>
+    </div>
+    @foreach (var id in Model.Seleccion.Where(id => Model.Candidatos.All(e => e.Id != id)))
+    {
+        <input type="hidden" name="Seleccion" value="@id" />
+        <p class="text-warning">Hay un envío seleccionado que no está disponible para este día. La confirmación volverá a comprobarlo.</p>
+    }
+    </div>
+    </section>
+    <section id="validacion-ruta" tabindex="-1" class="card mb-4" aria-labelledby="titulo-validacion-ruta">
+    <div class="card-body p-4">
+    <h2 id="titulo-validacion-ruta" class="h5">Validar y confirmar</h2>
+    <p class="text-muted">La validación comprueba paradas, capacidad y franjas horarias. Los envíos se asignan al confirmar.</p>
+    @if (Model.Evaluacion is { } evaluacion)
+    {
+        <div class="alert @(evaluacion.Valida ? "alert-success" : "alert-danger")" role="status" data-resultado-validacion>
+            <p class="fw-semibold">@(evaluacion.Valida ? "Validación correcta. Esta comprobación no guarda cambios." : "La selección no cumple las reglas. Revisá los motivos indicados.")</p>
+            <p>Peso: @evaluacion.PesoKg / @evaluacion.CapacidadPesoKg kg · Volumen: @evaluacion.VolumenM3.ToString("0.######") / @evaluacion.CapacidadVolumenM3 m³ · Paradas: @evaluacion.Paradas / @evaluacion.MaxParadas</p>
+            @foreach (var r in evaluacion.Restricciones) { <p class="mb-0">@r.Mensaje</p> }
+        </div>
+        @if (evaluacion.Valida && Model.CambioDatos)
+        {
+            <p>Primero confirmá el cambio de fecha o recursos en Datos de la ruta. Después volvé a validar los envíos que querés agregar.</p>
+        }
+        else if (evaluacion.Valida && Model.Seleccion.Count == 0)
+        {
+            <p>Se comprobaron las paradas actuales. Marcá envíos disponibles y volvé a validar para agregarlos.</p>
+        }
+    }
+    </div>
+    <div class="card-footer p-3 d-flex flex-wrap gap-2">
+    @if (Model.Id is not null && Model.EditandoDatos)
+    {
+        <p class="mb-0 text-muted">Confirmá o cancelá la edición de los datos de la ruta antes de validar y agregar envíos.</p>
+    }
+    else
+    {
+        <button asp-page-handler="Validar" class="btn btn-outline-primary" data-validar-ruta disabled="@(Model.Seleccion.Count == 0)">Validar selección</button>
+        <span class="text-muted align-self-center" data-ayuda-validacion hidden="@(Model.Seleccion.Count > 0)">Seleccioná al menos un envío para validar.</span>
+        @if (Model.Id is null && Model.Evaluacion?.Valida == true && Model.Seleccion.Count > 0) { <button asp-page-handler="Confirmar" class="btn btn-primary" data-confirmar-ruta>Confirmar ruta</button> }
+        <p class="text-warning mb-0 w-100" role="status" data-validacion-pendiente hidden>Cambiaste la selección. Volvé a validar antes de confirmar.</p>
+    }
+    </div>
+    </section>
+

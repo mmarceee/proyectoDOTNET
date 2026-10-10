@@ -9,18 +9,29 @@
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
-        <h1>Envío @envio.Numero</h1>
+        <h1 class="mb-2">Envío @envio.Numero</h1>
         <span class="badge @EstadoEnvioBadge.Clase(envio.Estado)">@EstadoEnvioTexto.Mostrar(envio.Estado)</span>
-        <span class="ms-2">Fecha de alta: @Model.MostrarFecha(envio.CreadoEn)</span>
+        <span class="text-muted ms-2">Fecha de alta: @Model.MostrarFecha(envio.CreadoEn)</span>
     </div>
     <a href="@Model.UrlVolver" class="btn btn-outline-secondary">Volver al listado</a>
 </div>
 
+<section class="card mb-4" aria-labelledby="resumen-titulo">
+    <div class="card-body p-4">
+        <h2 id="resumen-titulo" class="h5 mb-3">Resumen del envío</h2>
+        <dl class="row g-3 mb-0">
+            <div class="col-12 col-sm-4"><dt class="text-muted fw-normal">Bultos</dt><dd class="mb-0 fs-5 fw-semibold">@envio.Bultos.Count</dd></div>
+            <div class="col-12 col-sm-4"><dt class="text-muted fw-normal">Peso declarado total</dt><dd class="mb-0 fs-5 fw-semibold">@envio.Bultos.Sum(b => b.PesoKg).ToString("0.##") kg</dd></div>
+            <div class="col-12 col-sm-4"><dt class="text-muted fw-normal">Tarifa total</dt><dd class="mb-0 fs-5 fw-semibold">@envio.MontoTarifa.ToString("0.00")</dd></div>
+        </dl>
+    </div>
+</section>
+
 <div class="row g-3 mb-4">
     <section class="col-12 col-lg-6" aria-labelledby="destinatario-titulo">
         <div class="card h-100">
-            <div class="card-body">
-                <h2 id="destinatario-titulo" class="h4">Destinatario</h2>
+            <div class="card-body p-4">
+                <h2 id="destinatario-titulo" class="h5 mb-3">Destinatario</h2>
                 <dl class="row mb-0">
                     <dt class="col-sm-4">Nombre</dt><dd class="col-sm-8">@envio.Destinatario.Nombre</dd>
                     <dt class="col-sm-4">Teléfono</dt><dd class="col-sm-8">@envio.Destinatario.Telefono</dd>
@@ -32,8 +43,8 @@
     </section>
     <section class="col-12 col-lg-6" aria-labelledby="direccion-titulo">
         <div class="card h-100">
-            <div class="card-body">
-                <h2 id="direccion-titulo" class="h4">Dirección de entrega</h2>
+            <div class="card-body p-4">
+                <h2 id="direccion-titulo" class="h5 mb-3">Dirección de entrega</h2>
                 <dl class="row mb-0">
                     <dt class="col-sm-4">Dirección</dt><dd class="col-sm-8">@envio.Direccion.Calle @envio.Direccion.Numero</dd>
                     <dt class="col-sm-4">Localidad</dt><dd class="col-sm-8">@envio.Direccion.Localidad</dd>
@@ -46,10 +57,13 @@
     </section>
 </div>
 
-<section class="mb-4" aria-labelledby="bultos-titulo">
-    <h2 id="bultos-titulo" class="h4">Bultos (@envio.Bultos.Count)</h2>
+<div class="row g-4 mb-4">
+    <div class="col-12 col-xl-9">
+<section class="card h-100" aria-labelledby="bultos-titulo">
+    <div class="card-body p-4">
+    <h2 id="bultos-titulo" class="h5 mb-3">Bultos (@envio.Bultos.Count)</h2>
     <div class="table-responsive">
-        <table class="table table-striped align-middle">
+        <table class="table align-middle mb-0">
             <thead>
                 <tr>
                     <th scope="col">Código</th>
@@ -68,9 +82,9 @@
                         <td>@bulto.PesoKg.ToString("0.##")</td>
                         <td>@bulto.LargoCm.ToString("0.##") × @bulto.AnchoCm.ToString("0.##") × @bulto.AltoCm.ToString("0.##")</td>
                         <td class="text-end">@bulto.MontoTarifa.ToString("0.00")</td>
-                        <td>@(Model.BultosRecibidos.Contains(bulto.Id) ? "Recibido" : "Pendiente")</td>
+                        <td><span class="badge @(bulto.Recibido ? "text-bg-success" : "text-bg-secondary")">@(bulto.Recibido ? "Recibido" : "Pendiente")</span></td>
                         <td>
-                            @if (envio.Estado == "Admitido" && !Model.BultosRecibidos.Contains(bulto.Id))
+                            @if (bulto.PuedeRecepcionar)
                             {
                                 <a href="@Model.UrlRecepcion(bulto.Codigo)" class="btn btn-outline-primary btn-sm"
                                    aria-label="Recepcionar bulto @bulto.Codigo">Recepcionar</a>
@@ -88,71 +102,30 @@
             </tfoot>
         </table>
     </div>
+    </div>
 </section>
-
-<section class="mb-4" aria-labelledby="tarifa-titulo">
-    <h2 id="tarifa-titulo" class="h4">Cuadro tarifario aplicado</h2>
+    </div>
+    <div class="col-12 col-xl-3">
+<section class="card h-100" aria-labelledby="tarifa-titulo">
+    <div class="card-body p-4">
+    <h2 id="tarifa-titulo" class="h5 mb-3">Cuadro tarifario aplicado</h2>
     @if (envio.VersionTarifario is { } version)
     {
-        <p>Versión @version.Numero <span class="text-muted">(@version.Id)</span></p>
+        <p class="mb-2 fw-semibold">Versión @version.Numero</p>
+        <details class="text-muted small text-break"><summary>Identificador de la versión</summary><p class="mt-2 mb-0">@version.Id</p></details>
     }
     else
     {
-        <p>No se registró una versión tarifaria al admitir este envío.</p>
+        <p class="text-muted mb-0">No se registró una versión tarifaria al admitir este envío.</p>
     }
+    </div>
 </section>
+    </div>
+</div>
 
-<section aria-labelledby="historial-titulo">
-    <h2 id="historial-titulo" class="h4">Historial de eventos</h2>
-    @if (envio.Eventos.Count == 0)
-    {
-        <p>No hay eventos registrados.</p>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th scope="col">Fecha y hora</th>
-                        <th scope="col">Estado anterior</th>
-                        <th scope="col">Estado nuevo</th>
-                        <th scope="col">Origen</th>
-                        <th scope="col">Responsable</th>
-                        <th scope="col">Ubicación</th>
-                        <th scope="col">Detalle</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var evento in envio.Eventos)
-                    {
-                        <tr>
-                            <td class="text-nowrap">@Model.MostrarFecha(evento.OcurridoEn)</td>
-                            <td>@(evento.EstadoAnterior is null ? "Alta del envío" : EstadoEnvioTexto.Mostrar(evento.EstadoAnterior))</td>
-                            <td>@EstadoEnvioTexto.Mostrar(evento.EstadoNuevo)</td>
-                            <td>@OrigenEventoTexto.Mostrar(evento.Origen)</td>
-                            <td class="text-break">@(evento.ResponsableId?.ToString() ?? "Sin informar")</td>
-                            <td>
-                                @if (evento.Latitud.HasValue && evento.Longitud.HasValue)
-                                {
-                                    <span>@evento.Latitud, @evento.Longitud</span>
-                                }
-                                else
-                                {
-                                    <span>Sin informar</span>
-                                }
-                            </td>
-                            <td>@(evento.Detalle ?? "Sin informar")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-</section>
-
-<section class="mt-4" aria-labelledby="intentos-titulo">
-    <h2 id="intentos-titulo" class="h4">Intentos de entrega</h2>
+<section class="card mb-4" aria-labelledby="intentos-titulo">
+    <div class="card-body p-4">
+    <h2 id="intentos-titulo" class="h5 mb-3">Intentos de entrega</h2>
     @if (envio.Intentos.Count == 0)
     {
         <p>No hay intentos de entrega registrados.</p>
@@ -199,10 +172,14 @@
             </div>
         </article>
     }
+    </div>
 </section>
 
-<section class="mt-4" aria-labelledby="incidencias-titulo">
-    <h2 id="incidencias-titulo" class="h4">Incidencias</h2>
+<div class="row g-4 mb-4">
+    <div class="col-12 col-lg-6">
+<section class="card h-100" aria-labelledby="incidencias-titulo">
+    <div class="card-body p-4">
+    <h2 id="incidencias-titulo" class="h5 mb-3">Incidencias</h2>
     @if (envio.Incidencias.Count == 0)
     {
         <p>No hay incidencias registradas.</p>
@@ -225,10 +202,13 @@
             </div>
         </article>
     }
+    </div>
 </section>
-
-<section class="mt-4" aria-labelledby="devolucion-titulo">
-    <h2 id="devolucion-titulo" class="h4">Devolución</h2>
+    </div>
+    <div class="col-12 col-lg-6">
+<section class="card h-100" aria-labelledby="devolucion-titulo">
+    <div class="card-body p-4">
+    <h2 id="devolucion-titulo" class="h5 mb-3">Devolución</h2>
     @if (envio.Devolucion is { } devolucion)
     {
         <dl class="row">
@@ -245,4 +225,59 @@
     {
         <p>No hay devolución registrada.</p>
     }
+    </div>
+</section>
+    </div>
+</div>
+
+<section aria-labelledby="historial-titulo">
+    <div class="card-body p-4">
+    <h2 id="historial-titulo" class="h5 mb-2">Historial de eventos</h2>
+    <p class="text-muted mb-4">Consultá los cambios de estado y las acciones registradas en este envío.</p>
+    @if (envio.Eventos.Count == 0)
+    {
+        <p>No hay eventos registrados.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Fecha y hora</th>
+                        <th scope="col">Estado anterior</th>
+                        <th scope="col">Estado nuevo</th>
+                        <th scope="col">Origen</th>
+                        <th scope="col">Responsable</th>
+                        <th scope="col">Ubicación</th>
+                        <th scope="col">Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var evento in envio.Eventos)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@Model.MostrarFecha(evento.OcurridoEn)</td>
+                            <td>@(evento.EstadoAnterior is null ? "Alta del envío" : EstadoEnvioTexto.Mostrar(evento.EstadoAnterior))</td>
+                            <td>@EstadoEnvioTexto.Mostrar(evento.EstadoNuevo)</td>
+                            <td>@OrigenEventoTexto.Mostrar(evento.Origen)</td>
+                            <td class="text-break">@(evento.ResponsableId?.ToString() ?? "Sin informar")</td>
+                            <td>
+                                @if (evento.Latitud.HasValue && evento.Longitud.HasValue)
+                                {
+                                    <span>@evento.Latitud, @evento.Longitud</span>
+                                }
+                                else
+                                {
+                                    <span>Sin informar</span>
+                                }
+                            </td>
+                            <td>@(evento.Detalle ?? "Sin informar")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    </div>
 </section>

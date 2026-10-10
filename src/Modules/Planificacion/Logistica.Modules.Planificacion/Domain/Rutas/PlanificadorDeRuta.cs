@@ -1,7 +1,14 @@
+using Logistica.SharedKernel;
+
 namespace Logistica.Modules.Planificacion.Domain.Rutas;
 
 internal static class PlanificadorDeRuta
 {
+    public static void ExigirFechaVigente(DateOnly fecha, DateOnly hoy)
+    {
+        if (fecha < hoy) throw new DomainException("La fecha de la ruta no puede ser anterior a hoy.");
+    }
+
     public static EvaluacionRuta Evaluar(DateOnly fecha, VehiculoRuta vehiculo, int maxParadas, IReadOnlyList<EnvioRuta> envios)
     {
         var errores = new List<RestriccionRuta>();
