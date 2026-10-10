@@ -29,6 +29,7 @@ public static class EnviosModule
         services.AddScoped<IEnvioDetalleReader, EnvioDetalleReader>();
         services.AddScoped<ConsultarDetalleEnvioHandler>();
         services.AddScoped<IArchivoEvidenciaReader, ArchivoEvidenciaReader>();
+        services.AddScoped<ConsultarEvidenciaHandler>();
         services.AddScoped<CrearEnvioHandler>();
 
         // Contrato para los otros módulos (ADR-0001, addendum 3).

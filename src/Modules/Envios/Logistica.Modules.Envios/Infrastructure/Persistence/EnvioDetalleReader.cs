@@ -1,31 +1,19 @@
 using Logistica.Modules.Envios.Application.Features.ConsultarDetalleEnvio;
-using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
 
-internal sealed class EnvioDetalleReader(
-    EnviosDbContext db,
-    ICurrentTenant tenant) : IEnvioDetalleReader
+// El aislamiento por operador y comercio lo aplica el filtro global "Tenant" (ADR-0002):
+// un envío ajeno y uno inexistente dan el mismo null.
+internal sealed class EnvioDetalleReader(EnviosDbContext db) : IEnvioDetalleReader
 {
     public async Task<EnvioDetalleDto?> ConsultarAsync(
         ConsultarDetalleEnvioQuery query,
         CancellationToken ct)
     {
-        if (tenant.OperadorId is not Guid operadorId)
-        {
-            return null;
-        }
-
-        // Aislamiento manual hasta que estén disponibles los filtros globales (ADR-0002).
         var consulta = db.Envios
             .AsNoTracking()
-            .Where(e => e.OperadorId == operadorId && e.Numero == query.Numero);
-
-        if (tenant.ComercioId is Guid comercioId)
-        {
-            consulta = consulta.Where(e => e.ComercioId == comercioId);
-        }
+            .Where(e => e.Numero == query.Numero);
 
         // Consultas separadas para evitar multiplicar las filas de bultos por las de eventos.
         var encontrado = await consulta
@@ -56,7 +44,7 @@ internal sealed class EnvioDetalleReader(
                         b.LargoCm,
                         b.AnchoCm,
                         b.AltoCm,
-                        b.MontoTarifa))
+                        b.MontoTarifa, false, false))
                     .ToList(),
                 e.Eventos.OrderBy(ev => ev.OcurridoEn).ThenBy(ev => ev.Id)
                     .Select(ev => new EventoEnvioDetalleDto(
@@ -88,14 +76,9 @@ internal sealed class EnvioDetalleReader(
         }
 
         var incidencias = db.Incidencias.AsNoTracking()
-            .Where(i => i.EnvioId == encontrado.Id && i.OperadorId == operadorId);
+            .Where(i => i.EnvioId == encontrado.Id);
         var devoluciones = db.Devoluciones.AsNoTracking()
-            .Where(d => d.EnvioId == encontrado.Id && d.OperadorId == operadorId);
-        if (tenant.ComercioId is Guid comercio)
-        {
-            incidencias = incidencias.Where(i => i.ComercioId == comercio);
-            devoluciones = devoluciones.Where(d => d.ComercioId == comercio);
-        }
+            .Where(d => d.EnvioId == encontrado.Id);
 
         return encontrado.Detalle with
         {

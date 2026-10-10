@@ -218,7 +218,9 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 
 * cubre(codigoPostal: string): bool
 
-* agregarFranja(desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\]): FranjaHoraria
+* agregarFranja(desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\], vigenteDesde: DateOnly): FranjaHoraria
+
+* reemplazarFranja(franjaAnteriorId: Guid, desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\], vigenteDesde: DateOnly): FranjaHoraria — crea una nueva franja y cierra la vigencia de la anterior, conservando su historial. La aplicación coordina la comprobación de anticipación, reprogramación, revalidación y notificaciones de los envíos afectados.
 
 **FranjaHoraria**
 
@@ -233,6 +235,18 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 * horaHasta: TimeOnly
 
 * dias: DiaSemana\[\]
+
+* vigenteDesde: DateOnly (primer día de vigencia, incluido)
+
+* vigenteHasta: DateOnly (opcional; último día de vigencia, incluido; sin valor significa sin fin programado)
+
+* reemplazaAId: Guid (opcional; identifica explícitamente la franja anterior de la misma zona que esta reemplaza)
+
+**Vigencia de franjas (acordada al definir CU-40 el 09/10/2026):** el Administrador del operador programa cambios de franjas por zona con una fecha de entrada en vigencia. Cada cambio crea una nueva franja, vinculada explícitamente a la anterior mediante reemplazaAId, sin sobrescribir sus horarios históricos. La anterior termina el día previo a vigenteDesde de su reemplazo. Las consultas de cobertura horaria se resuelven para el día de entrega o de la ruta. Los compromisos afectados desde esa fecha se reprograman y revalidan con más de 24 horas de anticipación hasta el inicio más temprano entre la franja anterior y la nueva, conservando el historial y notificando al destinatario y al comercio. No se modifican rutas Despachadas o EnCurso; se propone una vigencia posterior si impiden el cambio. Los pedidos nuevos no postergan el cambio y sólo pueden usar franjas atendidas para su fecha. Los envíos sin día definido resuelven su franja al planificar. Las firmas del flujo por lote y su coordinación técnica con rutas se definen en la especificación técnica de CU-40; el comportamiento transaccional y la aplicación de T19 se detallan en las decisiones acordadas.
+
+**Confirmación del cambio programado (acordada el 09/10/2026):** la aplicación comprueba todos los envíos y rutas afectados y confirma las nuevas vigencias, reprogramaciones, cambios necesarios en la planificación y mensajes de aviso en Outbox en una sola transacción. Si cualquier compromiso o conflicto impide el cambio, se conserva la configuración anterior sin reprogramaciones parciales. Las notificaciones se entregan después de confirmar y se reintentan si fallan, sin deshacer la operación. Las firmas objetivo de los contratos se definen en la especificación técnica de CU-40; los envíos ya asignados a rutas Planificadas se tratan mediante T19, conforme a las notas de Planificación.
+
+La [especificación técnica de CU-40](cu-40/especificacion-tecnica-cu-40.md), sección 8, concreta el flujo por lote, los contratos, reemplazos sucesivos y el tratamiento de envíos sin día definido. La implementación de esta ampliación corresponde a CU-04.
 
 **VersionTarifario**
 
@@ -684,6 +698,8 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 
 * id: Guid
 
+* operadorId: Guid
+
 * repartidorId: Guid
 
 * vehiculoId: Guid
@@ -696,11 +712,19 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 
 * despachadaEn: DateTimeOffset (opcional)
 
+* revision: long (inicia en 1 y aumenta con cada modificación efectiva, incluidas sus paradas; token de concurrencia según la especificación técnica)
+
+* reservaActiva: bool (mantenida por el agregado: Planificada con paradas, Despachada o EnCurso; no editable desde una petición)
+
 **Métodos**
 
 * agregarParada(envioId: Guid): void
 
+* modificarPlanificacion(fecha: DateOnly, repartidorId: Guid, vehiculoId: Guid): void — sólo en estado Planificada (ampliación de CU-40 acordada el 09/10/2026). La aplicación coordina la revalidación completa de los envíos, los recursos activos y su disponibilidad, y el cambio atómico de reservas; si falla, se conservan los datos anteriores. No modifica las paradas ni repite las transiciones de asignación de los envíos.
+
 * quitarParada(envioId: Guid): void — sólo si la ruta no fue despachada; la parada se elimina (T4, T19)
+
+* En el cambio programado de franjas de CU-04, un envío AsignadoARuta afectado sale de su ruta Planificada por T19 y queda Reprogramado con la nueva franja, conservando el día de entrega. Si sólo lo determinaba la ruta, ese día se guarda como fechaEntregaProgramada al reprogramar. La parada se elimina sin borrar la evidencia histórica; si la ruta queda vacía, libera sus recursos. Se muestran los envíos afectados antes de confirmar y se dejan disponibles para reasignación manual mediante T13 (acordado al definir CU-40 el 09/10/2026).
 
 * ordenarParadas(): void — por hora de inicio de la franja comprometida y, dentro de la misma franja, por zona y código postal (CU-42)
 
@@ -724,6 +748,58 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 
 * llegadaEn: DateTimeOffset (opcional)
 
+**ValidacionRuta**
+
+*entidad histórica de Planificación, vinculada a Ruta; inmutable una vez confirmada, acordada el 09/10/2026*
+
+**Atributos**
+
+* id: Guid
+
+* rutaId: Guid
+
+* revisionRuta: long (revisión resultante de la confirmación evaluada)
+
+* validadaEn: DateTimeOffset
+
+* responsableId: Guid (opcional, según el origen de la operación)
+
+* operacion: OperacionValidacionRuta
+
+* fechaRuta: DateOnly (copia de la fecha evaluada)
+
+* repartidorId: Guid (copia de la asignación evaluada)
+
+* vehiculoId: Guid
+
+* capacidadPesoKg: decimal (copia del límite utilizado)
+
+* capacidadVolumenM3: decimal (copia del límite utilizado)
+
+* largoCargaCm, anchoCargaCm, altoCargaCm: decimal (copias de las dimensiones utilizadas)
+
+* versionReglasId: Guid
+
+* maxParadasPorRuta: int (copia del límite utilizado)
+
+* bultos: DatosBultoValidado\[\]
+
+**DatosBultoValidado**
+
+*objeto valor de ValidacionRuta; no depende de la existencia de una Parada*
+
+* envioId: Guid
+
+* bultoId: Guid
+
+* pesoKg: decimal
+
+* largoCm, anchoCm, altoCm: decimal
+
+* volumenM3: decimal (calculado a partir de las dimensiones conservadas)
+
+Una confirmación exitosa crea un nuevo registro con todos los bultos evaluados. Se guarda con la operación en la misma transacción. Eliminar una parada no elimina esta evidencia, ni una nueva confirmación sobrescribe las anteriores. Las referencias a envíos y bultos no implican acceso a las entidades internas de Envíos.
+
 ## **Enumerados**
 
 **EstadoRuta**  *«enum»*
@@ -736,13 +812,23 @@ Planificada, Despachada, EnCurso, Finalizada
 
 Pendiente, Completada, Fallida
 
+**OperacionValidacionRuta**  *«enum»*
+
+Creacion, Agregado, Modificacion, Despacho, CambioFranjaProgramado
+
 ## **Notas**
 
 * RF 15 ("un envío no puede estar en dos rutas a la vez") es una invariante de aplicación/base de datos, no una cardinalidad del diagrama: un envío no puede tener más de una parada activa (estado distinto de Completada o Fallida) al mismo tiempo. Se valida en la aplicación y se refuerza con un índice único parcial de PostgreSQL: UNIQUE (envioId) WHERE estado = 'Pendiente'. Al quitar un envío de una ruta no despachada (CU-41, T4, T19), la parada se elimina.
 
+* Creación y reserva de recursos (acordado para CU-40 el 09/10/2026): la ruta se persiste al confirmar con al menos un envío. Una ruta Planificada con paradas reserva repartidor y vehículo para su fecha; si queda vacía por CU-41, conserva su estado y libera la reserva. Volver a agregar envíos requiere comprobar y reservar nuevamente los recursos en la misma transacción. Una ruta Despachada o EnCurso mantiene la ocupación para su fecha y bloquea nuevas asignaciones si sigue sin finalizar desde una fecha anterior. Completar o fallar paradas no las elimina ni libera por sí solo los recursos: la ruta debe pasar a Finalizada. Una ruta Finalizada no reserva recursos; la excepción de ruta vacía sólo corresponde a Planificada.
+
 * El orden de las paradas (RF 16) usa un criterio fijo, sin ADR de despacho: hora de inicio de la franja comprometida y, dentro de la misma franja, zona y código postal. El despachador puede ajustarlo a mano (CU-42). Si el equipo aborda el opcional de optimización (sección 7.3 de la letra), se compara contra este criterio.
 
+* Evidencia de carga (acordado para CU-40 el 09/10/2026): ValidacionRuta conserva los pesos y dimensiones usados por bulto, los recursos y límites evaluados y el momento/responsable/operación de cada confirmación. Al agregar envíos, modificar la planificación o despachar (CU-43), se revalida la carga completa con las medidas actuales de recepción y el respaldo declarado por valor no medido. Las confirmaciones posteriores no sobrescriben la evidencia anterior. La evidencia se confirma en la misma transacción que la operación y pertenece a la ruta, sin eliminarse al quitar una parada por CU-41. Las tablas, restricciones y consultas del historial se definen en la especificación técnica de CU-40; su implementación queda pendiente.
+
 * La validación de restricciones de RF 14 (máximo de paradas, capacidad de peso/volumen vía Vehiculo.admiteCarga, compatibilidad de franja horaria) no vive en una sola clase: la ejecuta un servicio de dominio (por ejemplo PlanificadorDeRuta) que orquesta Ruta, Vehiculo y los Envio candidatos. No es una clase de este diagrama; se documenta en la arquitectura.
+
+* Reglas de planificación (acordado para CU-40 el 09/10/2026): crear, agregar envíos, modificar la planificación y despachar se validan con la versión de reglas vigente al confirmar. Se conserva su identificador y el máximo de paradas aplicado junto con la evidencia de cada confirmación. La prevalidación no congela la versión; un cambio que invalida la selección impide confirmar y se informa el nuevo límite. Las reglas posteriores no modifican retroactivamente una ruta Despachada o EnCurso ni la evidencia de su despacho. Esta versión de planificación no reemplaza la versión de reglas propia de cada envío.
 
 # **Ejecución en calle, intentos, pruebas e incidencias operativas**
 
@@ -1076,7 +1162,9 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | Envio | 0..\* | asociación | 1 | VersionReglas |
 | EventoEnvio | 0..\* | asociación | 0..1 | Usuario |
 | IntentoEntrega | 0..\* | asociación | 0..1 | MotivoNoEntrega |
-| Ruta | 1 | composición | 1..\* | Parada |
+| Ruta | 1 | composición | 0..\* | Parada |
+| Ruta | 1 | composición | 1..\* | ValidacionRuta |
+| ValidacionRuta | 1 | composición | 0..\* | DatosBultoValidado |
 | Ruta | 0..\* | asociación | 1 | Repartidor |
 | Ruta | 0..\* | asociación | 1 | Vehiculo |
 | Parada | 0..\* | asociación | 1 | Envio |

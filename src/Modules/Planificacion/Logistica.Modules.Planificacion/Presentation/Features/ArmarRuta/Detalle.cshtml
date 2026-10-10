@@ -1,0 +1,46 @@
+@page "/backoffice/rutas/{id:guid}"
+@model DetalleModel
+@{ ViewData["Title"] = "Detalle de ruta"; }
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1>Ruta del @Model.Ruta?.Fecha.ToString("dd/MM/yyyy")</h1>
+        <p class="text-muted mb-0">Estado: <strong>@Model.Ruta?.Estado</strong> · Revisión @Model.Ruta?.Revision</p>
+    </div>
+    <a href="/backoffice/rutas" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+@if (Model.MensajeConfirmacion is { } mensaje)
+{
+    <div id="resultado-ruta" class="alert alert-success" role="status">@mensaje</div>
+}
+<section id="paradas-actuales" tabindex="-1" class="card mb-4" aria-labelledby="titulo-paradas-actuales">
+<div class="card-body p-4">
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <h2 id="titulo-paradas-actuales" class="h5 mb-0">Paradas actuales</h2>
+    @if (Model.Editable)
+    {
+        <button form="formulario-ruta" asp-page-handler="AbrirEnvios" class="btn btn-primary" formnovalidate disabled="@Model.EditandoDatos">Agregar envíos</button>
+    }
+</div>
+<div class="table-responsive">
+<table class="table align-middle mb-0"><thead><tr><th>Orden</th><th>Envío</th><th>Estado de la parada</th></tr></thead><tbody>
+@foreach (var parada in Model.Ruta?.Paradas ?? []) { <tr><td>@parada.Orden</td><td>@Model.NumerosEnvio.GetValueOrDefault(parada.EnvioId, "Envío no disponible")</td><td>@parada.Estado</td></tr> }
+</tbody></table>
+</div>
+</div>
+</section>
+@if (Model.Editable) { @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/Formulario.cshtml", Model) }
+<section class="card mt-5 mb-4" aria-labelledby="historial-validaciones">
+<div class="card-body p-4">
+<h2 id="historial-validaciones" class="h5">Historial de validaciones</h2>
+<p class="text-muted mb-4">Consultá las validaciones registradas al confirmar cambios en la ruta.</p>
+@if (Model.Historial.Count == 0) { <p class="text-muted mb-0">Todavía no hay validaciones registradas.</p> }
+@foreach (var validacion in Model.Historial)
+{
+    <details class="border rounded p-3 mb-3"><summary>@validacion.Operacion · revisión @validacion.RevisionRuta · @validacion.ValidadaEn.ToString("u")</summary>
+    <p class="mt-3">Peso: @validacion.Bultos.Sum(b => b.PesoKg) / @validacion.CapacidadPesoKg kg · Volumen: @validacion.Bultos.Sum(b => b.VolumenM3) / @validacion.CapacidadVolumenM3 m³ · Máximo: @validacion.MaxParadas paradas</p>
+    <div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Bulto</th><th>Peso kg</th><th>Dimensiones cm</th></tr></thead><tbody>
+    @foreach (var bulto in validacion.Bultos) { <tr><td>@Model.NumerosEnvio.GetValueOrDefault(bulto.EnvioId, "Envío no disponible")</td><td>@bulto.PesoKg</td><td>@bulto.LargoCm × @bulto.AnchoCm × @bulto.AltoCm</td></tr> }
+    </tbody></table></div></details>
+}
+</div>
+</section>

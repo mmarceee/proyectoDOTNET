@@ -10,9 +10,9 @@ internal static class EvidenciaEndpoint
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/backoffice/envios/{numero}/evidencias/{archivoId:guid}",
-            async (string numero, Guid archivoId, IArchivoEvidenciaReader reader, HttpContext http, CancellationToken ct) =>
+            async (string numero, Guid archivoId, ConsultarEvidenciaHandler handler, HttpContext http, CancellationToken ct) =>
             {
-                var archivo = await reader.ConsultarAsync(numero, archivoId, ct);
+                var archivo = await handler.HandleAsync(new(numero, archivoId), ct);
                 if (archivo is null)
                 {
                     return Results.NotFound();

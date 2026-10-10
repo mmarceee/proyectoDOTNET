@@ -11,4 +11,6 @@ public interface IEnviosModuleApi
 
     // Aplica T2: Admitido → EnDeposito. Lanza una DomainException si el envío no está Admitido.
     Task RecibirEnDepositoAsync(Guid envioId, Guid? responsableId, CancellationToken ct);
+    Task<IReadOnlyList<EnvioPlanificable>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct);
+    Task AsignarARutaAsync(Guid rutaId, IReadOnlyList<AsignacionEnvioRuta> asignaciones, Guid? responsableId, CancellationToken ct);
 }

@@ -5,6 +5,8 @@ internal interface IRecepcionRepository
 {
     Task<IReadOnlyList<Guid>> BultosRecibidosAsync(Guid envioId, CancellationToken ct);
 
+    Task<IReadOnlyList<RecepcionDeposito>> ConsultarPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct);
+
     void Agregar(RecepcionDeposito recepcion);
 
     Task GuardarCambiosAsync(CancellationToken ct);

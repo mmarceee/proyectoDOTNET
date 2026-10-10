@@ -1,31 +1,18 @@
 using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
-using Logistica.SharedKernel;
+using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
 
-internal sealed class EnviosListadoReader(
-    EnviosDbContext db,
-    ICurrentTenant tenant) : IEnviosListadoReader
+// El aislamiento por operador y comercio lo aplica el filtro global "Tenant" (ADR-0002);
+// acá sólo están los filtros de la pantalla.
+internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoReader
 {
     public async Task<ConsultarEnviosResult> ConsultarAsync(
         ConsultarEnviosQuery query,
         CancellationToken ct)
     {
-        if (tenant.OperadorId is not Guid operadorId)
-        {
-            return new ConsultarEnviosResult(
-                [], 1, query.TamanoPagina, 0);
-        }
-
-        var consulta = db.Envios
-            .AsNoTracking()
-            .Where(e => e.OperadorId == operadorId);
-
-        if (tenant.ComercioId is Guid comercioId)
-        {
-            consulta = consulta.Where(e => e.ComercioId == comercioId);
-        }
+        IQueryable<Envio> consulta = db.Envios.AsNoTracking();
 
         if (query.Estado is { } estado)
         {

@@ -1,4 +1,6 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.Modules.Administracion.Application;
+using Logistica.Modules.Administracion.Application.Features.ConsultarRecursosPlanificacion;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -17,6 +19,8 @@ public static class AdministracionModule
             configuration.GetConnectionString("Postgres"), AdministracionDbContext.Schema);
 
         services.AddScoped<DatosIniciales>();
+        services.AddScoped<IRecursosPlanificacionReader, RecursosPlanificacionReader>();
+        services.AddScoped<Contracts.IAdministracionModuleApi, AdministracionModuleApi>();
 
         return services;
     }

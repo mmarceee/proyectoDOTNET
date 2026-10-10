@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Logistica.UnitTests" />
+    <InternalsVisibleTo Include="Logistica.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>

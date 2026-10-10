@@ -104,6 +104,174 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                     b.ToTable("Operadores", "administracion");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Planificacion.FranjaHoraria", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.PrimitiveCollection<int[]>("Dias")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
+
+                    b.Property<TimeOnly>("HoraDesde")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("HoraHasta")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReemplazaAId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("VigenteDesde")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("VigenteHasta")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("ZonaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReemplazaAId")
+                        .IsUnique();
+
+                    b.HasIndex("OperadorId", "ZonaId", "VigenteDesde");
+
+                    b.ToTable("FranjasHorarias", "administracion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Planificacion.Repartidor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Documento")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Documento")
+                        .IsUnique();
+
+                    b.ToTable("Repartidores", "administracion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Planificacion.Vehiculo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("AltoCargaCm")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("AnchoCargaCm")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("CapacidadPesoKg")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("CapacidadVolumenM3")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("LargoCargaCm")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Matricula")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Matricula")
+                        .IsUnique();
+
+                    b.ToTable("Vehiculos", "administracion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Planificacion.VersionReglasPlanificacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("MaxParadasPorRuta")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("VigenteDesde")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("VigenteHasta")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Numero")
+                        .IsUnique();
+
+                    b.ToTable("VersionesReglasPlanificacion", "administracion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Planificacion.Zona", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.PrimitiveCollection<string[]>("CodigosPostales")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Codigo")
+                        .IsUnique();
+
+                    b.ToTable("Zonas", "administracion");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Comercios.RelacionComercial", b =>
                 {
                     b.HasOne("Logistica.Modules.Administracion.Domain.Comercios.Comercio", null)

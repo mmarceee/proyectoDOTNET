@@ -23,6 +23,32 @@ internal sealed class DatosIniciales(AdministracionDbContext db, TimeProvider re
             comercio,
             "envios@tiendademo.uy",
             ct);
+        await SembrarPlanificacionAsync(ct);
+    }
+
+    private async Task SembrarPlanificacionAsync(CancellationToken ct)
+    {
+        var operador = OperadorDemoId;
+        if (!await db.Repartidores.AnyAsync(r => r.OperadorId == operador, ct))
+            db.Repartidores.AddRange(Domain.Planificacion.Repartidor.Crear(operador, "Repartidor Demo 1", "DEMO-1", Guid.Parse("41111111-1111-1111-1111-111111111111")),
+                Domain.Planificacion.Repartidor.Crear(operador, "Repartidor Demo 2", "DEMO-2", Guid.Parse("42222222-2222-2222-2222-222222222222")));
+        if (!await db.Vehiculos.AnyAsync(v => v.OperadorId == operador, ct))
+            db.Vehiculos.AddRange(Domain.Planificacion.Vehiculo.Crear(operador, "DEMO001", "Furgón", 1000, 8, 400, 200, 200, Guid.Parse("51111111-1111-1111-1111-111111111111")),
+                Domain.Planificacion.Vehiculo.Crear(operador, "DEMO002", "Furgón", 500, 4, 300, 150, 150, Guid.Parse("52222222-2222-2222-2222-222222222222")));
+        var zonaId = Guid.Parse("61111111-1111-1111-1111-111111111111");
+        if (!await db.Zonas.AnyAsync(z => z.Id == zonaId, ct))
+            db.Zonas.Add(Domain.Planificacion.Zona.Crear(operador, "MVD-DEMO", "Montevideo Demo", ["11000", "11100", "11200", "11300", "11400"], zonaId));
+        if (!await db.Franjas.AnyAsync(f => f.OperadorId == operador, ct))
+        {
+            var dias = Enum.GetValues<DayOfWeek>();
+            db.Franjas.AddRange(Domain.Planificacion.FranjaHoraria.Crear(operador, zonaId, new(9, 0), new(13, 0), dias,
+                new(2026, 1, 1), Guid.Parse("71111111-1111-1111-1111-111111111111")),
+                Domain.Planificacion.FranjaHoraria.Crear(operador, zonaId, new(14, 0), new(18, 0), dias, new(2026, 1, 1), Guid.Parse("72222222-2222-2222-2222-222222222222")));
+        }
+        if (!await db.ReglasPlanificacion.AnyAsync(r => r.OperadorId == operador, ct))
+            db.ReglasPlanificacion.Add(Domain.Planificacion.VersionReglasPlanificacion.Publicar(operador, 1, 20,
+                new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), Guid.Parse("81111111-1111-1111-1111-111111111111")));
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task SembrarOperadorAsync(Operador operador, Comercio comercio, string emailContacto, CancellationToken ct)

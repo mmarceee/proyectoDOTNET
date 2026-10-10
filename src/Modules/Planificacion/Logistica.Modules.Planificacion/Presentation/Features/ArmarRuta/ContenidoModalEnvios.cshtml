@@ -1,0 +1,14 @@
+@model RutaEditorModel
+<div data-contenido-envios data-resultado-ruta="@Model.SeccionResultado" data-seleccion-validada="@Model.SeleccionValidada.ToString().ToLowerInvariant()">
+    <input type="hidden" data-revision-ruta value="@Model.RevisionEsperada" />
+    <p data-estado-filtros class="text-muted" role="status" hidden>Actualizando envíos…</p>
+    <div data-error-filtros class="alert alert-danger" role="alert" hidden></div>
+    @if (Model.ModalEnvios)
+    {
+        <div id="errores-ruta" tabindex="-1" role="alert" asp-validation-summary="All" class="text-danger mb-3"></div>
+    }
+    @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/SeleccionEnvios.cshtml", Model)
+    <template data-confirmacion-validada>
+        @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/ConfirmacionEnvios.cshtml", Model)
+    </template>
+</div>

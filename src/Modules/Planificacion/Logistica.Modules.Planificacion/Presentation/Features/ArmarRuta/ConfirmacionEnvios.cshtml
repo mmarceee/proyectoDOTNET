@@ -1,0 +1,15 @@
+@model RutaEditorModel
+@if (Model.SeleccionValidada && Model.Evaluacion is { } evaluacion)
+{
+    <section id="confirmacion-envios" tabindex="-1" class="card border-success mb-4" aria-labelledby="titulo-confirmacion-envios">
+        <div class="card-body">
+            <h2 id="titulo-confirmacion-envios" class="h5 text-success">Selección validada</h2>
+            <p>@Model.Seleccion.Count envíos listos para agregar. Todavía no se guardaron los cambios.</p>
+            <p class="text-muted">Total de la ruta: @evaluacion.Paradas paradas · @evaluacion.PesoKg / @evaluacion.CapacidadPesoKg kg · @evaluacion.VolumenM3.ToString("0.######") / @evaluacion.CapacidadVolumenM3 m³</p>
+            <div class="d-flex flex-wrap gap-2">
+                <button asp-page-handler="Confirmar" class="btn btn-success" data-confirmar-ruta>Confirmar agregado de envíos</button>
+                <button asp-page-handler="CerrarEnvios" class="btn btn-outline-secondary" formnovalidate>Cancelar agregado</button>
+            </div>
+        </div>
+    </section>
+}

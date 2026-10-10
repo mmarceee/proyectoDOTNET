@@ -1,0 +1,185 @@
+@model RutaEditorModel
+@if (Model.Desarrollo) { <div class="alert alert-warning">Modo de desarrollo. Pendiente de integrar tenant y autenticación.</div> }
+@if (!Model.ModalEnvios)
+{
+    <div id="errores-ruta" tabindex="-1" role="alert" asp-validation-summary="All" class="text-danger mb-3"></div>
+}
+<form id="formulario-ruta" method="post" data-filtros-ruta data-resultado-ruta="@Model.SeccionResultado">
+    <input asp-for="Id" type="hidden" /><input asp-for="RevisionEsperada" type="hidden" />
+    <input asp-for="EditandoDatos" type="hidden" />
+    <input asp-for="ModalEnvios" type="hidden" />
+    <section id="datos-ruta" tabindex="-1" class="card mb-4" aria-labelledby="titulo-datos-ruta">
+    <div class="card-body p-4">
+    <h2 id="titulo-datos-ruta" class="h5 mb-3">Datos de la ruta</h2>
+    @if (Model.Id is not null && !Model.EditandoDatos && Model.Ruta is { } ruta)
+    {
+        <input asp-for="Fecha" type="hidden" /><input asp-for="RepartidorId" type="hidden" /><input asp-for="VehiculoId" type="hidden" />
+        <dl class="row g-3 mb-3">
+            <div class="col-md-4"><dt class="text-muted fw-normal">Fecha</dt><dd class="mb-0 fw-semibold">@ruta.Fecha.ToString("dd/MM/yyyy")</dd></div>
+            <div class="col-md-4"><dt class="text-muted fw-normal">Repartidor</dt><dd class="mb-0 fw-semibold">@(Model.Recursos.Repartidores.FirstOrDefault(r => r.Id == ruta.RepartidorId)?.Nombre ?? "Repartidor no disponible")</dd></div>
+            <div class="col-md-4"><dt class="text-muted fw-normal">Vehículo</dt><dd class="mb-0 fw-semibold">@(Model.Recursos.Vehiculos.FirstOrDefault(v => v.Id == ruta.VehiculoId)?.Matricula ?? "Vehículo no disponible")</dd></div>
+        </dl>
+        <button asp-page-handler="EditarDatos" class="btn btn-outline-primary" formnovalidate>Modificar</button>
+    }
+    else
+    {
+    <div class="row g-3">
+        <div class="col-md-4"><label asp-for="Fecha" class="form-label">Fecha</label><input asp-for="Fecha" type="date" class="form-control" min="@Model.Hoy.ToString("yyyy-MM-dd")" required data-filtro-ruta /></div>
+        <div class="col-md-4"><label asp-for="RepartidorId" class="form-label">Repartidor</label><select asp-for="RepartidorId" class="form-select" required><option value="">Seleccionar</option>@foreach (var r in Model.Recursos.Repartidores) { <option value="@r.Id">@r.Nombre</option> }</select></div>
+        <div class="col-md-4"><label asp-for="VehiculoId" class="form-label">Vehículo</label><select asp-for="VehiculoId" class="form-select" required><option value="">Seleccionar</option>@foreach (var v in Model.Recursos.Vehiculos) { <option value="@v.Id">@v.Matricula · @v.CapacidadPesoKg kg · @v.CapacidadVolumenM3 m³</option> }</select></div>
+    </div>
+    @if (Model.Id is not null)
+    {
+        <p class="text-muted mt-3 mb-2">Al confirmar se comprueban las paradas actuales y se guardan los cambios de fecha, repartidor o vehículo.</p>
+        <div class="d-flex flex-wrap gap-2">
+            <button asp-page-handler="Modificar" class="btn btn-success">Confirmar</button>
+            <button asp-page-handler="CancelarDatos" class="btn btn-outline-secondary" formnovalidate>Cancelar</button>
+        </div>
+    }
+    }
+    </div>
+    </section>
+    @if (Model.Id is null)
+    {
+        @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/SeleccionEnvios.cshtml", Model)
+    }
+    else
+    {
+        <div data-resumen-envios>
+            @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/ConfirmacionEnvios.cshtml", Model)
+        </div>
+        <div id="agregar-envios" class="modal fade" tabindex="-1" aria-labelledby="titulo-agregar-envios" aria-hidden="true" data-abrir="@Model.ModalEnvios.ToString().ToLowerInvariant()">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="titulo-agregar-envios" class="modal-title h5">Agregar envíos a la ruta</h2>
+                        <button asp-page-handler="CerrarEnvios" class="btn-close" aria-label="Cerrar" formnovalidate></button>
+                    </div>
+                    <div class="modal-body">
+                        @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/ContenidoModalEnvios.cshtml", Model)
+                    </div>
+                    <div class="modal-footer">
+                        <button asp-page-handler="CerrarEnvios" class="btn btn-outline-secondary" formnovalidate>Cancelar agregado</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</form>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const formulario = document.querySelector('[data-filtros-ruta]');
+        const enfocarResultado = () => {
+            const resultado = document.getElementById(formulario.dataset.resultadoRuta);
+            if (resultado) {
+                resultado.focus({ preventScroll: true });
+                resultado.scrollIntoView({ block: 'center' });
+            }
+        };
+        const modal = document.getElementById('agregar-envios');
+        const actualizarValidacion = () => {
+            const contenedor = modal ?? formulario;
+            const seleccionados = [...contenedor.querySelectorAll('[name="Seleccion"]')]
+                .some(control => control.type === 'hidden' || control.checked);
+            const boton = contenedor.querySelector('[data-validar-ruta]');
+            if (boton) boton.disabled = !seleccionados || modal?.querySelector('.modal-body').getAttribute('aria-busy') === 'true';
+            const ayuda = contenedor.querySelector('[data-ayuda-validacion]');
+            if (ayuda) ayuda.hidden = seleccionados;
+        };
+        actualizarValidacion();
+        let consultaActual;
+        const actualizarEnvios = async boton => {
+            consultaActual?.abort();
+            const consulta = new AbortController();
+            consultaActual = consulta;
+            const cuerpo = modal.querySelector('.modal-body');
+            // Capturar la selección antes de bloquear las acciones durante la consulta.
+            const campos = new FormData(formulario);
+            campos.delete('Seleccion');
+            formulario.querySelectorAll('[name="Seleccion"]').forEach(control => {
+                if (control.type === 'hidden' || control.checked) campos.append('Seleccion', control.value);
+            });
+            const activo = document.activeElement;
+            const nombreActivo = cuerpo.contains(activo) ? activo.name : null;
+            const inicio = activo?.selectionStart;
+            const fin = activo?.selectionEnd;
+            const posicion = cuerpo.scrollTop;
+            const bloquear = valor => {
+                cuerpo.setAttribute('aria-busy', String(valor));
+                cuerpo.querySelector('[data-estado-filtros]').hidden = !valor;
+                cuerpo.querySelectorAll('[name="Seleccion"], [data-validar-ruta], [data-confirmar-ruta]')
+                    .forEach(control => control.disabled = valor);
+                actualizarValidacion();
+            };
+            bloquear(true);
+            cuerpo.querySelector('[data-error-filtros]').hidden = true;
+            try {
+                const respuesta = await fetch(boton.formAction, {
+                    method: 'POST', body: campos, signal: consulta.signal,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!respuesta.ok) throw new Error('No se pudo actualizar la selección.');
+                const documento = new DOMParser().parseFromString(await respuesta.text(), 'text/html');
+                const contenido = documento.querySelector('[data-contenido-envios]');
+                if (!contenido) throw new Error('Respuesta inesperada.');
+                if (consultaActual !== consulta) return;
+                cuerpo.replaceChildren(contenido);
+                formulario.elements['RevisionEsperada'].value = contenido.querySelector('[data-revision-ruta]').value;
+                cuerpo.scrollTop = posicion;
+                const resumen = formulario.querySelector('[data-resumen-envios]');
+                resumen.replaceChildren();
+                if (contenido.dataset.seleccionValidada === 'true') {
+                    resumen.append(contenido.querySelector('[data-confirmacion-validada]').content.cloneNode(true));
+                    formulario.elements['ModalEnvios'].value = 'false';
+                    modal.addEventListener('hidden.bs.modal', () => {
+                        const confirmacion = resumen.querySelector('#confirmacion-envios');
+                        confirmacion?.focus({ preventScroll: true });
+                        confirmacion?.scrollIntoView({ block: 'nearest' });
+                    }, { once: true });
+                    bootstrap.Modal.getOrCreateInstance(modal).hide();
+                } else if (boton.matches('[data-validar-ruta]')) {
+                    const resultado = contenido.querySelector(`#${contenido.dataset.resultadoRuta}`);
+                    resultado?.focus({ preventScroll: true });
+                    resultado?.scrollIntoView({ block: 'nearest' });
+                } else if (nombreActivo) {
+                    const campo = formulario.elements.namedItem(nombreActivo);
+                    campo?.focus({ preventScroll: true });
+                    if (inicio != null && fin != null) campo.setSelectionRange(inicio, fin);
+                }
+            } catch (error) {
+                if (error.name === 'AbortError' || consultaActual !== consulta) return;
+                const aviso = cuerpo.querySelector('[data-error-filtros]');
+                aviso.textContent = 'No se pudieron actualizar los envíos. Volvé a intentar.';
+                aviso.hidden = false;
+            } finally {
+                if (consultaActual === consulta) bloquear(false);
+            }
+        };
+        if (modal?.dataset.abrir === 'true') {
+            modal.addEventListener('shown.bs.modal', enfocarResultado, { once: true });
+            bootstrap.Modal.getOrCreateInstance(modal).show();
+        } else {
+            enfocarResultado();
+        }
+        formulario.addEventListener('submit', evento => {
+            const boton = evento.submitter;
+            if (!modal?.classList.contains('show') || !boton?.matches('[data-filtrar-ruta], [data-limpiar-filtros], [data-validar-ruta]')) return;
+            evento.preventDefault();
+            actualizarEnvios(boton);
+        });
+        formulario.addEventListener('change', evento => {
+            if (evento.target.matches('[name="Seleccion"]')) {
+                actualizarValidacion();
+                formulario.querySelectorAll('[data-confirmar-ruta]').forEach(boton => boton.disabled = true);
+                const aviso = formulario.querySelector('[data-validacion-pendiente]');
+                if (aviso) aviso.hidden = false;
+                formulario.querySelector('[data-resultado-validacion]')?.setAttribute('hidden', '');
+                formulario.querySelector('[data-resumen-envios]')?.replaceChildren();
+                return;
+            }
+            if (!evento.target.matches('[data-filtro-ruta]')) return;
+            if (evento.target.name !== 'Pagina') formulario.elements['Pagina'].value = '1';
+            formulario.requestSubmit(formulario.querySelector('[data-filtrar-ruta]'));
+        });
+    });
+</script>

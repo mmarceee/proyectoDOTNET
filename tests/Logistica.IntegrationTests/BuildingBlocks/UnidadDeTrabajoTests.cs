@@ -84,7 +84,7 @@ public sealed class UnidadDeTrabajoTests : IAsyncLifetime
     private static PruebaDbContext Crear(UnidadDeTrabajo unidad)
     {
         var options = new DbContextOptionsBuilder<PruebaDbContext>().UseNpgsql(unidad.Conexion).Options;
-        return new PruebaDbContext(options, unidad);
+        return new PruebaDbContext(options, unidad, new SinInquilino());
     }
 
     // Lee con una conexión aparte: sólo ve lo que quedó confirmado.
@@ -103,8 +103,15 @@ public sealed class UnidadDeTrabajoTests : IAsyncLifetime
         public string Texto { get; private set; } = texto;
     }
 
-    public sealed class PruebaDbContext(DbContextOptions<PruebaDbContext> options, UnidadDeTrabajo unidad)
-        : ModuleDbContext(options, "prueba", unidad)
+    // Nota no pertenece a ningún inquilino: el filtro no la alcanza y sirve cualquier ICurrentTenant.
+    private sealed class SinInquilino : ICurrentTenant
+    {
+        public Guid? OperadorId => null;
+        public Guid? ComercioId => null;
+    }
+
+    public sealed class PruebaDbContext(DbContextOptions<PruebaDbContext> options, UnidadDeTrabajo unidad, ICurrentTenant tenant)
+        : ModuleDbContext(options, "prueba", unidad, tenant)
     {
         public DbSet<Nota> Notas => Set<Nota>();
     }

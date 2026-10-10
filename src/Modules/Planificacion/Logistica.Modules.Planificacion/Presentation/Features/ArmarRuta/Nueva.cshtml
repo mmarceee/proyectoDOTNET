@@ -1,0 +1,8 @@
+@page "/backoffice/rutas/nueva"
+@model NuevaModel
+@{ ViewData["Title"] = "Nueva ruta"; }
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="mb-0">Nueva ruta</h1>
+    <a href="/backoffice/rutas" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+@await Html.PartialAsync("~/Presentation/Features/ArmarRuta/Formulario.cshtml", Model)
