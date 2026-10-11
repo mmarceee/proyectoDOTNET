@@ -13,6 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
 using Logistica.Modules.Envios.Application.Features.ConsultarDetalleEnvio;
 using Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio;
+using Logistica.Modules.Envios.Application.Features.CancelarEnvio;
+using Logistica.Modules.Envios.Presentation.Features.CancelarEnvio;
 
 namespace Logistica.Modules.Envios;
 
@@ -31,6 +33,7 @@ public static class EnviosModule
         services.AddScoped<IArchivoEvidenciaReader, ArchivoEvidenciaReader>();
         services.AddScoped<ConsultarEvidenciaHandler>();
         services.AddScoped<CrearEnvioHandler>();
+        services.AddScoped<CancelarEnvioHandler>();
 
         // Contrato para los otros módulos (ADR-0001, addendum 3).
         services.AddScoped<IEnviosModuleApi, EnviosModuleApi>();
@@ -43,6 +46,7 @@ public static class EnviosModule
         var group = endpoints.MapGroup("/api/envios").WithTags("Envios");
 
         CrearEnvioEndpoint.Map(group);
+        CancelarEnvioEndpoint.Map(group);
         EvidenciaEndpoint.Map(endpoints);
 
         return endpoints;

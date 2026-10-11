@@ -51,5 +51,24 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             "EnvioAsignadoARuta.v1", new { MessageId = messageId, OperadorId = operadorId, EnvioId = envioId,
                 RutaId = rutaId, ResponsableId = responsableId, OcurridoEn = ahora, Origen = "Backoffice", Version = 1 }, ahora, messageId));
     }
+    public void RegistrarCancelacion(Envio envio, string? motivo, DateTimeOffset ahora)
+    {
+        // El Worker avisa al comercio y al destinatario (CU-16, actor secundario): por eso viajan el comercio y el número.
+        var messageId = Guid.CreateVersion7();
+        db.OutboxMessages.Add(Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage.Crear(envio.OperadorId,
+            "EnvioCancelado.v1", new
+            {
+                MessageId = messageId,
+                OperadorId = envio.OperadorId,
+                ComercioId = envio.ComercioId,
+                EnvioId = envio.Id,
+                Numero = envio.Numero,
+                Motivo = motivo,
+                OcurridoEn = ahora,
+                Origen = "PortalComercio",
+                Version = 1
+            },
+            ahora, messageId));
+    }
 
 }
