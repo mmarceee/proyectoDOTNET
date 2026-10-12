@@ -11,6 +11,7 @@ internal sealed class PlanificacionDbContext(DbContextOptions<PlanificacionDbCon
     public const string Schema = "planificacion";
     public DbSet<Ruta> Rutas => Set<Ruta>();
     public DbSet<Parada> Paradas => Set<Parada>();
+    public DbSet<EnvioParada> EnviosParada => Set<EnvioParada>();
     public DbSet<ValidacionRuta> Validaciones => Set<ValidacionRuta>();
     public DbSet<RetiroEnvioRuta> Retiros => Set<RetiroEnvioRuta>();
 }

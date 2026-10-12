@@ -49,7 +49,7 @@ public class QuitarEnvioDeRutaTests(PostgresApiFactory factory) : IClassFixture<
         var historial = await client.GetStringAsync($"/api/planificacion/rutas/{ruta.Id}/validaciones");
         var actual = await LeerRutaAsync(await QuitarAsync(client, ruta, b.Id));
         Assert.Equal(ruta.Revision + 1, actual.Revision);
-        Assert.Equal(new[] { a.Id, c.Id }, actual.Paradas.Select(p => p.EnvioId));
+        Assert.Equal(new[] { a.Id, c.Id }, actual.Paradas.SelectMany(p => p.Envios).Select(e => e.EnvioId));
         Assert.Equal(new[] { 1, 2 }, actual.Paradas.Select(p => p.Orden));
         Assert.True(actual.ReservaActiva);
         Assert.Equal(historial, await client.GetStringAsync($"/api/planificacion/rutas/{ruta.Id}/validaciones"));
@@ -97,7 +97,7 @@ public class QuitarEnvioDeRutaTests(PostgresApiFactory factory) : IClassFixture<
         var vacia = await LeerRutaAsync(await QuitarAsync(client, ruta, a.Id));
         Assert.Empty(vacia.Paradas); Assert.False(vacia.ReservaActiva); Assert.Equal("Planificada", vacia.Estado);
         var otra = await CrearAsync(client, ruta.Fecha, a.Id, b.Id);
-        Assert.Contains(otra.Paradas, p => p.EnvioId == a.Id);
+        Assert.Contains(otra.Paradas.SelectMany(p => p.Envios), e => e.EnvioId == a.Id);
         var agregado = await client.PostAsJsonAsync($"/api/planificacion/rutas/{ruta.Id}/envios",
             new AgregarEnviosRutaRequest(vacia.Revision, [a.Id]));
         Assert.Equal(HttpStatusCode.Conflict, agregado.StatusCode);
@@ -331,7 +331,7 @@ public class QuitarEnvioDeRutaTests(PostgresApiFactory factory) : IClassFixture<
     {
         var creado = await client.PostAsJsonAsync("/api/envios", new CrearEnvioRequest(
             new DestinatarioRequest("Ana CU41", "099123456", null, null),
-            new DireccionRequest("Av. Italia", "1234", "Montevideo", "Montevideo", "11300", null),
+            new DireccionRequest("Av. Italia", Guid.NewGuid().ToString("N"), "Montevideo", "Montevideo", "11300", null),
             [new BultoRequest(2, 30, 20, 10)]));
         creado.EnsureSuccessStatusCode();
         var envio = (await creado.Content.ReadFromJsonAsync<CrearEnvioResponse>())!;

@@ -141,7 +141,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
             () => b.PostAsJsonAsync("/api/planificacion/rutas", new CrearRutaRequest(fecha, OtroRepartidor, OtroVehiculo, [envio.Id])));
         Assert.Single(respuestas, r => r.StatusCode == HttpStatusCode.Created);
         Assert.Single(respuestas, r => r.StatusCode == HttpStatusCode.Conflict);
-        Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM planificacion."Paradas" WHERE "EnvioId"=@id""", envio.Id));
+        Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM planificacion."EnviosParada" WHERE "EnvioId"=@id""", envio.Id));
         Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text""", envio.Id));
     }
 
@@ -259,12 +259,12 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         var envio = await RecibidoAsync(client);
         var ruta = await ExigirRutaAsync(await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(new(2035, 2, 3), envio.Id)), HttpStatusCode.Created);
         var error = await Assert.ThrowsAsync<PostgresException>(() => EjecutarSqlAsync("""
-            INSERT INTO planificacion."Paradas" ("Id", "OperadorId", "RutaId", "EnvioId", "Orden", "Estado")
-            VALUES (@id, '11111111-1111-1111-1111-111111111111', @ruta, @envio, 2, 'Pendiente')
-            """, Guid.NewGuid(), ("ruta", ruta.Id), ("envio", envio.Id)));
+            INSERT INTO planificacion."EnviosParada" ("Id", "OperadorId", "RutaId", "EnvioId", "ParadaId", "Estado")
+            VALUES (@id, '11111111-1111-1111-1111-111111111111', @ruta, @envio, @parada, 'Pendiente')
+            """, Guid.NewGuid(), ("ruta", ruta.Id), ("envio", envio.Id), ("parada", ruta.Paradas[0].Id)));
         Assert.Equal("23505", error.SqlState);
-        Assert.Contains(error.ConstraintName, new[] { "UX_Paradas_EnvioActivo", "IX_Paradas_RutaId_EnvioId" });
-        Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM planificacion."Paradas" WHERE "EnvioId"=@id""", envio.Id));
+        Assert.Contains(error.ConstraintName, new[] { "UX_Paradas_EnvioActivo", "IX_EnviosParada_RutaId_EnvioId" });
+        Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM planificacion."EnviosParada" WHERE "EnvioId"=@id""", envio.Id));
     }
 
     [Fact]
@@ -301,7 +301,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         Assert.Equal(HttpStatusCode.BadRequest, sinToken.StatusCode);
         Assert.Contains("token válido", await sinToken.Content.ReadAsStringAsync());
 
-        var rutaId = await ScalarAsync<Guid>("""SELECT "RutaId" FROM planificacion."Paradas" WHERE "EnvioId"=@id""", envio.Id);
+        var rutaId = await ScalarAsync<Guid>("""SELECT "RutaId" FROM planificacion."EnviosParada" WHERE "EnvioId"=@id""", envio.Id);
         var detalle = $"/backoffice/rutas/{rutaId}";
         campos["Id"] = rutaId.ToString();
         campos["RevisionEsperada"] = (await client.GetFromJsonAsync<RutaResponse>($"/api/planificacion/rutas/{rutaId}"))!.Revision.ToString();
@@ -409,7 +409,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         Assert.Equal(HttpStatusCode.OK, agregado.StatusCode);
         Assert.Contains("Se agregaron 1 envíos a la ruta.", WebUtility.HtmlDecode(await agregado.Content.ReadAsStringAsync()));
         Assert.Equal("AsignadoARuta", await ScalarAsync<string>("""SELECT "Estado" FROM envios."Envios" WHERE "Id"=@id""", otroEnvio.Id));
-        Assert.Equal(rutaId, await ScalarAsync<Guid>("""SELECT "RutaId" FROM planificacion."Paradas" WHERE "EnvioId"=@id""", otroEnvio.Id));
+        Assert.Equal(rutaId, await ScalarAsync<Guid>("""SELECT "RutaId" FROM planificacion."EnviosParada" WHERE "EnvioId"=@id""", otroEnvio.Id));
     }
 
     [Theory]
@@ -486,7 +486,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     {
         var crear = await client.PostAsJsonAsync("/api/envios", new CrearEnvioRequest(
             new DestinatarioRequest("Ana", "099123456", null, null),
-            new DireccionRequest("Av. Italia", "1234", "Montevideo", "Montevideo", "11300", null),
+            new DireccionRequest("Av. Italia", Guid.NewGuid().ToString("N"), "Montevideo", "Montevideo", "11300", null),
             [new BultoRequest(peso, 30, 20, 10)]));
         crear.EnsureSuccessStatusCode();
         var envio = (await crear.Content.ReadFromJsonAsync<CrearEnvioResponse>())!;
@@ -497,7 +497,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     private async Task ExigirSinAsignacionAsync(Guid id)
     {
         Assert.Equal("EnDeposito", await ScalarAsync<string>("""SELECT "Estado" FROM envios."Envios" WHERE "Id"=@id""", id));
-        Assert.Equal(0L, await ScalarAsync<long>("""SELECT count(*) FROM planificacion."Paradas" WHERE "EnvioId"=@id""", id));
+        Assert.Equal(0L, await ScalarAsync<long>("""SELECT count(*) FROM planificacion."EnviosParada" WHERE "EnvioId"=@id""", id));
         Assert.Equal(0L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text""", id));
     }
     private async Task<T> ScalarAsync<T>(string sql, Guid id)

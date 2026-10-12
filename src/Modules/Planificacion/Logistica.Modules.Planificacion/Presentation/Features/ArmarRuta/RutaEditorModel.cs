@@ -225,7 +225,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
             Ruta = await lectorRutas.DetalleAsync(id, ct);
             Historial = await lectorRutas.ValidacionesAsync(id, 1, ct);
             Retiros = await lectorRutas.RetirosAsync(id, 1, ct);
-            NumerosEnvio = await lectorRutas.NumerosEnvioAsync(Ruta.Paradas.Select(p => p.EnvioId)
+            NumerosEnvio = await lectorRutas.NumerosEnvioAsync(Ruta.Paradas.SelectMany(p => p.Envios).Select(e => e.EnvioId)
                 .Concat(Historial.SelectMany(v => v.Bultos).Select(b => b.EnvioId)).Distinct().ToArray(), ct);
             // Una nueva confirmación debe usar la revisión recién mostrada, sin reenviar automáticamente.
             RevisionEsperada = Ruta.Revision; ModelState.Remove(nameof(RevisionEsperada));

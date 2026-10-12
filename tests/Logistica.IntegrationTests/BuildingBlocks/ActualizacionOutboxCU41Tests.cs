@@ -21,7 +21,7 @@ public sealed class ActualizacionOutboxCU41Tests(PostgresApiFactory factory) : I
         var operador = scope.ServiceProvider.GetRequiredService<ICurrentTenant>().OperadorId!.Value;
         var envioId = Guid.NewGuid();
         var ahora = DateTimeOffset.UtcNow;
-        var ruta = Ruta.Crear(operador, new DateOnly(2039, 1, 1), Guid.NewGuid(), Guid.NewGuid(), [envioId], ahora);
+        var ruta = Ruta.Crear(operador, new DateOnly(2039, 1, 1), Guid.NewGuid(), Guid.NewGuid(), [new EnvioRuta(envioId, "ENV-TEST", null, null, null, false, [])], ahora);
         ruta.QuitarEnvio(envioId);
         var retiro = RetiroEnvioRuta.Registrar(ruta, envioId, "ENV-PRUEBA-MIGRACION", 1, null, ahora);
         db.Rutas.Add(ruta); db.Retiros.Add(retiro);

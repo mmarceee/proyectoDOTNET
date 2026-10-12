@@ -6,7 +6,7 @@ Fecha: 12/10/2026. Responsable: Lucas. Implementación para desarrollo; cierre s
 
 En el detalle de una ruta Planificada, **Editar paradas** habilita **Quitar** para cada envío. Se pide confirmación en un modal que muestra el número del envío y explica que volverá a En depósito. Cancelar cierra el modal sin enviar una operación de baja.
 
-Confirmar elimina la parada, renumera las restantes, incrementa la revisión de la ruta y aplica T4 (`AsignadoARuta → EnDeposito`). Conserva zona, franja y fecha comprometidas del envío. El envío vuelve a estar disponible para asignarse a otra ruta, sujeto a los filtros y restricciones de CU-40.
+Confirmar quita el envío de su parada, incrementa la revisión de la ruta y aplica T4 (`AsignadoARuta → EnDeposito`). Si hay otros envíos en la visita, se conserva; si era el último de esa visita, se elimina y se renumeran las restantes. Conserva zona, franja y fecha comprometidas del envío. El envío vuelve a estar disponible para asignarse a otra ruta, sujeto a los filtros y restricciones de CU-40. Ver el [acuerdo de paradas y envíos](../cu-40/paradas-y-envios.md).
 
 Si se quita el último envío, la ruta permanece Planificada y libera sus reservas de repartidor y vehículo. Una nueva asignación a esa ruta debe volver a verificar la disponibilidad. El historial de validaciones de carga se conserva: quitar una parada no modifica ni elimina la evidencia previa.
 
@@ -45,3 +45,5 @@ Las mismas pruebas verifican ahora el registro durable del retiro, su número y 
 Resultado tras integrar `origin/main` (`d69f1ae`) y adaptar CU-41: `scripts/cu40-en-docker.sh test`, compilación Release sin errores ni advertencias y **192 pruebas aprobadas** (40 unitarias, 54 de arquitectura y 98 de integración), ninguna fallida ni omitida. CU-41 incorpora doce escenarios de integración. `ActualizacionOutboxCU41Tests` verifica además una base con HistorialRetirosCU41 ya aplicado y la conservación de mensajes pendientes anteriores al cambio del Outbox. Se ajustó la prueba de edición de datos del CU-40 para distinguir su acción CancelarDatos del botón Cancelar del nuevo modal.
 
 El historial de retiros requiere la migración `HistorialRetirosCU41`, que crea `planificacion.RetirosEnvioRuta`. Las migraciones del Outbox transversal corresponden al trabajo coordinado con Ezequiel.
+
+Actualización del modelo de visitas del 12/10: `ParadasConVariosEnvios` conserva las asignaciones en `EnviosParada` y agrupa las rutas Planificadas anteriores. Tras esta adaptación pasaron **203 pruebas** (46 unitarias, 54 de arquitectura y 103 de integración), sin advertencias ni errores. El comportamiento de quitar un miembro de una visita compartida y conservarla hasta quitar el último está incluido en las pruebas de [paradas y envíos](../cu-40/paradas-y-envios.md).

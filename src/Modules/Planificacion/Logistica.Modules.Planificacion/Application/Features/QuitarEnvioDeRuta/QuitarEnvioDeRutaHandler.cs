@@ -28,7 +28,7 @@ internal sealed class QuitarEnvioDeRutaHandler(IRutaRepository rutas, IAdministr
             if (ruta.Revision != command.RevisionEsperada)
                 throw new ConflictoRutaException("RutaModificada", "Otra operación modificó la ruta. Revisá las paradas y confirmá nuevamente.", revision: ruta.Revision);
 
-            var parada = ruta.Paradas.SingleOrDefault(p => p.EnvioId == command.EnvioId)
+            var parada = ruta.Paradas.SingleOrDefault(p => p.Envios.Any(e => e.EnvioId == command.EnvioId))
                 ?? throw new DomainException("El envío no pertenece a la ruta.");
             var envio = (await envios.ObtenerParaPlanificacionAsync([command.EnvioId], ct)).SingleOrDefault()
                 ?? throw new DomainException("El envío no está disponible.");

@@ -27,21 +27,29 @@
         </div>
     }
 </div>
-<div class="table-responsive">
-<table class="table align-middle mb-0"><thead><tr><th>Orden</th><th>Envío</th><th>Estado de la parada</th>@if (Model.Editable) { <th class="text-end" data-accion-quitar hidden>Acciones</th> }</tr></thead><tbody>
 @foreach (var parada in Model.Ruta?.Paradas ?? [])
 {
-    var numero = Model.NumerosEnvio.GetValueOrDefault(parada.EnvioId, "Envío no disponible");
-    <tr><td>@parada.Orden</td><td>@numero</td><td>@parada.Estado</td>
-    @if (Model.Editable)
+    <section class="border rounded p-3 mb-3" data-parada-id="@parada.Id">
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+        <h3 class="h6 mb-0">Parada @parada.Orden · @parada.Direccion</h3>
+        <span class="text-muted">@parada.Envios.Count envíos · @parada.Estado</span>
+    </div>
+    @if (parada.Desde is { } desde && parada.Hasta is { } hasta)
+    { <p class="text-muted mb-2">Horario de la visita: @desde.ToString("HH:mm")–@hasta.ToString("HH:mm")</p> }
+    <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Envío</th><th>Estado del envío en la parada</th>@if (Model.Editable) { <th class="text-end" data-accion-quitar hidden>Acciones</th> }</tr></thead><tbody>
+    @foreach (var envio in parada.Envios)
     {
-        <td class="text-end" data-accion-quitar hidden><button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#quitar-envio" data-envio-id="@parada.EnvioId" data-envio-numero="@numero" aria-label="Quitar envío @numero">Quitar</button></td>
+        var numero = Model.NumerosEnvio.GetValueOrDefault(envio.EnvioId, "Envío no disponible");
+        <tr><td>@numero</td><td>@envio.Estado</td>
+        @if (Model.Editable)
+        {
+            <td class="text-end" data-accion-quitar hidden><button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#quitar-envio" data-envio-id="@envio.EnvioId" data-envio-numero="@numero" aria-label="Quitar envío @numero">Quitar</button></td>
+        }
+        </tr>
     }
-    </tr>
+    </tbody></table></div></section>
 }
-@if (Model.Ruta?.Paradas.Count == 0) { <tr><td colspan="@(Model.Editable ? 4 : 3)" class="text-muted text-center py-4">La ruta no tiene envíos. Sus recursos están disponibles.</td></tr> }
-</tbody></table>
-</div>
+@if (Model.Ruta?.Paradas.Count == 0) { <p class="text-muted text-center py-4">La ruta no tiene envíos. Sus recursos están disponibles.</p> }
 </div>
 </section>
 @if (Model.Editable) { @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/Formulario.cshtml", Model) }

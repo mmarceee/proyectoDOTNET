@@ -24,7 +24,8 @@ internal sealed class PreparadorEnviosRuta(IDepositoModuleApi deposito, IAdminis
                     m?.AnchoCm ?? b.AnchoCm, m?.AltoCm ?? b.AltoCm);
             }).ToList();
             return new EnvioRuta(e.Id, e.Numero, e.FechaEntregaProgramada, zona,
-                f is null ? null : new FranjaRuta(f.Id, f.ZonaId, f.Desde, f.Hasta, f.Dias), e.FranjaHorariaId is not null, carga);
+                f is null ? null : new FranjaRuta(f.Id, f.ZonaId, f.Desde, f.Hasta, f.Dias), e.FranjaHorariaId is not null, carga,
+                e.Punto is null ? null : new PuntoEntrega(e.Punto.Calle, e.Punto.Numero, e.Punto.Localidad, e.Punto.Departamento, e.Punto.CodigoPostal));
         }).ToList();
     }
 }
