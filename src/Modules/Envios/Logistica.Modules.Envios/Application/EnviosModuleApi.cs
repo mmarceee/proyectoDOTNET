@@ -28,7 +28,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             envio.DefinirPlanificacion(envio.ZonaId, asignacion.FranjaId, envio.FechaEntregaProgramada);
             envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, responsableId, ahora,
                 detalle: $"Asignado a la ruta {rutaId}.");
-            envios.RegistrarAsignacion(envio.OperadorId, envio.Id, rutaId, responsableId, ahora);
+            envios.RegistrarAsignacion(envio.Id, rutaId, responsableId, ahora);
         }
         await envios.GuardarCambiosAsync(ct);
     }
