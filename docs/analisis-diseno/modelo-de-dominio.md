@@ -718,13 +718,13 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 
 **Métodos**
 
-* agregarParada(envioId: Guid): void
+* agregarEnvios(envios: EnvioRuta[]): void — agrupa visitas por dirección e intervalo común. Apartamentos del mismo edificio comparten parada; un envío sin franja participa de una sola visita compatible (acuerdo del 12/10/2026).
 
-* modificarPlanificacion(fecha: DateOnly, repartidorId: Guid, vehiculoId: Guid): void — sólo en estado Planificada (ampliación de CU-40 acordada el 09/10/2026). La aplicación coordina la revalidación completa de los envíos, los recursos activos y su disponibilidad, y el cambio atómico de reservas; si falla, se conservan los datos anteriores. No modifica las paradas ni repite las transiciones de asignación de los envíos.
+* modificarPlanificacion(fecha: DateOnly, repartidorId: Guid, vehiculoId: Guid): void — sólo en estado Planificada (ampliación de CU-40 acordada el 09/10/2026). La aplicación coordina la revalidación completa de los envíos, los recursos activos y su disponibilidad, y el cambio atómico de reservas; si falla, se conservan los datos anteriores. Puede reagrupar visitas según las franjas de la nueva fecha; conserva los envíos y no repite sus transiciones de asignación.
 
-* quitarParada(envioId: Guid): void — sólo si la ruta no fue despachada; la parada se elimina (T4, T19)
+* quitarEnvio(envioId: Guid): void — sólo si la ruta no fue despachada; se quita el envío y se elimina la parada únicamente si ya no contiene otros envíos (T4, T19).
 
-* En el cambio programado de franjas de CU-04, un envío AsignadoARuta afectado sale de su ruta Planificada por T19 y queda Reprogramado con la nueva franja, conservando el día de entrega. Si sólo lo determinaba la ruta, ese día se guarda como fechaEntregaProgramada al reprogramar. La parada se elimina sin borrar la evidencia histórica; si la ruta queda vacía, libera sus recursos. Se muestran los envíos afectados antes de confirmar y se dejan disponibles para reasignación manual mediante T13 (acordado al definir CU-40 el 09/10/2026).
+* En el cambio programado de franjas de CU-04, un envío AsignadoARuta afectado sale de su ruta Planificada por T19 y queda Reprogramado con la nueva franja, conservando el día de entrega. Si sólo lo determinaba la ruta, ese día se guarda como fechaEntregaProgramada al reprogramar. Se quita el miembro y se elimina la parada sólo si ya no contiene otros envíos, sin borrar la evidencia histórica; si la ruta queda vacía, libera sus recursos. Se muestran los envíos afectados antes de confirmar y se dejan disponibles para reasignación manual mediante T13 (acordado al definir CU-40 el 09/10/2026).
 
 * ordenarParadas(): void — por hora de inicio de la franja comprometida y, dentro de la misma franja, por zona y código postal (CU-42)
 
@@ -734,19 +734,38 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 
 **Parada**
 
+*Visita a una dirección; contiene uno o más envíos con horarios compatibles. El máximo por ruta cuenta visitas, no envíos. Ver [paradas y envíos](cu-40/paradas-y-envios.md).*
+
 **Atributos**
 
 * id: Guid
 
 * rutaId: Guid
 
-* envioId: Guid
+* operadorId: Guid
+
+* claveDireccion: string (calle, número, localidad, departamento y código postal normalizados; excluye apartamento/referencia)
+
+* direccion: string
+
+* desde, hasta: TimeOnly (opcionales, intervalo común de los envíos)
+
+* envios: EnvioParada[]
 
 * orden: int
 
 * estado: EstadoParada
 
 * llegadaEn: DateTimeOffset (opcional)
+
+**EnvioParada**
+
+* id: Guid
+* operadorId: Guid
+* rutaId: Guid
+* paradaId: Guid
+* envioId: Guid
+* estado: EstadoParada (estado individual dentro de la visita; el estado del envío sigue en Envíos)
 
 **ValidacionRuta**
 
@@ -818,7 +837,7 @@ Creacion, Agregado, Modificacion, Despacho, CambioFranjaProgramado
 
 ## **Notas**
 
-* RF 15 ("un envío no puede estar en dos rutas a la vez") es una invariante de aplicación/base de datos, no una cardinalidad del diagrama: un envío no puede tener más de una parada activa (estado distinto de Completada o Fallida) al mismo tiempo. Se valida en la aplicación y se refuerza con un índice único parcial de PostgreSQL: UNIQUE (envioId) WHERE estado = 'Pendiente'. Al quitar un envío de una ruta no despachada (CU-41, T4, T19), la parada se elimina.
+* RF 15 ("un envío no puede estar en dos rutas a la vez") es una invariante de aplicación/base de datos, no una cardinalidad del diagrama: un envío no puede tener más de una parada activa (estado distinto de Completada o Fallida) al mismo tiempo. Se valida en la aplicación y se refuerza con un índice único parcial de PostgreSQL: UNIQUE (envioId) WHERE estado = 'Pendiente' en EnviosParada. Al quitar un envío de una ruta no despachada (CU-41, T4, T19), se elimina su miembro; la visita se elimina sólo si ya no contiene otros envíos.
 
 * Creación y reserva de recursos (acordado para CU-40 el 09/10/2026): la ruta se persiste al confirmar con al menos un envío. Una ruta Planificada con paradas reserva repartidor y vehículo para su fecha; si queda vacía por CU-41, conserva su estado y libera la reserva. Volver a agregar envíos requiere comprobar y reservar nuevamente los recursos en la misma transacción. Una ruta Despachada o EnCurso mantiene la ocupación para su fecha y bloquea nuevas asignaciones si sigue sin finalizar desde una fecha anterior. Completar o fallar paradas no las elimina ni libera por sí solo los recursos: la ruta debe pasar a Finalizada. Una ruta Finalizada no reserva recursos; la excepción de ruta vacía sólo corresponde a Planificada.
 
@@ -832,7 +851,7 @@ Creacion, Agregado, Modificacion, Despacho, CambioFranjaProgramado
 
 # **Ejecución en calle, intentos, pruebas e incidencias operativas**
 
-*RF 18 (descarga offline) y RF 24 (resolución de conflictos de sincronización) no agregan clases de dominio: son comportamiento de la app y contenido del ADR de sincronización.*
+*RF 18 (descarga offline) es comportamiento de la app. RF 24 (resolución de conflictos de sincronización) agrega `OperacionDispositivo`, el registro de cada operación sincronizada con su resultado (ADR-0004, sección 2.2); se detalla al implementarlo para el 22/10.*
 
 ## **Clases**
 
@@ -1167,7 +1186,8 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | ValidacionRuta | 1 | composición | 0..\* | DatosBultoValidado |
 | Ruta | 0..\* | asociación | 1 | Repartidor |
 | Ruta | 0..\* | asociación | 1 | Vehiculo |
-| Parada | 0..\* | asociación | 1 | Envio |
+| Parada | 1 | composición | 1..\* | EnvioParada |
+| EnvioParada | 0..\* | asociación | 1 | Envio |
 | Rendicion | 1 | composición | 0..\* | LineaRendicion |
 | EscaneoCarga | 0..\* | asociación | 1 | Ruta |
 | EscaneoCarga | 0..\* | asociación | 1 | Bulto |

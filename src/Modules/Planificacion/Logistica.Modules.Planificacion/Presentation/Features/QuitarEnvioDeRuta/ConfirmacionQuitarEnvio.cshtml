@@ -1,0 +1,47 @@
+@model Logistica.Modules.Planificacion.Presentation.Features.ArmarRuta.DetalleModel
+<div id="quitar-envio" class="modal fade" tabindex="-1" aria-labelledby="titulo-quitar-envio" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="QuitarEnvio">
+                <input asp-for="Id" type="hidden" />
+                <input asp-for="RevisionEsperada" type="hidden" />
+                <input type="hidden" name="Fecha" value="@Model.Ruta?.Fecha.ToString("yyyy-MM-dd")" />
+                <input asp-for="EnvioAQuitar" type="hidden" />
+                <div class="modal-header">
+                    <h2 id="titulo-quitar-envio" class="modal-title h5">Quitar envío de la ruta</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Querés quitar el envío <strong data-numero-quitar></strong> de esta ruta?</p>
+                    <p class="text-muted mb-0">Volverá a En depósito y podrá asignarse a otra ruta. Su fecha y franja comprometidas se conservarán.</p>
+                    <p class="text-muted mt-2 mb-0">Si quedan otros envíos en esa parada, la visita se conserva.</p>
+                    @if (Model.Ruta?.Paradas.Sum(p => p.Envios.Count) == 1)
+                    {
+                        <p class="text-muted mt-3 mb-0">La ruta quedará vacía y liberará el repartidor y el vehículo.</p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Confirmar quitar envío</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const editar = document.querySelector('[data-editar-paradas]');
+        const modal = document.getElementById('quitar-envio');
+        editar?.addEventListener('click', () => {
+            const activo = editar.getAttribute('aria-pressed') !== 'true';
+            editar.setAttribute('aria-pressed', String(activo));
+            editar.textContent = activo ? 'Terminar edición' : 'Editar paradas';
+            document.querySelectorAll('[data-accion-quitar]').forEach(accion => accion.hidden = !activo);
+        });
+        modal.addEventListener('show.bs.modal', evento => {
+            const boton = evento.relatedTarget;
+            modal.querySelector('[name="EnvioAQuitar"]').value = boton.dataset.envioId;
+            modal.querySelector('[data-numero-quitar]').textContent = boton.dataset.envioNumero;
+        });
+    });
+</script>

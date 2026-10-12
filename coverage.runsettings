@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cobertura de pruebas (opcional 7.2 de la letra): se mide sólo sobre las capas de dominio y
+  aplicación de los módulos, que es lo que pide el opcional. Infrastructure, Presentation, Contracts,
+  el host y las migraciones quedan afuera.
+  La usan el CI y scripts/test-en-docker.sh, pasándosela a dotnet test con la opción settings
+  y activando el colector "XPlat Code Coverage" (los comandos están en esos dos archivos).
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!-- [ensamblado]tipo; el * abarca también los puntos del namespace. -->
+          <Include>[Logistica.Modules.*]Logistica.Modules.*.Domain.*,[Logistica.Modules.*]Logistica.Modules.*.Application.*</Include>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <SkipAutoProps>true</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

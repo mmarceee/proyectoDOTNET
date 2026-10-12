@@ -79,7 +79,7 @@ Cada integrante responde por bloques coherentes, alineados con su área del plan
 | CU-19 | Reprogramar un envío no entregado | M | Cristian | |
 | CU-30 | Recibir bultos en depósito | M | Ezequiel | Transición T2 con transacción compartida. |
 | CU-40 | Armar una hoja de ruta | C | Lucas | RF 15: un envío en una sola ruta, con concurrencia. |
-| CU-41 | Quitar un envío de una ruta | M | Lucas | |
+| CU-41 | Quitar un envío de una ruta | M | Lucas | T4, confirmación, renumeración y liberación de reservas; [avance e integración pendiente del Outbox](cu-41/avance-cu-41.md). |
 
 **Trabajo transversal:** máquina de estados con su tabla declarativa y pruebas (Cristian); interceptor, filtros por inquilino y pruebas de aislamiento (Cristian y Ezequiel); datos iniciales de dos operadores con configuración distinta (Cristian); `ModuleDbContext` con schema por módulo y tabla outbox (Ezequiel).
 

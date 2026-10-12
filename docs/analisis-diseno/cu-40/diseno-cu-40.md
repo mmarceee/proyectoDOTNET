@@ -11,7 +11,8 @@ Este documento desarrolla el [modelo de dominio](../modelo-de-dominio.md), la es
 | Entidad | Atributos documentados |
 | :--- | :--- |
 | Ruta | Id, RepartidorId, VehiculoId, Fecha, Estado, CreadaEn, DespachadaEn opcional |
-| Parada | Id, RutaId, EnvioId, Orden, Estado, LlegadaEn opcional |
+| Parada | Id, RutaId, dirección normalizada, intervalo común, Orden, Estado, LlegadaEn opcional y colección de EnvioParada |
+| EnvioParada | Id, OperadorId, RutaId, ParadaId, EnvioId y estado individual dentro de la visita |
 
 Estados de ruta: `Planificada`, `Despachada`, `EnCurso`, `Finalizada`. No se agrega `Cancelada` ni `Borrador` sin revisar el modelo.
 
@@ -20,6 +21,8 @@ Estados de parada: `Pendiente`, `Completada`, `Fallida`.
 El modelo contempla agregar/quitar paradas, ordenarlas, moverlas y despachar. CU-40 cubre crear, agregar y, por ampliación acordada, modificar fecha, repartidor y vehículo mientras la ruta esté Planificada; los demás comportamientos pertenecen a sus respectivos casos de uso.
 
 ## 2. Decisiones ya acordadas
+
+El acuerdo del 12/10 diferencia visita y envío: apartamentos del mismo edificio comparten parada con franjas compatibles; los envíos sin franja participan una sola vez. Ver [reglas y migración](paradas-y-envios.md).
 
 * Candidatos en `EnDeposito` o `Reprogramado`, sin otra parada activa.
 * Una fecha programada debe coincidir con la ruta; si no existe, el despachador elige el día operativo al asignar. La asignación no sobrescribe la fecha programada.
@@ -33,7 +36,7 @@ El modelo contempla agregar/quitar paradas, ordenarlas, moverlas y despachar. CU
 * Una ruta Finalizada no reserva recursos. La excepción de ruta vacía sólo corresponde a Planificada.
 * Se permite modificar fecha, repartidor y vehículo de una ruta Planificada. Se revalidan todos sus envíos (fecha/franja, carga y máximo de paradas), la pertenencia al operador, el estado activo y la disponibilidad de los recursos. Desde Despachada estos datos quedan bloqueados.
 * La modificación y el cambio de reservas se confirman en una sola transacción, con control de concurrencia sobre la ruta. Si alguna validación o reserva falla, se conservan los datos y las reservas anteriores. Una ruta Planificada vacía sigue sin reservar recursos.
-* Modificar estos datos conserva las paradas y los envíos asignados, sin repetir T3/T13 ni sobrescribir sus fechas programadas.
+* Modificar estos datos conserva los envíos asignados y puede reagrupar las visitas según la fecha, sin repetir T3/T13 ni sobrescribir sus fechas programadas.
 * Cada confirmación exitosa conserva una copia del peso y las dimensiones usados para cada bulto de las paradas validadas, vinculada a la ruta, los envíos y el momento de validación. El volumen se calcula con esas dimensiones.
 * Al agregar envíos, modificar fecha/repartidor/vehículo o despachar, se consultan las medidas actuales de los módulos dueños y se revalida la carga completa, usando recepción y respaldo declarado según las reglas acordadas. La copia histórica no sustituye esa consulta.
 * Una nueva confirmación conserva su propia evidencia sin sobrescribir las anteriores. La evidencia y el cambio de ruta se guardan juntos; una operación rechazada no registra una confirmación exitosa.
@@ -50,7 +53,7 @@ El modelo contempla agregar/quitar paradas, ordenarlas, moverlas y despachar. CU
 * Programar el cambio de franjas es una operación completa: se comprueban todos los envíos y rutas afectados antes de confirmar. Si alguno impide aplicarlo, se identifica el motivo y se conserva la configuración anterior sin reprogramaciones parciales.
 * Las vigencias de las franjas, las reprogramaciones, los cambios necesarios en la planificación y los mensajes de notificación en Outbox se confirman en una misma transacción. Las comprobaciones incluyen conflictos con solicitudes simultáneas, no sólo los datos mostrados previamente.
 * El envío de avisos ocurre después de confirmar. Un fallo de entrega de la notificación se reintenta mediante Outbox y Worker sin deshacer la operación ni sus compromisos; no se exige que el destinatario reciba el aviso para confirmar el cambio.
-* Para los envíos afectados que están AsignadoARuta en una ruta Planificada, el cambio programado aplica T19: pasan a Reprogramado, reciben la nueva franja y salen de la ruta eliminando su parada. Conservan el día de entrega definido; si sólo lo determinaba la ruta, se conserva como FechaEntregaProgramada al reprogramar.
+* Para los envíos afectados que están AsignadoARuta en una ruta Planificada, el cambio programado aplica T19: pasan a Reprogramado, reciben la nueva franja y salen de la ruta quitando su miembro; la parada se elimina sólo si ya no contiene otros envíos. Conservan el día de entrega definido; si sólo lo determinaba la ruta, se conserva como FechaEntregaProgramada al reprogramar.
 * Antes de confirmar se muestran los envíos que saldrán de sus rutas. Después quedan disponibles para que el despachador los reasigne mediante T13, sin reasignación automática. Si una ruta queda vacía, libera repartidor y vehículo conforme a las reglas acordadas. La evidencia histórica de sus confirmaciones se conserva aunque se elimine la parada.
 * ValidacionRuta representa la evidencia inmutable de cada confirmación exitosa: referencia a Ruta, fecha/hora, responsable, tipo de operación (creación, agregado, modificación o despacho), versión de reglas, máximo de paradas, vehículo y sus capacidades y dimensiones de carga, y detalle de envíos/bultos con los pesos y dimensiones usados. También conserva la fecha de la ruta y el repartidor de esa confirmación para identificar la planificación evaluada.
 * Cada ValidacionRuta pertenece a la ruta y contiene sus detalles de carga por bulto. No depende de la existencia de Parada ni se elimina en cascada al quitarla. Se agrega un nuevo registro por confirmación; no se modifica el historial para reflejar datos actuales. Los identificadores de envío y bulto son referencias a los módulos dueños, sin navegar sus entidades internas.
@@ -62,7 +65,8 @@ El modelo contempla agregar/quitar paradas, ordenarlas, moverlas y despachar. CU
 | Parte | Responsabilidad |
 | :--- | :--- |
 | Ruta | Proteger el estado editable, la colección de paradas, los duplicados dentro de la ruta y el orden de inserción. |
-| Parada | Representar la asignación de un envío completo; nace Pendiente. No es un repositorio independiente. |
+| Parada | Representar una visita a una dirección con uno o más envíos y un intervalo común; nace Pendiente. No es un repositorio independiente. |
+| EnvioParada | Representar la asignación individual y mantener RF 15 por envío. Quitar un miembro conserva la visita mientras queden otros. |
 | Servicio de dominio de planificación | Validar fecha/franja, máximo de paradas y carga con datos de candidatos, vehículo y reglas, incluyendo las paradas existentes. |
 | Handler de CU-40 | Obtener los datos por contratos, comprobar recursos, invocar las reglas y coordinar la transacción. |
 | Infraestructura | Persistir, aplicar restricciones de unicidad y detectar conflictos de concurrencia. |
@@ -87,7 +91,7 @@ Los contratos deben distinguir datos inexistentes o no accesibles y conflictos d
 
 ## 5. Garantías exigidas por CU-40
 
-* Índice único parcial sobre EnvioId para paradas Pendiente (RF 15).
+* Índice único parcial sobre EnvioId para miembros de parada Pendiente (EnviosParada) (RF 15).
 * Concurrencia optimista sobre Ruta. Cambiar sus paradas debe actualizar también la fila de la raíz para que su versión detecte modificaciones simultáneas.
 * Protección frente a reservas simultáneas de repartidor o vehículo según las reglas de ocupación acordadas, incluyendo rutas Despachadas o EnCurso de fechas anteriores y la recuperación de reservas de una ruta Planificada vacía. La especificación técnica define exclusión breve por operador e índices de reserva por fecha.
 * Ruta, paradas, transiciones de Envíos y mensajes Outbox se confirman juntos o se revierten juntos.

@@ -1,6 +1,5 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.BuildingBlocks.Infrastructure.Tenancy;
-using Logistica.Modules.Envios.Infrastructure.Persistence;
 using Logistica.Modules.Planificacion.Domain.Rutas;
 using Logistica.Modules.Planificacion.Infrastructure.Persistence;
 using Logistica.SharedKernel;
@@ -57,37 +56,16 @@ public class AislamientoPlanificacionTests(PostgresApiFactory factory) : IClassF
         Assert.False(await leer.Rutas.AnyAsync(r => r.Id == ruta.Id));
     }
 
-    [Fact]
-    public async Task Outbox_recibe_filtro_aunque_no_herede_Entity_y_rechaza_escrituras_ajenas()
-    {
-        using var scope = factory.Services.CreateScope();
-        var a = Guid.NewGuid(); var b = Guid.NewGuid();
-        foreach (var operador in new[] { a, b })
-        {
-            await using var guardar = Contexto<EnviosDbContext>(scope, operador);
-            guardar.OutboxMessages.Add(OutboxMessage.Crear(operador, "Prueba.v1", new { Valor = 1 }, DateTimeOffset.UtcNow));
-            await guardar.SaveChangesAsync();
-        }
-        foreach (var operador in new Guid?[] { a, b, null })
-        {
-            await using var leer = Contexto<EnviosDbContext>(scope, operador);
-            var mensajes = await leer.OutboxMessages.ToListAsync();
-            if (operador is null) Assert.Empty(mensajes);
-            else Assert.Equal(operador, Assert.Single(mensajes).OperadorId);
-        }
-        await using var comoA = Contexto<EnviosDbContext>(scope, a);
-        comoA.OutboxMessages.Add(OutboxMessage.Crear(b, "Prueba.v1", new { Valor = 2 }, DateTimeOffset.UtcNow));
-        await Assert.ThrowsAsync<TenantMismatchException>(() => comoA.SaveChangesAsync());
-    }
+    // Las pruebas del outbox están en BuildingBlocks/OutboxTests: el outbox no lleva filtro "Tenant" (ADR-0002, sección 2.4).
 
     private static T Contexto<T>(IServiceScope scope, Guid? operador) where T : ModuleDbContext
         => ActivatorUtilities.CreateInstance<T>(scope.ServiceProvider, new InquilinoFijo(operador, null));
     private static Ruta NuevaRuta(Guid operador) => Ruta.Crear(operador, new(2035, 1, 1),
-        Guid.NewGuid(), Guid.NewGuid(), [Guid.NewGuid()], DateTimeOffset.UtcNow);
+        Guid.NewGuid(), Guid.NewGuid(), [new EnvioRuta(Guid.NewGuid(), "ENV-TEST", null, null, null, false, [])], DateTimeOffset.UtcNow);
     private static async Task<Ruta> GuardarRutaAsync(IServiceScope scope, Guid operador)
     {
         var ruta = NuevaRuta(operador);
-        var envioId = ruta.Paradas[0].EnvioId;
+        var envioId = ruta.Paradas[0].Envios[0].EnvioId;
         var envio = new EnvioRuta(envioId, "ENV-PRUEBA", null, null, null, false,
             [new CargaBulto(envioId, Guid.NewGuid(), 1, 10, 10, 10)]);
         var evidencia = ValidacionRuta.Registrar(ruta, OperacionValidacionRuta.Creacion,

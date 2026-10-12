@@ -205,9 +205,9 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | Decisión | Estado |
 | :---- | :---- |
 | Modo de renderizado de Blazor WebAssembly y sus consecuencias sobre escalado, estado, latencia y recursos (obligatorio, letra 6.2 y 8.2) | Pendiente |
-| Política de resolución de conflictos de sincronización de la PWA (obligatorio, letra 8.2) | Pendiente |
+| Política de resolución de conflictos de sincronización de la PWA (obligatorio, letra 8.2) | Propuesto: ADR-0004 |
 | Casos de uso almacenados en caché y reglas de expiración e invalidación (obligatorio, letra 8.2) | Pendiente |
-| Garantía de consistencia entre persistencia y publicación de eventos mediante Outbox (obligatorio, letra 8.2) | Propuesto: ADR-0003 |
+| Garantía de consistencia entre persistencia y publicación de eventos mediante Outbox (obligatorio, letra 8.2) | Aceptado: ADR-0003 |
 
 # **9 Referencias**
 
@@ -228,3 +228,4 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | 1.0 | 25/09/2026 | Propuesta inicial aceptada. |
 | 1.1 | 01/10/2026 | Se incorporan las decisiones de los addenda 1 a 5 del ADR-0001 (host único, código compartido, endpoints en los módulos, comunicación entre módulos, ArchUnitNET), el ADR-0003 propuesto, el correo y el almacenamiento de archivos; se actualizan el entorno local, la organización del repositorio y el despliegue. |
 | 1.2 | 03/10/2026 | Se incorporan Playwright y los requerimientos opcionales de pruebas elegidos por el equipo (sección 3.8). |
+| 1.3 | 12/10/2026 | Estado de los ADR obligatorios: ADR-0003 aceptado y ADR-0004 (conflictos de sincronización) propuesto. |

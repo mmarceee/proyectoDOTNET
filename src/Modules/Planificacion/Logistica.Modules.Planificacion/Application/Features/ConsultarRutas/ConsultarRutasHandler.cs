@@ -23,6 +23,13 @@ internal sealed class ConsultarRutasHandler(IRutaRepository rutas, IEnviosModule
             v.MaxParadasPorRuta, v.CapacidadPesoKg, v.CapacidadVolumenM3, v.LargoCargaCm, v.AnchoCargaCm, v.AltoCargaCm,
             v.Bultos.Select(b => new BultoValidadoResponse(b.EnvioId, b.BultoId, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm, b.VolumenM3)).ToList())).ToList();
     }
+    public async Task<IReadOnlyList<RetiroEnvioRutaResponse>> RetirosAsync(Guid id, int pagina, CancellationToken ct)
+    {
+        await ExigirRutaAsync(id, ct);
+        if (pagina < 1) throw new DomainException("La página debe ser positiva.");
+        return (await rutas.RetirosAsync(id, pagina, ct)).Select(r => new RetiroEnvioRutaResponse(r.Id, r.EnvioId,
+            r.NumeroEnvio, r.OrdenAnterior, r.ParadasRestantes, r.RevisionRuta, r.ResponsableId, r.OcurridoEn)).ToList();
+    }
     private async Task<Ruta> ExigirRutaAsync(Guid id, CancellationToken ct)
         => await rutas.ObtenerAsync(id, ct) ?? throw new RutaNoEncontradaException();
 }

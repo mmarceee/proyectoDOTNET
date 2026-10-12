@@ -31,6 +31,9 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ComercioId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Contenido")
                         .IsRequired()
                         .HasColumnType("text");
@@ -46,11 +49,17 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Tipo")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("character varying(55)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PublicadoEn", "OcurridoEn");
+                    b.HasIndex("OcurridoEn")
+                        .HasFilter("\"PublicadoEn\" IS NULL");
 
                     b.ToTable("outbox_messages", "envios");
                 });

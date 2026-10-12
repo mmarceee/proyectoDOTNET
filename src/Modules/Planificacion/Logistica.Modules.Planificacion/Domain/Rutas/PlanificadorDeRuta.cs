@@ -14,7 +14,8 @@ internal static class PlanificadorDeRuta
         var errores = new List<RestriccionRuta>();
         if (envios.Select(e => e.Id).Distinct().Count() != envios.Count)
             errores.Add(new("EnvioRepetido", "Un envío no puede aparecer dos veces en la selección."));
-        if (envios.Count > maxParadas)
+        var paradas = AgrupadorParadas.Agrupar(envios).Count;
+        if (paradas > maxParadas)
             errores.Add(new("MaximoParadasExcedido", $"La ruta admite hasta {maxParadas} paradas."));
         decimal peso = 0, volumen = 0;
         foreach (var envio in envios)
@@ -43,6 +44,6 @@ internal static class PlanificadorDeRuta
         }
         if (peso > vehiculo.PesoKg) errores.Add(new("CapacidadPesoExcedida", "Se supera la capacidad de peso del vehículo."));
         if (volumen > vehiculo.VolumenM3) errores.Add(new("CapacidadVolumenExcedida", "Se supera la capacidad de volumen del vehículo."));
-        return new(peso, volumen, envios.Count, errores);
+        return new(peso, volumen, paradas, errores);
     }
 }

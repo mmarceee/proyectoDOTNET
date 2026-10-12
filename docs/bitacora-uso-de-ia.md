@@ -105,8 +105,88 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | — |
 | **Verificación** | Revisión contra el código y el ADR-0002. |
 
+## **3.6 Reporte de cobertura en el pipeline (opcional 7.2)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `coverage.runsettings` (nuevo), `.config/dotnet-tools.json`, `.github/workflows/ci.yml`, `scripts/test-en-docker.sh`, `.gitignore`, `README.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cumplir la condición del opcional de cobertura: "reporte publicado por el pipeline", medido sobre las capas de dominio y aplicación. |
+| **Cómo se trabajó** | La IA propuso el enfoque y escribió la configuración. Ezequiel corrió el script en Docker y verificó el reporte. |
+| **Aceptado sin modificaciones** | Medir con el colector coverlet (ya referenciado en los proyectos de prueba), filtrado a los namespaces `Domain` y `Application` de los módulos; unir los tres proyectos de prueba con ReportGenerator como herramienta local; publicar el resumen en la página de la ejecución y el reporte HTML como el artefacto `reporte-cobertura`; generar el mismo reporte en `coverage/` desde `scripts/test-en-docker.sh`. |
+| **Modificado** | — |
+| **Descartado** | Medir toda la solución: incluiría Infrastructure, Presentation y migraciones, y el número no diría nada sobre lo que pide el opcional. Usar la acción de GitHub de ReportGenerator: la herramienta local da el mismo reporte en el CI y en la máquina de cada uno. Un umbral que haga fallar el pipeline: se agrega cuando se acerque el 12/11. |
+| **Verificación** | Ejecución de `scripts/test-en-docker.sh` del 12/10: 4 ensamblados y 38 clases medidas; cobertura de líneas del 91,5 % (388 de 424) y de ramas del 74,5 % (258 de 346). El reporte en el CI se verifica en el primer PR. |
+
+## **3.7 Tabla outbox por módulo (ADR-0003)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal (acordado con Lucas Ottonello, que había creado el outbox de CU-40) |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `OutboxMessage.cs` y `ModuleDbContext.cs` (BuildingBlocks); `EnviosDbContext.cs`, `IEnvioRepository.cs`, `EnvioRepository.cs` y `EnviosModuleApi.cs` (Envíos); `Events/EnvioAsignadoARuta.cs` (nuevo, Envios.Contracts); migraciones `OutboxPorModulo` de Administración, Depósito, Envíos y Planificación; pruebas `OutboxTests` (nueva), `AislamientoPlanificacionTests` y `ArmarRutaTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Alinear el outbox de CU-40 con los ADR: sin filtro "Tenant" (ADR-0002, 2.4), una tabla por módulo registrada desde `ModuleDbContext` (ADR-0003, 2.1) y las columnas del sobre (ADR-0003, 2.6). |
+| **Cómo se trabajó** | La IA detectó el conflicto al revisar CU-40 y redactó la propuesta para el equipo. Lucas la aprobó. Después, la IA escribió el código, generó las migraciones en Docker y corrió las pruebas. |
+| **Aceptado sin modificaciones** | `OutboxMessage` sin `IOperadorOwned`, con `OperadorId`, `ComercioId`, `TraceParent`, `Tipo`, `OcurridoEn`, `Contenido` y `PublicadoEn`; `ModuleDbContext.AgregarAlOutbox` como único punto de escritura, que toma el inquilino de la sesión y falla cerrado; índice parcial de pendientes; evento `EnvioAsignadoARuta` en Contracts; `RegistrarAsignacion` sin el parámetro `operadorId`. |
+| **Modificado** | La prueba del outbox de `AislamientoPlanificacionTests`, que verificaba el filtro, se reemplazó por `OutboxTests`, como pidió Lucas: el publicador lee los pendientes sin inquilino, los metadatos son los de la sesión, sin operador no se puede registrar, el evento se revierte con el cambio y cada módulo tiene su tabla. En `ArmarRutaTests`, la consulta que buscaba el `MessageId` dentro del contenido ahora verifica el tipo y que esté pendiente. |
+| **Descartado** | Mantener el filtro en el outbox: el publicador, sin inquilino, no vería nada, y para leer necesitaría `IgnoreQueryFilters`, que el ADR-0002 prohíbe. Recibir el operador por parámetro: el sobre tiene que salir de la sesión, nunca del llamador. Implementar ahora `IIntegrationEventPublisher`, el publicador y la tabla inbox: corresponden al 29/10. Cambiar `Contenido` a `jsonb`: la conversión de la columna existente complica la migración sin beneficio actual. |
+| **Verificación** | Pruebas en Docker: 178 pruebas (40 unitarias, 54 de arquitectura y 84 de integración), todas pasan, incluida la de CU-40 que comprueba que la asignación y el evento se revierten juntos. |
+
+## **3.8 ADR-0003 versión 1.0**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `docs/analisis-diseno/ADR-0003-outbox-y-mensajeria.md`; CU-09 en `docs/analisis-diseno/casos-de-uso.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Completar el ADR para su aprobación: resolver los huecos de la versión 0.1 y alinearlo con el ADR-0002, con CU-09 y con lo ya implementado. |
+| **Cómo se trabajó** | A pedido de Ezequiel, la IA identificó los huecos y redactó la versión 1.0 a partir de la letra (RNF 6.8), los ADR-0001 y 0002, CU-09 y el código. |
+| **Aceptado sin modificaciones** | El outbox sin filtro y con el inquilino tomado de la sesión; `IIntegrationEventPublisher` declarada en cada módulo; semántica *al menos una vez* sin orden garantizado; inbox con clave (`MessageId`, `Consumidor`); reintentos con colas de espera con TTL; cola `logistica.fallidos` con un registrador que la vuelca en la tabla `mensajes_fallidos`, con filtro de inquilino, para CU-09; el sobre en las propiedades y cabeceras de AMQP; retención, observabilidad y tabla de verificación con su estado. |
+| **Modificado** | — |
+| **Descartado** | Las alternativas 3.5 a 3.10 del ADR, cada una con su motivo. |
+| **Verificación** | Revisión de la coherencia con el ADR-0002 (secciones 2.4, 2.5 y 4), CU-09 y el código del outbox. El equipo lo aprobó el 12/10, incluidas las tres decisiones nuevas (la tabla `mensajes_fallidos` con su registrador, `IIntegrationEventPublisher` por módulo y el sobre en cabeceras AMQP). |
+
+## **3.9 Respuesta 404 ante una escritura de otro inquilino**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `src/Logistica.Api/Errores/TenantMismatchExceptionHandler.cs` (nuevo), `Program.cs`; prueba `Tenancy/EscrituraDeOtroInquilinoTests` (nueva) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cumplir la sección 2.9 del ADR-0002: una escritura sobre datos de otro inquilino responde igual que un recurso inexistente, y queda registrada para auditoría. Hasta ahora terminaba en un 500. |
+| **Cómo se trabajó** | A pedido de Ezequiel, la IA escribió el manejador siguiendo el patrón de `DomainExceptionHandler` y una prueba de integración, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | Un `IExceptionHandler` que responde 404 **sin cuerpo**, igual que los `NotFound()` de los endpoints, y registra un *warning* con método, ruta, inquilino de la sesión y la excepción; el inquilino se pide al request porque los manejadores son singleton. En la prueba, un repositorio que entrega una recepción de otro operador, para que la rechace el interceptor real. |
+| **Modificado** | — |
+| **Descartado** | Responder 404 con ProblemDetails: el cuerpo distinto delataría que el recurso existe. Responder 403: lo prohíbe el ADR. Lanzar la excepción a mano desde un endpoint de prueba: no probaría que la excepción del interceptor llega al manejador. |
+| **Verificación** | Pruebas en Docker: 179 pruebas (40 unitarias, 54 de arquitectura y 85 de integración), todas pasan. La prueba nueva compara la respuesta con la de un envío inexistente y verifica que no quedaron ni la recepción ni la transición T2. |
+
+## **3.10 ADR-0004 · Resolución de conflictos de sincronización**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `docs/analisis-diseno/ADR-0004-resolucion-de-conflictos-de-sincronizacion.md` (nuevo); CU-52 en `casos-de-uso.md` (v0.6); `propuesta-stack-y-entorno-desarrollo.md` (v1.3); nota de RF 24 en `modelo-de-dominio.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Redactar el ADR obligatorio de la letra (sección 8.2) sobre la sincronización de la PWA, que necesitan CU-17, CU-18 y CU-52 y la cola local de la PWA. |
+| **Cómo se trabajó** | La IA analizó la letra, los casos de uso y la tabla de transiciones, e identificó qué cambios puede tener un envío en el servidor mientras el repartidor está sin conexión. Planteó tres decisiones con una recomendación; Ezequiel eligió, discutió el caso del extravío y decidió conservar T16 desde *EnTransito* por los robos. Después la IA redactó el ADR. |
+| **Aceptado sin modificaciones** | Sincronizar operaciones y no estados; idempotencia por `OperacionId` registrada en la misma transacción que el efecto; el servidor decide con la máquina de estados (elegido por Ezequiel); los archivos dentro de la operación (elegido por Ezequiel); una transacción por operación; conservar las operaciones rechazadas sin aplicarlas; la hora del dispositivo con corrección del reloj adelantado; las reglas para la PWA, el transporte, la correlación y las métricas. |
+| **Modificado** | La IA proponía como conflicto principal un extravío declarado por error mientras el envío estaba en reparto. Ezequiel objetó que un paquete no se extravía en la camioneta, pero que T16 debe conservar *EnTransito* para los robos. El caso guía del ADR pasó a ser el robo, con una entrega anterior sin sincronizar. |
+| **Descartado** | La última escritura gana, el dispositivo gana, la revisión manual de todo, sincronizar estados, descartar las operaciones rechazadas, el lote atómico, subir los archivos aparte, depender sólo de la Background Sync API, y CRDT o event sourcing (alternativas 3.1 a 3.9 del ADR). Se evaluó sacar *EnTransito* de T16 y se descartó (decisión de Ezequiel). |
+| **Verificación** | Revisión contra la letra (RF 24, 6.11, 6.12, 9.3), CU-17, CU-18, CU-21, CU-41, CU-43, CU-50 a CU-52 y la tabla de transiciones. Está **pendiente la aprobación del equipo**, en especial la de Lucas, por la parte de la PWA. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 09/10/2026 | Versión inicial: criterios y entradas del aislamiento por inquilino (hito del 15/10). | Ezequiel Marcenal |
+| 0.2 | 12/10/2026 | Entrada del reporte de cobertura en el pipeline. | Ezequiel Marcenal |
+| 0.3 | 12/10/2026 | Entrada de la tabla outbox por módulo. | Ezequiel Marcenal |
+| 0.4 | 12/10/2026 | Entrada del ADR-0003 versión 1.0. | Ezequiel Marcenal |
+| 0.5 | 12/10/2026 | Entrada de la respuesta 404 ante una escritura de otro inquilino. | Ezequiel Marcenal |
+| 0.6 | 12/10/2026 | Entrada del ADR-0004. | Ezequiel Marcenal |
