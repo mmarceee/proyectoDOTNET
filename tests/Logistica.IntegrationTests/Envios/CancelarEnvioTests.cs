@@ -30,6 +30,12 @@ public class CancelarEnvioTests(PostgresApiFactory factory) : IClassFixture<Post
         Assert.Equal("El cliente se arrepintió", await ConsultarAsync<string>(
             """SELECT "Detalle" FROM envios."EventosEnvio" WHERE "EnvioId" = @id AND "EstadoNuevo" = 'Cancelado'""", envio.Id));
         Assert.Equal(1L, await MensajesCanceladoAsync(envio.Id));
+
+        // El inquilino del sobre sale de la sesión: el comercio provisorio que canceló (ADR-0002, sección 2.5).
+        Assert.Equal(Guid.Parse("22222222-2222-2222-2222-222222222222"), await ConsultarAsync<Guid>(
+            """SELECT "ComercioId" FROM envios.outbox_messages WHERE "Tipo" = 'EnvioCancelado.v1' AND "Contenido"::jsonb ->> 'EnvioId' = @id::text""",
+            envio.Id));
+
     }
 
     [Fact]
