@@ -135,6 +135,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Mantener el filtro en el outbox: el publicador, sin inquilino, no vería nada, y para leer necesitaría `IgnoreQueryFilters`, que el ADR-0002 prohíbe. Recibir el operador por parámetro: el sobre tiene que salir de la sesión, nunca del llamador. Implementar ahora `IIntegrationEventPublisher`, el publicador y la tabla inbox: corresponden al 29/10. Cambiar `Contenido` a `jsonb`: la conversión de la columna existente complica la migración sin beneficio actual. |
 | **Verificación** | Pruebas en Docker: 178 pruebas (40 unitarias, 54 de arquitectura y 84 de integración), todas pasan, incluida la de CU-40 que comprueba que la asignación y el evento se revierten juntos. |
 
+## **3.8 ADR-0003 versión 1.0**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `docs/analisis-diseno/ADR-0003-outbox-y-mensajeria.md`; CU-09 en `docs/analisis-diseno/casos-de-uso.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Completar el ADR para su aprobación: resolver los huecos de la versión 0.1 y alinearlo con el ADR-0002, con CU-09 y con lo ya implementado. |
+| **Cómo se trabajó** | A pedido de Ezequiel, la IA identificó los huecos y redactó la versión 1.0 a partir de la letra (RNF 6.8), los ADR-0001 y 0002, CU-09 y el código. |
+| **Aceptado sin modificaciones** | El outbox sin filtro y con el inquilino tomado de la sesión; `IIntegrationEventPublisher` declarada en cada módulo; semántica *al menos una vez* sin orden garantizado; inbox con clave (`MessageId`, `Consumidor`); reintentos con colas de espera con TTL; cola `logistica.fallidos` con un registrador que la vuelca en la tabla `mensajes_fallidos`, con filtro de inquilino, para CU-09; el sobre en las propiedades y cabeceras de AMQP; retención, observabilidad y tabla de verificación con su estado. |
+| **Modificado** | — |
+| **Descartado** | Las alternativas 3.5 a 3.10 del ADR, cada una con su motivo. |
+| **Verificación** | Revisión de la coherencia con el ADR-0002 (secciones 2.4, 2.5 y 4), CU-09 y el código del outbox. El equipo lo aprobó el 12/10, incluidas las tres decisiones nuevas (la tabla `mensajes_fallidos` con su registrador, `IIntegrationEventPublisher` por módulo y el sobre en cabeceras AMQP). |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -142,3 +157,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.1 | 09/10/2026 | Versión inicial: criterios y entradas del aislamiento por inquilino (hito del 15/10). | Ezequiel Marcenal |
 | 0.2 | 12/10/2026 | Entrada del reporte de cobertura en el pipeline. | Ezequiel Marcenal |
 | 0.3 | 12/10/2026 | Entrada de la tabla outbox por módulo. | Ezequiel Marcenal |
+| 0.4 | 12/10/2026 | Entrada del ADR-0003 versión 1.0. | Ezequiel Marcenal |
