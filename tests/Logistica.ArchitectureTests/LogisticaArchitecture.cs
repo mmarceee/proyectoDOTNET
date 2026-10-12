@@ -63,4 +63,9 @@ internal static class LogisticaArchitecture
     public static GivenTypesConjunction InAnyNamespace(params string[] roots) =>
         Types(true).That().ResideInNamespaceMatching(
             $@"^({string.Join("|", roots.Select(Regex.Escape))})(\..+)?$");
+
+    // Todo ASP.NET Core menos ASP.NET Core Identity. Los tipos de Identity (usuarios y roles sobre EF Core) son
+    // persistencia, no HTTP, y pueden vivir en Infrastructure (ADR-0001, sección 2.4; guía, sección 2.1).
+    public static GivenTypesConjunction AspNetCoreSalvoIdentity =>
+        Types(true).That().ResideInNamespaceMatching(@"^Microsoft\.AspNetCore(\.(?!Identity(\.|$)).+)?$");
 }

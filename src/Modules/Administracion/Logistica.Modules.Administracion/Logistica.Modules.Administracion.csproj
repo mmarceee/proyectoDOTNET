@@ -10,6 +10,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Usuarios, contraseñas y perfiles con ASP.NET Core Identity sobre EF Core (CU-02). -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+  </ItemGroup>
+
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Logistica.UnitTests" />
     <InternalsVisibleTo Include="Logistica.IntegrationTests" />
   </ItemGroup>

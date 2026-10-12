@@ -54,6 +54,7 @@ var app = builder.Build();
 if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await app.Services.MigrateModuleDatabasesAsync();
+    await app.Services.MigrarIdentidadAsync();
     await app.Services.SembrarDatosInicialesAsync();
 }
 

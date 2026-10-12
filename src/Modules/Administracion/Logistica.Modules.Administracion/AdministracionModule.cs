@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Logistica.Modules.Administracion.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Administracion;
 
@@ -21,6 +24,21 @@ public static class AdministracionModule
         services.AddScoped<DatosIniciales>();
         services.AddScoped<IRecursosPlanificacionReader, RecursosPlanificacionReader>();
         services.AddScoped<Contracts.IAdministracionModuleApi, AdministracionModuleApi>();
+
+        // Identity (CU-02): usuarios y perfiles en su propio DbContext. No usa la unidad de trabajo de los módulos.
+        services.AddDbContext<IdentidadDbContext>(options => options.UseNpgsql(
+            configuration.GetConnectionString("Postgres"),
+            npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", IdentidadDbContext.Schema)));
+
+        services.AddIdentityCore<Usuario>(opciones =>
+        {
+            // Un correo, un usuario en todo el sistema (ADR-0002, sección 5).
+            opciones.User.RequireUniqueEmail = true;
+            opciones.Lockout.MaxFailedAccessAttempts = 5;
+        })
+            .AddRoles<IdentityRole<Guid>>()
+            .AddEntityFrameworkStores<IdentidadDbContext>();
+
 
         return services;
     }
@@ -39,5 +57,15 @@ public static class AdministracionModule
         using var scope = services.CreateScope();
 
         await scope.ServiceProvider.GetRequiredService<DatosIniciales>().SembrarAsync(ct);
+    }
+
+
+    // Crea o actualiza las tablas de Identity. La llama el host junto con las migraciones de los módulos,
+    // porque IdentidadDbContext no es un ModuleDbContext y MigrateModuleDatabasesAsync no lo ve.
+    public static async Task MigrarIdentidadAsync(this IServiceProvider services, CancellationToken ct = default)
+    {
+        using var scope = services.CreateScope();
+
+        await scope.ServiceProvider.GetRequiredService<IdentidadDbContext>().Database.MigrateAsync(ct);
     }
 }
