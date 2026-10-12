@@ -165,6 +165,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Responder 404 con ProblemDetails: el cuerpo distinto delataría que el recurso existe. Responder 403: lo prohíbe el ADR. Lanzar la excepción a mano desde un endpoint de prueba: no probaría que la excepción del interceptor llega al manejador. |
 | **Verificación** | Pruebas en Docker: 179 pruebas (40 unitarias, 54 de arquitectura y 85 de integración), todas pasan. La prueba nueva compara la respuesta con la de un envío inexistente y verifica que no quedaron ni la recepción ni la transición T2. |
 
+## **3.10 ADR-0004 · Resolución de conflictos de sincronización**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `docs/analisis-diseno/ADR-0004-resolucion-de-conflictos-de-sincronizacion.md` (nuevo); CU-52 en `casos-de-uso.md` (v0.6); `propuesta-stack-y-entorno-desarrollo.md` (v1.3); nota de RF 24 en `modelo-de-dominio.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Redactar el ADR obligatorio de la letra (sección 8.2) sobre la sincronización de la PWA, que necesitan CU-17, CU-18 y CU-52 y la cola local de la PWA. |
+| **Cómo se trabajó** | La IA analizó la letra, los casos de uso y la tabla de transiciones, e identificó qué cambios puede tener un envío en el servidor mientras el repartidor está sin conexión. Planteó tres decisiones con una recomendación; Ezequiel eligió, discutió el caso del extravío y decidió conservar T16 desde *EnTransito* por los robos. Después la IA redactó el ADR. |
+| **Aceptado sin modificaciones** | Sincronizar operaciones y no estados; idempotencia por `OperacionId` registrada en la misma transacción que el efecto; el servidor decide con la máquina de estados (elegido por Ezequiel); los archivos dentro de la operación (elegido por Ezequiel); una transacción por operación; conservar las operaciones rechazadas sin aplicarlas; la hora del dispositivo con corrección del reloj adelantado; las reglas para la PWA, el transporte, la correlación y las métricas. |
+| **Modificado** | La IA proponía como conflicto principal un extravío declarado por error mientras el envío estaba en reparto. Ezequiel objetó que un paquete no se extravía en la camioneta, pero que T16 debe conservar *EnTransito* para los robos. El caso guía del ADR pasó a ser el robo, con una entrega anterior sin sincronizar. |
+| **Descartado** | La última escritura gana, el dispositivo gana, la revisión manual de todo, sincronizar estados, descartar las operaciones rechazadas, el lote atómico, subir los archivos aparte, depender sólo de la Background Sync API, y CRDT o event sourcing (alternativas 3.1 a 3.9 del ADR). Se evaluó sacar *EnTransito* de T16 y se descartó (decisión de Ezequiel). |
+| **Verificación** | Revisión contra la letra (RF 24, 6.11, 6.12, 9.3), CU-17, CU-18, CU-21, CU-41, CU-43, CU-50 a CU-52 y la tabla de transiciones. Está **pendiente la aprobación del equipo**, en especial la de Lucas, por la parte de la PWA. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -174,3 +189,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.3 | 12/10/2026 | Entrada de la tabla outbox por módulo. | Ezequiel Marcenal |
 | 0.4 | 12/10/2026 | Entrada del ADR-0003 versión 1.0. | Ezequiel Marcenal |
 | 0.5 | 12/10/2026 | Entrada de la respuesta 404 ante una escritura de otro inquilino. | Ezequiel Marcenal |
+| 0.6 | 12/10/2026 | Entrada del ADR-0004. | Ezequiel Marcenal |
