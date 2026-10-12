@@ -1,4 +1,4 @@
-# **ADR-0004 · Modo de renderizado de Blazor**
+# **ADR-0005 · Modo de renderizado de Blazor**
 
 | Estado | Propuesto — pendiente de revisión por el equipo |
 | :---- | :---- |
