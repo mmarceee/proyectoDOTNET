@@ -61,11 +61,11 @@ public class AislamientoPlanificacionTests(PostgresApiFactory factory) : IClassF
     private static T Contexto<T>(IServiceScope scope, Guid? operador) where T : ModuleDbContext
         => ActivatorUtilities.CreateInstance<T>(scope.ServiceProvider, new InquilinoFijo(operador, null));
     private static Ruta NuevaRuta(Guid operador) => Ruta.Crear(operador, new(2035, 1, 1),
-        Guid.NewGuid(), Guid.NewGuid(), [Guid.NewGuid()], DateTimeOffset.UtcNow);
+        Guid.NewGuid(), Guid.NewGuid(), [new EnvioRuta(Guid.NewGuid(), "ENV-TEST", null, null, null, false, [])], DateTimeOffset.UtcNow);
     private static async Task<Ruta> GuardarRutaAsync(IServiceScope scope, Guid operador)
     {
         var ruta = NuevaRuta(operador);
-        var envioId = ruta.Paradas[0].EnvioId;
+        var envioId = ruta.Paradas[0].Envios[0].EnvioId;
         var envio = new EnvioRuta(envioId, "ENV-PRUEBA", null, null, null, false,
             [new CargaBulto(envioId, Guid.NewGuid(), 1, 10, 10, 10)]);
         var evidencia = ValidacionRuta.Registrar(ruta, OperacionValidacionRuta.Creacion,

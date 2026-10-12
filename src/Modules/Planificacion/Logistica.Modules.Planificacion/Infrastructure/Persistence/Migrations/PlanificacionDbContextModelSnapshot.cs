@@ -103,7 +103,7 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                     b.ToTable("BultosValidacionRuta", "planificacion");
                 });
 
-            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.Parada", b =>
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.EnvioParada", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -114,6 +114,53 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                     b.Property<string>("Estado")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ParadaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RutaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvioId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Paradas_EnvioActivo")
+                        .HasFilter("\"Estado\" = 'Pendiente'");
+
+                    b.HasIndex("RutaId", "EnvioId")
+                        .IsUnique();
+
+                    b.HasIndex("OperadorId", "RutaId", "ParadaId");
+
+                    b.ToTable("EnviosParada", "planificacion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.Parada", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClaveDireccion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<TimeOnly?>("Desde")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<string>("Direccion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<TimeOnly?>("Hasta")
+                        .HasColumnType("time without time zone");
 
                     b.Property<DateTimeOffset?>("LlegadaEn")
                         .HasColumnType("timestamp with time zone");
@@ -129,17 +176,50 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EnvioId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Paradas_EnvioActivo")
-                        .HasFilter("\"Estado\" = 'Pendiente'");
+                    b.ToTable("Paradas", "planificacion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.RetiroEnvioRuta", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NumeroEnvio")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("OcurridoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("OrdenAnterior")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ParadasRestantes")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ResponsableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("RevisionRuta")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RutaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
 
                     b.HasIndex("OperadorId", "RutaId");
 
-                    b.HasIndex("RutaId", "EnvioId")
+                    b.HasIndex("RutaId", "RevisionRuta")
                         .IsUnique();
 
-                    b.ToTable("Paradas", "planificacion");
+                    b.ToTable("RetirosEnvioRuta", "planificacion");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.Ruta", b =>
@@ -265,6 +345,16 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.EnvioParada", b =>
+                {
+                    b.HasOne("Logistica.Modules.Planificacion.Domain.Rutas.Parada", null)
+                        .WithMany("Envios")
+                        .HasForeignKey("OperadorId", "RutaId", "ParadaId")
+                        .HasPrincipalKey("OperadorId", "RutaId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.Parada", b =>
                 {
                     b.HasOne("Logistica.Modules.Planificacion.Domain.Rutas.Ruta", null)
@@ -272,6 +362,16 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                         .HasForeignKey("OperadorId", "RutaId")
                         .HasPrincipalKey("OperadorId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.RetiroEnvioRuta", b =>
+                {
+                    b.HasOne("Logistica.Modules.Planificacion.Domain.Rutas.Ruta", null)
+                        .WithMany()
+                        .HasForeignKey("OperadorId", "RutaId")
+                        .HasPrincipalKey("OperadorId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
@@ -283,6 +383,11 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("OperadorId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.Parada", b =>
+                {
+                    b.Navigation("Envios");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.Ruta", b =>

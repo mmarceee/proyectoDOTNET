@@ -52,4 +52,10 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         db.AgregarAlOutbox(EnvioAsignadoARuta.Tipo,
             new EnvioAsignadoARuta(envioId, rutaId, responsableId, nameof(OrigenEvento.Backoffice)), ahora);
     }
+
+    public void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
+    {
+        db.AgregarAlOutbox(EnvioDesasignadoDeRuta.Tipo,
+            new EnvioDesasignadoDeRuta(envioId, rutaId, responsableId, nameof(OrigenEvento.Backoffice)), ahora);
+    }
 }

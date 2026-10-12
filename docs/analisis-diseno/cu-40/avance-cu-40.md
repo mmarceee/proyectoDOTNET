@@ -2,7 +2,7 @@
 
 Fecha: 09/10/2026. Responsable: Lucas. Estado: implementado para desarrollo, pendiente de integración y cierre.
 
-Lucas autorizó preparar CU-40 mientras Ezequiel termina el aislamiento por inquilino. Se verificó la implementación en origin/marce, commit ebea3bc, con 124 pruebas aprobadas; ver [revisión y ajustes de integración](revision-marce.md). Al resolver el merge iniciado por Lucas se incorporó el aislamiento al CU-40, conservando su participación transaccional y extendiendo el filtro a Outbox. El cierre sigue pendiente de sesión real y las comprobaciones restantes.
+Lucas autorizó preparar CU-40 mientras Ezequiel termina el aislamiento por inquilino. Se verificó la implementación en origin/marce, commit ebea3bc, con 124 pruebas aprobadas; ver [revisión y ajustes de integración](revision-marce.md). Se incorporó el aislamiento al CU-40 conservando su participación transaccional. El 12/10 se integra la corrección de Outbox de main: sin marcador ni filtro de inquilino y con metadatos del sobre tomados de la sesión, según ADR-0002 y ADR-0003 aprobado. El cierre sigue pendiente de sesión real y las comprobaciones restantes.
 
 ## Disponible
 
@@ -55,11 +55,11 @@ El script copia el checkout dentro del contenedor y compila allí, evitando los 
 ## Integración pendiente
 
 1. Integración realizada: ModuleDbContext, TenantSaveChangesInterceptor, InquilinoFijo y AislamientoTests de Ezequiel. PlanificacionDbContext recibe ICurrentTenant. Se conserva ParticiparEnTransaccionAsync, que CU-40 necesita antes del bloqueo SQL.
-2. Guardas temporales retiradas de AdministracionModuleApi, RutaRepository, DepositoModuleApi y EnvioRepository. El filtro Tenant se aplica también a tipos IOperadorOwned que no heredan Entity, cubriendo OutboxMessage. Se agregaron pruebas A/B, sesión ausente y escrituras ajenas para rutas, paradas, evidencia y Outbox.
+2. Guardas temporales retiradas de AdministracionModuleApi, RutaRepository, DepositoModuleApi y EnvioRepository. El filtro Tenant protege rutas, paradas y evidencia. OutboxMessage queda sin marcador ni filtro; AgregarAlOutbox obtiene el inquilino de la sesión. Las pruebas transversales comprueban lectura sin inquilino y rechazo de registro sin operador.
 3. Adaptar el seed a InquilinoFijo. No sembrar filas de varios operadores con el contexto del request. Resolver la combinación de snapshots/migraciones del trabajo paralelo y comprobar creación desde cero y actualización desde la base anterior.
 4. Ampliar las comprobaciones combinadas a recursos y operaciones HTTP con sesión real, además de las pruebas de aislamiento y concurrencia ya incorporadas. Revisar el SQL parametrizado del bloqueo: Operador es global y su ID se obtiene exclusivamente de ICurrentTenant.
 5. Integrar Identity del trabajo correspondiente: operador resuelto desde claims, perfil Despachador, responsable desde NameIdentifier y middleware del host. El filtro de acceso actual ya exige autenticación/perfil fuera de desarrollo, pero no instala Identity. Añadir pruebas con usuarios de distintos operadores, dos despachadores del mismo operador y usuario de comercio. Mantener las comprobaciones antiforgery.
-6. Conectar el publicador transversal del ADR-0003. EnvioAsignadoARuta.v1 ya queda en Outbox junto con la asignación; se conserva el mismo MessageId en fila y contenido. La publicación y el consumidor no se consideran implementados por guardar el mensaje.
+6. Conectar el publicador transversal del ADR-0003. EnvioAsignadoARuta.v1 ya queda en Outbox junto con la asignación. MessageId, fecha, inquilino y traza pertenecen al sobre; el contenido contiene EnvioId, RutaId, ResponsableId y Origen. La publicación y el consumidor no se consideran implementados por guardar el mensaje.
 
 Los métodos de dominio para quitar/despachar/iniciar/finalizar preparan las reservas para CU-41/43/51/55; no habilitan sus endpoints. Esos flujos deberán usar el mismo bloqueo del operador, revisar la versión de ruta y conservar su evidencia cuando corresponda. El cambio programado de franjas y sus notificaciones permanece en CU-04.
 

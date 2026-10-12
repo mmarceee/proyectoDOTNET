@@ -24,7 +24,7 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
         ExigirEditable(ruta, pedido.RevisionEsperada);
         if (ruta is null || pedido.Fecha != ruta.Fecha)
             PlanificadorDeRuta.ExigirFechaVigente(pedido.Fecha, await calendario.HoyAsync(ct));
-        var todos = (ruta?.Paradas.Select(p => p.EnvioId) ?? []).Concat(pedido.EnvioIds).ToArray();
+        var todos = (ruta?.EnvioIds ?? []).Concat(pedido.EnvioIds).ToArray();
         if (todos.Distinct().Count() != todos.Length) throw new DomainException("La selección incluye un envío ya presente o repetido.");
         var datos = await CargarEvaluacionAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, todos,
             pedido.EnvioIds, ruta?.Id, ct);
@@ -41,7 +41,7 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
             var datos = await CargarEvaluacionAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, pedido.EnvioIds,
                 pedido.EnvioIds, null, ct);
             ExigirValida(datos.Evaluacion);
-            var ruta = Ruta.Crear(Operador, pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, pedido.EnvioIds, reloj.GetUtcNow());
+            var ruta = Ruta.Crear(Operador, pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, datos.Envios, reloj.GetUtcNow());
             rutas.Agregar(ruta);
             await AsignarAsync(ruta, pedido.EnvioIds, datos.Envios, ct);
             await GuardarValidacionAsync(ruta, OperacionValidacionRuta.Creacion, datos, ct);
@@ -57,11 +57,11 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
         {
             await administracion.BloquearPlanificacionAsync(ct);
             var ruta = await ExigirRutaAsync(id, ct); ExigirEditable(ruta, pedido.RevisionEsperada);
-            var todos = ruta.Paradas.Select(p => p.EnvioId).Concat(pedido.EnvioIds).ToArray();
+            var todos = ruta.EnvioIds.Concat(pedido.EnvioIds).ToArray();
             if (todos.Distinct().Count() != todos.Length) throw new DomainException("Algún envío ya pertenece a la ruta.");
             var datos = await CargarEvaluacionAsync(ruta.Fecha, ruta.RepartidorId, ruta.VehiculoId, todos, pedido.EnvioIds, ruta.Id, ct);
             ExigirValida(datos.Evaluacion);
-            ruta.AgregarEnvios(pedido.EnvioIds);
+            ruta.AgregarEnvios(datos.Envios);
             await AsignarAsync(ruta, pedido.EnvioIds, datos.Envios, ct);
             await GuardarValidacionAsync(ruta, OperacionValidacionRuta.Agregado, datos, ct);
             respuesta = Mapear(ruta, Resumen(datos.Evaluacion, datos.Vehiculo, datos.Reglas));
@@ -78,10 +78,10 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
             if (pedido.Fecha != ruta.Fecha)
                 PlanificadorDeRuta.ExigirFechaVigente(pedido.Fecha, await calendario.HoyAsync(ct));
             var datos = await CargarEvaluacionAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId,
-                ruta.Paradas.Select(p => p.EnvioId).ToArray(), [], ruta.Id, ct);
+                ruta.EnvioIds.ToArray(), [], ruta.Id, ct);
             ExigirValida(datos.Evaluacion);
             var anterior = ruta.Revision;
-            ruta.ModificarPlanificacion(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId);
+            ruta.ModificarPlanificacion(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, datos.Envios);
             if (ruta.Revision != anterior) await GuardarValidacionAsync(ruta, OperacionValidacionRuta.Modificacion, datos, ct);
             respuesta = Mapear(ruta, Resumen(datos.Evaluacion, datos.Vehiculo, datos.Reglas));
         }, [], ct);
@@ -102,7 +102,7 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
         noDisponibles.AddRange(leidos.Where(e => !nuevos.Contains(e.Id) && e.Estado != "AsignadoARuta").Select(e => e.Id));
         if (noDisponibles.Count > 0) throw new ConflictoRutaException("EnvioNoDisponible", "Algunos envíos ya no están disponibles. Revisá y confirmá el resto.", noDisponibles.Distinct().ToList());
         var reglas = await administracion.ObtenerReglasPlanificacionAsync(reloj.GetUtcNow(), ct);
-        var preparados = await preparador.PrepararAsync(leidos, fecha, recursos, ct);
+        var preparados = await preparador.PrepararAsync(todos.Select(id => leidos.Single(e => e.Id == id)).ToList(), fecha, recursos, ct);
         var vehiculo = new VehiculoRuta(vehiculoDto.Id, vehiculoDto.CapacidadPesoKg, vehiculoDto.CapacidadVolumenM3,
             vehiculoDto.LargoCargaCm, vehiculoDto.AnchoCargaCm, vehiculoDto.AltoCargaCm);
         return new(vehiculo, reglas, preparados, PlanificadorDeRuta.Evaluar(fecha, vehiculo, reglas.MaxParadasPorRuta, preparados));

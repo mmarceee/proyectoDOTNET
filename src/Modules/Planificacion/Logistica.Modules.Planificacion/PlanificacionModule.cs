@@ -7,6 +7,8 @@ using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Planificacion.Application.Abstractions;
 using Logistica.Modules.Planificacion.Application.Exceptions;
 using Logistica.Modules.Planificacion.Application.Features.ArmarRuta;
+using Logistica.Modules.Planificacion.Application.Features.QuitarEnvioDeRuta;
+using Logistica.Modules.Planificacion.Presentation.Features.QuitarEnvioDeRuta;
 using Logistica.Modules.Planificacion.Application.Features.ConsultarRutas;
 using Logistica.Modules.Planificacion.Application.Features.ConsultarEnviosDisponibles;
 using Logistica.Modules.Planificacion.Application.Features.ConsultarRecursosPlanificacion;
@@ -30,6 +32,7 @@ public static class PlanificacionModule
         services.AddScoped<IConfirmacionPlanificacion, ConfirmacionPlanificacion>();
         services.AddScoped<IResponsablePlanificacion, ResponsablePlanificacion>();
         services.AddScoped<ArmarRutaHandler>();
+        services.AddScoped<QuitarEnvioDeRutaHandler>();
         services.AddScoped<ConsultarRutasHandler>();
         services.AddScoped<ConsultarEnviosDisponiblesHandler>();
         services.AddScoped<ConsultarRecursosPlanificacionHandler>();
@@ -46,6 +49,7 @@ public static class PlanificacionModule
 
         PlanificacionEndpointFilters.Add(group);
         ArmarRutaEndpoint.Map(group);
+        QuitarEnvioDeRutaEndpoint.Map(group);
         ConsultarRutasEndpoint.Map(group);
         ConsultarEnviosDisponiblesEndpoint.Map(group);
         ConsultarRecursosPlanificacionEndpoint.Map(group);

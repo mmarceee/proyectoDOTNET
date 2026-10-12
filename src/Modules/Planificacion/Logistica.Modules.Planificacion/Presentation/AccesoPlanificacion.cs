@@ -22,7 +22,7 @@ internal sealed class AccesoPlanificacion(IHostEnvironment environment, IConfigu
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         if (Error(context.HttpContext) is int status) return Results.Problem(statusCode: status, title: status == 401 ? "Iniciá sesión para planificar." : "Acceso no permitido.");
-        if (context.HttpContext.Request.Method is "POST" or "PUT" && context.HttpContext.Request.Headers.ContainsKey("Cookie"))
+        if (context.HttpContext.Request.Method is "POST" or "PUT" or "DELETE" && context.HttpContext.Request.Headers.ContainsKey("Cookie"))
         {
             try { await antiforgery.ValidateRequestAsync(context.HttpContext); }
             catch (AntiforgeryValidationException) { return Results.Problem(statusCode: 400, title: "La solicitud no tiene un token válido."); }

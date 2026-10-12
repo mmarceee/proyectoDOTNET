@@ -13,7 +13,8 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         var lista = await envios.ObtenerParaPlanificacionAsync(envioIds, ct);
         return lista.Select(e => new EnvioPlanificable(e.Id, e.OperadorId, e.Numero, e.Estado.ToString(), e.ZonaId,
             e.FranjaHorariaId, e.FechaEntregaProgramada, $"{e.Direccion.Calle} {e.Direccion.Numero}, {e.Direccion.Localidad}",
-            e.Direccion.CodigoPostal, e.Bultos.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList())).ToList();
+            e.Direccion.CodigoPostal, e.Bultos.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
+            new PuntoEntregaPlanificable(e.Direccion.Calle, e.Direccion.Numero, e.Direccion.Localidad, e.Direccion.Departamento, e.Direccion.CodigoPostal))).ToList();
     }
     public async Task AsignarARutaAsync(Guid rutaId, IReadOnlyList<AsignacionEnvioRuta> asignaciones, Guid? responsableId, CancellationToken ct)
     {
@@ -50,6 +51,19 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
                 .OrderBy(b => b.Codigo)
                 .Select(b => new BultoDeclarado(b.Id, b.Codigo, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm))
                 .ToList());
+    }
+
+    public async Task DesasignarDeRutaAsync(Guid rutaId, Guid envioId, Guid? responsableId, CancellationToken ct)
+    {
+        var envio = await envios.ObtenerAsync(envioId, ct) ?? throw new DomainException("El envío no está disponible.");
+        if (envio.Estado != EstadoEnvio.AsignadoARuta)
+            throw new DomainException("Sólo se puede desasignar un envío que esté AsignadoARuta.");
+        var ahora = reloj.GetUtcNow();
+        // T4 conserva zona, franja y fecha programada; sólo cambia el estado y registra el hecho.
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora,
+            detalle: $"Quitado de la ruta {rutaId}.");
+        envios.RegistrarDesasignacion(envio.Id, rutaId, responsableId, ahora);
+        await envios.GuardarCambiosAsync(ct);
     }
 
     public async Task RecibirEnDepositoAsync(Guid envioId, Guid? responsableId, CancellationToken ct)

@@ -9,7 +9,8 @@ internal sealed class ParadaConfiguration : IEntityTypeConfiguration<Parada>
     public void Configure(EntityTypeBuilder<Parada> b)
     {
         b.ToTable("Paradas"); b.Property(p => p.Estado).HasConversion<string>();
-        b.HasIndex(p => p.EnvioId).IsUnique().HasFilter("\"Estado\" = 'Pendiente'").HasDatabaseName("UX_Paradas_EnvioActivo");
-        b.HasIndex(p => new { p.RutaId, p.EnvioId }).IsUnique();
+        b.HasAlternateKey(p => new { p.OperadorId, p.RutaId, p.Id });
+        b.HasMany(p => p.Envios).WithOne().HasForeignKey(e => new { e.OperadorId, e.RutaId, e.ParadaId })
+            .HasPrincipalKey(p => new { p.OperadorId, p.RutaId, p.Id });
     }
 }

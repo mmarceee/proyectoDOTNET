@@ -29,7 +29,8 @@ Todo tipo de implementación es internal. Domain no depende de EF, ASP.NET ni en
 | Tipo | Definición técnica |
 | :--- | :--- |
 | Ruta | Entity e IOperadorOwned. Id, OperadorId, RepartidorId, VehiculoId, Fecha, Estado, CreadaEn, DespachadaEn opcional, Revision: long y ReservaActiva: bool. Colección privada de Parada; métodos que protegen Planificada y duplicados. |
-| Parada | Entity e IOperadorOwned. Id, OperadorId copiado de Ruta, RutaId, EnvioId, Orden, Estado, LlegadaEn opcional. Sólo Ruta crea o elimina paradas. |
+| Parada | Entity e IOperadorOwned. Id, OperadorId copiado de Ruta, RutaId, dirección normalizada, intervalo común, Orden, Estado, LlegadaEn opcional y colección de EnvioParada. Sólo Ruta crea o elimina visitas. |
+| EnvioParada | Entity e IOperadorOwned. Id, OperadorId, RutaId, ParadaId, EnvioId y estado individual. El agregado conserva la visita al quitar un envío mientras queden otros. |
 | ValidacionRuta | Entity e IOperadorOwned. Datos ya acordados en el modelo, OperadorId copiado de Ruta y RevisionRuta evaluada. Registro histórico inmutable. |
 | DatosBultoValidado | Objeto valor con EnvioId, BultoId, PesoKg, LargoCm, AnchoCm, AltoCm y volumen calculado. Se persiste como detalle de ValidacionRuta. |
 | BultoValidacionRuta | Entidad de persistencia histórica e IOperadorOwned, con Id, OperadorId, ValidacionRutaId y los datos del objeto valor DatosBultoValidado. Permite que la tabla hija participe del filtro/interceptor sin intentar aplicar un filtro independiente a un complex type. No referencia Parada. |
@@ -37,7 +38,7 @@ Todo tipo de implementación es internal. Domain no depende de EF, ASP.NET ni en
 
 Revision nace en 1 y aumenta con cada modificación efectiva del agregado, incluidas agregar/quitar paradas y cambios de estado. Se configura como token de concurrencia. Así cambiar sólo una parada también actualiza la fila de Ruta. Envíos conserva su token xmin existente.
 
-ReservaActiva se deriva y mantiene desde Ruta: Planificada con paradas, Despachada o EnCurso implica reserva; Planificada vacía y Finalizada no. No es un campo editable por el cliente. Orden inicial es el de selección, numerado desde 1; agregar continúa el orden actual. CU-42 realiza el ordenamiento posterior.
+ReservaActiva se deriva y mantiene desde Ruta: Planificada con paradas, Despachada o EnCurso implica reserva; Planificada vacía y Finalizada no. No es un campo editable por el cliente. La agrupación conserva el orden de aparición de las direcciones y coloca sus visitas por horario compatible; CU-42 realiza el ordenamiento posterior. El acuerdo del 12/10 y su migración se detallan en [paradas y envíos](paradas-y-envios.md).
 
 Para una modificación o ampliación, los envíos que ya pertenecen a la ruta se reconocen como asignaciones propias: no se exige que vuelvan a EnDeposito/Reprogramado ni se reaplica T3/T13. Las validaciones de fecha/franja y carga sí abarcan toda la ruta.
 
@@ -88,10 +89,10 @@ PlanificacionDbContext usa schema planificacion, ModuleDbContext y la conexión 
 
 | Restricción | Implementación |
 | :--- | :--- |
-| RF 15 | Índice único parcial Paradas(EnvioId) WHERE Estado = 'Pendiente'. EnvioId es Guid global; OperadorId también se valida en toda lectura/escritura. |
+| RF 15 | Índice único parcial EnviosParada(EnvioId) WHERE Estado = 'Pendiente'. EnvioId es Guid global; OperadorId también se valida en toda lectura/escritura. |
 | Reserva por día | Índices únicos Rutas(OperadorId, Fecha, RepartidorId) y (OperadorId, Fecha, VehiculoId), ambos WHERE ReservaActiva = true. |
 | Versión de ruta | Revision como token de concurrencia EF, comparado además con RevisionEsperada de la petición. |
-| Parada repetida en ruta | Índice único (RutaId, EnvioId) más protección del agregado. |
+| Envío repetido en ruta | Índice único EnviosParada(RutaId, EnvioId) más protección del agregado. |
 | Evidencia por confirmación | Unicidad (RutaId, RevisionRuta) en ValidacionesRuta. No se crea evidencia nueva para una operación sin cambios. |
 | Historial independiente | BultosValidacionRuta depende de ValidacionRuta, no de Parada. Quitar una parada nunca elimina evidencia. EnvioId/BultoId son valores históricos. |
 

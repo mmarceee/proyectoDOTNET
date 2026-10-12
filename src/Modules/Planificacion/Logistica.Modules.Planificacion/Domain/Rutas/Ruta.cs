@@ -15,10 +15,11 @@ internal sealed class Ruta : Entity, IOperadorOwned
     public long Revision { get; private set; }
     public bool ReservaActiva { get; private set; }
     public IReadOnlyList<Parada> Paradas => _paradas;
+    public IEnumerable<Guid> EnvioIds => _paradas.OrderBy(p => p.Orden).SelectMany(p => p.Envios).Select(e => e.EnvioId);
     private Ruta() { }
 
     public static Ruta Crear(Guid operadorId, DateOnly fecha, Guid repartidorId, Guid vehiculoId,
-        IReadOnlyList<Guid> envios, DateTimeOffset ahora)
+        IReadOnlyList<EnvioRuta> envios, DateTimeOffset ahora)
     {
         if (operadorId == Guid.Empty || repartidorId == Guid.Empty || vehiculoId == Guid.Empty)
             throw new DomainException("La ruta necesita operador, repartidor y vehículo.");
@@ -29,31 +30,34 @@ internal sealed class Ruta : Entity, IOperadorOwned
         return ruta;
     }
 
-    public void AgregarEnvios(IReadOnlyList<Guid> envios)
+    // Recibe la selección completa, para que evaluación y persistencia agrupen las mismas visitas.
+    public void AgregarEnvios(IReadOnlyList<EnvioRuta> envios)
     {
         ExigirPlanificada();
-        if (envios.Count == 0 || envios.Any(id => id == Guid.Empty)
-            || envios.Distinct().Count() != envios.Count || envios.Any(id => _paradas.Any(p => p.EnvioId == id)))
+        if (envios.Count == 0 || envios.Any(e => e.Id == Guid.Empty)
+            || envios.Select(e => e.Id).Distinct().Count() != envios.Count
+            || EnvioIds.Any(id => !envios.Any(e => e.Id == id)) || envios.Count <= EnvioIds.Count())
             throw new DomainException("La selección debe contener envíos válidos, nuevos y sin duplicados.");
-        var orden = _paradas.Count == 0 ? 0 : _paradas.Max(p => p.Orden);
-        foreach (var id in envios) _paradas.Add(new Parada(this, id, ++orden));
+        Reorganizar(envios);
         Actualizar();
     }
 
-    public void ModificarPlanificacion(DateOnly fecha, Guid repartidorId, Guid vehiculoId)
+    public void ModificarPlanificacion(DateOnly fecha, Guid repartidorId, Guid vehiculoId, IReadOnlyList<EnvioRuta>? envios = null)
     {
         ExigirPlanificada();
         if (repartidorId == Guid.Empty || vehiculoId == Guid.Empty) throw new DomainException("Los recursos son obligatorios.");
         if (Fecha == fecha && RepartidorId == repartidorId && VehiculoId == vehiculoId) return;
         Fecha = fecha; RepartidorId = repartidorId; VehiculoId = vehiculoId;
+        if (envios is not null) Reorganizar(envios);
         Actualizar();
     }
 
     public void QuitarEnvio(Guid envioId)
     {
         ExigirPlanificada();
-        var parada = _paradas.SingleOrDefault(p => p.EnvioId == envioId) ?? throw new DomainException("El envío no pertenece a la ruta.");
-        _paradas.Remove(parada);
+        var parada = _paradas.SingleOrDefault(p => p.Envios.Any(e => e.EnvioId == envioId)) ?? throw new DomainException("El envío no pertenece a la ruta.");
+        parada.Quitar(envioId);
+        if (parada.Envios.Count == 0) _paradas.Remove(parada);
         var orden = 0;
         foreach (var restante in _paradas.OrderBy(p => p.Orden)) restante.CambiarOrden(++orden);
         Actualizar();
@@ -74,6 +78,29 @@ internal sealed class Ruta : Entity, IOperadorOwned
     {
         if (Estado is not (EstadoRuta.EnCurso or EstadoRuta.Despachada)) throw new DomainException("La ruta no está en ejecución.");
         Estado = EstadoRuta.Finalizada; Actualizar();
+    }
+    private void Reorganizar(IReadOnlyList<EnvioRuta> envios)
+    {
+        var anteriores = _paradas.OrderBy(p => p.Orden).ToList();
+        var miembros = anteriores.SelectMany(p => p.Envios).ToDictionary(e => e.EnvioId);
+        var grupos = AgrupadorParadas.Agrupar(envios);
+        var utilizadas = new HashSet<Guid>();
+        var nuevas = new List<Parada>();
+        foreach (var grupo in grupos)
+        {
+            var parada = anteriores.FirstOrDefault(p => !utilizadas.Contains(p.Id)
+                && grupo.Envios.Any(e => miembros.TryGetValue(e.Id, out var m) && m.ParadaId == p.Id)) ?? new Parada(this);
+            utilizadas.Add(parada.Id);
+            nuevas.Add(parada);
+        }
+        foreach (var parada in anteriores) parada.Vaciar();
+        for (var i = 0; i < grupos.Count; i++)
+        {
+            var parada = nuevas[i]; parada.Definir(grupos[i], i + 1);
+            foreach (var envio in grupos[i].Envios)
+                parada.Agregar(miembros.GetValueOrDefault(envio.Id) ?? new EnvioParada(parada, envio.Id));
+        }
+        _paradas.Clear(); _paradas.AddRange(nuevas);
     }
     private void ExigirPlanificada()
     {
