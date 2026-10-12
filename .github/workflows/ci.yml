@@ -23,8 +23,33 @@ jobs:
       - name: Build
         run: dotnet build Logistica.slnx --no-restore --configuration Release
 
+      # Cobertura de las capas de dominio y aplicación (opcional 7.2): ver coverage.runsettings.
       - name: Test
-        run: dotnet test Logistica.slnx --no-build --configuration Release
+        id: test
+        run: >
+          dotnet test Logistica.slnx --no-build --configuration Release
+          --settings coverage.runsettings --collect "XPlat Code Coverage"
+          --results-directory TestResults
+
+      # Une los resultados de los tres proyectos de prueba en un solo reporte.
+      - name: Coverage report
+        if: ${{ !cancelled() && steps.test.outcome != 'skipped' }}
+        run: |
+          dotnet tool restore
+          dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage \
+            -reporttypes:"Html;MarkdownSummaryGithub" -title:"Logística · dominio y aplicación"
+
+      # El resumen queda en la página de la ejecución; el reporte navegable, como artefacto.
+      - name: Publish coverage summary
+        if: ${{ !cancelled() && steps.test.outcome != 'skipped' }}
+        run: cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: ${{ !cancelled() && steps.test.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-cobertura
+          path: coverage
 
   docker-images:
     # Verifica que las imágenes que despliega App Platform sigan compilando.

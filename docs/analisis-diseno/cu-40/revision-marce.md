@@ -1,5 +1,7 @@
 # Revisión del aislamiento de marce para CU-40
 
+> Actualización del 12/10/2026: este documento conserva la revisión histórica del 09/10. Las decisiones sobre filtrar Outbox que aparecen debajo quedaron reemplazadas por la corrección de main: OutboxMessage no lleva marcador ni filtro Tenant; AgregarAlOutbox toma los metadatos de la sesión (ADR-0002 y ADR-0003 aprobado). CU-40 y CU-41 se adaptaron a esa implementación.
+
 Fecha: 09/10/2026. Rama revisada: `origin/marce`, commit `ebea3bc` (Multitenancy: filtro global Tenant, interceptor de escrituras y pruebas de aislamiento). La referencia se actualizó desde origin antes de revisar. No se integraron cambios en lukovski.
 
 ## Qué está implementado

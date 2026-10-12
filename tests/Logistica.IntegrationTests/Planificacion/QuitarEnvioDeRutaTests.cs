@@ -70,13 +70,19 @@ public class QuitarEnvioDeRutaTests(PostgresApiFactory factory) : IClassFixture<
         Assert.Equal(zona, quitado.ZonaId); Assert.Equal(franja, quitado.FranjaHorariaId);
         Assert.Equal(fecha, quitado.FechaEntregaProgramada);
         Assert.Single(quitado.Eventos, e => e.EstadoAnterior == EstadoEnvio.AsignadoARuta && e.EstadoNuevo == EstadoEnvio.EnDeposito);
-        var mensaje = Assert.Single(await envios.OutboxMessages.Where(m => m.Tipo == "EnvioDesasignadoDeRuta.v1").ToListAsync(),
+        var mensaje = Assert.Single(await envios.Outbox.Where(m => m.Tipo == "EnvioDesasignadoDeRuta.v1").ToListAsync(),
             m => ContieneEnvio(m.Contenido, b.Id));
         using var datos = JsonDocument.Parse(mensaje.Contenido);
-        Assert.Equal(mensaje.Id, datos.RootElement.GetProperty("MessageId").GetGuid());
+        Assert.NotEqual(Guid.Empty, mensaje.Id);
         Assert.Equal(ruta.Id, datos.RootElement.GetProperty("RutaId").GetGuid());
-        Assert.Equal(quitado.OperadorId, datos.RootElement.GetProperty("OperadorId").GetGuid());
-        Assert.Equal(quitado.ComercioId, datos.RootElement.GetProperty("ComercioId").GetGuid());
+        var tenant = leer.ServiceProvider.GetRequiredService<ICurrentTenant>();
+        Assert.Equal(tenant.OperadorId, mensaje.OperadorId);
+        Assert.Equal(tenant.ComercioId, mensaje.ComercioId);
+        Assert.False(datos.RootElement.TryGetProperty("MessageId", out _));
+        Assert.False(datos.RootElement.TryGetProperty("OperadorId", out _));
+        Assert.False(datos.RootElement.TryGetProperty("ComercioId", out _));
+        Assert.False(datos.RootElement.TryGetProperty("OcurridoEn", out _));
+        Assert.Equal("Backoffice", datos.RootElement.GetProperty("Origen").GetString());
         var disponibles = (await client.GetFromJsonAsync<EnviosDisponiblesResponse>(
             $"/api/planificacion/envios-disponibles?fecha={fecha:yyyy-MM-dd}&texto={b.Numero}"))!;
         Assert.Equal(b.Id, Assert.Single(disponibles.Items).Id);
@@ -158,7 +164,7 @@ public class QuitarEnvioDeRutaTests(PostgresApiFactory factory) : IClassFixture<
         var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         var actual = await db.Envios.Include(e => e.Eventos).SingleAsync(e => e.Id == envio.Id);
         Assert.Single(actual.Eventos, e => e.EstadoAnterior == EstadoEnvio.AsignadoARuta && e.EstadoNuevo == EstadoEnvio.EnDeposito);
-        Assert.Equal(1, (await db.OutboxMessages.Where(m => m.Tipo == "EnvioDesasignadoDeRuta.v1").ToListAsync())
+        Assert.Equal(1, (await db.Outbox.Where(m => m.Tipo == "EnvioDesasignadoDeRuta.v1").ToListAsync())
             .Count(m => ContieneEnvio(m.Contenido, envio.Id)));
     }
 
@@ -339,7 +345,7 @@ public class QuitarEnvioDeRutaTests(PostgresApiFactory factory) : IClassFixture<
         var envio = await db.Envios.Include(e => e.Eventos).SingleAsync(e => e.Id == id);
         Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
         Assert.DoesNotContain(envio.Eventos, e => e.EstadoAnterior == EstadoEnvio.AsignadoARuta && e.EstadoNuevo == EstadoEnvio.EnDeposito);
-        Assert.DoesNotContain(await db.OutboxMessages.Where(m => m.Tipo == "EnvioDesasignadoDeRuta.v1").ToListAsync(),
+        Assert.DoesNotContain(await db.Outbox.Where(m => m.Tipo == "EnvioDesasignadoDeRuta.v1").ToListAsync(),
             m => ContieneEnvio(m.Contenido, id));
     }
     private static bool ContieneEnvio(string contenido, Guid id)

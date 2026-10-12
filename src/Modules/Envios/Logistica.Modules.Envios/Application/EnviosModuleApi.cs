@@ -28,7 +28,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             envio.DefinirPlanificacion(envio.ZonaId, asignacion.FranjaId, envio.FechaEntregaProgramada);
             envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, responsableId, ahora,
                 detalle: $"Asignado a la ruta {rutaId}.");
-            envios.RegistrarAsignacion(envio.OperadorId, envio.Id, rutaId, responsableId, ahora);
+            envios.RegistrarAsignacion(envio.Id, rutaId, responsableId, ahora);
         }
         await envios.GuardarCambiosAsync(ct);
     }
@@ -61,7 +61,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         // T4 conserva zona, franja y fecha programada; sólo cambia el estado y registra el hecho.
         envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora,
             detalle: $"Quitado de la ruta {rutaId}.");
-        envios.RegistrarDesasignacion(envio.OperadorId, envio.ComercioId, envio.Id, rutaId, responsableId, ahora);
+        envios.RegistrarDesasignacion(envio.Id, rutaId, responsableId, ahora);
         await envios.GuardarCambiosAsync(ct);
     }
 

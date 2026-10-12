@@ -1,6 +1,6 @@
 # CU-41 · Quitar un envío de una ruta
 
-Fecha: 12/10/2026. Responsable: Lucas. Implementación para desarrollo; cierre sujeto a sesión real e integración del Outbox transversal.
+Fecha: 12/10/2026. Responsable: Lucas. Implementación para desarrollo; cierre sujeto a sesión real y publicación de eventos por RabbitMQ.
 
 ## Comportamiento
 
@@ -32,9 +32,9 @@ No se revalida la capacidad al quitar: la carga disminuye, y una configuración 
 
 ## Coordinación con el Outbox
 
-Ezequiel y Cristian revisan el Outbox del CU-40 respecto de ADR-0002 y ADR-0003. Este cambio no modifica `OutboxMessage`, `ModuleDbContext`, su marcador o la configuración/migraciones de la tabla. Agrega `RegistrarDesasignacion` en el repositorio de Envíos para escribir `EnvioDesasignadoDeRuta.v1` mediante el adaptador actual, en la transacción existente.
+Se integra el cambio de `main` realizado por Ezequiel: tabla Outbox por módulo registrada en `ModuleDbContext`, sin marcador ni filtro de inquilino, conforme a ADR-0002 y ADR-0003 aprobado. CU-40 y CU-41 escriben mediante `AgregarAlOutbox` en la transacción existente.
 
-Al incorporar el Outbox transversal, adaptar también **RegistrarDesasignacion** y las verificaciones de CU-41 al nuevo sobre. El evento actual conserva MessageId, OperadorId, ComercioId, EnvioId, RutaId, ResponsableId y OcurridoEn. El OperadorId y ComercioId actuales proceden del envío leído por el módulo propietario; la integración transversal deberá aplicar la política de metadatos del contexto original acordada en ADR-0002. No se certifica todavía el publicador sin inquilino ni la entrega por RabbitMQ.
+**RegistrarDesasignacion** y las verificaciones de CU-41 se adaptan al nuevo sobre. El contenido de `EnvioDesasignadoDeRuta.v1` contiene EnvioId, RutaId, ResponsableId y Origen. MessageId, fecha, inquilino y traza quedan en las columnas del Outbox: OperadorId y ComercioId provienen de `ICurrentTenant`, no del envío ni del llamador. Las pruebas de BuildingBlocks verifican la lectura sin inquilino; el servicio publicador y la entrega por RabbitMQ siguen pendientes según ADR-0003.
 
 ## Pruebas
 
@@ -42,6 +42,6 @@ Las pruebas de integración usan PostgreSQL real. Cubren quitar una parada inter
 
 Las mismas pruebas verifican ahora el registro durable del retiro, su número y orden anterior, la revisión y paradas restantes, la visualización desde Razor con fecha UTC−3, el rollback del historial y el rechazo de consultas desde otra empresa. Las validaciones de carga anteriores permanecen idénticas.
 
-Resultado de `scripts/cu40-en-docker.sh test`: compilación Release sin errores ni advertencias y **187 pruebas aprobadas** (40 unitarias, 54 de arquitectura y 93 de integración), ninguna fallida ni omitida. CU-41 incorpora doce escenarios de integración. Se ajustó la prueba de edición de datos del CU-40 para distinguir su acción CancelarDatos del botón Cancelar del nuevo modal.
+Resultado tras integrar `origin/main` (`d69f1ae`) y adaptar CU-41: `scripts/cu40-en-docker.sh test`, compilación Release sin errores ni advertencias y **192 pruebas aprobadas** (40 unitarias, 54 de arquitectura y 98 de integración), ninguna fallida ni omitida. CU-41 incorpora doce escenarios de integración. `ActualizacionOutboxCU41Tests` verifica además una base con HistorialRetirosCU41 ya aplicado y la conservación de mensajes pendientes anteriores al cambio del Outbox. Se ajustó la prueba de edición de datos del CU-40 para distinguir su acción CancelarDatos del botón Cancelar del nuevo modal.
 
 El historial de retiros requiere la migración `HistorialRetirosCU41`, que crea `planificacion.RetirosEnvioRuta`. Las migraciones del Outbox transversal corresponden al trabajo coordinado con Ezequiel.

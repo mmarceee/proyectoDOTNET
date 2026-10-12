@@ -1,5 +1,5 @@
-using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Contracts.Events;
+using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
@@ -45,20 +45,17 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             : consulta.Where(e => envioIds.Contains(e.Id));
         return await consulta.OrderBy(e => e.Numero).ToListAsync(ct);
     }
-    public void RegistrarAsignacion(Guid operadorId, Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
+
+    // El operador y el comercio del sobre los pone AgregarAlOutbox desde la sesión.
+    public void RegistrarAsignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
     {
-        var messageId = Guid.CreateVersion7();
-        db.OutboxMessages.Add(Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage.Crear(operadorId,
-            "EnvioAsignadoARuta.v1", new { MessageId = messageId, OperadorId = operadorId, EnvioId = envioId,
-                RutaId = rutaId, ResponsableId = responsableId, OcurridoEn = ahora, Origen = "Backoffice", Version = 1 }, ahora, messageId));
+        db.AgregarAlOutbox(EnvioAsignadoARuta.Tipo,
+            new EnvioAsignadoARuta(envioId, rutaId, responsableId, nameof(OrigenEvento.Backoffice)), ahora);
     }
 
-    public void RegistrarDesasignacion(Guid operadorId, Guid comercioId, Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
+    public void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
     {
-        var mensaje = new EnvioDesasignadoDeRuta(Guid.CreateVersion7(), operadorId, comercioId,
-            envioId, rutaId, responsableId, ahora);
-        db.OutboxMessages.Add(Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage.Crear(
-            operadorId, "EnvioDesasignadoDeRuta.v1", mensaje, ahora, mensaje.MessageId));
+        db.AgregarAlOutbox(EnvioDesasignadoDeRuta.Tipo,
+            new EnvioDesasignadoDeRuta(envioId, rutaId, responsableId, nameof(OrigenEvento.Backoffice)), ahora);
     }
-
 }

@@ -44,6 +44,8 @@ Si Windows (Smart App Control) bloquea los DLL compilados y las pruebas no carga
 bash scripts/test-en-docker.sh
 ```
 
+El script también genera el reporte de cobertura de las capas de dominio y aplicación en `coverage/index.html` (configuración en `coverage.runsettings`). En el CI, el resumen aparece en la página de cada ejecución y el reporte completo se descarga como el artefacto `reporte-cobertura`.
+
 ## Rutas
 
 | Ruta | Contenido |
