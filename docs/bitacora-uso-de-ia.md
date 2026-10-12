@@ -148,7 +148,7 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Aceptado sin modificaciones** | El outbox sin filtro y con el inquilino tomado de la sesión; `IIntegrationEventPublisher` declarada en cada módulo; semántica *al menos una vez* sin orden garantizado; inbox con clave (`MessageId`, `Consumidor`); reintentos con colas de espera con TTL; cola `logistica.fallidos` con un registrador que la vuelca en la tabla `mensajes_fallidos`, con filtro de inquilino, para CU-09; el sobre en las propiedades y cabeceras de AMQP; retención, observabilidad y tabla de verificación con su estado. |
 | **Modificado** | — |
 | **Descartado** | Las alternativas 3.5 a 3.10 del ADR, cada una con su motivo. |
-| **Verificación** | Revisión de la coherencia con el ADR-0002 (secciones 2.4, 2.5 y 4), CU-09 y el código del outbox. Está **pendiente la aprobación del equipo**. |
+| **Verificación** | Revisión de la coherencia con el ADR-0002 (secciones 2.4, 2.5 y 4), CU-09 y el código del outbox. El equipo lo aprobó el 12/10, incluidas las tres decisiones nuevas (la tabla `mensajes_fallidos` con su registrador, `IIntegrationEventPublisher` por módulo y el sobre en cabeceras AMQP). |
 
 # **4\. Historial de versiones**
 

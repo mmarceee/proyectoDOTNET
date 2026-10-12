@@ -1,6 +1,6 @@
 # **ADR-0003 · Outbox, mensajería y consistencia entre módulos**
 
-| Estado | Propuesto, versión 1.0 — pendiente de aprobación del equipo antes del 15/10. La tabla outbox (sección 2.1) se acordó con Lucas Ottonello el 12/10 y ya está implementada. |
+| Estado | Aceptado — aprobado por el equipo el 12/10/2026. La tabla outbox (secciones 2.1 y 2.2) ya está implementada; el resto se implementa para el 29/10 (sección 7). |
 | :---- | :---- |
 | **Fecha** | 30 de septiembre de 2026 (actualizado el 12 de octubre de 2026) |
 | **Autor** | Ezequiel Marcenal |
@@ -288,3 +288,4 @@ Las preguntas abiertas de la versión 0.1 quedaron resueltas:
 | :---: | :---: | :---- | :---- |
 | 0.1 | 30/09/2026 | Propuesta inicial. | Ezequiel Marcenal |
 | 1.0 | 12/10/2026 | Se completa la decisión: el outbox sin filtro de inquilino y con el inquilino del sobre tomado de la sesión (`AgregarAlOutbox`), columnas e índice de la tabla, `IIntegrationEventPublisher` por módulo, semántica de entrega y orden, clave de la inbox, reintentos con colas de espera, cola de fallidos con registrador y tabla `mensajes_fallidos` para CU-09, propiedades AMQP del mensaje, retención, observabilidad y estado de la verificación. Se agregan las alternativas 3.5 a 3.10 y se resuelven las preguntas abiertas. | Ezequiel Marcenal |
+| 1.1 | 12/10/2026 | Aprobado por el equipo (Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes), incluidos la tabla `mensajes_fallidos` con su registrador, `IIntegrationEventPublisher` por módulo y el sobre en cabeceras AMQP. | Ezequiel Marcenal |
