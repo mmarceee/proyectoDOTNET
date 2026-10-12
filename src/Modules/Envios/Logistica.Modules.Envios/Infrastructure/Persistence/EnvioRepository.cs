@@ -1,4 +1,5 @@
 using Logistica.Modules.Envios.Domain.Envios;
+using Logistica.Modules.Envios.Contracts.Events;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
@@ -50,6 +51,14 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         db.OutboxMessages.Add(Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage.Crear(operadorId,
             "EnvioAsignadoARuta.v1", new { MessageId = messageId, OperadorId = operadorId, EnvioId = envioId,
                 RutaId = rutaId, ResponsableId = responsableId, OcurridoEn = ahora, Origen = "Backoffice", Version = 1 }, ahora, messageId));
+    }
+
+    public void RegistrarDesasignacion(Guid operadorId, Guid comercioId, Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
+    {
+        var mensaje = new EnvioDesasignadoDeRuta(Guid.CreateVersion7(), operadorId, comercioId,
+            envioId, rutaId, responsableId, ahora);
+        db.OutboxMessages.Add(Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage.Crear(
+            operadorId, "EnvioDesasignadoDeRuta.v1", mensaje, ahora, mensaje.MessageId));
     }
 
 }

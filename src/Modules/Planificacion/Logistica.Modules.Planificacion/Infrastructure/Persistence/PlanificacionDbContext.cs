@@ -12,4 +12,5 @@ internal sealed class PlanificacionDbContext(DbContextOptions<PlanificacionDbCon
     public DbSet<Ruta> Rutas => Set<Ruta>();
     public DbSet<Parada> Paradas => Set<Parada>();
     public DbSet<ValidacionRuta> Validaciones => Set<ValidacionRuta>();
+    public DbSet<RetiroEnvioRuta> Retiros => Set<RetiroEnvioRuta>();
 }

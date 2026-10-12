@@ -52,6 +52,19 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
                 .ToList());
     }
 
+    public async Task DesasignarDeRutaAsync(Guid rutaId, Guid envioId, Guid? responsableId, CancellationToken ct)
+    {
+        var envio = await envios.ObtenerAsync(envioId, ct) ?? throw new DomainException("El envío no está disponible.");
+        if (envio.Estado != EstadoEnvio.AsignadoARuta)
+            throw new DomainException("Sólo se puede desasignar un envío que esté AsignadoARuta.");
+        var ahora = reloj.GetUtcNow();
+        // T4 conserva zona, franja y fecha programada; sólo cambia el estado y registra el hecho.
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora,
+            detalle: $"Quitado de la ruta {rutaId}.");
+        envios.RegistrarDesasignacion(envio.OperadorId, envio.ComercioId, envio.Id, rutaId, responsableId, ahora);
+        await envios.GuardarCambiosAsync(ct);
+    }
+
     public async Task RecibirEnDepositoAsync(Guid envioId, Guid? responsableId, CancellationToken ct)
     {
         var envio = await envios.ObtenerAsync(envioId, ct)

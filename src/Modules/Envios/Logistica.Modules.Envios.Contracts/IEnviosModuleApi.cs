@@ -13,4 +13,6 @@ public interface IEnviosModuleApi
     Task RecibirEnDepositoAsync(Guid envioId, Guid? responsableId, CancellationToken ct);
     Task<IReadOnlyList<EnvioPlanificable>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct);
     Task AsignarARutaAsync(Guid rutaId, IReadOnlyList<AsignacionEnvioRuta> asignaciones, Guid? responsableId, CancellationToken ct);
+    // T4. Planificación comprueba pertenencia y estado de la ruta dentro de la transacción compartida.
+    Task DesasignarDeRutaAsync(Guid rutaId, Guid envioId, Guid? responsableId, CancellationToken ct);
 }

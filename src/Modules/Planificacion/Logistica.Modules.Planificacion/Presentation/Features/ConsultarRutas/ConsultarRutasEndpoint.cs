@@ -14,5 +14,7 @@ internal static class ConsultarRutasEndpoint
         group.MapGet("/rutas/{id:guid}", async (Guid id, ConsultarRutasHandler service, CancellationToken ct) => Results.Ok(await service.DetalleAsync(id, ct)));
         group.MapGet("/rutas/{id:guid}/validaciones", async (Guid id, int? pagina, ConsultarRutasHandler service, CancellationToken ct)
             => Results.Ok(await service.ValidacionesAsync(id, pagina ?? 1, ct)));
+        group.MapGet("/rutas/{id:guid}/retiros", async (Guid id, int? pagina, ConsultarRutasHandler service, CancellationToken ct)
+            => Results.Ok(await service.RetirosAsync(id, pagina ?? 1, ct)));
     }
 }

@@ -39,6 +39,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
     public RutaResponse? Ruta { get; private set; }
     public EvaluacionRutaResponse? Evaluacion { get; private set; }
     public IReadOnlyList<ValidacionRutaResponse> Historial { get; private set; } = [];
+    public IReadOnlyList<RetiroEnvioRutaResponse> Retiros { get; private set; } = [];
     public bool Desarrollo => acceso.Desarrollo;
     public bool Editable => Ruta is null || Ruta.Estado == "Planificada";
     public bool CambioDatos => Ruta is not null && (Ruta.Fecha != Fecha || Ruta.RepartidorId != RepartidorId || Ruta.VehiculoId != VehiculoId);
@@ -191,7 +192,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
         return ModelState.IsValid;
     }
     private static bool Esperada(Exception e) => e is DomainException or ConflictoRutaException or RutaNoEncontradaException;
-    private void MostrarError(Exception e)
+    protected void MostrarError(Exception e)
     {
         SeccionResultado = "errores-ruta";
         ModelState.AddModelError(string.Empty, e.Message);
@@ -201,7 +202,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
             ModelState.Remove(nameof(Seleccion));
         }
     }
-    private async Task CargarFrescoAsync(CancellationToken ct)
+    protected async Task CargarFrescoAsync(CancellationToken ct)
     {
         await using var scope = scopes.CreateAsyncScope();
         await CargarAsync(scope.ServiceProvider.GetRequiredService<ConsultarRutasHandler>(),
@@ -223,6 +224,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
         {
             Ruta = await lectorRutas.DetalleAsync(id, ct);
             Historial = await lectorRutas.ValidacionesAsync(id, 1, ct);
+            Retiros = await lectorRutas.RetirosAsync(id, 1, ct);
             NumerosEnvio = await lectorRutas.NumerosEnvioAsync(Ruta.Paradas.Select(p => p.EnvioId)
                 .Concat(Historial.SelectMany(v => v.Bultos).Select(b => b.EnvioId)).Distinct().ToArray(), ct);
             // Una nueva confirmación debe usar la revisión recién mostrada, sin reenviar automáticamente.

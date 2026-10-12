@@ -98,7 +98,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text AND "Contenido"::jsonb->>'MessageId'="Id"::text""", envio.Id));
         var pagina = await client.GetAsync($"/backoffice/rutas/{ruta.Id}");
         Assert.Equal(HttpStatusCode.OK, pagina.StatusCode);
-        Assert.Contains("Historial de validaciones", await pagina.Content.ReadAsStringAsync());
+        Assert.Contains("Historial de la ruta", await pagina.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -294,7 +294,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         await ExigirSinAsignacionAsync(envio.Id);
         var confirmado = await client.PostAsync("/backoffice/rutas/nueva?handler=Confirmar", new FormUrlEncodedContent(campos));
         Assert.Equal(HttpStatusCode.OK, confirmado.StatusCode);
-        Assert.Contains("Historial de validaciones", await confirmado.Content.ReadAsStringAsync());
+        Assert.Contains("Historial de la ruta", await confirmado.Content.ReadAsStringAsync());
         Assert.Contains("Ruta creada y envíos asignados correctamente.", WebUtility.HtmlDecode(await confirmado.Content.ReadAsStringAsync()));
         Assert.Equal("AsignadoARuta", await ScalarAsync<string>("""SELECT "Estado" FROM envios."Envios" WHERE "Id"=@id""", envio.Id));
         var sinToken = await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(new(2035, 2, 5), envio.Id));
@@ -350,11 +350,11 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         campos["ModalEnvios"] = "false";
         campos.Remove("Texto");
         Assert.Contains(">Modificar</button>", datosFijos);
-        Assert.DoesNotContain(">Cancelar</button>", datosFijos);
+        Assert.DoesNotContain("handler=CancelarDatos", datosFijos);
         var editar = await client.PostAsync($"{detalle}?handler=EditarDatos", new FormUrlEncodedContent(campos));
         var editarHtml = await editar.Content.ReadAsStringAsync();
         Assert.Contains("class=\"btn btn-success\"", editarHtml);
-        Assert.Contains(">Cancelar</button>", editarHtml);
+        Assert.Contains("handler=CancelarDatos", editarHtml);
         Assert.DoesNotContain(">Validar selección</button>", editarHtml);
         campos["EditandoDatos"] = "true";
         campos["Fecha"] = "";
@@ -365,7 +365,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         var canceladoHtml = await cancelado.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, cancelado.StatusCode);
         Assert.DoesNotContain("validation-summary-errors", canceladoHtml);
-        Assert.DoesNotContain(">Cancelar</button>", canceladoHtml);
+        Assert.DoesNotContain("handler=CancelarDatos", canceladoHtml);
         Assert.Contains($"value=\"{otroEnvio.Id}\" checked", canceladoHtml);
         var sinModificar = (await client.GetFromJsonAsync<RutaResponse>($"/api/planificacion/rutas/{rutaId}"))!;
         Assert.Equal(new DateOnly(2035, 2, 4), sinModificar.Fecha);
@@ -387,13 +387,13 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
 
         var sinCambios = await client.PostAsync($"{detalle}?handler=Modificar", new FormUrlEncodedContent(campos));
         Assert.Contains("No hay cambios para guardar.", WebUtility.HtmlDecode(await sinCambios.Content.ReadAsStringAsync()));
-        Assert.Contains(">Cancelar</button>", await sinCambios.Content.ReadAsStringAsync());
+        Assert.Contains("handler=CancelarDatos", await sinCambios.Content.ReadAsStringAsync());
         campos["RepartidorId"] = OtroRepartidor.ToString();
         campos["VehiculoId"] = OtroVehiculo.ToString();
         var modificado = await client.PostAsync($"{detalle}?handler=Modificar", new FormUrlEncodedContent(campos));
         Assert.Equal(HttpStatusCode.OK, modificado.StatusCode);
         Assert.Contains("Fecha y recursos guardados correctamente.", await modificado.Content.ReadAsStringAsync());
-        Assert.DoesNotContain(">Cancelar</button>", await modificado.Content.ReadAsStringAsync());
+        Assert.DoesNotContain("handler=CancelarDatos", await modificado.Content.ReadAsStringAsync());
         var ruta = (await client.GetFromJsonAsync<RutaResponse>($"/api/planificacion/rutas/{rutaId}"))!;
         Assert.Equal(OtroRepartidor, ruta.RepartidorId);
         Assert.Equal(OtroVehiculo, ruta.VehiculoId);
@@ -527,6 +527,8 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         public Task<IReadOnlyList<ValidacionRuta>> ValidacionesAsync(Guid id, int pagina, CancellationToken ct) => original.ValidacionesAsync(id, pagina, ct);
         public void Agregar(Ruta ruta) => original.Agregar(ruta);
         public void Agregar(ValidacionRuta validacion) => original.Agregar(validacion);
+        public Task<IReadOnlyList<RetiroEnvioRuta>> RetirosAsync(Guid id, int pagina, CancellationToken ct) => original.RetirosAsync(id, pagina, ct);
+        public void Agregar(RetiroEnvioRuta retiro) => original.Agregar(retiro);
         public Task GuardarAsync(CancellationToken ct) => throw new InvalidOperationException("Fallo inyectado después de guardar Envíos.");
     }
 }

@@ -27,6 +27,10 @@ internal sealed class RutaRepository(PlanificacionDbContext db) : IRutaRepositor
         => await db.Validaciones.AsNoTracking().Include(v => v.Bultos).Where(v => v.RutaId == rutaId)
             .OrderByDescending(v => v.RevisionRuta).Skip((pagina - 1) * 20).Take(20).ToListAsync(ct);
     public void Agregar(Ruta ruta) => db.Rutas.Add(ruta);
+    public async Task<IReadOnlyList<RetiroEnvioRuta>> RetirosAsync(Guid rutaId, int pagina, CancellationToken ct)
+        => await db.Retiros.AsNoTracking().Where(r => r.RutaId == rutaId).OrderByDescending(r => r.RevisionRuta)
+            .Skip((pagina - 1) * 20).Take(20).ToListAsync(ct);
+    public void Agregar(RetiroEnvioRuta retiro) => db.Retiros.Add(retiro);
     public void Agregar(ValidacionRuta validacion) => db.Validaciones.Add(validacion);
     public Task GuardarAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }
