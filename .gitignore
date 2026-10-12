@@ -7,6 +7,10 @@
 **/bin/
 **/obj/
 
+# Resultados de pruebas y reporte de cobertura
+TestResults/
+/coverage/
+
 # Configuración local
 .env
 

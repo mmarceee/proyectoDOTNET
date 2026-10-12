@@ -105,8 +105,24 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | — |
 | **Verificación** | Revisión contra el código y el ADR-0002. |
 
+## **3.6 Reporte de cobertura en el pipeline (opcional 7.2)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `coverage.runsettings` (nuevo), `.config/dotnet-tools.json`, `.github/workflows/ci.yml`, `scripts/test-en-docker.sh`, `.gitignore`, `README.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cumplir la condición del opcional de cobertura: "reporte publicado por el pipeline", medido sobre las capas de dominio y aplicación. |
+| **Cómo se trabajó** | La IA propuso el enfoque y escribió la configuración. Ezequiel corrió el script en Docker y verificó el reporte. |
+| **Aceptado sin modificaciones** | Medir con el colector coverlet (ya referenciado en los proyectos de prueba), filtrado a los namespaces `Domain` y `Application` de los módulos; unir los tres proyectos de prueba con ReportGenerator como herramienta local; publicar el resumen en la página de la ejecución y el reporte HTML como el artefacto `reporte-cobertura`; generar el mismo reporte en `coverage/` desde `scripts/test-en-docker.sh`. |
+| **Modificado** | — |
+| **Descartado** | Medir toda la solución: incluiría Infrastructure, Presentation y migraciones, y el número no diría nada sobre lo que pide el opcional. Usar la acción de GitHub de ReportGenerator: la herramienta local da el mismo reporte en el CI y en la máquina de cada uno. Un umbral que haga fallar el pipeline: se agrega cuando se acerque el 12/11. |
+| **Verificación** | Ejecución de `scripts/test-en-docker.sh` del 12/10: 4 ensamblados y 38 clases medidas; cobertura de líneas del 91,5 % (388 de 424) y de ramas del 74,5 % (258 de 346). El reporte en el CI se verifica en el primer PR. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 09/10/2026 | Versión inicial: criterios y entradas del aislamiento por inquilino (hito del 15/10). | Ezequiel Marcenal |
+| 0.2 | 12/10/2026 | Entrada del reporte de cobertura en el pipeline. | Ezequiel Marcenal |
