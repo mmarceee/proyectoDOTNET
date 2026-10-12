@@ -153,7 +153,7 @@ Con el contexto del request, el interceptor rechaza la escritura con `TenantMism
 
 ### Respuesta HTTP ante otro inquilino
 
-Leer un recurso ajeno da `null`, igual que uno inexistente, y el endpoint responde **404 genérico**. Según el ADR-0002 (sección 2.9), una `TenantMismatchException` en una escritura se registra en el log para auditoría y también responde 404, nunca 403. Esa traducción todavía no está implementada (sección 5).
+Leer un recurso ajeno da `null`, igual que uno inexistente, y el endpoint responde **404 genérico**. Una `TenantMismatchException` en una escritura responde **el mismo 404 sin cuerpo**, nunca 403, y queda registrada en el log con el método, la ruta, el inquilino de la sesión y la entidad rechazada (ADR-0002, sección 2.9). La traduce `TenantMismatchExceptionHandler`, en `Logistica.Api/Errores`.
 
 ---
 
@@ -192,7 +192,6 @@ Para verlas fallar: comentar el `throw` de la regla 3 en el interceptor y correr
 - **Identity** (Cristian): reemplazar `TenantProvisorio` por una implementación que lea los claims de la cookie. El filtro y el interceptor no cambian, porque sólo dependen de `ICurrentTenant`.
 - **Texto de los ADR:** el ADR-0002 (secciones 2.1 y 2.2) y el ADR-0001 hablan de una extensión `ApplyTenantQueryFilters()`. La implementación aplica el filtro dentro de `ModuleDbContext.OnModelCreating`, y las dos reglas que el ADR exige se cumplen igual. Hay que corregir el texto.
 - **Prueba estructural, parte (a)** (ADR-0002, sección 4): que toda entidad con una propiedad `OperadorId` implemente `IOperadorOwned`, salvo el Outbox y `Usuario`.
-- **Traducir `TenantMismatchException` a 404** en el manejo de errores de la API, con registro en el log.
 - **Regla de arquitectura** que impida `IgnoreQueryFilters`, `ExecuteUpdate`, `ExecuteDelete` y el SQL crudo fuera de los lugares autorizados (ADR-0002, sección 4, a confirmar).
 
 ---
@@ -215,3 +214,4 @@ Para verlas fallar: comentar el `throw` de la regla 3 en el interceptor y correr
 | :---: | :---: | :---- |
 | 1.0 | 09/10/2026 | Versión inicial: filtro global "Tenant", `TenantSaveChangesInterceptor`, `InquilinoFijo`, retiro de los filtros manuales y pruebas de aislamiento. |
 | 1.1 | 12/10/2026 | El outbox queda fuera del filtro; sus metadatos de inquilino salen de la sesión. |
+| 1.2 | 12/10/2026 | `TenantMismatchException` responde 404 sin cuerpo y queda en el log. |

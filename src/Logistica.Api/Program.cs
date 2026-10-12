@@ -13,8 +13,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 
-// Errores como ProblemDetails; las reglas de negocio violadas responden 400.
+// Errores como ProblemDetails; las reglas de negocio violadas responden 400. Una escritura sobre datos
+// de otro inquilino responde 404, igual que un recurso inexistente (ADR-0002, sección 2.9).
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<TenantMismatchExceptionHandler>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddExceptionHandler<ConcurrenciaExceptionHandler>();
 

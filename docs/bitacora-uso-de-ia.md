@@ -150,6 +150,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Las alternativas 3.5 a 3.10 del ADR, cada una con su motivo. |
 | **Verificación** | Revisión de la coherencia con el ADR-0002 (secciones 2.4, 2.5 y 4), CU-09 y el código del outbox. El equipo lo aprobó el 12/10, incluidas las tres decisiones nuevas (la tabla `mensajes_fallidos` con su registrador, `IIntegrationEventPublisher` por módulo y el sobre en cabeceras AMQP). |
 
+## **3.9 Respuesta 404 ante una escritura de otro inquilino**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `src/Logistica.Api/Errores/TenantMismatchExceptionHandler.cs` (nuevo), `Program.cs`; prueba `Tenancy/EscrituraDeOtroInquilinoTests` (nueva) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cumplir la sección 2.9 del ADR-0002: una escritura sobre datos de otro inquilino responde igual que un recurso inexistente, y queda registrada para auditoría. Hasta ahora terminaba en un 500. |
+| **Cómo se trabajó** | A pedido de Ezequiel, la IA escribió el manejador siguiendo el patrón de `DomainExceptionHandler` y una prueba de integración, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | Un `IExceptionHandler` que responde 404 **sin cuerpo**, igual que los `NotFound()` de los endpoints, y registra un *warning* con método, ruta, inquilino de la sesión y la excepción; el inquilino se pide al request porque los manejadores son singleton. En la prueba, un repositorio que entrega una recepción de otro operador, para que la rechace el interceptor real. |
+| **Modificado** | — |
+| **Descartado** | Responder 404 con ProblemDetails: el cuerpo distinto delataría que el recurso existe. Responder 403: lo prohíbe el ADR. Lanzar la excepción a mano desde un endpoint de prueba: no probaría que la excepción del interceptor llega al manejador. |
+| **Verificación** | Pruebas en Docker: 179 pruebas (40 unitarias, 54 de arquitectura y 85 de integración), todas pasan. La prueba nueva compara la respuesta con la de un envío inexistente y verifica que no quedaron ni la recepción ni la transición T2. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -158,3 +173,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.2 | 12/10/2026 | Entrada del reporte de cobertura en el pipeline. | Ezequiel Marcenal |
 | 0.3 | 12/10/2026 | Entrada de la tabla outbox por módulo. | Ezequiel Marcenal |
 | 0.4 | 12/10/2026 | Entrada del ADR-0003 versión 1.0. | Ezequiel Marcenal |
+| 0.5 | 12/10/2026 | Entrada de la respuesta 404 ante una escritura de otro inquilino. | Ezequiel Marcenal |
