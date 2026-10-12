@@ -851,7 +851,7 @@ Creacion, Agregado, Modificacion, Despacho, CambioFranjaProgramado
 
 # **Ejecución en calle, intentos, pruebas e incidencias operativas**
 
-*RF 18 (descarga offline) y RF 24 (resolución de conflictos de sincronización) no agregan clases de dominio: son comportamiento de la app y contenido del ADR de sincronización.*
+*RF 18 (descarga offline) es comportamiento de la app. RF 24 (resolución de conflictos de sincronización) agrega `OperacionDispositivo`, el registro de cada operación sincronizada con su resultado (ADR-0004, sección 2.2); se detalla al implementarlo para el 22/10.*
 
 ## **Clases**
 
