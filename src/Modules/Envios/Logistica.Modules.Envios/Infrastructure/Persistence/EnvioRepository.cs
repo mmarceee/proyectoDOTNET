@@ -52,6 +52,11 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         db.AgregarAlOutbox(EnvioAsignadoARuta.Tipo,
             new EnvioAsignadoARuta(envioId, rutaId, responsableId, nameof(OrigenEvento.Backoffice)), ahora);
     }
+    public void RegistrarCancelacion(Envio envio, string? motivo, DateTimeOffset ahora)
+    {
+        db.AgregarAlOutbox(EnvioCancelado.Tipo,
+            new EnvioCancelado(envio.Id, envio.Numero, motivo, nameof(OrigenEvento.PortalComercio)), ahora);
+    }
 
     public void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
     {
