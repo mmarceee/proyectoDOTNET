@@ -13,7 +13,9 @@ internal interface IEnvioRepository
 
     void Agregar(Envio envio);
     Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct);
-    void RegistrarAsignacion(Guid operadorId, Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);
+
+    // Deja el evento de la asignación en el outbox; se guarda con el próximo GuardarCambiosAsync, junto con el envío.
+    void RegistrarAsignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);
 
     Task GuardarCambiosAsync(CancellationToken ct);
 }

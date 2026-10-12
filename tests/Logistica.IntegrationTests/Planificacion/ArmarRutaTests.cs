@@ -95,7 +95,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         Assert.Single(historial);
         Assert.Equal(2.05m, Assert.Single(historial[0].Bultos).PesoKg);
         Assert.Equal(30m, historial[0].Bultos[0].LargoCm);
-        Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text AND "Contenido"::jsonb->>'MessageId'="Id"::text""", envio.Id));
+        Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text AND "Tipo"='EnvioAsignadoARuta.v1' AND "PublicadoEn" IS NULL""", envio.Id));
         var pagina = await client.GetAsync($"/backoffice/rutas/{ruta.Id}");
         Assert.Equal(HttpStatusCode.OK, pagina.StatusCode);
         Assert.Contains("Historial de validaciones", await pagina.Content.ReadAsStringAsync());

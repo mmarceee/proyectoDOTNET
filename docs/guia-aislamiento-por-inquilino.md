@@ -23,6 +23,7 @@ En el código:
 - **Cada fila sabe de quién es.** La entidad lleva `OperadorId` e implementa `IOperadorOwned`; si también la consulta el comercio, lleva `ComercioId` e implementa `IComercioOwned`.
 - **Cada request sabe quién es el inquilino.** Lo expone `ICurrentTenant` (scoped). Hoy lo implementa `TenantProvisorio`; cuando esté Identity, saldrá de los claims de la cookie.
 - `Operador` y `Comercio` son **globales**: no implementan los marcadores. `Usuario` (Identity) tampoco tiene filtro (ADR-0002, sección 2.4).
+- **El outbox tampoco tiene filtro** (ADR-0002, sección 2.4): el publicador lo lee sin inquilino. `OperadorId` y `ComercioId` son metadatos del mensaje, y los pone `ModuleDbContext.AgregarAlOutbox` desde la sesión, que es el único camino para escribirlo. Sin operador, falla cerrado.
 
 ---
 
@@ -213,3 +214,4 @@ Para verlas fallar: comentar el `throw` de la regla 3 en el interceptor y correr
 | Versión | Fecha | Descripción |
 | :---: | :---: | :---- |
 | 1.0 | 09/10/2026 | Versión inicial: filtro global "Tenant", `TenantSaveChangesInterceptor`, `InquilinoFijo`, retiro de los filtros manuales y pruebas de aislamiento. |
+| 1.1 | 12/10/2026 | El outbox queda fuera del filtro; sus metadatos de inquilino salen de la sesión. |

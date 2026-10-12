@@ -1,5 +1,6 @@
-using System.Reflection;
 using System.Data.Common;
+using System.Diagnostics;
+using System.Reflection;
 using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,6 +28,21 @@ public abstract class ModuleDbContext(DbContextOptions options, string schema, U
 
     // Lo lee TenantSaveChangesInterceptor para validar las escrituras.
     internal ICurrentTenant Tenant => tenant;
+
+    // La tabla outbox del módulo (ADR-0003, sección 2.1). Sin filtro "Tenant": la lee el publicador,
+    // que corre sin inquilino. Para escribir en ella, AgregarAlOutbox.
+    public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
+
+    // Registra un evento de integración en el outbox del módulo; se confirma con el próximo SaveChanges,
+    // junto con el cambio que lo origina, o se revierte con él (ADR-0003, sección 2.2). El inquilino del
+    // sobre sale de la sesión y nunca del llamador (ADR-0002, sección 2.5); sin operador, falla cerrado.
+    public void AgregarAlOutbox<T>(string tipo, T contenido, DateTimeOffset ocurridoEn)
+    {
+        var operadorId = tenant.OperadorId
+            ?? throw new TenantMismatchException($"Se intentó registrar {tipo} en el outbox sin un operador en la sesión.");
+
+        Outbox.Add(OutboxMessage.Crear(tipo, contenido, ocurridoEn, operadorId, tenant.ComercioId, Activity.Current?.Id));
+    }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -82,7 +98,10 @@ public abstract class ModuleDbContext(DbContextOptions options, string schema, U
             entity.Ignore(nameof(Entity.DomainEvents));
         }
 
-        // Los marcadores también se aplican a filas de infraestructura que no heredan Entity, como OutboxMessage.
+        ConfigurarOutbox(modelBuilder);
+
+        // Recorre todos los tipos con el marcador, hereden o no de Entity. El outbox no lo tiene, así que
+        // queda sin filtro, como pide el ADR-0002 (sección 2.4).
         foreach (var entityType in modelBuilder.Model.GetEntityTypes()
                      .Where(t => typeof(IOperadorOwned).IsAssignableFrom(t.ClrType)))
         {
@@ -97,6 +116,20 @@ public abstract class ModuleDbContext(DbContextOptions options, string schema, U
                 AplicarFiltro(nameof(AplicarFiltroOperador), entityType.ClrType, modelBuilder);
             }
         }
+    }
+
+    // Una tabla outbox_messages por módulo, en el schema del módulo (HasDefaultSchema).
+    private static void ConfigurarOutbox(ModelBuilder modelBuilder)
+    {
+        var outbox = modelBuilder.Entity<OutboxMessage>();
+        outbox.ToTable("outbox_messages");
+        outbox.HasKey(m => m.Id);
+        outbox.Property(m => m.Id).ValueGeneratedNever();
+        outbox.Property(m => m.Tipo).HasMaxLength(200);
+        outbox.Property(m => m.TraceParent).HasMaxLength(55);
+
+        // El publicador busca los pendientes por orden de llegada: el índice parcial sólo guarda esos.
+        outbox.HasIndex(m => m.OcurridoEn).HasFilter("\"PublicadoEn\" IS NULL");
     }
 
     // El tipo de la entidad se conoce recien en ejecucion: se llama al metodo generico de este tipo.

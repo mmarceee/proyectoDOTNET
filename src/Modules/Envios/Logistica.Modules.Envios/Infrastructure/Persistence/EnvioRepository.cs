@@ -1,3 +1,4 @@
+using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.EntityFrameworkCore;
 
@@ -44,12 +45,11 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             : consulta.Where(e => envioIds.Contains(e.Id));
         return await consulta.OrderBy(e => e.Numero).ToListAsync(ct);
     }
-    public void RegistrarAsignacion(Guid operadorId, Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
-    {
-        var messageId = Guid.CreateVersion7();
-        db.OutboxMessages.Add(Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage.Crear(operadorId,
-            "EnvioAsignadoARuta.v1", new { MessageId = messageId, OperadorId = operadorId, EnvioId = envioId,
-                RutaId = rutaId, ResponsableId = responsableId, OcurridoEn = ahora, Origen = "Backoffice", Version = 1 }, ahora, messageId));
-    }
 
+    // El operador y el comercio del sobre los pone AgregarAlOutbox desde la sesión.
+    public void RegistrarAsignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
+    {
+        db.AgregarAlOutbox(EnvioAsignadoARuta.Tipo,
+            new EnvioAsignadoARuta(envioId, rutaId, responsableId, nameof(OrigenEvento.Backoffice)), ahora);
+    }
 }

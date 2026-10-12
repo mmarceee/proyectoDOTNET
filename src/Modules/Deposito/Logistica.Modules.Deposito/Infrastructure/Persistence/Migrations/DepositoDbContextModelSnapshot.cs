@@ -23,6 +23,44 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Logistica.BuildingBlocks.Infrastructure.Persistence.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Contenido")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("OcurridoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PublicadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("character varying(55)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OcurridoEn")
+                        .HasFilter("\"PublicadoEn\" IS NULL");
+
+                    b.ToTable("outbox_messages", "deposito");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Deposito.Domain.Recepciones.RecepcionDeposito", b =>
                 {
                     b.Property<Guid>("Id")

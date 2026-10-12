@@ -120,9 +120,25 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Medir toda la solución: incluiría Infrastructure, Presentation y migraciones, y el número no diría nada sobre lo que pide el opcional. Usar la acción de GitHub de ReportGenerator: la herramienta local da el mismo reporte en el CI y en la máquina de cada uno. Un umbral que haga fallar el pipeline: se agrega cuando se acerque el 12/11. |
 | **Verificación** | Ejecución de `scripts/test-en-docker.sh` del 12/10: 4 ensamblados y 38 clases medidas; cobertura de líneas del 91,5 % (388 de 424) y de ramas del 74,5 % (258 de 346). El reporte en el CI se verifica en el primer PR. |
 
+## **3.7 Tabla outbox por módulo (ADR-0003)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal (acordado con Lucas Ottonello, que había creado el outbox de CU-40) |
+| **Fecha** | 12/10/2026 |
+| **Archivos** | `OutboxMessage.cs` y `ModuleDbContext.cs` (BuildingBlocks); `EnviosDbContext.cs`, `IEnvioRepository.cs`, `EnvioRepository.cs` y `EnviosModuleApi.cs` (Envíos); `Events/EnvioAsignadoARuta.cs` (nuevo, Envios.Contracts); migraciones `OutboxPorModulo` de Administración, Depósito, Envíos y Planificación; pruebas `OutboxTests` (nueva), `AislamientoPlanificacionTests` y `ArmarRutaTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Alinear el outbox de CU-40 con los ADR: sin filtro "Tenant" (ADR-0002, 2.4), una tabla por módulo registrada desde `ModuleDbContext` (ADR-0003, 2.1) y las columnas del sobre (ADR-0003, 2.6). |
+| **Cómo se trabajó** | La IA detectó el conflicto al revisar CU-40 y redactó la propuesta para el equipo. Lucas la aprobó. Después, la IA escribió el código, generó las migraciones en Docker y corrió las pruebas. |
+| **Aceptado sin modificaciones** | `OutboxMessage` sin `IOperadorOwned`, con `OperadorId`, `ComercioId`, `TraceParent`, `Tipo`, `OcurridoEn`, `Contenido` y `PublicadoEn`; `ModuleDbContext.AgregarAlOutbox` como único punto de escritura, que toma el inquilino de la sesión y falla cerrado; índice parcial de pendientes; evento `EnvioAsignadoARuta` en Contracts; `RegistrarAsignacion` sin el parámetro `operadorId`. |
+| **Modificado** | La prueba del outbox de `AislamientoPlanificacionTests`, que verificaba el filtro, se reemplazó por `OutboxTests`, como pidió Lucas: el publicador lee los pendientes sin inquilino, los metadatos son los de la sesión, sin operador no se puede registrar, el evento se revierte con el cambio y cada módulo tiene su tabla. En `ArmarRutaTests`, la consulta que buscaba el `MessageId` dentro del contenido ahora verifica el tipo y que esté pendiente. |
+| **Descartado** | Mantener el filtro en el outbox: el publicador, sin inquilino, no vería nada, y para leer necesitaría `IgnoreQueryFilters`, que el ADR-0002 prohíbe. Recibir el operador por parámetro: el sobre tiene que salir de la sesión, nunca del llamador. Implementar ahora `IIntegrationEventPublisher`, el publicador y la tabla inbox: corresponden al 29/10. Cambiar `Contenido` a `jsonb`: la conversión de la columna existente complica la migración sin beneficio actual. |
+| **Verificación** | Pruebas en Docker: 178 pruebas (40 unitarias, 54 de arquitectura y 84 de integración), todas pasan, incluida la de CU-40 que comprueba que la asignación y el evento se revierten juntos. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 09/10/2026 | Versión inicial: criterios y entradas del aislamiento por inquilino (hito del 15/10). | Ezequiel Marcenal |
 | 0.2 | 12/10/2026 | Entrada del reporte de cobertura en el pipeline. | Ezequiel Marcenal |
+| 0.3 | 12/10/2026 | Entrada de la tabla outbox por módulo. | Ezequiel Marcenal |
