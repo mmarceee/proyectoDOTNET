@@ -30,9 +30,12 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Reloj del sistema: los handlers lo reciben inyectado para que las pruebas puedan fijar la fecha.
 builder.Services.AddSingleton(TimeProvider.System);
 
-// Inquilino de cada request. Provisorio hasta Identity (15/10).
+// Inquilino de cada request: de la cookie de sesión (ADR-0002, sección 2.5). TenantProvisorio queda sólo como
+// respaldo de Development mientras las pantallas y las pruebas pasan a iniciar sesión.
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ICurrentTenant, TenantProvisorio>();
+builder.Services.AddScoped<TenantProvisorio>();
+builder.Services.AddScoped<ICurrentTenant, TenantDeSesion>();
+builder.Services.AddAuthorization();
 
 // Backoffice: las páginas viven en Logistica.Backoffice y en Presentation/Features de cada módulo.
 // La raíz "/" permite descubrirlas fuera de la carpeta Pages; cada página declara su ruta absoluta
@@ -71,6 +74,11 @@ if (app.Environment.IsDevelopment())
 {
     app.UseWebAssemblyDebugging();
 }
+
+// Lee la cookie de sesión en cada request y arma el usuario, antes de que llegue a cualquier endpoint o página.
+app.UseAuthentication();
+app.UseAuthorization();
+
 
 app.MapStaticAssets();
 
