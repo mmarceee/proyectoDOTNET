@@ -1,0 +1,35 @@
+@page "/cuenta/ingresar"
+@model Logistica.Modules.Administracion.Presentation.Features.IniciarSesion.IngresarModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Ingresar";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <h1 class="h3 mb-4">Ingresar</h1>
+
+        @if (Model.Error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@Model.Error</div>
+        }
+
+        <form method="post">
+            <input type="hidden" asp-for="ReturnUrl" />
+
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label">Correo</label>
+                <input asp-for="Email" class="form-control" autocomplete="username" autofocus />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Contrasena" class="form-label">Contraseña</label>
+                <input asp-for="Contrasena" class="form-control" autocomplete="current-password" />
+                <span asp-validation-for="Contrasena" class="text-danger"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+        </form>
+    </div>
+</div>

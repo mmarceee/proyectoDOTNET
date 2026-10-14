@@ -183,7 +183,7 @@ Las reglas propias del negocio no se duplicarán dentro de los handlers. Por eje
 
 * Application no depende de Infrastructure, Presentation, Entity Framework Core ni ASP.NET Core.
 
-* Infrastructure puede depender de Application y Domain para implementar sus contratos, pero no de Presentation ni de ASP.NET Core.
+* Infrastructure puede depender de Application y Domain para implementar sus contratos, pero no de Presentation ni de ASP.NET Core. Única excepción: ASP.NET Core Identity (namespace Microsoft.AspNetCore.Identity), cuyos tipos de usuarios y roles sobre EF Core son persistencia y no HTTP; viven en Infrastructure/Identity del módulo Administración (guía de la ruta de un caso de uso, sección 2.1).
 
 * Presentation puede depender de Application y de los Contracts, pero no de Infrastructure.
 
@@ -442,4 +442,5 @@ Los puntos 1, 3, 6 y 7 ya están implementados en el esqueleto de la solución (
 | :---- | :---- | :---- | :---- |
 | 1.0 | 24/09/2026 | Versión inicial aceptada. | Lucas Ottonello |
 | 2.0 | 01/10/2026 | Incorpora en el texto los addenda 1 a 5: código compartido, ubicación de endpoints y contratos, comunicación entre módulos, ArchUnitNET, Backoffice y aplicaciones WebAssembly en el mismo host. Decisiones revisadas y aceptadas por Lucas Ottonello el 02/10/2026. | Ezequiel Marcenal |
+| 2.1 | 12/10/2026 | Sección 2.4: excepción para ASP.NET Core Identity en Infrastructure, con su prueba de arquitectura. Pendiente de revisión del equipo. | Cristian Reyes |
 
