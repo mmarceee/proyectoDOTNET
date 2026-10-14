@@ -27,6 +27,7 @@ public static class AdministracionModule
         services.AddScoped<DatosIniciales>();
         services.AddScoped<UsuariosIniciales>();
         services.AddScoped<IServicioSesion, ServicioSesion>();
+        services.AddScoped<Application.Features.SeleccionarOperador.IOperadoresDelComercio, OperadoresDelComercio>();
         services.AddScoped<IRecursosPlanificacionReader, RecursosPlanificacionReader>();
         services.AddScoped<Contracts.IAdministracionModuleApi, AdministracionModuleApi>();
 

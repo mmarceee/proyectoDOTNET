@@ -65,6 +65,21 @@ public class DatosInicialesTests(PostgresApiFactory factory) : IClassFixture<Pos
         Assert.Equal(["CDC-ESTE"], await comoEste.Zonas.Select(z => z.Codigo).ToListAsync());
     }
 
+    // CU-03: antes de elegir operador, la sesión del comercio no tiene inquilino; la consulta autorizada a ignorar el
+    // filtro (ADR-0002, sección 2.4) igual le muestra los dos operadores con los que trabaja.
+    [Fact]
+    public async Task Tienda_Demo_puede_elegir_entre_los_dos_operadores_aunque_todavia_no_tenga_operador()
+    {
+        factory.CreateClient();
+        using var scope = factory.Services.CreateScope();
+        await using var sinOperador = ActivatorUtilities.CreateInstance<AdministracionDbContext>(
+            scope.ServiceProvider, new InquilinoFijo(null, ComercioDemo));
+
+        var operadores = await new OperadoresDelComercio(sinOperador).ActivosAsync(ComercioDemo, CancellationToken.None);
+
+        Assert.Equal([OperadorEste, OperadorDemo], operadores.Select(o => o.Id));
+    }
+
     [Fact]
     public async Task Volver_a_ejecutar_los_datos_iniciales_no_duplica_nada()
     {

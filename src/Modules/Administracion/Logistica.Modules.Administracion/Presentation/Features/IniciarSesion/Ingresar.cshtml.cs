@@ -44,6 +44,14 @@ internal sealed class IngresarModel(IServicioSesion sesion) : PageModel
             return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl! : "/backoffice");
         }
 
+        // CU-03: el usuario de comercio elige el operador antes de ver datos. El ReturnUrl lo acompaña.
+        if (resultado == ResultadoInicioSesion.DebeElegirOperador)
+        {
+            return LocalRedirect(Url.IsLocalUrl(ReturnUrl)
+                ? $"/cuenta/operador?ReturnUrl={Uri.EscapeDataString(ReturnUrl!)}"
+                : "/cuenta/operador");
+        }
+
         Error = resultado == ResultadoInicioSesion.Bloqueada
             ? "La cuenta está bloqueada por varios intentos fallidos. Probá de nuevo en unos minutos."
             : "El correo o la contraseña no son correctos.";
