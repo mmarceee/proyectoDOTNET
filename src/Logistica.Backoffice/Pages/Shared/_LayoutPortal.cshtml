@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Portal del comercio</title>
+    <link rel="stylesheet" href="~/_content/Logistica.Backoffice/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/_content/Logistica.Backoffice/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="border-bottom mb-4 py-3">
+        <div class="container d-flex justify-content-between align-items-center gap-3">
+            <a class="navbar-brand" href="/portal/">Portal del comercio</a>
+            @if (User.Identity?.IsAuthenticated == true && User.IsInRole("UsuarioComercio"))
+            {
+                <form method="post" action="/cuenta/salir" asp-antiforgery="true" class="m-0">
+                    <input type="hidden" name="Portal" value="true" />
+                    <button class="btn btn-outline-secondary btn-sm btn-logout" type="submit">Cerrar sesión</button>
+                </form>
+            }
+        </div>
+    </header>
+    <main class="container pb-3">@RenderBody()</main>
+    <footer class="border-top footer text-muted"><div class="container">&copy; 2026 - VoluptaExpress</div></footer>
+</body>
+</html>

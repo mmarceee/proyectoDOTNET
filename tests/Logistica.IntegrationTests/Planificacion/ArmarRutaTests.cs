@@ -180,11 +180,14 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     }
 
     [Fact]
-    public async Task Sin_identity_el_acceso_normal_falla_cerrado()
+    public async Task Sin_sesion_API_falla_cerrado_y_Backoffice_redirige_al_login()
     {
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { AllowAutoRedirect = false });
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/planificacion/recursos?fecha=2035-01-01")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/backoffice/rutas/nueva")).StatusCode);
+        var pagina = await client.GetAsync("/backoffice/rutas/nueva");
+        Assert.Equal(HttpStatusCode.Redirect, pagina.StatusCode);
+        Assert.Contains("/cuenta/ingresar", pagina.Headers.Location!.ToString());
     }
 
     [Fact]
@@ -521,7 +524,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     private sealed class RepositorioQueFalla(IRutaRepository original) : IRutaRepository
     {
         public Task<Ruta?> ObtenerAsync(Guid id, CancellationToken ct) => original.ObtenerAsync(id, ct);
-        public Task<IReadOnlyList<Ruta>> ListarAsync(DateOnly? fecha, CancellationToken ct) => original.ListarAsync(fecha, ct);
+        public Task<IReadOnlyList<Ruta>> ListarAsync(DateOnly? fecha, EstadoRuta? estado, CancellationToken ct) => original.ListarAsync(fecha, estado, ct);
         public Task<IReadOnlyList<Guid>> EnviosOcupadosAsync(IReadOnlyCollection<Guid> ids, Guid? propia, CancellationToken ct) => original.EnviosOcupadosAsync(ids, propia, ct);
         public Task<IReadOnlyList<string>> RecursosOcupadosAsync(DateOnly fecha, Guid repartidor, Guid vehiculo, Guid? propia, CancellationToken ct) => original.RecursosOcupadosAsync(fecha, repartidor, vehiculo, propia, ct);
         public Task<IReadOnlyList<ValidacionRuta>> ValidacionesAsync(Guid id, int pagina, CancellationToken ct) => original.ValidacionesAsync(id, pagina, ct);

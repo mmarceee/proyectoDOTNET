@@ -96,3 +96,44 @@ button.accept-policy {
     background-color: #800020;
     color: #fff;
 }
+
+.btn-logout {
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--bs-danger, #dc3545);
+  --bs-btn-hover-border-color: var(--bs-danger, #dc3545);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--bs-danger, #dc3545);
+  --bs-btn-active-border-color: var(--bs-danger, #dc3545);
+}
+
+main h1 {
+  text-align: center;
+}
+
+.backoffice-page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+}
+
+.backoffice-page-header > :first-child {
+  grid-column: 2;
+  text-align: center;
+}
+
+.backoffice-page-header > .btn {
+  grid-column: 3;
+  justify-self: end;
+}
+
+@media (max-width: 767.98px) {
+  .backoffice-page-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .backoffice-page-header > :first-child,
+  .backoffice-page-header > .btn {
+    grid-column: 1;
+  }
+}

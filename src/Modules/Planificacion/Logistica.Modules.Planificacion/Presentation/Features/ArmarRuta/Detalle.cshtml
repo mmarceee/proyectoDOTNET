@@ -1,10 +1,14 @@
 @page "/backoffice/rutas/{id:guid}"
 @model DetalleModel
 @{ ViewData["Title"] = "Detalle de ruta"; }
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+<div class="backoffice-page-header mb-4">
     <div>
         <h1>Ruta del @Model.Ruta?.Fecha.ToString("dd/MM/yyyy")</h1>
         <p class="text-muted mb-0">Estado: <strong>@Model.Ruta?.Estado</strong> · Revisión @Model.Ruta?.Revision</p>
+        @if (Model.Ruta?.DespachadaEn is { } despacho)
+        {
+            <p class="text-muted mb-0">Despachada el @despacho.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</p>
+        }
     </div>
     <a href="/backoffice/rutas" class="btn btn-outline-secondary">Volver al listado</a>
 </div>
@@ -52,6 +56,7 @@
 @if (Model.Ruta?.Paradas.Count == 0) { <p class="text-muted text-center py-4">La ruta no tiene envíos. Sus recursos están disponibles.</p> }
 </div>
 </section>
+@await Html.PartialAsync("~/Presentation/Features/DespacharRuta/ConfirmacionDespacho.cshtml", Model)
 @if (Model.Editable) { @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/Formulario.cshtml", Model) }
 @if (Model.Editable) { @await Html.PartialAsync("~/Presentation/Features/QuitarEnvioDeRuta/ConfirmacionQuitarEnvio.cshtml", Model) }
 else { <div asp-validation-summary="All" class="text-danger mb-3" role="alert"></div> }

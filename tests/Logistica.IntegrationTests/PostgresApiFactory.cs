@@ -18,6 +18,8 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
         // y crea las tablas al iniciar, igual que en docker compose.
         builder.UseSetting("ConnectionStrings:Postgres", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "true");
+        // Las pruebas históricas preparan datos sin sesión; las de seguridad desactivan este respaldo.
+        builder.UseSetting("Identity:PermitirTenantProvisorio", "true");
     }
 
     public Task InitializeAsync()

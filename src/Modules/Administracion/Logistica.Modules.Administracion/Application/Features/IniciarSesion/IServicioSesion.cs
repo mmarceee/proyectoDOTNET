@@ -4,7 +4,7 @@ namespace Logistica.Modules.Administracion.Application.Features.IniciarSesion;
 // no conocen Identity ni el Usuario (ADR-0001, sección 2.4).
 internal interface IServicioSesion
 {
-    Task<ResultadoInicioSesion> IniciarAsync(string email, string contrasena);
+    Task<ResultadoInicioSesion> IniciarAsync(string email, string contrasena, TipoAccesoSesion acceso = TipoAccesoSesion.Personal);
 
     // CU-03: vuelve a emitir la cookie con el operador elegido, si el comercio del usuario tiene una relación activa
     // con él. El usuario es el de la sesión: Presentation lo toma de la cookie. false: no es un usuario de comercio
@@ -24,3 +24,5 @@ internal enum ResultadoInicioSesion
     CredencialesInvalidas,
     Bloqueada,
 }
+
+internal enum TipoAccesoSesion { Personal, Comercio, Repartidor }
