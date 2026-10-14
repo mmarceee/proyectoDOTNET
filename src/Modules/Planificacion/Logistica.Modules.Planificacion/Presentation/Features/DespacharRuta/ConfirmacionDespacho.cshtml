@@ -1,0 +1,25 @@
+@model DetalleModel
+@if (Model.Editable && Model.Ruta?.Paradas.Count > 0 && !Model.EditandoDatos)
+{
+    <section class="card mb-4" aria-labelledby="titulo-despacho">
+        <div class="card-body">
+            <h2 id="titulo-despacho" class="h5">Despachar ruta</h2>
+            <form method="post">
+                <input type="hidden" asp-for="RevisionEsperada" />
+                <input type="hidden" asp-for="Fecha" />
+                @if (Model.ConfirmacionDespacho && Model.EvaluacionDespacho is { } carga)
+                {
+                    <p>Restricciones verificadas: @carga.Paradas paradas · @carga.PesoKg kg · @carga.VolumenM3.ToString("0.######") m³.</p>
+                    <p>Al confirmar, la ruta queda disponible para el repartidor y ya no se podrá modificar.</p>
+                    <button asp-page-handler="Despachar" class="btn btn-success">Confirmar despacho</button>
+                    <a href="/backoffice/rutas/@Model.Id" class="btn btn-outline-secondary">Cancelar</a>
+                }
+                else
+                {
+                    <p>Cerrá la planificación después de revisar las paradas. Se comprobarán nuevamente los recursos y las restricciones.</p>
+                    <button asp-page-handler="PrepararDespacho" class="btn btn-primary">Validar despacho</button>
+                }
+            </form>
+        </div>
+    </section>
+}

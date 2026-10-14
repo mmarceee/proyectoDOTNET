@@ -9,11 +9,12 @@ using Logistica.Modules.Planificacion.Application.Exceptions;
 using Logistica.Modules.Planificacion.Application.Services;
 using Logistica.SharedKernel;
 using static Logistica.Modules.Planificacion.Application.Mapping.RutaResponseMapper;
+using static Logistica.Modules.Planificacion.Application.Services.EvaluadorRuta;
 
 namespace Logistica.Modules.Planificacion.Application.Features.ArmarRuta;
 
 internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionModuleApi administracion,
-    IEnviosModuleApi envios, PreparadorEnviosRuta preparador, IConfirmacionPlanificacion confirmacion,
+    IEnviosModuleApi envios, EvaluadorRuta evaluador, IConfirmacionPlanificacion confirmacion,
     ICurrentTenant tenant, IResponsablePlanificacion responsable, TimeProvider reloj, CalendarioPlanificacion calendario)
 {
     private Guid Operador => tenant.OperadorId ?? throw new DomainException("La sesión no tiene un operador.");
@@ -26,7 +27,7 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
             PlanificadorDeRuta.ExigirFechaVigente(pedido.Fecha, await calendario.HoyAsync(ct));
         var todos = (ruta?.EnvioIds ?? []).Concat(pedido.EnvioIds).ToArray();
         if (todos.Distinct().Count() != todos.Length) throw new DomainException("La selección incluye un envío ya presente o repetido.");
-        var datos = await CargarEvaluacionAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, todos,
+        var datos = await evaluador.CargarAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, todos,
             pedido.EnvioIds, ruta?.Id, ct);
         return Resumen(datos.Evaluacion, datos.Vehiculo, datos.Reglas);
     }
@@ -38,7 +39,7 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
         {
             await administracion.BloquearPlanificacionAsync(ct);
             PlanificadorDeRuta.ExigirFechaVigente(pedido.Fecha, await calendario.HoyAsync(ct));
-            var datos = await CargarEvaluacionAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, pedido.EnvioIds,
+            var datos = await evaluador.CargarAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, pedido.EnvioIds,
                 pedido.EnvioIds, null, ct);
             ExigirValida(datos.Evaluacion);
             var ruta = Ruta.Crear(Operador, pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, datos.Envios, reloj.GetUtcNow());
@@ -59,7 +60,7 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
             var ruta = await ExigirRutaAsync(id, ct); ExigirEditable(ruta, pedido.RevisionEsperada);
             var todos = ruta.EnvioIds.Concat(pedido.EnvioIds).ToArray();
             if (todos.Distinct().Count() != todos.Length) throw new DomainException("Algún envío ya pertenece a la ruta.");
-            var datos = await CargarEvaluacionAsync(ruta.Fecha, ruta.RepartidorId, ruta.VehiculoId, todos, pedido.EnvioIds, ruta.Id, ct);
+            var datos = await evaluador.CargarAsync(ruta.Fecha, ruta.RepartidorId, ruta.VehiculoId, todos, pedido.EnvioIds, ruta.Id, ct);
             ExigirValida(datos.Evaluacion);
             ruta.AgregarEnvios(datos.Envios);
             await AsignarAsync(ruta, pedido.EnvioIds, datos.Envios, ct);
@@ -77,7 +78,7 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
             var ruta = await ExigirRutaAsync(id, ct); ExigirEditable(ruta, pedido.RevisionEsperada);
             if (pedido.Fecha != ruta.Fecha)
                 PlanificadorDeRuta.ExigirFechaVigente(pedido.Fecha, await calendario.HoyAsync(ct));
-            var datos = await CargarEvaluacionAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId,
+            var datos = await evaluador.CargarAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId,
                 ruta.EnvioIds.ToArray(), [], ruta.Id, ct);
             ExigirValida(datos.Evaluacion);
             var anterior = ruta.Revision;
@@ -86,26 +87,6 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
             respuesta = Mapear(ruta, Resumen(datos.Evaluacion, datos.Vehiculo, datos.Reglas));
         }, [], ct);
         return respuesta!;
-    }
-    private async Task<DatosEvaluacion> CargarEvaluacionAsync(DateOnly fecha, Guid repartidorId, Guid vehiculoId,
-        IReadOnlyList<Guid> todos, IReadOnlyList<Guid> nuevos, Guid? propia, CancellationToken ct)
-    {
-        var recursos = await administracion.ConsultarRecursosPlanificacionAsync(fecha, ct);
-        if (!recursos.Repartidores.Any(r => r.Id == repartidorId)) throw new DomainException("El repartidor no existe o está inactivo.");
-        var vehiculoDto = recursos.Vehiculos.SingleOrDefault(v => v.Id == vehiculoId) ?? throw new DomainException("El vehículo no existe o está inactivo.");
-        var ocupados = todos.Count == 0 ? [] : await rutas.RecursosOcupadosAsync(fecha, repartidorId, vehiculoId, propia, ct);
-        if (ocupados.Count > 0) throw new ConflictoRutaException(ocupados[0], "Un recurso dejó de estar disponible. Elegí otro y confirmá nuevamente.", recursos: ocupados);
-        var leidos = await envios.ObtenerParaPlanificacionAsync(todos, ct);
-        var noDisponibles = todos.Where(id => !leidos.Any(e => e.Id == id && e.OperadorId == Operador)).ToList();
-        noDisponibles.AddRange(leidos.Where(e => nuevos.Contains(e.Id) && e.Estado is not ("EnDeposito" or "Reprogramado")).Select(e => e.Id));
-        noDisponibles.AddRange(await rutas.EnviosOcupadosAsync(todos, propia, ct));
-        noDisponibles.AddRange(leidos.Where(e => !nuevos.Contains(e.Id) && e.Estado != "AsignadoARuta").Select(e => e.Id));
-        if (noDisponibles.Count > 0) throw new ConflictoRutaException("EnvioNoDisponible", "Algunos envíos ya no están disponibles. Revisá y confirmá el resto.", noDisponibles.Distinct().ToList());
-        var reglas = await administracion.ObtenerReglasPlanificacionAsync(reloj.GetUtcNow(), ct);
-        var preparados = await preparador.PrepararAsync(todos.Select(id => leidos.Single(e => e.Id == id)).ToList(), fecha, recursos, ct);
-        var vehiculo = new VehiculoRuta(vehiculoDto.Id, vehiculoDto.CapacidadPesoKg, vehiculoDto.CapacidadVolumenM3,
-            vehiculoDto.LargoCargaCm, vehiculoDto.AnchoCargaCm, vehiculoDto.AltoCargaCm);
-        return new(vehiculo, reglas, preparados, PlanificadorDeRuta.Evaluar(fecha, vehiculo, reglas.MaxParadasPorRuta, preparados));
     }
     private Task AsignarAsync(Ruta ruta, IReadOnlyList<Guid> nuevos, IReadOnlyList<EnvioRuta> preparados, CancellationToken ct)
         => envios.AsignarARutaAsync(ruta.Id, nuevos.Select(id => new AsignacionEnvioRuta(id, preparados.Single(e => e.Id == id).Franja?.Id)).ToList(), responsable.Id, ct);
@@ -129,10 +110,4 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
         if (ids is null || (!permitirVacia && ids.Count == 0) || ids.Count > 1000 || ids.Any(id => id == Guid.Empty) || ids.Distinct().Count() != ids.Count)
             throw new DomainException("Seleccioná envíos válidos, sin duplicados (máximo 1000 por solicitud).");
     }
-    private static void ExigirValida(EvaluacionRuta evaluacion)
-    { if (!evaluacion.Valida) throw new RestriccionesRutaException(evaluacion.Restricciones); }
-    private static EvaluacionRutaResponse Resumen(EvaluacionRuta e, VehiculoRuta v, ReglasPlanificacion reglas)
-        => new(e.Valida, e.PesoKg, e.VolumenM3, e.Paradas, v.PesoKg, v.VolumenM3, reglas.MaxParadasPorRuta,
-            e.Restricciones.Select(r => new RestriccionRutaResponse(r.Codigo, r.Mensaje, r.EnvioId, r.BultoId)).ToList());
-    private sealed record DatosEvaluacion(VehiculoRuta Vehiculo, ReglasPlanificacion Reglas, IReadOnlyList<EnvioRuta> Envios, EvaluacionRuta Evaluacion);
 }
