@@ -2,12 +2,13 @@
 @model Logistica.Modules.Administracion.Presentation.Features.IniciarSesion.IngresarModel
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Ingresar";
+    ViewData["Title"] = "Ingresar al Backoffice";
 }
 
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-4">
-        <h1 class="h3 mb-4">Ingresar</h1>
+        <h1 class="h3 mb-4">Ingresar al Backoffice</h1>
+        <p class="text-center text-muted">Acceso para personal del operador.</p>
 
         @if (Model.Error is not null)
         {
@@ -15,8 +16,6 @@
         }
 
         <form method="post">
-            <input type="hidden" asp-for="ReturnUrl" />
-
             <div class="mb-3">
                 <label asp-for="Email" class="form-label">Correo</label>
                 <input asp-for="Email" class="form-control" autocomplete="username" autofocus />

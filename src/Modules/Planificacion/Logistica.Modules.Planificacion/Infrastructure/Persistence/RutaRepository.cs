@@ -8,8 +8,10 @@ internal sealed class RutaRepository(PlanificacionDbContext db) : IRutaRepositor
     // El filtro global Tenant protege raíces, paradas y evidencia, incluidas sus navegaciones.
     private IQueryable<Ruta> Consulta => db.Rutas;
     public Task<Ruta?> ObtenerAsync(Guid id, CancellationToken ct) => Consulta.Include(r => r.Paradas).ThenInclude(p => p.Envios).SingleOrDefaultAsync(r => r.Id == id, ct);
-    public async Task<IReadOnlyList<Ruta>> ListarAsync(DateOnly? fecha, CancellationToken ct)
-        => await Consulta.AsNoTracking().Include(r => r.Paradas).ThenInclude(p => p.Envios).Where(r => fecha == null || r.Fecha == fecha).OrderByDescending(r => r.Fecha).ThenBy(r => r.Id).Take(100).ToListAsync(ct);
+    public async Task<IReadOnlyList<Ruta>> ListarAsync(DateOnly? fecha, EstadoRuta? estado, CancellationToken ct)
+        => await Consulta.AsNoTracking().Include(r => r.Paradas).ThenInclude(p => p.Envios)
+            .Where(r => (fecha == null || r.Fecha == fecha) && (estado == null || r.Estado == estado))
+            .OrderByDescending(r => r.Fecha).ThenBy(r => r.Id).Take(100).ToListAsync(ct);
     public async Task<IReadOnlyList<Guid>> EnviosOcupadosAsync(IReadOnlyCollection<Guid> ids, Guid? propia, CancellationToken ct)
         => await db.EnviosParada.AsNoTracking().Where(p => ids.Contains(p.EnvioId)
             && p.Estado == EstadoParada.Pendiente && p.RutaId != propia).Select(p => p.EnvioId).ToListAsync(ct);

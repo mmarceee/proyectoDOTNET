@@ -10,7 +10,7 @@ internal static class ConsultarRutasEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/rutas", async (DateOnly? fecha, ConsultarRutasHandler service, CancellationToken ct) => Results.Ok(await service.ListarAsync(fecha, ct)));
+        group.MapGet("/rutas", async (DateOnly? fecha, string? estado, ConsultarRutasHandler service, CancellationToken ct) => Results.Ok(await service.ListarAsync(fecha, estado, ct)));
         group.MapGet("/rutas/{id:guid}", async (Guid id, ConsultarRutasHandler service, CancellationToken ct) => Results.Ok(await service.DetalleAsync(id, ct)));
         group.MapGet("/rutas/{id:guid}/validaciones", async (Guid id, int? pagina, ConsultarRutasHandler service, CancellationToken ct)
             => Results.Ok(await service.ValidacionesAsync(id, pagina ?? 1, ct)));

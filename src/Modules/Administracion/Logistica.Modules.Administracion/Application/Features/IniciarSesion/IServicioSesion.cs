@@ -4,7 +4,7 @@ namespace Logistica.Modules.Administracion.Application.Features.IniciarSesion;
 // no conocen Identity ni el Usuario (ADR-0001, sección 2.4).
 internal interface IServicioSesion
 {
-    Task<ResultadoInicioSesion> IniciarAsync(string email, string contrasena);
+    Task<ResultadoInicioSesion> IniciarAsync(string email, string contrasena, TipoAccesoSesion acceso = TipoAccesoSesion.Personal);
 
     Task CerrarAsync();
 }
@@ -15,3 +15,5 @@ internal enum ResultadoInicioSesion
     CredencialesInvalidas,
     Bloqueada,
 }
+
+internal enum TipoAccesoSesion { Personal, Comercio, Repartidor }

@@ -1,4 +1,5 @@
 .page {
+    min-height: 100vh;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -6,7 +7,25 @@
 
 main {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
+
+article { flex: 1; }
+
+.app-footer { padding-top: 1rem; padding-bottom: 1rem; }
+
+.btn-logout {
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #dc3545;
+    --bs-btn-hover-border-color: #dc3545;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #dc3545;
+    --bs-btn-active-border-color: #dc3545;
+}
+
+.top-row ::deep .btn-logout:hover { text-decoration: none; }
 
 .sidebar {
     background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
@@ -38,7 +57,7 @@ main {
 
 @media (max-width: 640.98px) {
     .top-row {
-        justify-content: space-between;
+        justify-content: flex-end;
     }
 
     .top-row ::deep a, .top-row ::deep .btn-link {

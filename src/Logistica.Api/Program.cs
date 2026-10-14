@@ -1,5 +1,6 @@
 using Logistica.Api.Errores;
 using Logistica.Api.Tenancy;
+using Logistica.Api.Seguridad;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Administracion;
 using Logistica.Modules.Deposito;
@@ -77,6 +78,7 @@ if (app.Environment.IsDevelopment())
 
 // Lee la cookie de sesión en cada request y arma el usuario, antes de que llegue a cualquier endpoint o página.
 app.UseAuthentication();
+app.UseMiddleware<AccesoAplicacionesMiddleware>();
 app.UseAuthorization();
 
 

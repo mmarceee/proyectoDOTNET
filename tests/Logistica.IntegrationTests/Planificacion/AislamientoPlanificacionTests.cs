@@ -5,6 +5,8 @@ using Logistica.Modules.Planificacion.Infrastructure.Persistence;
 using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Logistica.Modules.Planificacion.Application.Features.ConsultarRutas;
+using Logistica.Modules.Envios.Contracts;
 
 namespace Logistica.IntegrationTests.Planificacion;
 
@@ -54,6 +56,32 @@ public class AislamientoPlanificacionTests(PostgresApiFactory factory) : IClassF
         }
         await using var leer = Contexto<PlanificacionDbContext>(scope, a);
         Assert.False(await leer.Rutas.AnyAsync(r => r.Id == ruta.Id));
+    }
+
+    [Fact]
+    public async Task Listado_combina_fecha_y_estado_sin_perder_aislamiento()
+    {
+        using var scope = factory.Services.CreateScope();
+        var operador = Guid.NewGuid();
+        var planificada = NuevaRuta(operador);
+        var despachada = NuevaRuta(operador); despachada.Despachar(DateTimeOffset.UtcNow);
+        var enCurso = NuevaRuta(operador); enCurso.Despachar(DateTimeOffset.UtcNow); enCurso.Iniciar();
+        var finalizada = NuevaRuta(operador); finalizada.Despachar(DateTimeOffset.UtcNow); finalizada.Finalizar();
+        var otroDia = NuevaRuta(operador);
+        otroDia.ModificarPlanificacion(planificada.Fecha.AddDays(1), otroDia.RepartidorId, otroDia.VehiculoId);
+        await using var db = Contexto<PlanificacionDbContext>(scope, operador);
+        db.Rutas.AddRange(planificada, despachada, enCurso, finalizada, otroDia);
+        await db.SaveChangesAsync();
+        await GuardarRutaAsync(scope, Guid.NewGuid());
+        var handler = new ConsultarRutasHandler(new RutaRepository(db), scope.ServiceProvider.GetRequiredService<IEnviosModuleApi>());
+        Assert.Equal(5, (await handler.ListarAsync(null, null, default)).Count);
+        Assert.Equal(2, (await handler.ListarAsync(null, "Planificada", default)).Count);
+        Assert.Equal(planificada.Id, Assert.Single(await handler.ListarAsync(planificada.Fecha, "Planificada", default)).Id);
+        Assert.Equal(despachada.Id, Assert.Single(await handler.ListarAsync(null, "Despachada", default)).Id);
+        Assert.Equal(enCurso.Id, Assert.Single(await handler.ListarAsync(null, "EnCurso", default)).Id);
+        Assert.Equal(finalizada.Id, Assert.Single(await handler.ListarAsync(null, "Finalizada", default)).Id);
+        Assert.Empty(await handler.ListarAsync(otroDia.Fecha, "Despachada", default));
+        await Assert.ThrowsAsync<DomainException>(() => handler.ListarAsync(null, "999", default));
     }
 
     // Las pruebas del outbox están en BuildingBlocks/OutboxTests: el outbox no lleva filtro "Tenant" (ADR-0002, sección 2.4).

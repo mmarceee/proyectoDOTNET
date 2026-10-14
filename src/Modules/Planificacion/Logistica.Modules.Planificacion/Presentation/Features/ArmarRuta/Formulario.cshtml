@@ -1,5 +1,5 @@
 @model RutaEditorModel
-@if (Model.Desarrollo) { <div class="alert alert-warning">Modo de desarrollo. Pendiente de integrar tenant y autenticación.</div> }
+@if (Model.Desarrollo) { <div class="alert alert-warning">Modo de desarrollo sin sesión. Se usa el operador de prueba. Iniciá sesión para trabajar con tu usuario y operador.</div> }
 @if (!Model.ModalEnvios)
 {
     <div id="errores-ruta" tabindex="-1" role="alert" asp-validation-summary="All" class="text-danger mb-3"></div>

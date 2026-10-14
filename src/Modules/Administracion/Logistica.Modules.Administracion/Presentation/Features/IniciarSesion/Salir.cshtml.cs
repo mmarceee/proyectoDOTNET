@@ -4,18 +4,20 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Logistica.Modules.Administracion.Presentation.Features.IniciarSesion;
 
-// Cierra la sesión. Sólo por POST, con el token antifalsificación de Razor Pages: un enlace de otro sitio no puede
-// cerrarle la sesión a nadie. Abrirla por GET sólo lleva a la página de inicio de sesión.
+// Cierra la sesión sólo por POST con antiforgery. GET muestra la confirmación, sin cerrar la cookie.
 internal sealed class SalirModel(IServicioSesion sesion) : PageModel
 {
+    [BindProperty(SupportsGet = true)] public bool Portal { get; set; }
+    [BindProperty(SupportsGet = true)] public bool Repartidor { get; set; }
+    private string Login => Repartidor ? "/repartidor/ingresar" : Portal ? "/portal/ingresar" : "/cuenta/ingresar";
     public IActionResult OnGet()
     {
-        return LocalRedirect("/cuenta/ingresar");
+        return User.Identity?.IsAuthenticated == true ? Page() : LocalRedirect(Login);
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
         await sesion.CerrarAsync();
-        return LocalRedirect("/cuenta/ingresar");
+        return LocalRedirect(Login);
     }
 }

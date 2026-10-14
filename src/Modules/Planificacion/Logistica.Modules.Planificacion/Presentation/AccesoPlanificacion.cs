@@ -9,9 +9,13 @@ using Microsoft.Extensions.Hosting;
 namespace Logistica.Modules.Planificacion.Presentation;
 
 internal sealed class AccesoPlanificacion(IHostEnvironment environment, IConfiguration configuration, ICurrentTenant tenant,
-    IAntiforgery antiforgery) : IEndpointFilter, IAsyncPageFilter
+    IAntiforgery antiforgery, IHttpContextAccessor contexto) : IEndpointFilter, IAsyncPageFilter
 {
-    public bool Desarrollo => environment.IsDevelopment() && configuration.GetValue<bool>("Planificacion:HabilitarDesarrolloSinIdentity");
+    // El respaldo sólo aplica sin sesión. Con cookie se validan siempre perfil y tenant real.
+    public bool Desarrollo => environment.IsDevelopment()
+        && configuration.GetValue<bool>("Planificacion:HabilitarDesarrolloSinIdentity")
+        && configuration.GetValue<bool>("Identity:PermitirTenantProvisorio")
+        && contexto.HttpContext?.User.Identity?.IsAuthenticated != true;
     private int? Error(HttpContext http)
     {
         if (!Desarrollo && http.User.Identity?.IsAuthenticated != true) return 401;
@@ -32,7 +36,11 @@ internal sealed class AccesoPlanificacion(IHostEnvironment environment, IConfigu
     public Task OnPageHandlerSelectionAsync(PageHandlerSelectedContext context) => Task.CompletedTask;
     public async Task OnPageHandlerExecutionAsync(PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
     {
-        if (Error(context.HttpContext) is int status) { context.Result = new StatusCodeResult(status); return; }
+        if (Error(context.HttpContext) is int status)
+        {
+            context.Result = status == 401 ? new ChallengeResult() : new StatusCodeResult(status);
+            return;
+        }
         await next();
     }
 }

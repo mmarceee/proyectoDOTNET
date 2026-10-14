@@ -1,7 +1,7 @@
 @page "/backoffice/rutas/{id:guid}"
 @model DetalleModel
 @{ ViewData["Title"] = "Detalle de ruta"; }
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+<div class="backoffice-page-header mb-4">
     <div>
         <h1>Ruta del @Model.Ruta?.Fecha.ToString("dd/MM/yyyy")</h1>
         <p class="text-muted mb-0">Estado: <strong>@Model.Ruta?.Estado</strong> · Revisión @Model.Ruta?.Revision</p>

@@ -1,0 +1,29 @@
+@page "/portal/ingresar"
+@model Logistica.Modules.Administracion.Presentation.Features.IniciarSesion.IngresarPortalModel
+@{
+    Layout = "/Pages/Shared/_LayoutPortal.cshtml";
+    ViewData["Title"] = "Ingresar al Portal";
+}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <h1 class="h3 mb-4">Ingresar al Portal</h1>
+        <p class="text-center text-muted">Acceso para usuarios de comercio.</p>
+        @if (Model.Error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@Model.Error</div>
+        }
+        <form method="post">
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label">Correo</label>
+                <input asp-for="Email" class="form-control" autocomplete="username" autofocus />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Contrasena" class="form-label">Contraseña</label>
+                <input asp-for="Contrasena" class="form-control" autocomplete="current-password" />
+                <span asp-validation-for="Contrasena" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+        </form>
+    </div>
+</div>
