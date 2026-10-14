@@ -17,6 +17,8 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    @if (User.Identity?.IsAuthenticated == true && !User.IsInRole("UsuarioComercio"))
+                    {
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
                             <a class="nav-link text-dark" href="/backoffice">Inicio</a>
@@ -31,6 +33,16 @@
                             <a class="nav-link text-dark" href="/backoffice/rutas">Rutas</a>
                         </li>
                     </ul>
+                    }
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="navbar-text">@User.Identity.Name</span>
+                            <form method="post" action="/cuenta/salir" asp-antiforgery="true" class="m-0">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm btn-logout">Cerrar sesión</button>
+                            </form>
+                        </div>
+                    }
                 </div>
             </div>
         </nav>
@@ -43,7 +55,7 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2026 - VoluptasExpress
+            &copy; 2026 - VoluptaExpress
         </div>
     </footer>
 

@@ -1,4 +1,5 @@
 using Logistica.SharedKernel;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,7 +45,8 @@ public class TenantProvisorioTests(WebApplicationFactory<Program> factory)
     // igual que lo recibiría un handler.
     private ICurrentTenant TenantPara(string? ruta)
     {
-        var scope = factory.Services.CreateScope();
+        var host = factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "true"));
+        var scope = host.Services.CreateScope();
 
         var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
         accessor.HttpContext = ruta is null ? null : new DefaultHttpContext { Request = { Path = ruta } };

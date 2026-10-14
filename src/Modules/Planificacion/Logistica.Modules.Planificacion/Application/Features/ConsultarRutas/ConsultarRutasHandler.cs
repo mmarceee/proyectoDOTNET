@@ -12,7 +12,19 @@ internal sealed class ConsultarRutasHandler(IRutaRepository rutas, IEnviosModule
     public async Task<IReadOnlyDictionary<Guid, string>> NumerosEnvioAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
         => (await envios.ObtenerParaPlanificacionAsync(ids, ct)).ToDictionary(e => e.Id, e => e.Numero);
     public async Task<IReadOnlyList<RutaResponse>> ListarAsync(DateOnly? fecha, CancellationToken ct)
-        => (await rutas.ListarAsync(fecha, ct)).Select(r => Mapear(r)).ToList();
+        => await ListarAsync(fecha, null, ct);
+    public async Task<IReadOnlyList<RutaResponse>> ListarAsync(DateOnly? fecha, string? estado, CancellationToken ct)
+    {
+        EstadoRuta? filtro = null;
+        if (!string.IsNullOrWhiteSpace(estado))
+        {
+            // Sólo nombres del catálogo; no se aceptan valores numéricos del enum.
+            if (!Enum.GetNames<EstadoRuta>().Contains(estado))
+                throw new DomainException("El estado de la ruta no es válido.");
+            filtro = Enum.Parse<EstadoRuta>(estado);
+        }
+        return (await rutas.ListarAsync(fecha, filtro, ct)).Select(r => Mapear(r)).ToList();
+    }
     public async Task<RutaResponse> DetalleAsync(Guid id, CancellationToken ct) => Mapear(await ExigirRutaAsync(id, ct));
     public async Task<IReadOnlyList<ValidacionRutaResponse>> ValidacionesAsync(Guid id, int pagina, CancellationToken ct)
     {

@@ -1,0 +1,29 @@
+@page "/repartidor/ingresar"
+@model Logistica.Modules.Administracion.Presentation.Features.IniciarSesion.IngresarRepartidorModel
+@{
+    Layout = "/Pages/Shared/_LayoutRepartidor.cshtml";
+    ViewData["Title"] = "Ingresar como repartidor";
+}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <h1 class="h3 mb-4">Ingresar como repartidor</h1>
+        <p class="text-center text-muted">Acceso para repartidores del operador.</p>
+        @if (Model.Error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@Model.Error</div>
+        }
+        <form method="post">
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label">Correo</label>
+                <input asp-for="Email" class="form-control" autocomplete="username" autofocus />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Contrasena" class="form-label">Contraseña</label>
+                <input asp-for="Contrasena" class="form-control" autocomplete="current-password" />
+                <span asp-validation-for="Contrasena" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+        </form>
+    </div>
+</div>

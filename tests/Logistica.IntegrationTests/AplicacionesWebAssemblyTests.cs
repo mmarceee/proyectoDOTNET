@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Hosting;
 
 namespace Logistica.IntegrationTests;
 
@@ -17,7 +18,10 @@ public class AplicacionesWebAssemblyTests(WebApplicationFactory<Program> factory
     {
         var app = path.Split('/', StringSplitOptions.RemoveEmptyEntries)[0];
 
-        var html = await factory.CreateClient().GetStringAsync(path);
+        // Este fixture verifica assets y rutas, no autenticación (cubierta con cookie real en PlanificacionIdentityTests).
+        using var host = factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "true"));
+        using var client = host.CreateClient();
+        var html = await client.GetStringAsync(path);
 
         Assert.Contains($"<base href=\"/{app}/\" />", html);
     }
@@ -28,7 +32,8 @@ public class AplicacionesWebAssemblyTests(WebApplicationFactory<Program> factory
     [InlineData("repartidor")]
     public async Task El_runtime_de_Blazor_se_sirve_bajo_la_ruta_de_la_aplicacion(string app)
     {
-        var client = factory.CreateClient();
+        using var host = factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "true"));
+        using var client = host.CreateClient();
         var html = await client.GetStringAsync($"/{app}/");
 
         // El index.html referencia el script de Blazor con su nombre final (con huella de contenido).
@@ -42,7 +47,9 @@ public class AplicacionesWebAssemblyTests(WebApplicationFactory<Program> factory
     [Fact]
     public async Task El_service_worker_del_repartidor_se_sirve_en_su_ruta()
     {
-        var response = await factory.CreateClient().GetAsync("/repartidor/service-worker.js");
+        using var host = factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "true"));
+        using var client = host.CreateClient();
+        var response = await client.GetAsync("/repartidor/service-worker.js");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

@@ -29,6 +29,8 @@ internal sealed class UsuariosIniciales(UserManager<Usuario> usuarios, RoleManag
         await CrearAsync(Usuario.CrearPersonal(demo, "Despacho Demo", "despacho@operador-demo.uy"), Perfil.Despachador);
         await CrearAsync(Usuario.CrearPersonal(este, "Administración Este", "admin@envios-del-este.uy"), Perfil.Administrador);
         await CrearAsync(Usuario.CrearPersonal(este, "Despacho Este", "despacho@envios-del-este.uy"), Perfil.Despachador);
+        await CrearAsync(Usuario.CrearPersonal(demo, "Repartidor Demo", "repartidor@operador-demo.uy"), Perfil.Repartidor);
+        await CrearAsync(Usuario.CrearPersonal(este, "Repartidor Este", "repartidor@envios-del-este.uy"), Perfil.Repartidor);
 
         // Trabaja con los dos operadores: elige uno en la sesión (CU-03).
         await CrearAsync(Usuario.CrearDeComercio(DatosIniciales.ComercioDemoId, "Tienda Demo", "comercio@tiendademo.uy"),

@@ -30,8 +30,11 @@ public static class PlanificacionModule
         services.AddModuleDbContext<PlanificacionDbContext>(configuration.GetConnectionString("Postgres"), PlanificacionDbContext.Schema);
         services.AddScoped<IRutaRepository, RutaRepository>();
         services.AddScoped<IConfirmacionPlanificacion, ConfirmacionPlanificacion>();
+        services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
         services.AddScoped<IResponsablePlanificacion, ResponsablePlanificacion>();
         services.AddScoped<ArmarRutaHandler>();
+        services.AddScoped<Application.Features.DespacharRuta.DespacharRutaHandler>();
+        services.AddScoped<Application.Services.EvaluadorRuta>();
         services.AddScoped<QuitarEnvioDeRutaHandler>();
         services.AddScoped<ConsultarRutasHandler>();
         services.AddScoped<ConsultarEnviosDisponiblesHandler>();
@@ -49,6 +52,7 @@ public static class PlanificacionModule
 
         PlanificacionEndpointFilters.Add(group);
         ArmarRutaEndpoint.Map(group);
+        Presentation.Features.DespacharRuta.DespacharRutaEndpoint.Map(group);
         QuitarEnvioDeRutaEndpoint.Map(group);
         ConsultarRutasEndpoint.Map(group);
         ConsultarEnviosDisponiblesEndpoint.Map(group);
