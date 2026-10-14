@@ -25,6 +25,7 @@ public static class AdministracionModule
             configuration.GetConnectionString("Postgres"), AdministracionDbContext.Schema);
 
         services.AddScoped<DatosIniciales>();
+        services.AddScoped<UsuariosIniciales>();
         services.AddScoped<IServicioSesion, ServicioSesion>();
         services.AddScoped<IRecursosPlanificacionReader, RecursosPlanificacionReader>();
         services.AddScoped<Contracts.IAdministracionModuleApi, AdministracionModuleApi>();
@@ -82,6 +83,8 @@ public static class AdministracionModule
         using var scope = services.CreateScope();
 
         await scope.ServiceProvider.GetRequiredService<DatosIniciales>().SembrarAsync(ct);
+        // Después de los operadores y el comercio: los usuarios los referencian.
+        await scope.ServiceProvider.GetRequiredService<UsuariosIniciales>().SembrarAsync();
     }
 
 
