@@ -180,6 +180,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | La última escritura gana, el dispositivo gana, la revisión manual de todo, sincronizar estados, descartar las operaciones rechazadas, el lote atómico, subir los archivos aparte, depender sólo de la Background Sync API, y CRDT o event sourcing (alternativas 3.1 a 3.9 del ADR). Se evaluó sacar *EnTransito* de T16 y se descartó (decisión de Ezequiel). |
 | **Verificación** | Revisión contra la letra (RF 24, 6.11, 6.12, 9.3), CU-17, CU-18, CU-21, CU-41, CU-43, CU-50 a CU-52 y la tabla de transiciones. Está **pendiente la aprobación del equipo**, en especial la de Lucas, por la parte de la PWA. |
 
+## **3.11 Actualización de seguridad de los paquetes de .NET 10.0.13**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 14/10/2026 |
+| **Archivos** | `Directory.Packages.props`, `.config/dotnet-tools.json` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Destrabar la compilación. El 13/10 se publicaron CVE-2026-102870 y CVE-2026-96230 (ejecución remota de código en ASP.NET Core) contra `Microsoft.AspNetCore.Components.WebAssembly.Server` hasta 10.0.12. Con `TreatWarningsAsErrors`, la auditoría de NuGet (NU1903) hacía fallar la restauración. |
+| **Cómo se trabajó** | La IA consultó los avisos en GitHub, verificó que existiera la versión 10.0.13 de cada paquete, los actualizó, actualizó la imagen del SDK y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | Subir a 10.0.13 los ocho paquetes fijados en 10.0.12 y `dotnet-ef`, para que todos queden en la misma versión de parche. |
+| **Modificado** | — |
+| **Descartado** | Subir sólo el paquete afectado, porque dejaba versiones de parche mezcladas. Silenciar la advertencia NU1903, porque es una vulnerabilidad real. |
+| **Verificación** | Imagen `sdk:10.0` con ASP.NET Core 10.0.13; 212 pruebas (46 unitarias, 54 de arquitectura y 112 de integración), todas pasan. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -190,3 +205,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.4 | 12/10/2026 | Entrada del ADR-0003 versión 1.0. | Ezequiel Marcenal |
 | 0.5 | 12/10/2026 | Entrada de la respuesta 404 ante una escritura de otro inquilino. | Ezequiel Marcenal |
 | 0.6 | 12/10/2026 | Entrada del ADR-0004. | Ezequiel Marcenal |
+| 0.7 | 14/10/2026 | Entrada de la actualización de seguridad a .NET 10.0.13. | Ezequiel Marcenal |

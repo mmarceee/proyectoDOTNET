@@ -83,7 +83,7 @@ El módulo Ejecución registra cada operación recibida en la tabla `operaciones
 
 Cada operación se evalúa contra el estado **actual del servidor**, en el momento de procesarla:
 
-1\.  **Pertenencia.** El repartidor autenticado es el asignado a la ruta de la operación, y el envío es una parada de esa ruta. Si no, la operación es un conflicto (`RutaNoAsignada`).
+1\.  **Pertenencia.** El repartidor autenticado es el asignado a la ruta de la operación, y el envío está en una parada de esa ruta (una parada puede tener varios envíos, modelo de dominio). Si no, la operación es un conflicto (`RutaNoAsignada`).
 
 2\.  **Validez de los datos.** Las pruebas cumplen la versión de reglas **del envío** (la firma siempre; foto, nombre y documento según las reglas), el motivo existe en el catálogo de esa versión y cada archivo pesa hasta 1 MB. Si no, la operación es **inválida**. La PWA ya lo impide (CU-17 y CU-18, flujo A1), así que una operación inválida indica un error de la PWA, no un conflicto.
 
@@ -114,7 +114,7 @@ Los conflictos de la sección 1.2, con su motivo:
 | Operación sobre una ruta que no es del repartidor autenticado | `RutaNoAsignada` | Conflicto |
 | Operación sobre el mismo envío después de una rechazada en el mismo lote | `DependeDeOperacionRechazada` | Conflicto (sección 2.6) |
 
-La PWA evita la tercera situación desde su lado: una parada que ya tiene un resultado registrado en el dispositivo no admite otro (sección 2.8).
+La PWA evita la tercera situación desde su lado: un envío que ya tiene un resultado registrado en el dispositivo no admite otro (sección 2.8).
 
 ## **2.5 Qué se conserva de una operación rechazada**
 
@@ -144,7 +144,7 @@ Lo implementa Lucas Ottonello en CU-50 a CU-52. Este registro fija lo que el ser
 •  **Cola local.** Cada operación confirmada se guarda en IndexedDB, cifrada (sección 6.11 de la letra), con estado *Pendiente*, *Enviando*, *Aplicada* o *Rechazada*. Se borra recién cuando el servidor responde *Aplicada* o *Ya aplicada*. Una rechazada se muestra al repartidor hasta que la marca como vista.  
 •  **Cuándo sincroniza.** Al abrir la PWA, al recuperar la conexión (evento `online`) y cada 30 segundos mientras haya pendientes y conexión. Hay un solo envío en curso a la vez. Si falla la red, reintenta con espera creciente.  
 •  **Lotes.** Hasta 20 operaciones y 5 MB por lote; la foto ya viaja comprimida.  
-•  **Una parada, un resultado.** Si la parada ya tiene una entrega o un intento fallido registrados en el dispositivo, la PWA no permite registrar otro.  
+•  **Un envío, un resultado.** Si el envío ya tiene una entrega o un intento fallido registrados en el dispositivo, la PWA no permite registrar otro. Una parada con varios envíos (por ejemplo, apartamentos del mismo edificio) admite un resultado por cada envío.  
 •  **Sesión vencida** (CU-52, A3). El servidor responde 401 sin procesar el lote; la PWA pide iniciar sesión y conserva los pendientes.  
 •  **Después de sincronizar,** la PWA descarga los cambios de su ruta (CU-50, A3), así refleja los conflictos en las paradas.
 
@@ -278,3 +278,4 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 12/10/2026 | Propuesta inicial. Decisiones tomadas por el responsable antes de redactarla: el servidor decide con la máquina de estados, los archivos viajan dentro de la operación y T16 conserva *EnTransito* como origen (robo durante el reparto). | Ezequiel Marcenal |
+| 0.2 | 14/10/2026 | Se adapta a las paradas con varios envíos (modelo de dominio, CU-40): la pertenencia y la regla de un resultado se verifican por envío, no por parada. | Ezequiel Marcenal |
