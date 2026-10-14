@@ -37,15 +37,15 @@ public class ModuleDependencyTests
             .Check(Architecture);
     }
 
-    // ASP.NET Core solo se permite en Presentation y en la clase de entrada del módulo.
+    // ASP.NET Core solo se permite en Presentation y en la clase de entrada del módulo. Única excepción en
+    // Infrastructure: ASP.NET Core Identity, que es persistencia de usuarios y no HTTP (ADR-0001, sección 2.4).
     [Theory]
     [MemberData(nameof(ModuleNames))]
     public void Infrastructure_no_depende_de_Presentation_ni_de_AspNetCore(string module)
     {
         InNamespace($"Logistica.Modules.{module}.Infrastructure")
-            .Should().NotDependOnAny(InAnyNamespace(
-                $"Logistica.Modules.{module}.Presentation",
-                "Microsoft.AspNetCore"))
+            .Should().NotDependOnAny(InAnyNamespace($"Logistica.Modules.{module}.Presentation"))
+            .AndShould().NotDependOnAny(AspNetCoreSalvoIdentity)
             .WithoutRequiringPositiveResults()
             .Check(Architecture);
     }
