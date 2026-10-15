@@ -40,7 +40,8 @@ internal static class Sesion
         return await client.PostAsync(pagina, new FormUrlEncodedContent(campos));
     }
 
-    private static async Task<string> TokenAsync(HttpClient client, string pagina)
+    // El token antifalsificación de un formulario: se pide la página y se lee del HTML.
+    public static async Task<string> TokenAsync(HttpClient client, string pagina)
     {
         var html = await client.GetStringAsync(pagina);
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
