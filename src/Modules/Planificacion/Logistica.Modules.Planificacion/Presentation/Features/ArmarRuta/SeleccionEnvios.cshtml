@@ -17,14 +17,25 @@
         </div>
     </div>
     <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0"><thead><tr><th>Seleccionar</th><th>Envío</th><th>Dirección</th><th>Peso kg</th><th>Volumen m³</th></tr></thead><tbody>
+    <table class="table table-hover align-middle mb-0"><thead><tr><th>Seleccionar</th><th>Envío</th><th>Dirección</th><th>Peso kg</th><th>Volumen m³</th><th>Reintento</th></tr></thead><tbody>
     @foreach (var e in Model.Candidatos)
     {
-        <tr><td><input type="checkbox" name="Seleccion" value="@e.Id" checked="@Model.Seleccion.Contains(e.Id)" aria-label="Seleccionar @e.Numero" /></td><td>@e.Numero</td><td>@e.Direccion</td><td>@e.PesoKg</td><td>@e.VolumenM3.ToString("0.######")</td></tr>
+        <tr><td><input type="checkbox" name="Seleccion" value="@e.Id" checked="@(e.DisponibleParaFecha && Model.Seleccion.Contains(e.Id))" disabled="@(!e.DisponibleParaFecha)" aria-label="Seleccionar @e.Numero" /></td><td>@e.Numero</td><td>@e.Direccion</td><td>@e.PesoKg</td><td>@e.VolumenM3.ToString("0.######")</td>
+            <td>
+                @if (e.ReintentoDesde is DateTimeOffset desde)
+                {
+                    <span>Disponible desde @desde.ToString("dd/MM/yyyy HH:mm zzz") (hora del operador).</span>
+                    @if (!e.DisponibleParaFecha)
+                    {
+                        <span class="d-block text-warning">La franja o el día elegido comienza antes del plazo.</span>
+                    }
+                }
+                else { <span>—</span> }
+            </td></tr>
     }
     @if (Model.Candidatos.Count == 0)
     {
-        <tr><td colspan="5" class="text-center text-muted py-4">No hay envíos disponibles para la fecha y los filtros elegidos.</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">No hay envíos disponibles para la fecha y los filtros elegidos.</td></tr>
     }
     </tbody></table>
     </div>
@@ -38,7 +49,7 @@
     <section id="validacion-ruta" tabindex="-1" class="card mb-4" aria-labelledby="titulo-validacion-ruta">
     <div class="card-body p-4">
     <h2 id="titulo-validacion-ruta" class="h5">Validar y confirmar</h2>
-    <p class="text-muted">La validación comprueba paradas, capacidad y franjas horarias. Los envíos se asignan al confirmar.</p>
+    <p class="text-muted">La validación comprueba paradas, capacidad, franjas horarias y plazo entre intentos. Los envíos se asignan al confirmar.</p>
     @if (Model.Evaluacion is { } evaluacion)
     {
         <div class="alert @(evaluacion.Valida ? "alert-success" : "alert-danger")" role="status" data-resultado-validacion>

@@ -20,6 +20,8 @@ internal static class PlanificadorDeRuta
         decimal peso = 0, volumen = 0;
         foreach (var envio in envios)
         {
+            if (!envio.CumplePlazoEntreIntentos)
+                errores.Add(new("PlazoEntreIntentos", $"El envío {envio.Numero} está disponible desde {envio.ReintentoDesde:dd/MM/yyyy HH:mm zzz}; la franja o el día de la ruta comienza antes de ese plazo.", envio.Id));
             if (envio.Fecha is DateOnly programada && programada != fecha)
                 errores.Add(new("FechaIncompatible", $"El envío {envio.Numero} está programado para {programada:dd/MM/yyyy}.", envio.Id));
             if (envio.FranjaRequerida && (envio.Franja is null || !envio.Franja.Dias.Contains(fecha.DayOfWeek)
