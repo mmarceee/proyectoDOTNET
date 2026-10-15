@@ -29,7 +29,8 @@ internal sealed class EventoEnvio : Entity, IOperadorOwned, IComercioOwned
         ComercioId = envio.ComercioId;
         EstadoAnterior = estadoAnterior;
         EstadoNuevo = estadoNuevo;
-        OcurridoEn = ocurridoEn;
+        // PostgreSQL guarda los instantes en UTC; la hora del dispositivo puede venir con su desfase local.
+        OcurridoEn = ocurridoEn.ToUniversalTime();
         Origen = origen;
         ResponsableId = responsableId;
         Latitud = ubicacion?.Latitud;

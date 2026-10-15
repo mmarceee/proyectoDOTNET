@@ -38,7 +38,8 @@ internal sealed class IntentoEntrega : Entity, IOperadorOwned, IComercioOwned
         OperadorId = envio.OperadorId;
         ComercioId = envio.ComercioId;
         NumeroIntento = numero;
-        FechaHora = fechaHora;
+        // El mismo instante, en UTC: PostgreSQL no admite otro desfase, y la hora del dispositivo trae el local.
+        FechaHora = fechaHora.ToUniversalTime();
         Resultado = resultado;
         MotivoNoEntregaId = motivoNoEntregaId;
         Evidencia = evidencia;

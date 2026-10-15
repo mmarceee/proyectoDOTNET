@@ -31,7 +31,9 @@ internal sealed class Devolucion : Entity, IOperadorOwned, IComercioOwned
         return new Devolucion
         {
             EnvioId = envio.Id, OperadorId = envio.OperadorId, ComercioId = envio.ComercioId,
-            Motivo = motivo.Trim(), Estado = EstadoDevolucion.Pendiente, IniciadaEn = ahora,
+            Motivo = motivo.Trim(), Estado = EstadoDevolucion.Pendiente,
+            // En UTC: CU-18 la inicia con la hora del dispositivo, que trae su desfase local.
+            IniciadaEn = ahora.ToUniversalTime(),
         };
     }
 }

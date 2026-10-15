@@ -454,6 +454,8 @@ Produccion, Prueba
 
 * fechaEntregaProgramada: DateOnly (opcional; la fija la reprogramación — CU-19 y CU-61 — y la usan el armado de rutas — CU-40 — y la ventana estimada del seguimiento — CU-60)
 
+* reintentoDesde: DateTimeOffset (opcional; después de un intento fallido reprogramado, no se vuelve a intentar antes de esta hora: hora del intento más el plazo entre intentos de la VersionReglas — CU-18)
+
 * modalidad: Modalidad
 
 * versionTarifarioId: Guid
@@ -475,6 +477,12 @@ Produccion, Prueba
 * reprogramar(fecha: DateOnly, franjaHorariaId: Guid (opcional), origen: OrigenEvento, responsableId: Guid (opcional)): void — cambia la fecha y, cuando corresponde, aplica la transición (T9, T18 o T19). Si el envío está Admitido (CU-61) o ya Reprogramado (CU-19), sólo cambia la fecha, sin transición
 
 * agregarBulto(bulto: Bulto): void
+
+* registrarEntrega(prueba: PruebaEntrega, reglas: ReglasEntrega, responsableId: Guid (opcional), ocurridoEn: DateTimeOffset): IntentoEntrega — CU-17 (T6). Valida la prueba contra las reglas del envío antes de cambiar nada; la hora es la del dispositivo
+
+* registrarIntentoFallido(motivo: MotivoNoEntrega, evidencia: PruebaEntrega (opcional), observaciones: string (opcional), ubicacion: Ubicacion, reglas: ReglasEntrega, responsableId: Guid (opcional), ocurridoEn: DateTimeOffset): IntentoEntrega — CU-18 (T7 y, en la misma operación, T9 o T10). Si el motivo no es reprogramable o se agotaron los intentos, queda EnDevolucion y quien llama crea la Devolucion; si no, queda Reprogramado con reintentoDesde
+
+*ReglasEntrega y MotivoNoEntrega son, en Envíos, copias inmutables de lo que exige la VersionReglas del envío (PruebaExigida, maxIntentos, plazoEntreIntentosHoras y el motivo del catálogo): las reglas viven en Administración.*
 
 **Bulto**
 
