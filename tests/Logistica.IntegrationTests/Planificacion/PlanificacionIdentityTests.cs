@@ -191,7 +191,8 @@ public class PlanificacionIdentityTests(PostgresApiFactory factory) : IClassFixt
     {
         using var client = Cliente();
         var login = await IngresarAsync(client, "comercio@tiendademo.uy");
-        Assert.Equal("/portal/", login.Headers.Location!.ToString());
+        // CU-03: el comercio primero elige el operador de la sesión; después sigue al Portal.
+        Assert.Equal("/cuenta/operador?ReturnUrl=%2Fportal%2F", login.Headers.Location!.ToString());
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/portal/")).StatusCode);
         foreach (var path in new[] { "/backoffice", "/backoffice/envios", "/backoffice/deposito/recepcion", "/repartidor/" })
             Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(path)).StatusCode);

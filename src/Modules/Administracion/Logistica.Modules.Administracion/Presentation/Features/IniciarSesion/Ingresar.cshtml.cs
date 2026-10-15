@@ -43,6 +43,12 @@ internal abstract class IngresoModel(IServicioSesion sesion, TipoAccesoSesion ac
             return LocalRedirect(inicio);
         }
 
+        // CU-03: el usuario de comercio elige el operador antes de ver datos; después sigue al inicio de su aplicación.
+        if (resultado == ResultadoInicioSesion.DebeElegirOperador)
+        {
+            return LocalRedirect($"/cuenta/operador?ReturnUrl={Uri.EscapeDataString(inicio)}");
+        }
+
         Error = resultado == ResultadoInicioSesion.Bloqueada
             ? "La cuenta está bloqueada por varios intentos fallidos. Probá de nuevo en unos minutos."
             : "El correo o la contraseña no son correctos.";

@@ -1,0 +1,36 @@
+@page "/cuenta/operador"
+@model Logistica.Modules.Administracion.Presentation.Features.SeleccionarOperador.OperadorModel
+@{
+    Layout = "/Pages/Shared/_LayoutPortal.cshtml";
+    ViewData["Title"] = "Elegir operador";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <h1 class="h3 mb-2">¿Con qué operador vas a trabajar?</h1>
+        <p class="text-muted mb-4">Podés cambiarlo cuando quieras volviendo a esta página.</p>
+
+        @if (Model.Operadores.Count == 0)
+        {
+            <div class="alert alert-warning" role="alert">
+                Tu comercio no tiene operadores activos. Comunicate con tu operador logístico.
+            </div>
+        }
+        else
+        {
+            <form method="post">
+                <input type="hidden" asp-for="ReturnUrl" />
+
+                <div class="list-group">
+                    @foreach (var operador in Model.Operadores)
+                    {
+                        <button type="submit" name="operadorId" value="@operador.Id"
+                                class="list-group-item list-group-item-action py-3">
+                            @operador.Nombre
+                        </button>
+                    }
+                </div>
+            </form>
+        }
+    </div>
+</div>

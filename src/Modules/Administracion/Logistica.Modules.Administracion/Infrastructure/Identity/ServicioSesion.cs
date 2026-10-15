@@ -1,12 +1,15 @@
+using System.Security.Claims;
 using Logistica.Modules.Administracion.Application.Features.IniciarSesion;
-using Microsoft.AspNetCore.Identity;
+using Logistica.Modules.Administracion.Application.Features.SeleccionarOperador;
 using Logistica.Modules.Administracion.Contracts;
+using Microsoft.AspNetCore.Identity;
 
 namespace Logistica.Modules.Administracion.Infrastructure.Identity;
 
 // Inicia la sesión con ASP.NET Core Identity: verifica la contraseña contra su hash y emite la cookie con los
 // claims de FabricaDeClaims.
-internal sealed class ServicioSesion(SignInManager<Usuario> sesiones, UserManager<Usuario> usuarios) : IServicioSesion
+internal sealed class ServicioSesion(
+    SignInManager<Usuario> sesiones, UserManager<Usuario> usuarios, IOperadoresDelComercio operadores) : IServicioSesion
 {
     public async Task<ResultadoInicioSesion> IniciarAsync(string email, string contrasena, TipoAccesoSesion acceso = TipoAccesoSesion.Personal)
     {
@@ -36,10 +39,34 @@ internal sealed class ServicioSesion(SignInManager<Usuario> sesiones, UserManage
 
         if (resultado.Succeeded)
         {
-            return ResultadoInicioSesion.Iniciada;
+            return usuario.ComercioId is null ? ResultadoInicioSesion.Iniciada : ResultadoInicioSesion.DebeElegirOperador;
         }
 
         return resultado.IsLockedOut ? ResultadoInicioSesion.Bloqueada : ResultadoInicioSesion.CredencialesInvalidas;
+    }
+
+    public async Task<bool> SeleccionarOperadorAsync(Guid usuarioId, Guid operadorId, CancellationToken ct)
+    {
+        // El comercio sale del usuario de la sesión, nunca del pedido.
+        var usuario = await usuarios.FindByIdAsync(usuarioId.ToString());
+        if (usuario is not { Activo: true, ComercioId: Guid comercioId })
+        {
+            return false;
+        }
+
+        // El servidor nunca acepta un operador enviado por el cliente sin verificar la relación (CU-03,
+        // requerimiento especial 2).
+        var disponibles = await operadores.ActivosAsync(comercioId, ct);
+        if (disponibles.All(o => o.Id != operadorId))
+        {
+            return false;
+        }
+
+        // Elegir o cambiar de operador es volver a emitir la cookie: la elección no se guarda en la base
+        // (ADR-0002, sección 2.6). FabricaDeClaims agrega el comercio; acá se suma el operador.
+        await sesiones.SignInWithClaimsAsync(usuario, isPersistent: false,
+            [new Claim(ClaimsDeSesion.OperadorId, operadorId.ToString())]);
+        return true;
     }
 
     public Task CerrarAsync()
