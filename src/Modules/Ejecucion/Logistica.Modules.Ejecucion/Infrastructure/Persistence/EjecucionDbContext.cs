@@ -1,0 +1,14 @@
+using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.Modules.Ejecucion.Domain.Operaciones;
+using Logistica.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+
+namespace Logistica.Modules.Ejecucion.Infrastructure.Persistence;
+
+internal sealed class EjecucionDbContext(DbContextOptions<EjecucionDbContext> options, UnidadDeTrabajo unidadDeTrabajo, ICurrentTenant tenant)
+    : ModuleDbContext(options, Schema, unidadDeTrabajo, tenant)
+{
+    public const string Schema = "ejecucion";
+
+    public DbSet<OperacionDispositivo> Operaciones => Set<OperacionDispositivo>();
+}

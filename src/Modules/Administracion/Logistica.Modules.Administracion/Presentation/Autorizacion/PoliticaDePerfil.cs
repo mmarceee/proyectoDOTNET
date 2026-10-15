@@ -6,7 +6,9 @@ using Microsoft.Extensions.Hosting;
 namespace Logistica.Modules.Administracion.Presentation.Autorizacion;
 
 // Requisito de una política: tener el perfil y, si se pide, un operador en la sesión (el comercio lo elige, CU-03).
-internal sealed record PoliticaDePerfil(Perfil Perfil, bool ExigeOperador = false) : IAuthorizationRequirement;
+// ExigeRepartidor: además, el usuario está vinculado a su Repartidor (claim repartidor_id), para saber qué rutas son suyas.
+internal sealed record PoliticaDePerfil(Perfil Perfil, bool ExigeOperador = false, bool ExigeRepartidor = false)
+    : IAuthorizationRequirement;
 
 // Con sesión, el perfil se exige siempre. Sin sesión, sólo en Development con Identity:PermitirTenantProvisorio, se
 // deja pasar como hacen TenantDeSesion y el middleware de acceso: es el respaldo de las pruebas que todavía no inician
@@ -29,8 +31,11 @@ internal sealed class VerificadorDePerfil(IHostEnvironment entorno, IConfigurati
         }
 
         var tieneOperador = Guid.TryParse(usuario.FindFirst(ClaimsDeSesion.OperadorId)?.Value, out _);
+        var tieneRepartidor = Guid.TryParse(usuario.FindFirst(ClaimsDeSesion.RepartidorId)?.Value, out _);
 
-        if (usuario.IsInRole(requisito.Perfil.ToString()) && (!requisito.ExigeOperador || tieneOperador))
+        if (usuario.IsInRole(requisito.Perfil.ToString())
+            && (!requisito.ExigeOperador || tieneOperador)
+            && (!requisito.ExigeRepartidor || tieneRepartidor))
         {
             contexto.Succeed(requisito);
         }

@@ -1,13 +1,108 @@
 using Logistica.Modules.Envios.Contracts;
+using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Contracts.Results;
+using Logistica.Modules.Envios.Domain.Devoluciones;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Envios.Application;
 
 // Implementación del contrato de Envíos. Es internal: los otros módulos sólo ven la interfaz.
-internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj) : IEnviosModuleApi
+internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj, IReglasDeEntrega reglasDeEntrega,
+    IIntegrationEventPublisher eventos) : IEnviosModuleApi
 {
+    // CU-17 (T6). Las reglas de negocio no lanzan hacia afuera: vuelven como resultado, para que Ejecución aplique la
+    // política de conflictos (ADR-0004, sección 2.4). Los archivos se agregan recién cuando el dominio aceptó la entrega.
+    public async Task<RegistroEnCalle> RegistrarEntregaAsync(EntregaARegistrar entrega, CancellationToken ct)
+    {
+        var envio = await envios.ObtenerConIntentosAsync(entrega.EnvioId, ct);
+        if (envio is null)
+        {
+            return new(ResultadoRegistro.EnvioNoEncontrado);
+        }
+
+        try
+        {
+            var reglas = await reglasDeEntrega.DelEnvioAsync(envio, ct);
+            var firma = ArchivoEvidencia.Crear(envio, entrega.Firma.TipoContenido, entrega.Firma.Contenido);
+            var foto = entrega.Foto is null ? null : ArchivoEvidencia.Crear(envio, entrega.Foto.TipoContenido, entrega.Foto.Contenido);
+            var prueba = new PruebaEntrega(firma.Id, foto?.Id, entrega.NombreReceptor, entrega.DocumentoReceptor,
+                new Ubicacion(entrega.Latitud, entrega.Longitud), entrega.OcurridoEn);
+
+            envio.RegistrarEntrega(prueba, reglas, entrega.ResponsableId, entrega.OcurridoEn);
+
+            envios.Agregar(firma);
+            if (foto is not null)
+            {
+                envios.Agregar(foto);
+            }
+
+            var entregadoEn = envio.Eventos[^1].OcurridoEn;
+            eventos.Registrar(EnvioEntregado.Tipo,
+                new EnvioEntregado(envio.Id, envio.Numero, entregadoEn, entrega.ResponsableId), entregadoEn);
+
+            await envios.GuardarCambiosAsync(ct);
+            return new(ResultadoRegistro.Aplicado, envio.Estado.ToString());
+        }
+        catch (TransicionInvalidaException)
+        {
+            return new(ResultadoRegistro.Conflicto, envio.Estado.ToString());
+        }
+        catch (DomainException ex)
+        {
+            return new(ResultadoRegistro.Invalido, envio.Estado.ToString(), ex.Message);
+        }
+    }
+
+    // CU-18 (T7 con T9 o T10). Si el envío queda EnDevolucion, inicia la Devolucion en la misma transacción (CU-20).
+    public async Task<RegistroEnCalle> RegistrarIntentoFallidoAsync(IntentoFallidoARegistrar intento, CancellationToken ct)
+    {
+        var envio = await envios.ObtenerConIntentosAsync(intento.EnvioId, ct);
+        if (envio is null)
+        {
+            return new(ResultadoRegistro.EnvioNoEncontrado);
+        }
+
+        try
+        {
+            var reglas = await reglasDeEntrega.DelEnvioAsync(envio, ct);
+            var motivo = await reglasDeEntrega.MotivoAsync(envio, intento.MotivoId, ct)
+                ?? throw new DomainException("El motivo no está en el catálogo de las reglas del envío.");
+            var ubicacion = new Ubicacion(intento.Latitud, intento.Longitud);
+            var foto = intento.Foto is null ? null : ArchivoEvidencia.Crear(envio, intento.Foto.TipoContenido, intento.Foto.Contenido);
+            var evidencia = foto is null ? null : new PruebaEntrega(null, foto.Id, null, null, ubicacion, intento.OcurridoEn);
+
+            var registrado = envio.RegistrarIntentoFallido(motivo, evidencia, intento.Observaciones, ubicacion, reglas,
+                intento.ResponsableId, intento.OcurridoEn);
+
+            if (foto is not null)
+            {
+                envios.Agregar(foto);
+            }
+
+            if (envio.Estado == EstadoEnvio.EnDevolucion)
+            {
+                envios.Agregar(Devolucion.Crear(envio, $"Intento fallido: {motivo.Codigo}.", intento.OcurridoEn));
+            }
+
+            eventos.Registrar(IntentoFallidoRegistrado.Tipo,
+                new IntentoFallidoRegistrado(envio.Id, envio.Numero, registrado.NumeroIntento, motivo.Codigo,
+                    envio.Estado.ToString(), registrado.FechaHora, envio.ReintentoDesde),
+                registrado.FechaHora);
+
+            await envios.GuardarCambiosAsync(ct);
+            return new(ResultadoRegistro.Aplicado, envio.Estado.ToString());
+        }
+        catch (TransicionInvalidaException)
+        {
+            return new(ResultadoRegistro.Conflicto, envio.Estado.ToString());
+        }
+        catch (DomainException ex)
+        {
+            return new(ResultadoRegistro.Invalido, envio.Estado.ToString(), ex.Message);
+        }
+    }
+
     public async Task<IReadOnlyList<EnvioPlanificable>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct)
     {
         var lista = await envios.ObtenerParaPlanificacionAsync(envioIds, ct);

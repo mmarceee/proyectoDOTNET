@@ -28,9 +28,24 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         return db.Envios.SingleOrDefaultAsync(e => e.Id == id, ct);
     }
 
+    public Task<Envio?> ObtenerConIntentosAsync(Guid id, CancellationToken ct)
+    {
+        return db.Envios.Include(e => e.Intentos).SingleOrDefaultAsync(e => e.Id == id, ct);
+    }
+
     public void Agregar(Envio envio)
     {
         db.Envios.Add(envio);
+    }
+
+    public void Agregar(ArchivoEvidencia archivo)
+    {
+        db.ArchivosEvidencia.Add(archivo);
+    }
+
+    public void Agregar(Domain.Devoluciones.Devolucion devolucion)
+    {
+        db.Devoluciones.Add(devolucion);
     }
 
     public Task GuardarCambiosAsync(CancellationToken ct)

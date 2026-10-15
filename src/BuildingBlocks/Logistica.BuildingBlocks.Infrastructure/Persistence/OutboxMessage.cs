@@ -42,7 +42,8 @@ public sealed class OutboxMessage
         {
             Id = Guid.CreateVersion7(),
             Tipo = tipo,
-            OcurridoEn = ocurridoEn,
+            // En UTC: PostgreSQL no admite otro desfase, y la hora puede venir del dispositivo (ADR-0004, sección 2.7).
+            OcurridoEn = ocurridoEn.ToUniversalTime(),
             OperadorId = operadorId,
             ComercioId = comercioId,
             TraceParent = traceParent,

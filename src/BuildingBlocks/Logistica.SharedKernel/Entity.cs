@@ -9,7 +9,8 @@ public abstract class Entity
 
     protected Entity() { }
 
-    // Id fijo: sólo para los datos iniciales, que necesitan Ids conocidos de antemano.
+    // Id fijo: para los datos iniciales, que necesitan Ids conocidos de antemano, y para las operaciones de la PWA,
+    // cuyo Id genera el dispositivo (ADR-0004, sección 2.2).
     protected Entity(Guid id)
     {
         Id = id;
