@@ -28,6 +28,7 @@ internal sealed record PruebaEntrega
         DocumentoReceptor = documentoReceptor;
         Latitud = ubicacion.Latitud;
         Longitud = ubicacion.Longitud;
-        CapturadaEn = capturadaEn;
+        // El mismo instante, en UTC: PostgreSQL no admite otro desfase, y la hora del dispositivo trae el local.
+        CapturadaEn = capturadaEn.ToUniversalTime();
     }
 }

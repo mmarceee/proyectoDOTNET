@@ -178,7 +178,7 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Aceptado sin modificaciones** | Sincronizar operaciones y no estados; idempotencia por `OperacionId` registrada en la misma transacción que el efecto; el servidor decide con la máquina de estados (elegido por Ezequiel); los archivos dentro de la operación (elegido por Ezequiel); una transacción por operación; conservar las operaciones rechazadas sin aplicarlas; la hora del dispositivo con corrección del reloj adelantado; las reglas para la PWA, el transporte, la correlación y las métricas. |
 | **Modificado** | La IA proponía como conflicto principal un extravío declarado por error mientras el envío estaba en reparto. Ezequiel objetó que un paquete no se extravía en la camioneta, pero que T16 debe conservar *EnTransito* para los robos. El caso guía del ADR pasó a ser el robo, con una entrega anterior sin sincronizar. |
 | **Descartado** | La última escritura gana, el dispositivo gana, la revisión manual de todo, sincronizar estados, descartar las operaciones rechazadas, el lote atómico, subir los archivos aparte, depender sólo de la Background Sync API, y CRDT o event sourcing (alternativas 3.1 a 3.9 del ADR). Se evaluó sacar *EnTransito* de T16 y se descartó (decisión de Ezequiel). |
-| **Verificación** | Revisión contra la letra (RF 24, 6.11, 6.12, 9.3), CU-17, CU-18, CU-21, CU-41, CU-43, CU-50 a CU-52 y la tabla de transiciones. Está **pendiente la aprobación del equipo**, en especial la de Lucas, por la parte de la PWA. |
+| **Verificación** | Revisión contra la letra (RF 24, 6.11, 6.12, 9.3), CU-17, CU-18, CU-21, CU-41, CU-43, CU-50 a CU-52 y la tabla de transiciones. El equipo lo aprobó el 15/10 (versión 1.0). |
 
 ## **3.11 Actualización de seguridad de los paquetes de .NET 10.0.13**
 
@@ -195,6 +195,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Subir sólo el paquete afectado, porque dejaba versiones de parche mezcladas. Silenciar la advertencia NU1903, porque es una vulnerabilidad real. |
 | **Verificación** | Imagen `sdk:10.0` con ASP.NET Core 10.0.13; 212 pruebas (46 unitarias, 54 de arquitectura y 112 de integración), todas pasan. |
 
+## **3.12 Dominio de CU-17 y CU-18 en `Envio`**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 15/10/2026 |
+| **Archivos** | `ReglasEntrega.cs` y `MotivoNoEntrega.cs` (nuevos), `Envio.cs` (`RegistrarEntrega`, `RegistrarIntentoFallido`, `ReintentoDesde`); migración `ReintentoDesde` de Envíos; prueba `EntregaEIntentosTests` (nueva); `modelo-de-dominio.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar en el agregado las reglas de la entrega (T6) y del intento fallido (T7 con T9 o T10), sin depender de las reglas operativas (CU-06) ni de la sincronización (CU-52), que todavía no existen. |
+| **Cómo se trabajó** | La IA propuso el diseño y los pasos para que Ezequiel los escribiera; Ezequiel pidió que lo escribiera la IA. La IA escribió el código, la migración y las pruebas, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | Las reglas entran como parámetro (`ReglasEntrega`, `MotivoNoEntrega`), copias inmutables de la versión de reglas; validar todo antes de cambiar nada; número de intento asignado por el servidor; origen *AppRepartidor* para T6 y T7, y *Sistema* para T9 y T10; `ReintentoDesde` igual a la hora del intento más el plazo; el envío no crea la `Devolucion` (otro agregado), la crea quien llama. |
+| **Modificado** | Después, acordado con Lucas: `ReintentoDesde` se agregó al contrato `EnvioPlanificable` para que Planificación lo haga cumplir al armar y al despachar rutas. La prueba de integración de ese contrato mostró que Npgsql sólo acepta `DateTimeOffset` en UTC y la hora del dispositivo trae su desfase local: se normalizan a UTC `CreadoEn`, `EventoEnvio.OcurridoEn`, `IntentoEntrega.FechaHora`, `PruebaEntrega.CapturadaEn`, `Devolucion.IniciadaEn` y `ReintentoDesde` (ADR-0004 v1.1, sección 2.7). |
+| **Descartado** | Que el envío consulte las reglas a Administración (el dominio no depende de otros módulos); que `Envio` cree la `Devolucion`; guardar la reprogramación sólo en el texto del evento, porque el plazo no se podría hacer cumplir; un conversor global de `DateTimeOffset` en `ModuleDbContext`, porque puede afectar la traducción de las consultas y oculta la regla. |
+| **Verificación** | 15 pruebas unitarias nuevas y 1 de integración (`EnvioPlanificableTests`); 263 pruebas en total (61 unitarias, 54 de arquitectura y 148 de integración), todas pasan. Cobertura: 93,3 % de líneas y 79,2 % de ramas. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -206,3 +221,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.5 | 12/10/2026 | Entrada de la respuesta 404 ante una escritura de otro inquilino. | Ezequiel Marcenal |
 | 0.6 | 12/10/2026 | Entrada del ADR-0004. | Ezequiel Marcenal |
 | 0.7 | 14/10/2026 | Entrada de la actualización de seguridad a .NET 10.0.13. | Ezequiel Marcenal |
+| 0.8 | 15/10/2026 | Entrada del dominio de CU-17 y CU-18. | Ezequiel Marcenal |

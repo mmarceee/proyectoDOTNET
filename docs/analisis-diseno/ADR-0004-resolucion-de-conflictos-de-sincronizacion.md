@@ -1,6 +1,6 @@
 # **ADR-0004 · Resolución de conflictos de sincronización**
 
-| Estado | Propuesto — pendiente de aprobación del equipo |
+| Estado | Aceptado — aprobado por el equipo el 15/10/2026 |
 | :---- | :---- |
 | **Fecha** | 12 de octubre de 2026 |
 | **Autor** | Ezequiel Marcenal |
@@ -134,6 +134,7 @@ Una operación en conflicto o inválida **se guarda completa en `operaciones_dis
 ## **2.7 La hora**
 
 •  Se registran las dos horas: `OcurridoEn`, del dispositivo, y `RecibidoEn`, del servidor. El historial del envío usa `OcurridoEn` (RF 20).  
+•  La hora del dispositivo llega con su desfase local (por ejemplo, −03:00). El dominio la guarda como el mismo instante en UTC, porque PostgreSQL sólo admite `timestamp with time zone` en UTC; la hora local se reconstruye con la zona horaria del operador.  
 •  Una `OcurridoEn` posterior a `RecibidoEn` en más de 2 minutos indica un reloj adelantado: la operación se aplica con `RecibidoEn` y queda marcada con la hora corregida. No se rechaza: un reloj mal configurado no debe perder una entrega.  
 •  `RecibidoEn − OcurridoEn` es el atraso de la sincronización y alimenta las métricas (sección 2.9).
 
@@ -279,3 +280,5 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 | :---: | :---: | :---- | :---- |
 | 0.1 | 12/10/2026 | Propuesta inicial. Decisiones tomadas por el responsable antes de redactarla: el servidor decide con la máquina de estados, los archivos viajan dentro de la operación y T16 conserva *EnTransito* como origen (robo durante el reparto). | Ezequiel Marcenal |
 | 0.2 | 14/10/2026 | Se adapta a las paradas con varios envíos (modelo de dominio, CU-40): la pertenencia y la regla de un resultado se verifican por envío, no por parada. | Ezequiel Marcenal |
+| 1.0 | 15/10/2026 | Aprobado por el equipo (Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes). | Ezequiel Marcenal |
+| 1.1 | 15/10/2026 | Sección 2.7: la hora del dispositivo se guarda como el mismo instante en UTC. | Ezequiel Marcenal |

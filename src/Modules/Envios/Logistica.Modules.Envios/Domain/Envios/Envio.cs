@@ -23,6 +23,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public Guid? ZonaId { get; private set; }
     public Guid? FranjaHorariaId { get; private set; }
     public DateOnly? FechaEntregaProgramada { get; private set; }
+    // Después de un intento fallido reprogramado (T9): no se vuelve a intentar antes de esta hora (CU-18).
+    public DateTimeOffset? ReintentoDesde { get; private set; }
 
     public IReadOnlyList<Bulto> Bultos => _bultos;
     public IReadOnlyList<EventoEnvio> Eventos => _eventos;
@@ -66,7 +68,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             Destinatario = destinatario,
             Direccion = direccion,
             Estado = EstadoEnvio.Admitido,
-            CreadoEn = ahora,
+            // Todos los instantes del envío se guardan en UTC: PostgreSQL no admite otro desfase.
+            CreadoEn = ahora.ToUniversalTime(),
             VersionTarifarioId = versionTarifario?.Id,
             VersionTarifarioNumero = versionTarifario?.Numero,
         };
@@ -110,6 +113,81 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         var intento = new IntentoEntrega(this, numero, fechaHora, resultado, motivoNoEntregaId, evidencia, observaciones);
         _intentos.Add(intento);
         return intento;
+    }
+
+    // CU-17 (T6): el repartidor entregó el envío con su prueba. La hora es la del dispositivo (RF 20).
+    // Primero se valida todo y recién después se cambia algo: si una validación falla, el envío queda igual.
+    public IntentoEntrega RegistrarEntrega(PruebaEntrega prueba, ReglasEntrega reglas, Guid? responsableId,
+        DateTimeOffset ocurridoEn)
+    {
+        ExigirTransicion(EstadoEnvio.Entregado);
+
+        if (reglas.ExigeFoto && prueba.FotoArchivoId is null)
+        {
+            throw new DomainException("Las reglas del envío exigen una foto de la entrega.");
+        }
+
+        if (reglas.ExigeNombreYDocumento
+            && (string.IsNullOrWhiteSpace(prueba.NombreReceptor) || string.IsNullOrWhiteSpace(prueba.DocumentoReceptor)))
+        {
+            throw new DomainException("Las reglas del envío exigen el nombre y el documento de quien recibe.");
+        }
+
+        // La firma la valida IntentoEntrega: un intento exitoso sin firma no se puede crear.
+        var intento = AgregarIntento(_intentos.Count + 1, ocurridoEn, ResultadoIntento.Exitoso, null, prueba);
+        Transicionar(EstadoEnvio.Entregado, OrigenEvento.AppRepartidor, responsableId, ocurridoEn,
+            new Ubicacion(prueba.Latitud, prueba.Longitud));
+
+        return intento;
+    }
+
+    // CU-18 (T7 y, en la misma operación, T9 o T10): el repartidor no pudo entregar. Según el motivo y los intentos,
+    // el envío queda Reprogramado, para después del plazo entre intentos, o EnDevolucion. Si queda EnDevolucion,
+    // quien llama inicia la Devolucion (CU-20), que es otro agregado.
+    public IntentoEntrega RegistrarIntentoFallido(MotivoNoEntrega motivo, PruebaEntrega? evidencia, string? observaciones,
+        Ubicacion ubicacion, ReglasEntrega reglas, Guid? responsableId, DateTimeOffset ocurridoEn)
+    {
+        ExigirTransicion(EstadoEnvio.NoEntregado);
+
+        if (motivo.ExigeEvidencia && evidencia?.FotoArchivoId is null)
+        {
+            throw new DomainException($"El motivo {motivo.Codigo} exige una foto como evidencia.");
+        }
+
+        var intento = AgregarIntento(_intentos.Count + 1, ocurridoEn, ResultadoIntento.Fallido, motivo.Id, evidencia,
+            string.IsNullOrWhiteSpace(observaciones) ? null : observaciones.Trim());
+        Transicionar(EstadoEnvio.NoEntregado, OrigenEvento.AppRepartidor, responsableId, ocurridoEn, ubicacion,
+            $"Motivo: {motivo.Codigo}.");
+
+        // NoEntregado es transitorio (T11 se eliminó): la regla del operador decide el estado siguiente.
+        var fallidos = _intentos.Count(i => i.Resultado == ResultadoIntento.Fallido);
+
+        if (!motivo.Reprogramable || fallidos >= reglas.MaxIntentos)
+        {
+            var causa = motivo.Reprogramable
+                ? $"Se agotaron los {reglas.MaxIntentos} intentos."
+                : $"El motivo {motivo.Codigo} no admite reprogramar.";
+            Transicionar(EstadoEnvio.EnDevolucion, OrigenEvento.Sistema, null, ocurridoEn, detalle: causa);
+        }
+        else
+        {
+            // En UTC, como todos los instantes que se guardan: la hora del dispositivo trae su desfase local.
+            var reintento = (ocurridoEn + reglas.PlazoEntreIntentos).ToUniversalTime();
+            ReintentoDesde = reintento;
+            Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.Sistema, null, ocurridoEn,
+                detalle: $"Intento {fallidos} de {reglas.MaxIntentos}. Nuevo intento desde {reintento:yyyy-MM-dd HH:mm} UTC.");
+        }
+
+        return intento;
+    }
+
+    // Verifica la transición antes de tocar el envío, para no dejar un intento agregado sin su cambio de estado.
+    private void ExigirTransicion(EstadoEnvio nuevo)
+    {
+        if (!TablaTransiciones.Permite(Estado, nuevo))
+        {
+            throw new TransicionInvalidaException(Estado, nuevo);
+        }
     }
 
     // La tarifa del envío es la suma de sus bultos (CU-10).
