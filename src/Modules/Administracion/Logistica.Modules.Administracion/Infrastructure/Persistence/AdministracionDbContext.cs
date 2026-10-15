@@ -12,6 +12,7 @@ internal sealed class AdministracionDbContext(DbContextOptions<AdministracionDbC
     public const string Schema = "administracion";
 
     public DbSet<Operador> Operadores => Set<Operador>();
+    public DbSet<LogoOperador> Logos => Set<LogoOperador>();
     public DbSet<Comercio> Comercios => Set<Comercio>();
     public DbSet<RelacionComercial> RelacionesComerciales => Set<RelacionComercial>();
     public DbSet<Domain.Planificacion.Repartidor> Repartidores => Set<Domain.Planificacion.Repartidor>();

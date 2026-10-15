@@ -6,11 +6,19 @@
     <title>@ViewData["Title"] - Portal del comercio</title>
     <link rel="stylesheet" href="~/_content/Logistica.Backoffice/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/_content/Logistica.Backoffice/css/site.css" asp-append-version="true" />
+    @* La marca del operador elegido (CU-07). *@
+    <link rel="stylesheet" href="/cuenta/estilo.css" />
 </head>
 <body>
-    <header class="border-bottom mb-4 py-3">
+    <header class="barra-operador border-bottom mb-4 py-3">
         <div class="container d-flex justify-content-between align-items-center gap-3">
-            <a class="navbar-brand" href="/portal/">Portal del comercio</a>
+            <a class="navbar-brand d-flex align-items-center gap-2" href="/portal/">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <img src="/cuenta/logo" alt="" height="28" onerror="this.remove()" />
+                }
+                Portal del comercio
+            </a>
             @if (User.Identity?.IsAuthenticated == true && User.IsInRole("UsuarioComercio"))
             {
                 <form method="post" action="/cuenta/salir" asp-antiforgery="true" class="m-0">

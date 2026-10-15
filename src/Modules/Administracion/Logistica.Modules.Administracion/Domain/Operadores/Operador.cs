@@ -10,6 +10,9 @@ internal sealed class Operador : Entity
     public string ZonaHoraria { get; private set; } = "";
     public bool Activo { get; private set; }
 
+    // Logo, colores y contacto (CU-07). Nace con la identidad por defecto.
+    public IdentidadVisual Identidad { get; private set; } = IdentidadVisual.PorDefecto;
+
     private Operador() { } // para EF Core
 
     private Operador(Guid id) : base(id) { }
@@ -38,6 +41,13 @@ internal sealed class Operador : Entity
             Slug = slug,
             ZonaHoraria = zonaHoraria,
             Activo = true,
+            Identidad = IdentidadVisual.PorDefecto,
         };
+    }
+
+    // CU-07: la identidad se reemplaza entera; las reglas de cada dato las valida IdentidadVisual.
+    public void ActualizarIdentidad(IdentidadVisual nueva)
+    {
+        Identidad = nueva ?? throw new DomainException("La identidad visual es obligatoria.");
     }
 }
