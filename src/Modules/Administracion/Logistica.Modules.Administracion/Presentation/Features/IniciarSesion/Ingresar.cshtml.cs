@@ -43,12 +43,10 @@ internal abstract class IngresoModel(IServicioSesion sesion, TipoAccesoSesion ac
             return LocalRedirect(inicio);
         }
 
-        // CU-03: el usuario de comercio elige el operador antes de ver datos. El ReturnUrl lo acompaña.
+        // CU-03: el usuario de comercio elige el operador antes de ver datos; después sigue al inicio de su aplicación.
         if (resultado == ResultadoInicioSesion.DebeElegirOperador)
         {
-            return LocalRedirect(Url.IsLocalUrl(ReturnUrl)
-                ? $"/cuenta/operador?ReturnUrl={Uri.EscapeDataString(ReturnUrl!)}"
-                : "/cuenta/operador");
+            return LocalRedirect($"/cuenta/operador?ReturnUrl={Uri.EscapeDataString(inicio)}");
         }
 
         Error = resultado == ResultadoInicioSesion.Bloqueada

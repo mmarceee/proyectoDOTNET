@@ -3,7 +3,6 @@ using Logistica.Modules.Administracion.Application.Features.IniciarSesion;
 using Logistica.Modules.Administracion.Application.Features.SeleccionarOperador;
 using Logistica.Modules.Administracion.Contracts;
 using Microsoft.AspNetCore.Identity;
-using Logistica.Modules.Administracion.Contracts;
 
 namespace Logistica.Modules.Administracion.Infrastructure.Identity;
 
