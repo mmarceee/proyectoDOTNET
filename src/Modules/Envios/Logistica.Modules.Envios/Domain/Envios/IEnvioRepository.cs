@@ -11,7 +11,14 @@ internal interface IEnvioRepository
 
     Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct);
 
+    // Con sus intentos: CU-17 y CU-18 numeran el intento nuevo y cuentan los fallidos.
+    Task<Envio?> ObtenerConIntentosAsync(Guid id, CancellationToken ct);
+
     void Agregar(Envio envio);
+
+    // La firma y la foto de una entrega o un intento (CU-17 y CU-18), y la devolución que inicia T10 (CU-18).
+    void Agregar(ArchivoEvidencia archivo);
+    void Agregar(Devoluciones.Devolucion devolucion);
     Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct);
 // Los metadatos del sobre se toman de la sesión al registrar el evento.
     void RegistrarAsignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);

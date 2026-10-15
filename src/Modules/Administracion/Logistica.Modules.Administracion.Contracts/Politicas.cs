@@ -12,4 +12,7 @@ public static class Politicas
 
     // Configura el operador y gestiona usuarios (CU-01 a CU-08).
     public const string Administrador = "Administrador";
+
+    // Repartidor vinculado a su Repartidor (claim repartidor_id): sincroniza lo que registró en la PWA (CU-52).
+    public const string Repartidor = "Repartidor";
 }

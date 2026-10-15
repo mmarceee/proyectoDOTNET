@@ -269,9 +269,9 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 
 | Hito | Qué | Responsable |
 | :---- | :---- | :---- |
-| 22/10 | Endpoint y handler de sincronización, `operaciones_dispositivo`, política y resultados, CU-17 y CU-18 del lado del servidor | Ezequiel |
+| 22/10 | Endpoint y handler de sincronización, `operaciones_dispositivo`, política y resultados, CU-17 y CU-18 del lado del servidor. **Hecho el 15/10**, con reglas de entrega provisorias hasta CU-06 (`ReglasDeEntregaProvisorias`). | Ezequiel |
 | 22/10 | Cola local cifrada, disparadores, lotes y pantalla de rechazos en la PWA | Lucas |
-| 22/10 | Autenticación del repartidor | Cristian |
+| 22/10 | Autenticación del repartidor. **Hecho el 15/10** (claim `repartidor_id`). | Cristian |
 | 29/10 | Conflictos en el tablero en tiempo real (CU-66) | Cristian |
 
 # **8\. Historial de versiones**
@@ -282,3 +282,4 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 | 0.2 | 14/10/2026 | Se adapta a las paradas con varios envíos (modelo de dominio, CU-40): la pertenencia y la regla de un resultado se verifican por envío, no por parada. | Ezequiel Marcenal |
 | 1.0 | 15/10/2026 | Aprobado por el equipo (Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes). | Ezequiel Marcenal |
 | 1.1 | 15/10/2026 | Sección 2.7: la hora del dispositivo se guarda como el mismo instante en UTC. | Ezequiel Marcenal |
+| 1.2 | 15/10/2026 | Sección 7: el lado del servidor y la autenticación del repartidor quedan implementados. | Ezequiel Marcenal |

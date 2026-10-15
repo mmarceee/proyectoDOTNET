@@ -1,6 +1,8 @@
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Deposito.Application.Features.RecibirBulto;
 using Logistica.Modules.Deposito.Domain.Recepciones;
 using Logistica.SharedKernel;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
@@ -9,6 +11,9 @@ using System.Globalization;
 namespace Logistica.Modules.Deposito.Presentation.Features.RecibirBulto;
 
 // Pantalla de recepción del operario (CU-30). Delgada como un endpoint: arma el command y muestra el resultado.
+// Misma política que la API de recepción: el middleware deja entrar a todo el personal al Backoffice, pero recibir
+// bultos es sólo del operario de depósito.
+[Authorize(Policy = Politicas.OperarioDeposito)]
 internal sealed class IndexModel(RecibirBultoHandler handler, ConsultarBultoParaRecepcionHandler consulta) : PageModel
 {
     [BindProperty(SupportsGet = true)]

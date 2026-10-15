@@ -210,6 +210,36 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Que el envío consulte las reglas a Administración (el dominio no depende de otros módulos); que `Envio` cree la `Devolucion`; guardar la reprogramación sólo en el texto del evento, porque el plazo no se podría hacer cumplir; un conversor global de `DateTimeOffset` en `ModuleDbContext`, porque puede afectar la traducción de las consultas y oculta la regla. |
 | **Verificación** | 15 pruebas unitarias nuevas y 1 de integración (`EnvioPlanificableTests`); 263 pruebas en total (61 unitarias, 54 de arquitectura y 148 de integración), todas pasan. Cobertura: 93,3 % de líneas y 79,2 % de ramas. |
 
+## **3.13 Política de CU-30 en la pantalla del Backoffice**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 15/10/2026 |
+| **Archivos** | `Deposito/Presentation/Features/RecibirBulto/Index.cshtml.cs`; prueba `Deposito/RecepcionPaginaAutorizacionTests` (nueva) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Al revisar las políticas por perfil, la IA detectó que la API de CU-30 exigía *OperarioDeposito* pero la pantalla del Backoffice no: el middleware deja entrar a todo el personal, así que un despachador podía recibir bultos desde la pantalla. |
+| **Cómo se trabajó** | La IA agregó la misma política a la página y una prueba con sesiones reales, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | `[Authorize(Policy = Politicas.OperarioDeposito)]` en el `PageModel`; la prueba: el operario entra y el despachador y el administrador reciben 403 (al principio la prueba esperaba una redirección a acceso denegado; se ajustó cuando CU-07 cambió esa respuesta por un 403 directo). |
+| **Modificado** | — |
+| **Descartado** | Restringir la ruta en el middleware de acceso: las políticas por caso de uso viven en cada endpoint y página, como en el resto. |
+| **Verificación** | 289 pruebas (65 unitarias, 54 de arquitectura y 170 de integración), todas pasan. |
+
+## **3.14 Endpoint de sincronización (CU-52) y registro de CU-17 y CU-18 en Envíos**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal (con dos piezas en módulos de Lucas Ottonello y Cristian Reyes, acordadas para revisar en el PR) |
+| **Fecha** | 15/10/2026 |
+| **Archivos** | Ejecución: `OperacionDispositivo`, `SincronizarOperacionesHandler`, `ProcesarOperacionHandler`, `ProcesadorEnAmbitoPropio`, `EjecucionDbContext`, endpoint y migración `Inicial`. Envíos: `RegistrarEntregaAsync` y `RegistrarIntentoFallidoAsync` en `EnviosModuleApi`, `IReglasDeEntrega` y `ReglasDeEntregaProvisorias`, `IIntegrationEventPublisher`, eventos `EnvioEntregado` e `IntentoFallidoRegistrado`. Planificación: `IPlanificacionModuleApi` (nuevo). Administración: política `Repartidor`. `Http.Contracts/Repartidor`. Prueba `Ejecucion/SincronizacionTests` (nueva). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar el lado del servidor del ADR-0004: recibir las operaciones de la PWA y aplicarlas con la política acordada. |
+| **Cómo se trabajó** | La IA propuso el diseño y preguntó dos decisiones; Ezequiel eligió que la IA hiciera también las dos piezas de los módulos de sus compañeros, y limitar la primera versión a la entrega y el intento fallido. La IA escribió el código, la migración y las pruebas, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | Cada operación en su propio ámbito de DI (contextos y transacción nuevos), con un reintento ante concurrencia optimista; el registro de la operación en la misma transacción que el efecto; Envíos devuelve el resultado en lugar de lanzar, y Ejecución clasifica el conflicto por el estado actual; las rechazadas se guardan completas; reglas provisorias con un catálogo fijo de motivos hasta CU-06; el repartidor sale del claim `repartidor_id`; hasta 20 operaciones por lote. |
+| **Modificado** | Una prueba buscaba el base64 de la firma como texto dentro del JSON guardado, pero `JsonSerializer` escapa `+`, `/` e `=`: se cambió por deserializar y comparar la firma. Se recortan el tipo y el detalle al tamaño de su columna, para poder registrar una operación inválida con un tipo largo. Se sumaron pruebas de datos inválidos y de los demás conflictos, porque la cobertura de ramas había bajado de 79,4 % a 74,7 %. |
+| **Descartado** | Procesar todo el lote en un solo ámbito: un fallo dejaba cambios a medias en los DbContext para la operación siguiente. Que Envíos lance excepciones hacia Ejecución: Ejecución no puede conocer `TransicionInvalidaException`, que es interna de Envíos. Pedir las reglas a Administración antes de que exista CU-06. Incluir ahora la carga, la posición y la rendición, que son de Lucas: se rechazan como `TipoNoSoportado` sin cambiar el contrato. |
+| **Verificación** | 18 pruebas de integración nuevas con la sesión real del repartidor; 308 pruebas en total (65 unitarias, 54 de arquitectura y 189 de integración), todas pasan. Cobertura: 93,7 % de líneas y 76,4 % de ramas. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -222,3 +252,5 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.6 | 12/10/2026 | Entrada del ADR-0004. | Ezequiel Marcenal |
 | 0.7 | 14/10/2026 | Entrada de la actualización de seguridad a .NET 10.0.13. | Ezequiel Marcenal |
 | 0.8 | 15/10/2026 | Entrada del dominio de CU-17 y CU-18. | Ezequiel Marcenal |
+| 0.9 | 15/10/2026 | Entrada de la política de CU-30 en la pantalla del Backoffice. | Ezequiel Marcenal |
+| 0.10 | 15/10/2026 | Entrada del endpoint de sincronización (CU-52). | Ezequiel Marcenal |
