@@ -1,4 +1,5 @@
 using Logistica.Http.Contracts.Envios;
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Envios.Application.Features.CancelarEnvio;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +14,8 @@ internal static class CancelarEnvioEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/{id:guid}/cancelacion", CancelarAsync);
+        // CU-16: sólo el usuario de comercio cancela (T17 es suya).
+        group.MapPost("/{id:guid}/cancelacion", CancelarAsync).RequireAuthorization(Politicas.Comercio);
     }
 
     private static async Task<Results<NoContent, NotFound>> CancelarAsync(

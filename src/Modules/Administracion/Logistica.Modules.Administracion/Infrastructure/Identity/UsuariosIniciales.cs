@@ -7,7 +7,8 @@ namespace Logistica.Modules.Administracion.Infrastructure.Identity;
 // Datos iniciales de Identity (ADR-0002, sección 2.8): los perfiles como roles, y usuarios de demostración para
 // entrar como cada operador y como Tienda Demo. Corren al iniciar, después de DatosIniciales; son idempotentes.
 // Usuario no tiene filtro de inquilino (sección 2.4): el operador o el comercio se asignan acá, explícitos.
-internal sealed class UsuariosIniciales(UserManager<Usuario> usuarios, RoleManager<IdentityRole<Guid>> roles)
+internal sealed class UsuariosIniciales(
+    UserManager<Usuario> usuarios, RoleManager<IdentityRole<Guid>> roles, VinculoRepartidor vinculos)
 {
     // Sólo para la demostración y las pruebas. Cumple la política de contraseñas por defecto de Identity.
     public const string ContrasenaDemo = "Demo-2026!";
@@ -29,23 +30,31 @@ internal sealed class UsuariosIniciales(UserManager<Usuario> usuarios, RoleManag
         await CrearAsync(Usuario.CrearPersonal(demo, "Despacho Demo", "despacho@operador-demo.uy"), Perfil.Despachador);
         await CrearAsync(Usuario.CrearPersonal(este, "Administración Este", "admin@envios-del-este.uy"), Perfil.Administrador);
         await CrearAsync(Usuario.CrearPersonal(este, "Despacho Este", "despacho@envios-del-este.uy"), Perfil.Despachador);
-        await CrearAsync(Usuario.CrearPersonal(demo, "Repartidor Demo", "repartidor@operador-demo.uy"), Perfil.Repartidor);
-        await CrearAsync(Usuario.CrearPersonal(este, "Repartidor Este", "repartidor@envios-del-este.uy"), Perfil.Repartidor);
+        var repartidorDemo = await CrearAsync(Usuario.CrearPersonal(demo, "Repartidor Demo", "repartidor@operador-demo.uy"), Perfil.Repartidor);
+        var repartidorEste = await CrearAsync(Usuario.CrearPersonal(este, "Repartidor Este", "repartidor@envios-del-este.uy"), Perfil.Repartidor);
+
+        // Cada usuario repartidor es el primer repartidor de su operador (ADR-0004, sección 2.3).
+        await vinculos.VincularAsync(demo, DatosIniciales.RepartidorDemoId, repartidorDemo.Id, CancellationToken.None);
+        await vinculos.VincularAsync(este, DatosIniciales.RepartidorEsteId, repartidorEste.Id, CancellationToken.None);
+        await CrearAsync(Usuario.CrearPersonal(demo, "Depósito Demo", "deposito@operador-demo.uy"), Perfil.OperarioDeposito);
+        await CrearAsync(Usuario.CrearPersonal(este, "Depósito Este", "deposito@envios-del-este.uy"), Perfil.OperarioDeposito);
 
         // Trabaja con los dos operadores: elige uno en la sesión (CU-03).
         await CrearAsync(Usuario.CrearDeComercio(DatosIniciales.ComercioDemoId, "Tienda Demo", "comercio@tiendademo.uy"),
             Perfil.UsuarioComercio);
     }
 
-    private async Task CrearAsync(Usuario usuario, Perfil perfil)
+    // Devuelve el usuario ya existente o el recién creado.
+    private async Task<Usuario> CrearAsync(Usuario usuario, Perfil perfil)
     {
-        if (await usuarios.FindByEmailAsync(usuario.Email!) is not null)
+        if (await usuarios.FindByEmailAsync(usuario.Email!) is Usuario existente)
         {
-            return;
+            return existente;
         }
 
         Verificar(await usuarios.CreateAsync(usuario, ContrasenaDemo), usuario.Email!);
         Verificar(await usuarios.AddToRoleAsync(usuario, perfil.ToString()), usuario.Email!);
+        return usuario;
     }
 
     // Identity no lanza excepciones: devuelve un resultado. Si el seed falla, la API no arranca a medias.

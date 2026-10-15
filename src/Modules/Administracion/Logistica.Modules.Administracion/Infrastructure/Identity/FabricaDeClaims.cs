@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Logistica.Modules.Administracion.Contracts;
+using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 
@@ -10,7 +11,8 @@ namespace Logistica.Modules.Administracion.Infrastructure.Identity;
 // El usuario de comercio lleva sólo su comercio: el operador lo elige en la sesión (CU-03), y hasta entonces
 // no ve datos de ningún operador (sección 2.6).
 internal sealed class FabricaDeClaims(
-    UserManager<Usuario> usuarios, RoleManager<IdentityRole<Guid>> roles, IOptions<IdentityOptions> opciones)
+    UserManager<Usuario> usuarios, RoleManager<IdentityRole<Guid>> roles, IOptions<IdentityOptions> opciones,
+    VinculoRepartidor vinculos)
     : UserClaimsPrincipalFactory<Usuario, IdentityRole<Guid>>(usuarios, roles, opciones)
 {
     protected override async Task<ClaimsIdentity> GenerateClaimsAsync(Usuario usuario)
@@ -20,6 +22,13 @@ internal sealed class FabricaDeClaims(
         if (usuario.OperadorId is Guid operadorId)
         {
             identidad.AddClaim(new Claim(ClaimsDeSesion.OperadorId, operadorId.ToString()));
+
+            // El repartidor lleva además su Repartidor, para que la sincronización sepa qué rutas son suyas.
+            if (await UserManager.IsInRoleAsync(usuario, nameof(Perfil.Repartidor))
+                && await vinculos.RepartidorDeAsync(operadorId, usuario.Id, CancellationToken.None) is Guid repartidorId)
+            {
+                identidad.AddClaim(new Claim(ClaimsDeSesion.RepartidorId, repartidorId.ToString()));
+            }
         }
 
         if (usuario.ComercioId is Guid comercioId)

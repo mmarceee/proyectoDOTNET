@@ -6,4 +6,8 @@ public static class ClaimsDeSesion
 {
     public const string OperadorId = "operador_id";
     public const string ComercioId = "comercio_id";
+
+    // Usuario con perfil Repartidor vinculado a su Repartidor: la sincronización verifica que la ruta sea suya
+    // (ADR-0004, sección 2.3).
+    public const string RepartidorId = "repartidor_id";
 }

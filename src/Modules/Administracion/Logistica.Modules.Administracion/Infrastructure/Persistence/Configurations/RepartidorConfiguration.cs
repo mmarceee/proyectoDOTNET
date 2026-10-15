@@ -7,5 +7,11 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Configurat
 internal sealed class RepartidorConfiguration : IEntityTypeConfiguration<Repartidor>
 {
     public void Configure(EntityTypeBuilder<Repartidor> b)
-    { b.ToTable("Repartidores"); b.HasIndex(e => new { e.OperadorId, e.Documento }).IsUnique(); }
+    {
+        b.ToTable("Repartidores");
+        b.HasIndex(e => new { e.OperadorId, e.Documento }).IsUnique();
+
+        // Un usuario es, a lo sumo, un repartidor. PostgreSQL no compara los null, así que varios sin usuario no chocan.
+        b.HasIndex(e => e.UsuarioId).IsUnique();
+    }
 }

@@ -1,4 +1,5 @@
 using Logistica.Http.Contracts.Envios;
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Envios.Application.Features.CrearEnvio;
 using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.AspNetCore.Builder;
@@ -13,7 +14,8 @@ internal static class CrearEnvioEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/", CrearAsync);
+        // CU-10: lo crea el usuario de comercio, con el operador de la sesión elegido.
+        group.MapPost("/", CrearAsync).RequireAuthorization(Politicas.Comercio);
     }
 
     private static async Task<Created<CrearEnvioResponse>> CrearAsync(
