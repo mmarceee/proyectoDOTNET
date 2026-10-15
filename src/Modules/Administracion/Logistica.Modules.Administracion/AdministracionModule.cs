@@ -16,6 +16,8 @@ using Logistica.Modules.Administracion.Application.Features.IniciarSesion;
 using Logistica.Modules.Administracion.Application.Features.SeleccionarOperador;
 using Logistica.Modules.Administracion.Contracts;
 using System.Security.Claims;
+using Logistica.Modules.Administracion.Presentation.Autorizacion;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Logistica.Modules.Administracion;
 
@@ -71,6 +73,15 @@ public static class AdministracionModule
 
         // Cada 30 minutos Identity rearma la cookie desde la base (validación del security stamp). El operador que eligió
         // el comercio no está en la base (ADR-0002, sección 2.6): se copia de la cookie anterior (CU-03).
+        // Autorización por perfil (letra, sección 6.3): cada módulo usa estas políticas en sus endpoints.
+        services.AddSingleton<IAuthorizationHandler, VerificadorDePerfil>();
+        services.AddAuthorization(opciones =>
+        {
+            opciones.AddPolicy(Politicas.Comercio, p => p.AddRequirements(new PoliticaDePerfil(Perfil.UsuarioComercio, ExigeOperador: true)));
+            opciones.AddPolicy(Politicas.OperarioDeposito, p => p.AddRequirements(new PoliticaDePerfil(Perfil.OperarioDeposito)));
+            opciones.AddPolicy(Politicas.Administrador, p => p.AddRequirements(new PoliticaDePerfil(Perfil.Administrador)));
+        });
+
         services.AddHttpContextAccessor();
         services.AddOptions<SecurityStampValidatorOptions>().Configure<IHttpContextAccessor>((opciones, accesor) =>
             opciones.OnRefreshingPrincipal = contexto => ConservarOperadorAsync(contexto, accesor));
