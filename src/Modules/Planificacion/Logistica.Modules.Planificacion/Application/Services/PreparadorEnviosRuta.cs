@@ -13,6 +13,9 @@ internal sealed class PreparadorEnviosRuta(IDepositoModuleApi deposito, IAdminis
     {
         var medidas = (await deposito.ObtenerMedidasRecepcionAsync(lista.SelectMany(e => e.Bultos).Select(b => b.Id).ToArray(), ct)).ToDictionary(m => m.BultoId);
         var franjas = await administracion.ResolverFranjasAsync(lista.Where(e => e.FranjaHorariaId != null).Select(e => e.FranjaHorariaId!.Value).ToArray(), fecha, ct);
+        var zonaHoraria = lista.Any(e => e.ReintentoDesde is not null)
+            ? TimeZoneInfo.FindSystemTimeZoneById((await administracion.ObtenerContextoPlanificacionAsync(ct)).ZonaHoraria)
+            : null;
         return lista.Select(e =>
         {
             var zona = e.ZonaId ?? recursos.Zonas.SingleOrDefault(z => z.CodigosPostales.Contains(e.CodigoPostal))?.Id;
@@ -25,7 +28,10 @@ internal sealed class PreparadorEnviosRuta(IDepositoModuleApi deposito, IAdminis
             }).ToList();
             return new EnvioRuta(e.Id, e.Numero, e.FechaEntregaProgramada, zona,
                 f is null ? null : new FranjaRuta(f.Id, f.ZonaId, f.Desde, f.Hasta, f.Dias), e.FranjaHorariaId is not null, carga,
-                e.Punto is null ? null : new PuntoEntrega(e.Punto.Calle, e.Punto.Numero, e.Punto.Localidad, e.Punto.Departamento, e.Punto.CodigoPostal));
+                e.Punto is null ? null : new PuntoEntrega(e.Punto.Calle, e.Punto.Numero, e.Punto.Localidad, e.Punto.Departamento, e.Punto.CodigoPostal),
+                e.ReintentoDesde is DateTimeOffset limite ? TimeZoneInfo.ConvertTime(limite, zonaHoraria!) : null,
+                zonaHoraria is null ? null : new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(
+                    fecha.ToDateTime(f?.Desde ?? TimeOnly.MinValue, DateTimeKind.Unspecified), zonaHoraria)));
         }).ToList();
     }
 }

@@ -12,6 +12,20 @@ Se anticipan en Administración entidades, consultas, migraciones y datos inicia
 
 La programación de cambios de franjas, reprogramación masiva, avisos y T19 son una ampliación de CU-04. Su contrato se define aquí para que CU-40 pueda consumir las vigencias. Su flujo completo no se presenta como una acción de la pantalla de rutas.
 
+### Integración con el plazo entre intentos (CU-18, 15/10/2026)
+
+Envíos publica `ReintentoDesde` como instante opcional de `EnvioPlanificable`, calculado por su dominio y persistido en UTC. Planificación lo consume exclusivamente por ese contrato, sin leer tablas de Envíos (ADR-0001). No vuelve a calcular el plazo ni lo sustituye por las reglas vigentes del operador.
+
+`PreparadorEnviosRuta` resuelve la franja vigente para la fecha y consulta la zona horaria del operador mediante Administración. Convierte el comienzo de esa franja, o las 00:00 del día si el envío no tiene franja, a un instante UTC. `PlanificadorDeRuta` rechaza un comienzo anterior a `ReintentoDesde` con la restricción `PlazoEntreIntentos`; admite la igualdad y no agrega restricciones cuando el dato es nulo. La comparación no depende del reloj ni de la zona horaria del servidor.
+
+La evaluación compartida se usa al prevalidar, crear, agregar, modificar y despachar (CU-43). Se conserva el control al despachar aunque el envío ya esté `AsignadoARuta`: el plazo de Envíos sigue siendo aplicable. Una confirmación vuelve a leer los contratos y evaluar dentro de la unidad de trabajo existente.
+
+El listado devuelve `ReintentoDesde` con el desfase de la zona del operador y `DisponibleParaFecha`. Los candidatos que aún no cumplen el plazo permanecen visibles con la leyenda «Disponible desde», el motivo y su selección deshabilitada. La validación del servidor también rechaza una selección enviada manualmente. No se agregan migraciones en Planificación.
+
+Ejemplo: un fallo el 22/10 a las 11:30 de Montevideo con plazo de 24 horas permite el 23/10 en la franja 14–18, pero no 9–13. Sin franja, ese día tampoco se admite porque comienza antes de las 11:30.
+
+Verificación del 15/10: 81 pruebas de integración de Planificación aprobadas, incluidas las 7 nuevas de `PlazoEntreIntentosTests` (listado, mañana/tarde, igualdad, un segundo antes del límite, inicio del día y relectura al despachar); además, 61 pruebas unitarias y 54 de arquitectura aprobadas. Las pruebas usan PostgreSQL descartable y generan el plazo mediante el dominio de Envíos, con horas del dispositivo en −03:00.
+
 CU-40 completo exige aislamiento, sesión autenticada con perfil Despachador y escritura durable de EnvioAsignadoARuta en Outbox. Un tenant provisorio o un adaptador sin persistencia sólo habilita desarrollo, no satisface esos criterios. El publicador y la entrega de avisos siguen el trabajo transversal del ADR-0003; la integración con el publicador debe probarse antes de declarar disponible el flujo completo de avisos de CU-04.
 
 ### Integración con el trabajo de aislamiento de Ezequiel
