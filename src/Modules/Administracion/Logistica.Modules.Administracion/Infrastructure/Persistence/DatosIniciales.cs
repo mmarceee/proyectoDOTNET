@@ -19,6 +19,10 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
     // Segundo operador (15/10): otra zona, otra flota, otras franjas y otro máximo de paradas por ruta.
     public static readonly Guid OperadorEsteId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
+    // Los repartidores que tienen usuario de demostración (UsuariosIniciales los vincula).
+    public static readonly Guid RepartidorDemoId = Guid.Parse("41111111-1111-1111-1111-111111111111");
+    public static readonly Guid RepartidorEsteId = Guid.Parse("43333333-3333-3333-3333-333333333333");
+
     public async Task SembrarAsync(CancellationToken ct)
     {
         await SembrarComercioAsync(ct);
@@ -53,7 +57,7 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
             Operador.Crear("Operador Demo", "operador-demo", "America/Montevideo", id),
             "envios@tiendademo.uy",
             [
-                Repartidor.Crear(id, "Repartidor Demo 1", "DEMO-1", Guid.Parse("41111111-1111-1111-1111-111111111111")),
+                Repartidor.Crear(id, "Repartidor Demo 1", "DEMO-1", RepartidorDemoId),
                 Repartidor.Crear(id, "Repartidor Demo 2", "DEMO-2", Guid.Parse("42222222-2222-2222-2222-222222222222")),
             ],
             [
@@ -85,7 +89,7 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
             Operador.Crear("Envíos del Este", "envios-del-este", "America/Montevideo", id),
             "logistica@tiendademo.uy",
             [
-                Repartidor.Crear(id, "Repartidor Este 1", "ESTE-1", Guid.Parse("43333333-3333-3333-3333-333333333333")),
+                Repartidor.Crear(id, "Repartidor Este 1", "ESTE-1", RepartidorEsteId),
                 Repartidor.Crear(id, "Repartidor Este 2", "ESTE-2", Guid.Parse("44444444-4444-4444-4444-444444444444")),
             ],
             [
