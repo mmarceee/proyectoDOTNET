@@ -210,6 +210,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Que el envío consulte las reglas a Administración (el dominio no depende de otros módulos); que `Envio` cree la `Devolucion`; guardar la reprogramación sólo en el texto del evento, porque el plazo no se podría hacer cumplir; un conversor global de `DateTimeOffset` en `ModuleDbContext`, porque puede afectar la traducción de las consultas y oculta la regla. |
 | **Verificación** | 15 pruebas unitarias nuevas y 1 de integración (`EnvioPlanificableTests`); 263 pruebas en total (61 unitarias, 54 de arquitectura y 148 de integración), todas pasan. Cobertura: 93,3 % de líneas y 79,2 % de ramas. |
 
+## **3.13 Política de CU-30 en la pantalla del Backoffice**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 15/10/2026 |
+| **Archivos** | `Deposito/Presentation/Features/RecibirBulto/Index.cshtml.cs`; prueba `Deposito/RecepcionPaginaAutorizacionTests` (nueva) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Al revisar las políticas por perfil, la IA detectó que la API de CU-30 exigía *OperarioDeposito* pero la pantalla del Backoffice no: el middleware deja entrar a todo el personal, así que un despachador podía recibir bultos desde la pantalla. |
+| **Cómo se trabajó** | La IA agregó la misma política a la página y una prueba con sesiones reales, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | `[Authorize(Policy = Politicas.OperarioDeposito)]` en el `PageModel`; la prueba: el operario entra y el despachador y el administrador son redirigidos a acceso denegado. |
+| **Modificado** | — |
+| **Descartado** | Restringir la ruta en el middleware de acceso: las políticas por caso de uso viven en cada endpoint y página, como en el resto. |
+| **Verificación** | 289 pruebas (65 unitarias, 54 de arquitectura y 170 de integración), todas pasan. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -222,3 +237,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.6 | 12/10/2026 | Entrada del ADR-0004. | Ezequiel Marcenal |
 | 0.7 | 14/10/2026 | Entrada de la actualización de seguridad a .NET 10.0.13. | Ezequiel Marcenal |
 | 0.8 | 15/10/2026 | Entrada del dominio de CU-17 y CU-18. | Ezequiel Marcenal |
+| 0.9 | 15/10/2026 | Entrada de la política de CU-30 en la pantalla del Backoffice. | Ezequiel Marcenal |
