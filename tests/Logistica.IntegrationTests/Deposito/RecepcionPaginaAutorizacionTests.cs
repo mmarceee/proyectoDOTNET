@@ -35,8 +35,7 @@ public sealed class RecepcionPaginaAutorizacionTests(PostgresApiFactory factory)
 
         var respuesta = await client.GetAsync(Pagina);
 
-        // La cookie manda a la página de acceso denegado en lugar de mostrar la pantalla.
-        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
-        Assert.Contains("AccessDenied", respuesta.Headers.Location?.ToString());
+        // Con sesión pero sin el perfil: 403, sin mostrar la pantalla (no hay página de acceso denegado).
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
     }
 }
