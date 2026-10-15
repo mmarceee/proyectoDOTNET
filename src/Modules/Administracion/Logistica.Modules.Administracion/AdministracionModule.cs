@@ -32,6 +32,11 @@ public static class AdministracionModule
         services.AddScoped<DatosIniciales>();
         services.AddScoped<UsuariosIniciales>();
         services.AddScoped<VinculoRepartidor>();
+
+        // CU-07: identidad visual.
+        services.AddScoped<Domain.Operadores.IOperadorRepository, OperadorRepository>();
+        services.AddScoped<Application.Features.GestionarIdentidadVisual.ConsultarIdentidadVisualHandler>();
+        services.AddScoped<Application.Features.GestionarIdentidadVisual.ActualizarIdentidadVisualHandler>();
         services.AddScoped<IServicioSesion, ServicioSesion>();
         services.AddScoped<Application.Features.SeleccionarOperador.IOperadoresDelComercio, OperadoresDelComercio>();
         services.AddScoped<IRecursosPlanificacionReader, RecursosPlanificacionReader>();
@@ -95,7 +100,8 @@ public static class AdministracionModule
     {
         var group = endpoints.MapGroup("/api/administracion").WithTags("Administracion");
 
-        // Mapear acá los endpoints de Presentation/Features, por ejemplo: CrearEnvioEndpoint.Map(group);
+        // CU-07: la marca del operador de la sesión, para los layouts.
+        Presentation.Features.GestionarIdentidadVisual.MarcaDelOperadorEndpoint.Map(endpoints);
         return endpoints;
     }
 
@@ -122,7 +128,8 @@ public static class AdministracionModule
 
     private static Task ResponderORedirigir(RedirectContext<CookieAuthenticationOptions> contexto, int estado)
     {
-        if (contexto.Request.Path.StartsWithSegments("/api"))
+        // A la API, y a cualquier página cuando el perfil no alcanza (no hay página de acceso denegado): 401 o 403.
+        if (contexto.Request.Path.StartsWithSegments("/api") || estado == StatusCodes.Status403Forbidden)
         {
             contexto.Response.StatusCode = estado;
         }

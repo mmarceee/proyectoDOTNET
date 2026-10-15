@@ -55,6 +55,8 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
 
         return SembrarOperadorAsync(
             Operador.Crear("Operador Demo", "operador-demo", "America/Montevideo", id),
+            // Marca azul (CU-07).
+            new IdentidadVisual("#1A56DB", "#93C5FD", null, "contacto@operador-demo.uy", "+598 2900 0001"),
             "envios@tiendademo.uy",
             [
                 Repartidor.Crear(id, "Repartidor Demo 1", "DEMO-1", RepartidorDemoId),
@@ -87,6 +89,8 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
 
         return SembrarOperadorAsync(
             Operador.Crear("Envíos del Este", "envios-del-este", "America/Montevideo", id),
+            // Marca verde (CU-07): los dos operadores se distinguen a simple vista.
+            new IdentidadVisual("#047857", "#A7F3D0", null, "contacto@envios-del-este.uy", "+598 4372 0002"),
             "logistica@tiendademo.uy",
             [
                 Repartidor.Crear(id, "Repartidor Este 1", "ESTE-1", RepartidorEsteId),
@@ -106,7 +110,7 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
             ct);
     }
 
-    private async Task SembrarOperadorAsync(Operador operador, string emailContacto, Repartidor[] repartidores,
+    private async Task SembrarOperadorAsync(Operador operador, IdentidadVisual identidad, string emailContacto, Repartidor[] repartidores,
         Vehiculo[] vehiculos, Zona zona, FranjaHoraria[] franjas, VersionReglasPlanificacion reglas, CancellationToken ct)
     {
         // Un contexto con este operador como inquilino: el interceptor valida cada fila igual que en un request.
@@ -114,8 +118,16 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
         await using var db = ContextoDe(operador.Id);
 
         // Operador no tiene filtro de inquilino: se busca por Id.
-        if (!await db.Operadores.AnyAsync(o => o.Id == operador.Id, ct))
+        // La identidad se aplica también a un operador ya cargado que todavía tiene la de por defecto.
+        var existente = await db.Operadores.SingleOrDefaultAsync(o => o.Id == operador.Id, ct);
+        if (existente is not null && existente.Identidad == IdentidadVisual.PorDefecto)
         {
+            existente.ActualizarIdentidad(identidad);
+        }
+
+        if (existente is null)
+        {
+            operador.ActualizarIdentidad(identidad);
             db.Operadores.Add(operador);
             db.RelacionesComerciales.Add(
                 RelacionComercial.Crear(operador.Id, ComercioDemoId, emailContacto, reloj.GetUtcNow()));

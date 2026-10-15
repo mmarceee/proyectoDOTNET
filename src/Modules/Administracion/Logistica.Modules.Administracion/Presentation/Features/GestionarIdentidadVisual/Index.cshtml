@@ -1,0 +1,80 @@
+@page "/backoffice/identidad-visual"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarIdentidadVisual.IndexModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Identidad visual";
+}
+
+<h1 class="h3 mb-1">Identidad visual</h1>
+<p class="text-muted mb-4">La marca de @Model.NombreOperador en el Portal del comercio y en el Seguimiento público.</p>
+
+<div asp-validation-summary="All" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+@if (Model.Advertencia is not null)
+{
+    <div class="alert alert-warning" role="alert">@Model.Advertencia</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <form method="post" enctype="multipart/form-data">
+            <div class="row g-3 mb-3">
+                <div class="col-6">
+                    <label asp-for="ColorPrimario" class="form-label">Color primario</label>
+                    <input asp-for="ColorPrimario" type="color" class="form-control form-control-color w-100" />
+                </div>
+                <div class="col-6">
+                    <label asp-for="ColorSecundario" class="form-label">Color secundario</label>
+                    <input asp-for="ColorSecundario" type="color" class="form-control form-control-color w-100" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Logo" class="form-label">Logo (PNG, JPG o SVG, hasta 1 MB)</label>
+                <input asp-for="Logo" type="file" class="form-control" accept="image/png,image/jpeg,image/svg+xml" />
+                @if (Model.TieneLogo)
+                {
+                    <div class="form-text">Ya hay un logo cargado. Si no elegís otro, se conserva.</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="EmailContacto" class="form-label">Correo de contacto</label>
+                <input asp-for="EmailContacto" type="email" class="form-control" />
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="TelefonoContacto" class="form-label">Teléfono de contacto</label>
+                <input asp-for="TelefonoContacto" type="tel" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Guardar</button>
+        </form>
+    </div>
+
+    <div class="col-lg-6">
+        <h2 class="h6 text-muted">Vista previa</h2>
+        <div class="rounded border overflow-hidden">
+            <div data-color="primario" class="p-3 text-white fw-semibold">@Model.NombreOperador</div>
+            <div data-color="secundario" class="p-3">Así se ve el encabezado del Portal.</div>
+        </div>
+    </div>
+</div>
+
+@* Vista previa en vivo (CU-07, paso 4): repinta al mover los selectores de color, sin ir al servidor. *@
+<script>
+    (() => {
+        const primario = document.getElementById('ColorPrimario');
+        const secundario = document.getElementById('ColorSecundario');
+        const pintar = () => {
+            document.querySelector('[data-color="primario"]').style.background = primario.value;
+            document.querySelector('[data-color="secundario"]').style.background = secundario.value;
+        };
+        primario.addEventListener('input', pintar);
+        secundario.addEventListener('input', pintar);
+        pintar();
+    })();
+</script>

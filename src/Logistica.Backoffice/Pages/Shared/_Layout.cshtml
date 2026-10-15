@@ -6,12 +6,20 @@
     <title>@ViewData["Title"] - Backoffice</title>
     <link rel="stylesheet" href="~/_content/Logistica.Backoffice/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/_content/Logistica.Backoffice/css/site.css" asp-append-version="true" />
+    @* La marca del operador de la sesión (CU-07): va última para pisar los colores por defecto. *@
+    <link rel="stylesheet" href="/cuenta/estilo.css" />
 </head>
 <body>
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container">
-                <a class="navbar-brand" href="/backoffice">Backoffice</a>
+                <a class="navbar-brand d-flex align-items-center gap-2" href="/backoffice">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <img src="/cuenta/logo" alt="" height="28" onerror="this.remove()" />
+                    }
+                    Backoffice
+                </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Mostrar navegación">
                     <span class="navbar-toggler-icon"></span>
@@ -32,6 +40,12 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" href="/backoffice/rutas">Rutas</a>
                         </li>
+                        @if (User.IsInRole("Administrador"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/backoffice/identidad-visual">Identidad visual</a>
+                            </li>
+                        }
                     </ul>
                     }
                     @if (User.Identity?.IsAuthenticated == true)
