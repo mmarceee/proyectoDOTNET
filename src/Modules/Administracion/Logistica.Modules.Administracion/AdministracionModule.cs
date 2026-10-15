@@ -31,6 +31,7 @@ public static class AdministracionModule
 
         services.AddScoped<DatosIniciales>();
         services.AddScoped<UsuariosIniciales>();
+        services.AddScoped<VinculoRepartidor>();
         services.AddScoped<IServicioSesion, ServicioSesion>();
         services.AddScoped<Application.Features.SeleccionarOperador.IOperadoresDelComercio, OperadoresDelComercio>();
         services.AddScoped<IRecursosPlanificacionReader, RecursosPlanificacionReader>();
