@@ -1,4 +1,5 @@
 using Logistica.Http.Contracts.Deposito;
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Deposito.Application.Features.RecibirBulto;
 using Logistica.Modules.Deposito.Domain.Recepciones;
 using Microsoft.AspNetCore.Builder;
@@ -14,7 +15,8 @@ internal static class RecibirBultoEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/recepciones", RecibirAsync);
+        // CU-30: sólo el operario de depósito recibe bultos.
+        group.MapPost("/recepciones", RecibirAsync).RequireAuthorization(Politicas.OperarioDeposito);
     }
 
     private static async Task<Ok<RecibirBultoResponse>> RecibirAsync(
