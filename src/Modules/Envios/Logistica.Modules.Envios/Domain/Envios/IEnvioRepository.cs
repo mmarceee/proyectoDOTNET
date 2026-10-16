@@ -27,5 +27,8 @@ internal interface IEnvioRepository
     // CU-16: deja EnvioCancelado en el Outbox; se guarda junto con el cambio de estado en GuardarCambiosAsync.
     void RegistrarCancelacion(Envio envio, string? motivo, DateTimeOffset ahora);
 
+    // CU-19: deja EnvioReprogramado en el Outbox; se guarda junto con la nueva fecha en GuardarCambiosAsync.
+    void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora);
+
     Task GuardarCambiosAsync(CancellationToken ct);
 }

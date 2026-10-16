@@ -10,6 +10,9 @@ public static class Politicas
     // Recibe bultos en el depósito (CU-30).
     public const string OperarioDeposito = "OperarioDeposito";
 
+    // Planifica y ajusta las entregas: por ejemplo, reprograma un envío no entregado (CU-19).
+    public const string Despachador = "Despachador";
+
     // Configura el operador y gestiona usuarios (CU-01 a CU-08).
     public const string Administrador = "Administrador";
 
