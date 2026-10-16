@@ -73,6 +73,13 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             new EnvioCancelado(envio.Id, envio.Numero, motivo, nameof(OrigenEvento.PortalComercio)), ahora);
     }
 
+    public void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora)
+    {
+        db.AgregarAlOutbox(EnvioReprogramado.Tipo,
+            new EnvioReprogramado(envio.Id, envio.Numero, envio.FechaEntregaProgramada!.Value, envio.FranjaHorariaId!.Value,
+                nameof(OrigenEvento.Backoffice)), ahora);
+    }
+
     public void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
     {
         db.AgregarAlOutbox(EnvioDesasignadoDeRuta.Tipo,

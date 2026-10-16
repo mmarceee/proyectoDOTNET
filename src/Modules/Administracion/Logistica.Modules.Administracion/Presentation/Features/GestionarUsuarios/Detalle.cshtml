@@ -1,0 +1,83 @@
+@page "/backoffice/usuarios/{id:guid}"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarUsuarios.DetalleModel
+@using Logistica.Modules.Administracion.Application.Features.GestionarUsuarios
+@using Logistica.Modules.Administracion.Presentation.Features.GestionarUsuarios
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = Model.Usuario.Nombre;
+    var (estado, clase) = TextosUsuario.Estado(Model.Usuario.Estado);
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">@Model.Usuario.Nombre</h1>
+    <a href="/backoffice/usuarios" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+@if (Model.Enlace is not null)
+{
+    <div class="alert alert-info" role="status">
+        <strong>Sólo en desarrollo</strong>, mientras el Worker no manda el correo: <a href="@Model.Enlace">enlace de activación</a>.
+    </div>
+}
+
+<dl class="row">
+    <dt class="col-sm-3">Correo</dt>
+    <dd class="col-sm-9">@Model.Usuario.Email</dd>
+    <dt class="col-sm-3">Perfil</dt>
+    <dd class="col-sm-9">@TextosUsuario.NombreDePerfil(Model.Usuario.Perfil)</dd>
+    @if (Model.Usuario.Comercio is not null)
+    {
+        <dt class="col-sm-3">Comercio</dt>
+        <dd class="col-sm-9">@Model.Usuario.Comercio</dd>
+    }
+    <dt class="col-sm-3">Estado</dt>
+    <dd class="col-sm-9"><span class="badge @clase">@estado</span></dd>
+</dl>
+
+<div class="row g-4">
+    @if (Model.Usuario.EsPersonal && Model.Usuario.Estado != EstadoUsuario.Desactivado)
+    {
+        <div class="col-md-6">
+            <h2 class="h6">Cambiar el perfil</h2>
+            <form method="post" asp-page-handler="Perfil" class="d-flex gap-2">
+                <select asp-for="NuevoPerfil" class="form-select">
+                    @foreach (var perfil in TextosUsuario.PerfilesDelPersonal)
+                    {
+                        <option value="@perfil">@TextosUsuario.NombreDePerfil(perfil)</option>
+                    }
+                </select>
+                <button type="submit" class="btn btn-outline-primary">Cambiar</button>
+            </form>
+        </div>
+
+        <div class="col-md-6">
+            <h2 class="h6">Desactivar</h2>
+            <form method="post" asp-page-handler="Desactivar">
+                <button type="submit" class="btn btn-outline-danger">Desactivar el usuario</button>
+            </form>
+            <div class="form-text">No podrá iniciar sesión, y sus sesiones abiertas se cierran.</div>
+        </div>
+    }
+    else if (!Model.Usuario.EsPersonal)
+    {
+        <div class="col-12 text-muted">
+            Un usuario de comercio no se desactiva: para dejar de trabajar con su comercio se suspende la relación comercial.
+        </div>
+    }
+
+    @if (Model.Usuario.Estado == EstadoUsuario.PendienteDeActivacion)
+    {
+        <div class="col-md-6">
+            <h2 class="h6">Invitación</h2>
+            <form method="post" asp-page-handler="Reenviar">
+                <button type="submit" class="btn btn-outline-secondary">Reenviar la invitación</button>
+            </form>
+            <div class="form-text">El enlace vence a las 48 horas y sirve una sola vez.</div>
+        </div>
+    }
+</div>

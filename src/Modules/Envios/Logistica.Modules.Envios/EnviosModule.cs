@@ -15,6 +15,8 @@ using Logistica.Modules.Envios.Application.Features.ConsultarDetalleEnvio;
 using Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio;
 using Logistica.Modules.Envios.Application.Features.CancelarEnvio;
 using Logistica.Modules.Envios.Presentation.Features.CancelarEnvio;
+using Logistica.Modules.Envios.Application.Features.ReprogramarEnvio;
+using Logistica.Modules.Envios.Presentation.Features.ReprogramarEnvio;
 
 namespace Logistica.Modules.Envios;
 
@@ -34,6 +36,7 @@ public static class EnviosModule
         services.AddScoped<ConsultarEvidenciaHandler>();
         services.AddScoped<CrearEnvioHandler>();
         services.AddScoped<CancelarEnvioHandler>();
+        services.AddScoped<ReprogramarEnvioHandler>();
 
         // Provisorio hasta CU-06: las reglas de entrega y el catálogo de motivos (ver ReglasDeEntregaProvisorias).
         services.AddSingleton<IReglasDeEntrega, Infrastructure.ReglasDeEntregaProvisorias>();
@@ -51,6 +54,7 @@ public static class EnviosModule
 
         CrearEnvioEndpoint.Map(group);
         CancelarEnvioEndpoint.Map(group);
+        ReprogramarEnvioEndpoint.Map(group);
         EvidenciaEndpoint.Map(endpoints);
 
         return endpoints;
