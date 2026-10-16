@@ -253,7 +253,7 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Aceptado sin modificaciones** | `UnidadDeTrabajo.SumarAsync(DbContext)` y `Sumar(DbContext)`: comparan la transacción actual del contexto (`Database.CurrentTransaction`) con la de la unidad y lo suman o lo desenganchan; sin campo por contexto. `ModuleDbContext` e `IdentidadDbContext` los llaman antes de guardar. `Transaccion` vuelve a ser `internal`. |
 | **Modificado** | — |
 | **Descartado** | Dejar la transacción pública: cualquier módulo podría confirmarla o revertirla por fuera de `EjecutarAsync`. Una clase base común para los dos contextos: `IdentidadDbContext` ya hereda de `IdentityDbContext`. |
-| **Verificación** | Dos pruebas nuevas: el mismo contexto se suma a cada unidad nueva y una falla no deshace la anterior; después de una unidad, el contexto vuelve a guardar con su propia transacción. **Pendiente de correr**: Docker no estaba disponible. |
+| **Verificación** | Dos pruebas nuevas: el mismo contexto se suma a cada unidad nueva y una falla no deshace la anterior; después de una unidad, el contexto vuelve a guardar con su propia transacción. Pasan todas las pruebas en Docker (16/10); cobertura: 94,1 % de líneas y 77,5 % de ramas. |
 
 # **4\. Historial de versiones**
 
