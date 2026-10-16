@@ -1,6 +1,8 @@
 using System.Data;
 using System.Data.Common;
 using Logistica.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace Logistica.BuildingBlocks.Infrastructure.Persistence;
@@ -12,8 +14,34 @@ public sealed class UnidadDeTrabajo(string? connectionString) : IUnidadDeTrabajo
 {
     public NpgsqlConnection Conexion { get; } = new(connectionString);
 
-    // La leen ModuleDbContext y el DbContext de Identity antes de guardar, para sumarse a la transacción en curso.
-    public DbTransaction? Transaccion { get; private set; }
+    // La transacción en curso. Internal: nadie de afuera la confirma ni la revierte por su cuenta; los DbContext se suman
+    // a ella con Sumar o SumarAsync.
+    internal DbTransaction? Transaccion { get; private set; }
+
+    // Suma el contexto a la transacción en curso o, si la unidad ya terminó, lo desengancha, para que su próximo guardado
+    // vuelva a tener una transacción propia. Lo llaman antes de guardar ModuleDbContext y el DbContext de Identity, que
+    // no hereda de ModuleDbContext (ADR-0003: el alta de un usuario y su evento se confirman juntos).
+    public async Task SumarAsync(DbContext contexto, CancellationToken ct)
+    {
+        if (!EstaSumado(contexto))
+        {
+            await contexto.Database.UseTransactionAsync(Transaccion, ct);
+        }
+    }
+
+    public void Sumar(DbContext contexto)
+    {
+        if (!EstaSumado(contexto))
+        {
+            contexto.Database.UseTransaction(Transaccion);
+        }
+    }
+
+    // EF recuerda a qué transacción está sumado cada contexto: no hace falta guardarlo aparte.
+    private bool EstaSumado(DbContext contexto)
+    {
+        return contexto.Database.CurrentTransaction?.GetDbTransaction() == Transaccion;
+    }
 
     public async Task EjecutarAsync(Func<Task> trabajo, CancellationToken ct)
     {

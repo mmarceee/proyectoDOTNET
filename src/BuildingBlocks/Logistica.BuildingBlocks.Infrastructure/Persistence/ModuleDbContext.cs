@@ -1,4 +1,3 @@
-using System.Data.Common;
 using System.Diagnostics;
 using System.Reflection;
 using Logistica.SharedKernel;
@@ -11,9 +10,6 @@ namespace Logistica.BuildingBlocks.Infrastructure.Persistence;
 public abstract class ModuleDbContext(DbContextOptions options, string schema, UnidadDeTrabajo unidadDeTrabajo, ICurrentTenant tenant)
     : DbContext(options)
 {
-    // La transacción compartida a la que este DbContext está sumado, para no volver a sumarlo.
-    private DbTransaction? _transaccionCompartida;
-
     // Nombre del filtro global de inquilino (ADR-0002). Se usa en IgnoreQueryFilters([FiltroTenant]).
     public const string FiltroTenant = "Tenant";
 
@@ -49,35 +45,23 @@ public abstract class ModuleDbContext(DbContextOptions options, string schema, U
         optionsBuilder.AddInterceptors(InterceptorTenant);
     }
 
+    // Dentro de una unidad de trabajo, EF no abre su propia transacción: usa la compartida. Cuando la unidad termina,
+    // se desengancha, para que los próximos guardados vuelvan a tener su transacción propia (UnidadDeTrabajo.Sumar).
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        await SumarseATransaccionCompartidaAsync(cancellationToken);
+        await unidadDeTrabajo.SumarAsync(this, cancellationToken);
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        SumarseATransaccionCompartidaAsync(CancellationToken.None).GetAwaiter().GetResult();
+        unidadDeTrabajo.Sumar(this);
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
-    // Dentro de una unidad de trabajo, EF no abre su propia transacción: usa la compartida.
-    // Cuando la unidad termina, se desengancha (UseTransaction(null)) para que los próximos
-    // guardados vuelvan a tener su transacción propia.
-    public Task ParticiparEnTransaccionAsync(CancellationToken ct) => SumarseATransaccionCompartidaAsync(ct);
-
-    private async Task SumarseATransaccionCompartidaAsync(CancellationToken ct)
-    {
-        var compartida = unidadDeTrabajo.Transaccion;
-
-        if (compartida == _transaccionCompartida)
-        {
-            return;
-        }
-
-        await Database.UseTransactionAsync(compartida, ct);
-        _transaccionCompartida = compartida;
-    }
+    // Para una consulta que tiene que correr dentro de la transacción en curso, antes de guardar (por ejemplo, el
+    // bloqueo de CU-40 con SELECT ... FOR UPDATE).
+    public Task ParticiparEnTransaccionAsync(CancellationToken ct) => unidadDeTrabajo.SumarAsync(this, ct);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -240,6 +240,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Procesar todo el lote en un solo ámbito: un fallo dejaba cambios a medias en los DbContext para la operación siguiente. Que Envíos lance excepciones hacia Ejecución: Ejecución no puede conocer `TransicionInvalidaException`, que es interna de Envíos. Pedir las reglas a Administración antes de que exista CU-06. Incluir ahora la carga, la posición y la rendición, que son de Lucas: se rechazan como `TipoNoSoportado` sin cambiar el contrato. |
 | **Verificación** | 18 pruebas de integración nuevas con la sesión real del repartidor; 308 pruebas en total (65 unitarias, 54 de arquitectura y 189 de integración), todas pasan. Cobertura: 93,7 % de líneas y 76,4 % de ramas. |
 
+## **3.15 `UnidadDeTrabajo.Sumar`: un solo lugar para sumar un DbContext a la transacción**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal (acordado con Cristian Reyes, que había sumado Identity a la unidad de trabajo) |
+| **Fecha** | 16/10/2026 |
+| **Archivos** | `UnidadDeTrabajo.cs` y `ModuleDbContext.cs` (BuildingBlocks); `IdentidadDbContext.cs` (Administración); `UnidadDeTrabajoTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Para que el alta de un usuario y su evento se confirmaran juntos, Cristian había hecho pública la `DbTransaction` de la unidad y copiado en `IdentidadDbContext` la lógica de `ModuleDbContext`. La IA propuso concentrar esa lógica en `UnidadDeTrabajo` y volver a hacer `internal` la transacción. |
+| **Cómo se trabajó** | La IA revisó el cambio de Cristian, propuso la alternativa y, a pedido de Ezequiel, la implementó con dos pruebas nuevas. |
+| **Aceptado sin modificaciones** | `UnidadDeTrabajo.SumarAsync(DbContext)` y `Sumar(DbContext)`: comparan la transacción actual del contexto (`Database.CurrentTransaction`) con la de la unidad y lo suman o lo desenganchan; sin campo por contexto. `ModuleDbContext` e `IdentidadDbContext` los llaman antes de guardar. `Transaccion` vuelve a ser `internal`. |
+| **Modificado** | — |
+| **Descartado** | Dejar la transacción pública: cualquier módulo podría confirmarla o revertirla por fuera de `EjecutarAsync`. Una clase base común para los dos contextos: `IdentidadDbContext` ya hereda de `IdentityDbContext`. |
+| **Verificación** | Dos pruebas nuevas: el mismo contexto se suma a cada unidad nueva y una falla no deshace la anterior; después de una unidad, el contexto vuelve a guardar con su propia transacción. Pasan todas las pruebas en Docker (16/10); cobertura: 94,1 % de líneas y 77,5 % de ramas. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -254,3 +269,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.8 | 15/10/2026 | Entrada del dominio de CU-17 y CU-18. | Ezequiel Marcenal |
 | 0.9 | 15/10/2026 | Entrada de la política de CU-30 en la pantalla del Backoffice. | Ezequiel Marcenal |
 | 0.10 | 15/10/2026 | Entrada del endpoint de sincronización (CU-52). | Ezequiel Marcenal |
+| 0.11 | 16/10/2026 | Entrada de `UnidadDeTrabajo.Sumar`. | Ezequiel Marcenal |
