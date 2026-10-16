@@ -22,11 +22,11 @@ internal sealed class NuevoModel(AltaUsuarioHandler alta, IDatosParaUsuarios dat
     [EmailAddress(ErrorMessage = "El correo no es válido.")]
     public string Email { get; set; } = "";
 
-    [BindProperty]
+    [BindProperty(SupportsGet = true)]
     public Perfil Perfil { get; set; } = Perfil.Despachador;
 
     // Paso 4: sólo para el usuario de comercio.
-    [BindProperty]
+    [BindProperty(SupportsGet = true)]
     public Guid? ComercioId { get; set; }
 
     // Paso 4: opcional, sólo para el repartidor.

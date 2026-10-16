@@ -17,7 +17,8 @@ internal sealed class EvaluadorRuta(IRutaRepository rutas, IAdministracionModule
         IReadOnlyList<Guid> todos, IReadOnlyList<Guid> nuevos, Guid? propia, CancellationToken ct)
     {
         var recursos = await administracion.ConsultarRecursosPlanificacionAsync(fecha, ct);
-        if (!recursos.Repartidores.Any(r => r.Id == repartidorId)) throw new DomainException("El repartidor no existe o está inactivo.");
+        var repartidor = recursos.Repartidores.SingleOrDefault(r => r.Id == repartidorId)
+            ?? throw new DomainException("El repartidor no existe o está inactivo.");
         var vehiculoDto = recursos.Vehiculos.SingleOrDefault(v => v.Id == vehiculoId) ?? throw new DomainException("El vehículo no existe o está inactivo.");
         var ocupados = todos.Count == 0 ? [] : await rutas.RecursosOcupadosAsync(fecha, repartidorId, vehiculoId, propia, ct);
         if (ocupados.Count > 0) throw new ConflictoRutaException(ocupados[0], "Un recurso dejó de estar disponible. Elegí otro y confirmá nuevamente.", recursos: ocupados);
@@ -31,12 +32,13 @@ internal sealed class EvaluadorRuta(IRutaRepository rutas, IAdministracionModule
         var preparados = await preparador.PrepararAsync(todos.Select(id => leidos.Single(e => e.Id == id)).ToList(), fecha, recursos, ct);
         var vehiculo = new VehiculoRuta(vehiculoDto.Id, vehiculoDto.CapacidadPesoKg, vehiculoDto.CapacidadVolumenM3,
             vehiculoDto.LargoCargaCm, vehiculoDto.AnchoCargaCm, vehiculoDto.AltoCargaCm);
-        return new(vehiculo, reglas, preparados, PlanificadorDeRuta.Evaluar(fecha, vehiculo, reglas.MaxParadasPorRuta, preparados));
+        return new(vehiculo, reglas, preparados, PlanificadorDeRuta.Evaluar(fecha, vehiculo, reglas.MaxParadasPorRuta, preparados), repartidor);
     }
     public static void ExigirValida(EvaluacionRuta evaluacion)
     { if (!evaluacion.Valida) throw new RestriccionesRutaException(evaluacion.Restricciones); }
     public static EvaluacionRutaResponse Resumen(EvaluacionRuta e, VehiculoRuta v, ReglasPlanificacion reglas)
         => new(e.Valida, e.PesoKg, e.VolumenM3, e.Paradas, v.PesoKg, v.VolumenM3, reglas.MaxParadasPorRuta,
             e.Restricciones.Select(r => new RestriccionRutaResponse(r.Codigo, r.Mensaje, r.EnvioId, r.BultoId)).ToList());
-    internal sealed record DatosEvaluacion(VehiculoRuta Vehiculo, ReglasPlanificacion Reglas, IReadOnlyList<EnvioRuta> Envios, EvaluacionRuta Evaluacion);
+    internal sealed record DatosEvaluacion(VehiculoRuta Vehiculo, ReglasPlanificacion Reglas, IReadOnlyList<EnvioRuta> Envios,
+        EvaluacionRuta Evaluacion, RepartidorPlanificacion Repartidor);
 }

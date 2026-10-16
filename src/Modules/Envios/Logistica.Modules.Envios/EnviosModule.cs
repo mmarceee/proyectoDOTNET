@@ -27,6 +27,7 @@ public static class EnviosModule
     {
         services.AddModuleDbContext<EnviosDbContext>(configuration.GetConnectionString("Postgres"), EnviosDbContext.Schema);
         services.AddScoped<IEnvioRepository, EnvioRepository>();
+        services.AddScoped<Contracts.IEnviosDeComercio, EnviosDeComercio>();
 
         services.AddScoped<IEnviosListadoReader, EnviosListadoReader>();
         services.AddScoped<ConsultarEnviosHandler>();

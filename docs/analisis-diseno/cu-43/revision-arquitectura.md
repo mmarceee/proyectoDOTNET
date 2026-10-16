@@ -2,6 +2,8 @@
 
 Fecha: 14/10/2026. Alcance: cambios locales de despacho; no incluye implementar CU-50, Identity ni el consumidor de avisos.
 
+Actualización del 16/10/2026: la revisión siguiente conserva el estado de la entrega del 14/10. El consumidor, el publicador y la bandeja interna del repartidor se incorporan en la entrega descrita en [CU-43: implementación y prueba local](README.md). La descarga sigue reservada al CU-50.
+
 ## Resultado
 
 El despacho y el registro durable de su evento respetan las reglas revisadas. Se corrigió una desviación de organización: CU-43 estaba dentro del handler y endpoint de CU-40. Ahora tiene command y handler en `Application/Features/DespacharRuta`, endpoint y parcial en `Presentation/Features/DespacharRuta`. El detalle existente del Backoffice invoca el handler, igual que la integración de CU-41. CU-40 y CU-43 comparten `Application/Services/EvaluadorRuta`, sin duplicar las restricciones del dominio.

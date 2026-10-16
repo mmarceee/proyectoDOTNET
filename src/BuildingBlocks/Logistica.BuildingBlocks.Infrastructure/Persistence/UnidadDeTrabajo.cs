@@ -18,29 +18,44 @@ public sealed class UnidadDeTrabajo(string? connectionString) : IUnidadDeTrabajo
     // a ella con Sumar o SumarAsync.
     internal DbTransaction? Transaccion { get; private set; }
 
+    // Sólo esta unidad puede desenganchar las transacciones compartidas a las que sumó un contexto.
+    // Una transacción abierta con BeginTransaction por el propio contexto pertenece a su llamador
+    // (por ejemplo, publicador Outbox y consumidor Inbox), aunque no haya una unidad en curso.
+    private readonly Dictionary<DbContext, DbTransaction> _contextosSumados = [];
+
     // Suma el contexto a la transacción en curso o, si la unidad ya terminó, lo desengancha, para que su próximo guardado
     // vuelva a tener una transacción propia. Lo llaman antes de guardar ModuleDbContext y el DbContext de Identity, que
     // no hereda de ModuleDbContext (ADR-0003: el alta de un usuario y su evento se confirman juntos).
     public async Task SumarAsync(DbContext contexto, CancellationToken ct)
     {
-        if (!EstaSumado(contexto))
+        if (DebeCambiarTransaccion(contexto))
         {
             await contexto.Database.UseTransactionAsync(Transaccion, ct);
         }
+        RegistrarContexto(contexto);
     }
 
     public void Sumar(DbContext contexto)
     {
-        if (!EstaSumado(contexto))
+        if (DebeCambiarTransaccion(contexto))
         {
             contexto.Database.UseTransaction(Transaccion);
         }
+        RegistrarContexto(contexto);
     }
 
-    // EF recuerda a qué transacción está sumado cada contexto: no hace falta guardarlo aparte.
-    private bool EstaSumado(DbContext contexto)
+    private bool DebeCambiarTransaccion(DbContext contexto)
     {
-        return contexto.Database.CurrentTransaction?.GetDbTransaction() == Transaccion;
+        var actual = contexto.Database.CurrentTransaction?.GetDbTransaction();
+        return Transaccion is not null
+            ? actual != Transaccion
+            : _contextosSumados.TryGetValue(contexto, out var compartida) && actual == compartida;
+    }
+
+    private void RegistrarContexto(DbContext contexto)
+    {
+        if (Transaccion is not null) _contextosSumados[contexto] = Transaccion;
+        else _contextosSumados.Remove(contexto);
     }
 
     public async Task EjecutarAsync(Func<Task> trabajo, CancellationToken ct)

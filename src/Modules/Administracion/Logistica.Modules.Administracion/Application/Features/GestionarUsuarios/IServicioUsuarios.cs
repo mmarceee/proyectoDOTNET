@@ -14,6 +14,10 @@ internal interface IServicioUsuarios
     // Un usuario, sólo si es del operador o de uno de sus comercios; si no, null (como si no existiera).
     Task<UsuarioResumen?> ObtenerAsync(Guid usuarioId, Guid operadorId, IReadOnlyCollection<Guid> comercios, CancellationToken ct);
 
+    // CU-43: cuentas del operador activadas, activas y con perfil Repartidor. Consulta por lote;
+    // no expone usuarios de otro operador ni datos de Identity a Planificación.
+    Task<IReadOnlySet<Guid>> UsuariosRepartidoresHabilitadosAsync(Guid operadorId, IReadOnlyCollection<Guid> usuarioIds, CancellationToken ct);
+
     Task<bool> CorreoRegistradoAsync(string email);
 
     // A5: cuántos administradores activos le quedan al operador.

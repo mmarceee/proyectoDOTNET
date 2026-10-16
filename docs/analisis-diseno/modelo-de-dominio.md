@@ -738,7 +738,7 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 
 * moverParada(paradaId: Guid, nuevoOrden: int): void — ajuste manual del despachador (CU-42)
 
-* despachar(): void
+* despachar(): void — cierra la planificación. Antes de invocarlo, la aplicación comprueba mediante el contrato de Administración que el repartidor tenga usuario vinculado del mismo operador, con cuenta activada, activa y perfil Repartidor para la PWA, tanto al prevalidar como al confirmar (CU-43, acuerdo del 16/10/2026). Ante un vínculo ausente o una cuenta no habilitada se conserva Planificada y no se registra evidencia ni evento de despacho. Administración realiza la comprobación de cuenta y rol mediante ServicioUsuarios; el agregado no accede a Identity ni a entidades de Administración.
 
 **Parada**
 

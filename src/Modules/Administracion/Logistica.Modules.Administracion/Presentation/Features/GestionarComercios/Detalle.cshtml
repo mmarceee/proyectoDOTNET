@@ -1,0 +1,72 @@
+@page "/backoffice/comercios/{id:guid}"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarComercios.DetalleModel
+@using Logistica.Modules.Administracion.Domain.Comercios
+@{ Layout = "/Pages/Shared/_Layout.cshtml"; ViewData["Title"] = Model.Comercio.RazonSocial; }
+<h1 class="h3 mb-4">@Model.Comercio.RazonSocial</h1>
+@if (TempData["Mensaje"] is string mensaje) { <div class="alert alert-success" role="status">@mensaje</div> }
+<div asp-validation-summary="All" class="text-danger" role="alert"></div>
+@if (!ViewData.ModelState.IsValid) {
+    <p><a href="/backoffice/comercios/@Model.Id">Recargar detalle</a></p>
+}
+<dl class="row">
+    <dt class="col-sm-3">Documento fiscal</dt><dd class="col-sm-9">@Model.Comercio.DocumentoFiscal</dd>
+    <dt class="col-sm-3">Estado de la relación</dt><dd class="col-sm-9">@Model.Comercio.Estado</dd>
+    <dt class="col-sm-3">Fecha de alta</dt><dd class="col-sm-9">@Model.Comercio.FechaAlta.ToString("dd/MM/yyyy")</dd>
+</dl>
+<p class="text-muted">La razón social y el documento pertenecen al comercio. El correo y el estado se aplican sólo a su relación con tu empresa.</p>
+@if (Model.Comercio.Estado != EstadoRelacion.Baja) {
+    <form method="post" class="mb-4" id="editar-contacto">
+        <input asp-for="Version" type="hidden" />
+        <label asp-for="EmailContacto" class="form-label">Correo de contacto</label>
+        <input asp-for="EmailContacto" class="form-control mb-3" type="email" required readonly />
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary" data-editar>Editar</button>
+            <button type="submit" class="btn btn-primary" name="accion" value="contacto" data-guardar hidden>Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" data-cancelar hidden>Cancelar</button>
+        </div>
+    </form>
+    <form method="post" class="d-flex flex-wrap gap-2 mb-4">
+        <input asp-for="Version" type="hidden" />
+        @if (Model.Comercio.Estado == EstadoRelacion.Activa) {
+            <button class="btn btn-warning" name="accion" value="suspender" onclick="return confirm('¿Suspender la relación? El comercio no podrá crear nuevos envíos con tu empresa.');">Suspender</button>
+        } else {
+            <button class="btn btn-success" name="accion" value="reactivar" onclick="return confirm('¿Reactivar la relación comercial?');">Reactivar</button>
+        }
+        <button class="btn btn-outline-danger" name="accion" value="baja" onclick="return confirm('¿Dar de baja la relación? Esta acción no se puede revertir desde esta pantalla.');">Dar de baja</button>
+    </form>
+} else { <p>Correo de contacto: @Model.Comercio.EmailContacto</p> }
+@if (Model.TieneUsuario) {
+    <p>El comercio ya tiene una cuenta de acceso. Usa la misma cuenta para elegir entre sus operadores activos.</p>
+    <a href="/backoffice/usuarios">Ver usuarios</a>
+} else if (Model.Comercio.Estado == EstadoRelacion.Activa) {
+    <a class="btn btn-outline-primary" href="/backoffice/usuarios/nuevo?Perfil=UsuarioComercio&amp;ComercioId=@Model.Id">Invitar usuario del comercio</a>
+}
+<p class="mt-4"><a href="/backoffice/comercios">Volver a comercios</a></p>
+<script>
+    (() => {
+        const formulario = document.getElementById('editar-contacto');
+        if (!formulario) return;
+        const campo = formulario.querySelector('[name="EmailContacto"]');
+        const editar = formulario.querySelector('[data-editar]');
+        const guardar = formulario.querySelector('[data-guardar]');
+        const cancelar = formulario.querySelector('[data-cancelar]');
+        const cambiarModo = (edicion) => {
+            campo.readOnly = !edicion;
+            editar.hidden = edicion;
+            guardar.hidden = !edicion;
+            cancelar.hidden = !edicion;
+        };
+        editar.addEventListener('click', () => {
+            cambiarModo(true);
+            campo.focus();
+        });
+        cancelar.addEventListener('click', () => {
+            campo.value = campo.defaultValue;
+            cambiarModo(false);
+            editar.focus();
+        });
+        formulario.addEventListener('submit', (evento) => {
+            if (campo.readOnly) evento.preventDefault();
+        });
+    })();
+</script>

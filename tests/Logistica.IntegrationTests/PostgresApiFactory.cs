@@ -18,6 +18,8 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
         // y crea las tablas al iniciar, igual que en docker compose.
         builder.UseSetting("ConnectionStrings:Postgres", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "true");
+        // Los casos de mensajería habilitan su propio broker aislado; nunca usar el de user-secrets.
+        builder.UseSetting("ConnectionStrings:RabbitMQ", "");
         // Las pruebas históricas preparan datos sin sesión; las de seguridad desactivan este respaldo.
         builder.UseSetting("Identity:PermitirTenantProvisorio", "true");
     }

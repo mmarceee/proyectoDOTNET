@@ -29,7 +29,7 @@ internal sealed class DetalleModel(ArmarRutaHandler service, ConsultarRutasHandl
             if (confirmar)
             {
                 await despachar.HandleAsync(new(id, RevisionEsperada), ct);
-                MensajeConfirmacion = "Ruta despachada. El aviso al repartidor quedó pendiente de procesamiento.";
+                MensajeConfirmacion = "Ruta despachada. Se registró el aviso interno; el repartidor podrá verlo cuando termine de procesarse.";
                 return Redirect($"/backoffice/rutas/{id}#resultado-ruta");
             }
             var revision = RevisionEsperada;
