@@ -181,6 +181,27 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         return intento;
     }
 
+    // CU-19, reprogramación manual: el despachador elige la fecha y la franja del nuevo intento de un envío
+    // Reprogramado (T9 la aplicó CU-18). El estado no cambia: sigue Reprogramado, ahora con su nuevo compromiso.
+    // comienzoFranja es cuándo empieza esa franja ese día, en la zona horaria del operador: lo calcula quien llama,
+    // porque las franjas y las zonas horarias son de Administración.
+    public void ElegirNuevoIntento(DateOnly fecha, Guid franjaId, DateTimeOffset comienzoFranja)
+    {
+        if (Estado != EstadoEnvio.Reprogramado)
+        {
+            throw new DomainException("Sólo se elige un nuevo intento para un envío reprogramado.");
+        }
+
+        // A1: no antes del plazo entre intentos (RF 4).
+        if (ReintentoDesde is DateTimeOffset desde && comienzoFranja < desde)
+        {
+            throw new DomainException(
+                $"La franja empieza antes del plazo entre intentos: el envío se puede volver a intentar desde {desde:yyyy-MM-dd HH:mm} UTC.");
+        }
+
+        DefinirPlanificacion(ZonaId, franjaId, fecha);
+    }
+
     // Verifica la transición antes de tocar el envío, para no dejar un intento agregado sin su cambio de estado.
     private void ExigirTransicion(EstadoEnvio nuevo)
     {

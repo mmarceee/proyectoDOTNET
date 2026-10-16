@@ -13,15 +13,15 @@ internal static class Sesion
     public static WebApplicationFactoryClientOptions Opciones =>
         new() { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false };
 
-    // Cada usuario de demostración entra por la página de su aplicación.
-    public static async Task<HttpResponseMessage> IngresarAsync(HttpClient client, string email)
+    // Cada usuario de demostración entra por la página de su aplicación. Sin contraseña, la de demostración.
+    public static async Task<HttpResponseMessage> IngresarAsync(HttpClient client, string email, string? contrasena = null)
     {
         var pagina = email == "comercio@tiendademo.uy" ? "/portal/ingresar"
             : email.StartsWith("repartidor@") ? "/repartidor/ingresar"
             : "/cuenta/ingresar";
 
         var respuesta = await EnviarFormularioAsync(client, pagina,
-            new() { ["Email"] = email, ["Contrasena"] = UsuariosIniciales.ContrasenaDemo });
+            new() { ["Email"] = email, ["Contrasena"] = contrasena ?? UsuariosIniciales.ContrasenaDemo });
 
         Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
         return respuesta;
@@ -33,7 +33,8 @@ internal static class Sesion
         return EnviarFormularioAsync(client, "/cuenta/operador", new() { ["operadorId"] = operadorId.ToString() });
     }
 
-    private static async Task<HttpResponseMessage> EnviarFormularioAsync(
+    // Un formulario de una página, con su token antifalsificación (que se pide a la misma página).
+    public static async Task<HttpResponseMessage> EnviarFormularioAsync(
         HttpClient client, string pagina, Dictionary<string, string> campos)
     {
         campos["__RequestVerificationToken"] = await TokenAsync(client, pagina);

@@ -1,0 +1,81 @@
+@page "/backoffice/usuarios/nuevo"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarUsuarios.NuevoModel
+@using Logistica.Modules.Administracion.Contracts
+@using Logistica.Modules.Administracion.Presentation.Features.GestionarUsuarios
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Nuevo usuario";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Nuevo usuario</h1>
+    <a href="/backoffice/usuarios" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <form method="post">
+            <div class="mb-3">
+                <label asp-for="Nombre" class="form-label">Nombre</label>
+                <input asp-for="Nombre" class="form-control" />
+                <span asp-validation-for="Nombre" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label">Correo</label>
+                <input asp-for="Email" type="email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Perfil" class="form-label">Perfil</label>
+                <select asp-for="Perfil" class="form-select">
+                    @foreach (var perfil in TextosUsuario.PerfilesDelPersonal)
+                    {
+                        <option value="@perfil">@TextosUsuario.NombreDePerfil(perfil)</option>
+                    }
+                    <option value="@Perfil.UsuarioComercio">@TextosUsuario.NombreDePerfil(Perfil.UsuarioComercio)</option>
+                </select>
+            </div>
+
+            <div class="mb-3" data-solo-perfil="@Perfil.UsuarioComercio">
+                <label asp-for="ComercioId" class="form-label">Comercio</label>
+                <select asp-for="ComercioId" class="form-select">
+                    <option value="">Elegí un comercio</option>
+                    @foreach (var comercio in Model.Comercios)
+                    {
+                        <option value="@comercio.Id">@comercio.RazonSocial</option>
+                    }
+                </select>
+                <div class="form-text">Sólo los comercios con una relación activa con el operador.</div>
+            </div>
+
+            <div class="mb-4" data-solo-perfil="@Perfil.Repartidor">
+                <label asp-for="RepartidorId" class="form-label">Repartidor (opcional)</label>
+                <select asp-for="RepartidorId" class="form-select">
+                    <option value="">Sin vincular</option>
+                    @foreach (var repartidor in Model.Repartidores)
+                    {
+                        <option value="@repartidor.Id">@repartidor.Nombre (@repartidor.Documento)</option>
+                    }
+                </select>
+                <div class="form-text">Vincula la cuenta con el repartidor, para que la aplicación sepa qué rutas son suyas.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Crear e invitar</button>
+        </form>
+    </div>
+</div>
+
+@* Muestra el comercio o el repartidor sólo para el perfil que los usa (paso 4). *@
+<script>
+    (() => {
+        const perfil = document.getElementById('Perfil');
+        const mostrar = () => document.querySelectorAll('[data-solo-perfil]').forEach(campo =>
+            campo.hidden = campo.dataset.soloPerfil !== perfil.value);
+        perfil.addEventListener('change', mostrar);
+        mostrar();
+    })();
+</script>

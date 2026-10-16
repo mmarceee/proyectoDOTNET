@@ -1,0 +1,46 @@
+@page "/backoffice/usuarios"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarUsuarios.IndexModel
+@using Logistica.Modules.Administracion.Presentation.Features.GestionarUsuarios
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Usuarios";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Usuarios</h1>
+    <a href="/backoffice/usuarios/nuevo" class="btn btn-primary">Nuevo usuario</a>
+</div>
+
+@if (Model.Usuarios.Count == 0)
+{
+    <p class="text-muted">Todavía no hay usuarios.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Perfil</th>
+                    <th>Comercio</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var usuario in Model.Usuarios)
+                {
+                    var (estado, clase) = TextosUsuario.Estado(usuario.Estado);
+                    <tr>
+                        <td><a href="/backoffice/usuarios/@usuario.Id">@usuario.Nombre</a></td>
+                        <td>@usuario.Email</td>
+                        <td>@TextosUsuario.NombreDePerfil(usuario.Perfil)</td>
+                        <td>@(usuario.Comercio ?? "—")</td>
+                        <td><span class="badge @clase">@estado</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

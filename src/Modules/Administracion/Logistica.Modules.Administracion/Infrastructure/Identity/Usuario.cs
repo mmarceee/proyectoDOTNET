@@ -13,7 +13,26 @@ internal sealed class Usuario : IdentityUser<Guid>
     public Guid? ComercioId { get; private set; }
     public bool Activo { get; private set; }
 
+    // CU-02: recién creado, el usuario no tiene contraseña; la define con el enlace de la invitación.
+    public bool PendienteDeActivacion => PasswordHash is null;
+
+    // Es del personal del operador (no de un comercio).
+    public bool EsPersonal => OperadorId is not null;
+
     private Usuario() { } // para EF Core
+
+    // CU-02, A4: deja de poder iniciar sesión. Al usuario de comercio no se lo desactiva: lo comparten todos los
+    // operadores con los que trabaja su comercio, y para dejar de trabajar con uno se suspende la relación (CU-01).
+    // Cerrar las sesiones abiertas lo hace quien llama, cambiando el security stamp.
+    public void Desactivar()
+    {
+        if (!EsPersonal)
+        {
+            throw new DomainException("A un usuario de comercio no se lo desactiva: se suspende su relación comercial.");
+        }
+
+        Activo = false;
+    }
 
     // Administrador, despachador, repartidor u operario de depósito: trabaja para un solo operador.
     public static Usuario CrearPersonal(Guid operadorId, string nombre, string email, Guid? id = null)

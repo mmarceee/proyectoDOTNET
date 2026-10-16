@@ -38,13 +38,21 @@ public static class AdministracionModule
         services.AddScoped<Application.Features.GestionarIdentidadVisual.ConsultarIdentidadVisualHandler>();
         services.AddScoped<Application.Features.GestionarIdentidadVisual.ActualizarIdentidadVisualHandler>();
         services.AddScoped<IServicioSesion, ServicioSesion>();
+
+        // CU-02: gestionar usuarios.
+        services.AddScoped<Application.Features.GestionarUsuarios.IServicioUsuarios, ServicioUsuarios>();
+        services.AddScoped<Application.Features.GestionarUsuarios.IDatosParaUsuarios, DatosParaUsuarios>();
+        services.AddScoped<Application.Features.GestionarUsuarios.ConsultarUsuariosHandler>();
+        services.AddScoped<Application.Features.GestionarUsuarios.AltaUsuarioHandler>();
+        services.AddScoped<Application.Features.GestionarUsuarios.ModificarUsuarioHandler>();
         services.AddScoped<Application.Features.SeleccionarOperador.IOperadoresDelComercio, OperadoresDelComercio>();
         services.AddScoped<IRecursosPlanificacionReader, RecursosPlanificacionReader>();
         services.AddScoped<Contracts.IAdministracionModuleApi, AdministracionModuleApi>();
 
-        // Identity (CU-02): usuarios y perfiles en su propio DbContext. No usa la unidad de trabajo de los módulos.
-        services.AddDbContext<IdentidadDbContext>(options => options.UseNpgsql(
-            configuration.GetConnectionString("Postgres"),
+        // Identity (CU-02): usuarios y perfiles en su propio DbContext, sobre la conexión de la unidad de trabajo: así el
+        // alta de un usuario y su evento UsuarioCreado (outbox de Administración) se confirman juntos (ADR-0003).
+        services.AddDbContext<IdentidadDbContext>((sp, options) => options.UseNpgsql(
+            sp.GetRequiredService<UnidadDeTrabajo>().Conexion,
             npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", IdentidadDbContext.Schema)));
 
         services.AddIdentityCore<Usuario>(opciones =>
@@ -57,7 +65,12 @@ public static class AdministracionModule
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<IdentidadDbContext>()
             .AddSignInManager()
-            .AddClaimsPrincipalFactory<FabricaDeClaims>();
+            .AddClaimsPrincipalFactory<FabricaDeClaims>()
+            .AddDefaultTokenProviders();
+
+        // CU-02, requerimiento 3: el enlace de invitación vence a las 48 horas. Es de un solo uso porque, al definir la
+        // contraseña, cambia el security stamp y el token deja de valer.
+        services.Configure<DataProtectionTokenProviderOptions>(opciones => opciones.TokenLifespan = TimeSpan.FromHours(48));
 
         // La sesión viaja en una cookie de Identity (propuesta de stack, sección 3.4; letra, sección 6.3).
         services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
@@ -86,13 +99,20 @@ public static class AdministracionModule
             opciones.AddPolicy(Politicas.Comercio, p => p.AddRequirements(new PoliticaDePerfil(Perfil.UsuarioComercio, ExigeOperador: true)));
             opciones.AddPolicy(Politicas.OperarioDeposito, p => p.AddRequirements(new PoliticaDePerfil(Perfil.OperarioDeposito)));
             opciones.AddPolicy(Politicas.Administrador, p => p.AddRequirements(new PoliticaDePerfil(Perfil.Administrador)));
+            opciones.AddPolicy(Politicas.Despachador, p => p.AddRequirements(new PoliticaDePerfil(Perfil.Despachador)));
             opciones.AddPolicy(Politicas.Repartidor, p => p.AddRequirements(
                 new PoliticaDePerfil(Perfil.Repartidor, ExigeOperador: true, ExigeRepartidor: true)));
         });
 
         services.AddHttpContextAccessor();
         services.AddOptions<SecurityStampValidatorOptions>().Configure<IHttpContextAccessor>((opciones, accesor) =>
-            opciones.OnRefreshingPrincipal = contexto => ConservarOperadorAsync(contexto, accesor));
+        {
+            opciones.OnRefreshingPrincipal = contexto => ConservarOperadorAsync(contexto, accesor);
+
+            // CU-02, A4: desactivar o cambiar el perfil cambia el security stamp; las sesiones abiertas se enteran en la
+            // próxima validación. Cada minuto, en lugar de los 30 por defecto, a cambio de una consulta por minuto y sesión.
+            opciones.ValidationInterval = TimeSpan.FromMinutes(1);
+        });
 
 
         return services;
