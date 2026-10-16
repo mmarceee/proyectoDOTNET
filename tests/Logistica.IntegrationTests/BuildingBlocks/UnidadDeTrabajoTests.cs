@@ -68,6 +68,52 @@ public sealed class UnidadDeTrabajoTests : IAsyncLifetime
         Assert.Equal(0L, await ContarAsync(textos));
     }
 
+    // El mismo contexto en dos unidades seguidas: se suma a la segunda, no queda pegado a la primera (ya terminada).
+    // Que la segunda falle no deshace lo confirmado en la primera.
+    [Fact]
+    public async Task El_mismo_DbContext_se_suma_a_cada_unidad_nueva_y_una_falla_no_deshace_la_anterior()
+    {
+        var textos = new[] { $"P-{Guid.NewGuid()}", $"S-{Guid.NewGuid()}" };
+        await using var unidad = new UnidadDeTrabajo(_postgres.GetConnectionString());
+        await using var db = Crear(unidad);
+
+        await unidad.EjecutarAsync(async () =>
+        {
+            db.Notas.Add(new Nota(textos[0]));
+            await db.SaveChangesAsync();
+        }, CancellationToken.None);
+
+        await Assert.ThrowsAsync<DomainException>(() => unidad.EjecutarAsync(async () =>
+        {
+            db.Notas.Add(new Nota(textos[1]));
+            await db.SaveChangesAsync();
+            throw new DomainException("Falla en la segunda unidad.");
+        }, CancellationToken.None));
+
+        Assert.Equal(1L, await ContarAsync([textos[0]]));
+        Assert.Equal(0L, await ContarAsync([textos[1]]));
+    }
+
+    // Después de una unidad, el contexto se desengancha de su transacción (ya cerrada) y guarda con una propia.
+    [Fact]
+    public async Task Despues_de_una_unidad_el_DbContext_vuelve_a_guardar_con_su_propia_transaccion()
+    {
+        var textos = new[] { $"U-{Guid.NewGuid()}", $"F-{Guid.NewGuid()}" };
+        await using var unidad = new UnidadDeTrabajo(_postgres.GetConnectionString());
+        await using var db = Crear(unidad);
+
+        await unidad.EjecutarAsync(async () =>
+        {
+            db.Notas.Add(new Nota(textos[0]));
+            await db.SaveChangesAsync();
+        }, CancellationToken.None);
+
+        db.Notas.Add(new Nota(textos[1]));
+        await db.SaveChangesAsync();
+
+        Assert.Equal(2L, await ContarAsync(textos));
+    }
+
     [Fact]
     public async Task Fuera_de_una_unidad_de_trabajo_cada_DbContext_guarda_con_su_propia_transaccion()
     {
