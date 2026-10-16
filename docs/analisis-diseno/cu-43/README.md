@@ -4,12 +4,12 @@ Actualización: 16/10/2026. Incluye el despacho desde Backoffice y el aviso inte
 
 ## Comportamiento
 
-1. El despachador abre una ruta Planificada con paradas, valida las restricciones y confirma el despacho. La confirmación revalida recursos, reglas vigentes y medidas actuales. Tanto la prevalidación como la confirmación exigen que el repartidor tenga un usuario vinculado para acceder a la PWA. Si falta, se informa el nombre del repartidor y se conserva la ruta Planificada, sin evidencia de despacho ni evento. Crear o modificar la planificación antes de vincular la cuenta sigue permitido.
+1. El despachador abre una ruta Planificada con paradas, valida las restricciones y confirma el despacho. La confirmación revalida recursos, reglas vigentes y medidas actuales. Tanto la prevalidación como la confirmación exigen que el repartidor tenga un usuario vinculado del mismo operador, con cuenta activada, activa y perfil Repartidor. Administración comprueba las cuentas por lote mediante ServicioUsuarios y comunica su habilitación por Contracts, sin exponer datos de Identity a Planificación. Ante un vínculo ausente o una cuenta no habilitada, se informa el problema y se conserva la ruta Planificada, sin evidencia de despacho ni evento. Crear o modificar la planificación antes de habilitar la cuenta sigue permitido.
 2. La ruta pasa a Despachada con fecha/hora y evidencia. La planificación queda bloqueada. Los envíos conservan AsignadoARuta: sólo confirmar carga en CU-51 aplica T5 y los pasa a EnTransito. T4 sólo permite quitar envíos antes del despacho.
 3. El mismo commit guarda RutaDespachada.v1 en el outbox de Planificación. Un fallo revierte estado, evidencia y evento juntos.
 4. El publicador de la API envía el evento a RabbitMQ con confirmación del broker. Sólo entonces marca PublicadoEn. Si el broker falla, el evento sigue pendiente.
 5. El Worker ejecuta el consumidor de Seguimiento. Fija el operador desde las cabeceras del sobre y guarda el aviso y la inbox en una transacción. Reentregar el mismo MessageId no repite el efecto. Un índice único por operador, ruta y revisión evita también duplicar el aviso con otro MessageId.
-6. El repartidor inicia sesión en /repartidor/ y ve sus avisos, ordenados del más reciente al más antiguo. Puede actualizar y paginar. Cada aviso muestra la fecha de la ruta y el momento del despacho; es un hecho histórico, no una consulta del estado actual de ejecución.
+6. El repartidor inicia sesión en /repartidor/ y ve sus avisos, ordenados del más reciente al más antiguo. Puede actualizar y paginar. Cada aviso se presenta como «Ruta del dd/MM/yyyy» y muestra el momento del despacho, sin mostrar el GUID técnico. La ruta no tiene nombre ni numeración comercial propios en el modelo actual. El aviso es un hecho histórico, no una consulta del estado actual de ejecución.
 
 GET /api/repartidor/avisos?pagina=1 devuelve hasta 20 avisos. Exige sesión autenticada y política Repartidor incluso con respaldo de desarrollo. El operador y repartidor salen de la sesión, nunca de parámetros del cliente. La respuesta usa Cache-Control: no-store. No se cachean avisos offline ni se exponen datos de destinatarios.
 
@@ -46,5 +46,7 @@ dotnet test tests/Logistica.ArchitectureTests/Logistica.ArchitectureTests.csproj
 ```
 
 Las cinco pruebas de avisos usan PostgreSQL y RabbitMQ reales en contenedores aislados: despacho y publicación antes de iniciar el Worker, persistencia, reentrega tras reiniciar el consumidor, recuperación del outbox después de una publicación fallida, reintento transitorio, rechazo de mensajes incompletos, aislamiento de operador/repartidor y autorización. Las pruebas existentes cubren rollback del despacho, revalidación y concurrencia con el retiro de paradas.
+
+Las pruebas de despacho incluyen cuentas pendientes de activación, desactivadas, con otro perfil, de otro operador y vínculos a usuarios inexistentes, antes y después de una prevalidación válida. Los rechazos conservan estado y revisión, sin evidencia ni evento de despacho.
 
 Verificado también en Docker Compose con la API y el Worker publicados: inicio de sesión del repartidor, aviso de un despacho real pendiente y actualización de la bandeja. Si el navegador conserva la plantilla de una versión anterior, cerrar sus pestañas de la PWA y volver a abrirla permite activar el service worker actualizado.

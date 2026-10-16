@@ -15,6 +15,7 @@ internal sealed class RelacionComercialConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(r => new { r.OperadorId, r.ComercioId }).IsUnique();
 
         builder.Property(r => r.Estado).HasConversion<string>();
+        builder.Property(r => r.Version).IsRowVersion();
 
         // Las tres tablas son del mismo módulo, así que la base puede garantizar las claves foráneas.
         // Restrict: borrar un operador o un comercio no borra en cascada sus relaciones.

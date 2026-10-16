@@ -40,6 +40,9 @@ public static class AdministracionModule
         services.AddScoped<IServicioSesion, ServicioSesion>();
 
         // CU-02: gestionar usuarios.
+        services.AddScoped<Application.Features.GestionarComercios.IComerciosRepository, ComerciosRepository>();
+        services.AddScoped<Application.Features.GestionarComercios.GestionarComerciosHandler>();
+        services.AddScoped<IRelacionComercialActiva>(sp => sp.GetRequiredService<Application.Features.GestionarComercios.GestionarComerciosHandler>());
         services.AddScoped<Application.Features.GestionarUsuarios.IServicioUsuarios, ServicioUsuarios>();
         services.AddScoped<Application.Features.GestionarUsuarios.IDatosParaUsuarios, DatosParaUsuarios>();
         services.AddScoped<Application.Features.GestionarUsuarios.ConsultarUsuariosHandler>();

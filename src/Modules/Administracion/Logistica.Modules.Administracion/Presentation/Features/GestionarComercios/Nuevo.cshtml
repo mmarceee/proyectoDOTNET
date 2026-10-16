@@ -1,0 +1,33 @@
+@page "/backoffice/comercios/nuevo"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarComercios.NuevoModel
+@{ Layout = "/Pages/Shared/_Layout.cshtml"; ViewData["Title"] = "Nuevo comercio"; }
+<div class="row justify-content-center"><div class="col-md-7 col-lg-5">
+<h1 class="h3 mb-4">Nuevo comercio</h1>
+<div asp-validation-summary="All" class="text-danger" role="alert"></div>
+@if (!Model.Consultado) {
+    <form method="post" asp-page-handler="Buscar">
+        <label asp-for="DocumentoFiscal" class="form-label">Documento fiscal</label>
+        <input asp-for="DocumentoFiscal" class="form-control mb-3" inputmode="numeric" maxlength="12" required />
+        <p class="text-muted">Ingresá los 12 dígitos, sin puntos ni guiones.</p>
+        <button class="btn btn-primary">Buscar comercio</button>
+    </form>
+} else if (Model.Existente?.Vinculado == true) {
+    <p>Este comercio ya está vinculado: <strong>@Model.Existente.RazonSocial</strong>.</p>
+    <a class="btn btn-primary" href="/backoffice/comercios/@Model.Existente.Id">Abrir comercio</a>
+} else {
+    <p>Documento fiscal: <strong>@Model.DocumentoFiscal</strong></p>
+    <form method="post" action="/backoffice/comercios/nuevo" asp-antiforgery="true">
+        <input asp-for="DocumentoFiscal" type="hidden" />
+        @if (Model.Existente is not null) {
+            <p>Se encontró <strong>@Model.Existente.RazonSocial</strong>. Confirmá para vincularlo con tu operador.</p>
+        } else {
+            <label asp-for="RazonSocial" class="form-label">Razón social</label>
+            <input asp-for="RazonSocial" class="form-control mb-3" required />
+        }
+        <label asp-for="EmailContacto" class="form-label">Correo de contacto con tu empresa</label>
+        <input asp-for="EmailContacto" class="form-control mb-3" type="email" required />
+        <button class="btn btn-primary">@(Model.Existente is null ? "Crear comercio" : "Vincular comercio")</button>
+    </form>
+}
+<a class="d-inline-block mt-3" href="/backoffice/comercios">Volver a comercios</a>
+</div></div>

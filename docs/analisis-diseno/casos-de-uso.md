@@ -477,7 +477,7 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | :---- | :---- |
 | **Caso de uso** | CU-43 · Despachar una ruta |
 | **Descripción** | El despachador cierra la planificación de una ruta y la pone a disposición del repartidor, que puede descargarla en la PWA (RF 17). Una ruta despachada ya no se modifica. |
-| **Pre-Condición** | 1. El usuario tiene perfil *Despachador*.<br>2. La ruta está *Planificada* y tiene al menos una parada ordenada.<br>3. El repartidor asignado tiene un usuario vinculado para acceder a la PWA; se comprueba al prevalidar y otra vez al confirmar el despacho. |
+| **Pre-Condición** | 1. El usuario tiene perfil *Despachador*.<br>2. La ruta está *Planificada* y tiene al menos una parada ordenada.<br>3. El repartidor asignado tiene un usuario vinculado del mismo operador, con cuenta activada, activa y perfil Repartidor para acceder a la PWA; se comprueba al prevalidar y otra vez al confirmar el despacho. |
 | **Post-Condición** | **Éxito:** la ruta queda *Despachada*, con la fecha y hora. Se publica `RutaDespachada` por Outbox para avisar al repartidor.<br>**Fracaso:** la ruta sigue *Planificada*. |
 | **Actores** | **Principal:** despachador, desde el Backoffice.<br>**Secundario:** Worker (aviso al repartidor). |
 | **Flujo de evento principal** | 1. El despachador elige **Despachar** en la ruta.<br>2. El sistema vuelve a validar las restricciones (CU-40).<br>3. El sistema pide confirmación.<br>4. El sistema marca la ruta como despachada. |
