@@ -1,0 +1,22 @@
+@page "/backoffice/comercios"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarComercios.IndexModel
+@using Logistica.Modules.Administracion.Domain.Comercios
+@{ Layout = "/Pages/Shared/_Layout.cshtml"; ViewData["Title"] = "Comercios"; }
+<div class="backoffice-page-header mb-4">
+    <h1>Comercios</h1>
+    <a class="btn btn-primary" href="/backoffice/comercios/nuevo">Nuevo comercio</a>
+</div>
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-6"><label asp-for="Buscar" class="form-label">Razón social o documento fiscal</label><input asp-for="Buscar" class="form-control" /></div>
+    <div class="col-md-4"><label asp-for="Estado" class="form-label">Estado</label><select asp-for="Estado" class="form-select"><option value="">Todos</option>@foreach (var estado in Enum.GetValues<EstadoRelacion>()) { <option value="@estado">@estado</option> }</select></div>
+    <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary">Buscar</button></div>
+</form>
+@if (Model.Comercios.Count == 0) { <p>No hay comercios que coincidan con la búsqueda.</p> }
+else {
+<div class="table-responsive"><table class="table align-middle">
+    <thead><tr><th>Razón social</th><th>Documento fiscal</th><th>Estado</th><th>Fecha de alta</th><th>Acciones</th></tr></thead>
+    <tbody>@foreach (var comercio in Model.Comercios) {
+        <tr><td>@comercio.RazonSocial</td><td>@comercio.DocumentoFiscal</td><td>@comercio.Estado</td><td>@comercio.FechaAlta.ToString("dd/MM/yyyy")</td><td><a href="/backoffice/comercios/@comercio.Id">Ver detalle</a></td></tr>
+    }</tbody>
+</table></div>
+}

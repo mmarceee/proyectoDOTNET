@@ -1,34 +1,28 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
+<nav class="navbar navbar-expand-md navbar-dark" aria-label="Navegación principal">
+    <div class="container">
         <a class="navbar-brand" href="">Portal del comercio</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+        <button type="button" class="navbar-toggler" aria-label="Mostrar navegación"
+                aria-controls="main-navigation" aria-expanded="@(!collapseNavMenu ? "true" : "false")"
+                @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
+        <div id="main-navigation" class="navbar-collapse @(collapseNavMenu ? "collapse" : null)">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="CloseNavMenu">Inicio</NavLink>
+                </li>
+                <li class="nav-item"><NavLink class="nav-link" href="envios/nuevo" @onclick="CloseNavMenu">Nuevo envío</NavLink></li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/cuenta/operador?ReturnUrl=%2Fportal%2F">Cambiar operador</a>
+                </li>
+            </ul>
+            <a class="btn btn-sm btn-logout" href="/cuenta/salir?portal=true">Cerrar sesión</a>
+        </div>
     </div>
-</div>
-
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Inicio
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="envios/nuevo">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Nuevo envío
-            </NavLink>
-        </div>
-    </nav>
-</div>
+</nav>
 
 @code {
     private bool collapseNavMenu = true;
-
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
-    }
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
+    private void CloseNavMenu() => collapseNavMenu = true;
 }

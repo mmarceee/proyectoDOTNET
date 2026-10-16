@@ -98,6 +98,10 @@ button.accept-policy {
 }
 
 .btn-logout {
+  --bs-btn-color: #842029;
+  --bs-btn-bg: #f8d7da;
+  --bs-btn-border-color: #f1aeb5;
+  --bs-btn-focus-shadow-rgb: 220, 53, 69;
   --bs-btn-hover-color: #fff;
   --bs-btn-hover-bg: var(--bs-danger, #dc3545);
   --bs-btn-hover-border-color: var(--bs-danger, #dc3545);

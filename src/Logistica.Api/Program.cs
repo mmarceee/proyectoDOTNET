@@ -1,6 +1,7 @@
 using Logistica.Api.Errores;
 using Logistica.Api.Tenancy;
 using Logistica.Api.Seguridad;
+using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Administracion;
 using Logistica.Modules.Deposito;
@@ -55,7 +56,13 @@ builder.Services.AddSingleton(TimeProvider.System);
 // respaldo de Development mientras las pantallas y las pruebas pasan a iniciar sesión.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<TenantProvisorio>();
-builder.Services.AddScoped<ICurrentTenant, TenantDeSesion>();
+builder.Services.AddScoped<InquilinoMensaje>();
+builder.Services.AddScoped<TenantDeSesion>();
+builder.Services.AddScoped<ICurrentTenant>(sp =>
+{
+    var mensaje = sp.GetRequiredService<InquilinoMensaje>();
+    return mensaje.Activo ? mensaje : sp.GetRequiredService<TenantDeSesion>();
+});
 builder.Services.AddAuthorization();
 
 // Backoffice: las páginas viven en Logistica.Backoffice y en Presentation/Features de cada módulo.
@@ -70,6 +77,9 @@ builder.Services
     .AddEjecucionModule(builder.Configuration)
     .AddSeguimientoModule(builder.Configuration)
     .AddDepositoModule(builder.Configuration);
+
+if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("RabbitMQ")))
+    builder.Services.AddHostedService<PublicadorOutbox>();
 
 var app = builder.Build();
 

@@ -126,6 +126,8 @@ Como un comercio puede operar con más de un operador (§3.3), la relación come
 
 **RelacionComercial y Comercio.** RelacionComercial implementa IOperadorOwned e IComercioOwned: el personal de un operador sólo ve las relaciones de su operador, y un comercio sólo ve las suyas. Comercio no tiene filtro de inquilino, porque es compartido entre operadores; por eso los casos de uso de un operador nunca lo consultan directamente, sino siempre a través de RelacionComercial.
 
+**Aclaración de implementación de CU-01 (16/10/2026).** El alta/vinculación prevista en CU-01 A1 necesita identificar un comercio antes de que exista su relación con el operador. Exclusivamente para ese flujo se permite buscar en Comercio por coincidencia exacta del documento fiscal: se devuelve su identificación y razón social, sin consultar ni revelar relaciones con otros operadores. No es una búsqueda global por nombre ni un listado global. Las consultas de listado, detalle y modificación continúan entrando por RelacionComercial con el filtro Tenant. La implementación concentra este acceso en ComerciosRepository.BuscarDocumentoAsync; no utiliza IgnoreQueryFilters.
+
 ## **2.7 Identidad visual y reglas de negocio por tenant**
 
 Una vez resuelto el OperadorId, se carga la configuración de ese operador (colores, logo, cuadro tarifario, reglas operativas: RF 3, RF 4, RF 5) desde la misma base, filtrada igual que el resto. No hace falta ningún mecanismo aparte: es una entidad de configuración más, sujeta al mismo filtro por fila.

@@ -1,6 +1,7 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -125,6 +126,29 @@ public sealed class UnidadDeTrabajoTests : IAsyncLifetime
         await db.SaveChangesAsync();
 
         Assert.Equal(1L, await ContarAsync([texto]));
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task Una_transaccion_propia_se_conserva_hasta_que_su_dueno_confirma_o_revierte(bool guardarAsync, bool confirmar)
+    {
+        var texto = $"Propia-{Guid.NewGuid()}";
+        await using var unidad = new UnidadDeTrabajo(_postgres.GetConnectionString());
+        await using var db = Crear(unidad);
+        await using var transaccion = await db.Database.BeginTransactionAsync();
+
+        db.Notas.Add(new Nota(texto));
+        if (guardarAsync) await db.SaveChangesAsync();
+        else db.SaveChanges();
+
+        Assert.Same(transaccion.GetDbTransaction(), db.Database.CurrentTransaction?.GetDbTransaction());
+        Assert.Equal(0L, await ContarAsync([texto]));
+        if (confirmar) await transaccion.CommitAsync();
+        else await transaccion.RollbackAsync();
+        Assert.Equal(confirmar ? 1L : 0L, await ContarAsync([texto]));
     }
 
     private static PruebaDbContext Crear(UnidadDeTrabajo unidad)

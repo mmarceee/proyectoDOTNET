@@ -1,10 +1,14 @@
 @page "/backoffice/envios/{numero}"
 @model Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio.DetalleModel
+@using Microsoft.AspNetCore.Authorization
+@using Logistica.Modules.Administracion.Contracts
+@inject IAuthorizationService Autorizacion
 
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
     var envio = Model.Detalle;
     ViewData["Title"] = $"Envío {envio.Numero}";
+    var puedeRecibir = (await Autorizacion.AuthorizeAsync(User, Politicas.OperarioDeposito)).Succeeded;
 }
 
 <div class="backoffice-page-header mb-4">
@@ -71,7 +75,10 @@
                     <th scope="col">Largo × ancho × alto (cm)</th>
                     <th scope="col" class="text-end">Tarifa</th>
                     <th scope="col">Recepción</th>
-                    <th scope="col">Acciones</th>
+                    @if (puedeRecibir)
+                    {
+                        <th scope="col">Acciones</th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -83,13 +90,16 @@
                         <td>@bulto.LargoCm.ToString("0.##") × @bulto.AnchoCm.ToString("0.##") × @bulto.AltoCm.ToString("0.##")</td>
                         <td class="text-end">@bulto.MontoTarifa.ToString("0.00")</td>
                         <td><span class="badge @(bulto.Recibido ? "text-bg-success" : "text-bg-secondary")">@(bulto.Recibido ? "Recibido" : "Pendiente")</span></td>
-                        <td>
-                            @if (bulto.PuedeRecepcionar)
-                            {
-                                <a href="@Model.UrlRecepcion(bulto.Codigo)" class="btn btn-outline-primary btn-sm"
-                                   aria-label="Recepcionar bulto @bulto.Codigo">Recepcionar</a>
-                            }
-                        </td>
+                        @if (puedeRecibir)
+                        {
+                            <td>
+                                @if (bulto.PuedeRecepcionar)
+                                {
+                                    <a href="@Model.UrlRecepcion(bulto.Codigo)" class="btn btn-outline-primary btn-sm"
+                                       aria-label="Recepcionar bulto @bulto.Codigo">Recepcionar</a>
+                                }
+                            </td>
+                        }
                     </tr>
                 }
             </tbody>
@@ -97,7 +107,7 @@
                 <tr>
                     <th scope="row" colspan="3">Tarifa total</th>
                     <td class="text-end fw-bold">@envio.MontoTarifa.ToString("0.00")</td>
-                    <td colspan="2"></td>
+                    <td colspan="@(puedeRecibir ? 2 : 1)"></td>
                 </tr>
             </tfoot>
         </table>

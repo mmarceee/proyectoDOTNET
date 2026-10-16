@@ -39,6 +39,21 @@ internal sealed class ServicioUsuarios(
         return await usuarios.FindByEmailAsync(email.Trim()) is not null;
     }
 
+    public async Task<IReadOnlySet<Guid>> UsuariosRepartidoresHabilitadosAsync(
+        Guid operadorId, IReadOnlyCollection<Guid> usuarioIds, CancellationToken ct)
+    {
+        if (operadorId == Guid.Empty || usuarioIds.Count == 0) return new HashSet<Guid>();
+        var ids = usuarioIds.ToArray();
+        var habilitados = await (
+            from usuario in identidad.Users.AsNoTracking()
+            join perfilUsuario in identidad.UserRoles.AsNoTracking() on usuario.Id equals perfilUsuario.UserId
+            join perfil in identidad.Roles.AsNoTracking() on perfilUsuario.RoleId equals perfil.Id
+            where ids.Contains(usuario.Id) && usuario.OperadorId == operadorId && usuario.ComercioId == null
+                && usuario.Activo && usuario.PasswordHash != null && perfil.Name == nameof(Perfil.Repartidor)
+            select usuario.Id).Distinct().ToListAsync(ct);
+        return habilitados.ToHashSet();
+    }
+
     public async Task<int> AdministradoresActivosAsync(Guid operadorId)
     {
         var administradores = await usuarios.GetUsersInRoleAsync(nameof(Perfil.Administrador));

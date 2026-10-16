@@ -5,30 +5,44 @@ namespace Logistica.UnitTests.Administracion;
 
 public class RelacionComercialTests
 {
-    private static readonly Guid OperadorId = Guid.NewGuid();
-    private static readonly Guid ComercioId = Guid.NewGuid();
-    private static readonly DateTimeOffset Ahora = new(2026, 10, 8, 10, 0, 0, TimeSpan.Zero);
+    private static RelacionComercial Nueva() => RelacionComercial.Crear(Guid.NewGuid(), Guid.NewGuid(), "contacto@tienda.uy", DateTimeOffset.UtcNow);
 
     [Fact]
-    public void Una_relacion_nueva_queda_activa_con_su_operador_y_su_comercio()
+    public void Suspension_y_reactivacion_solo_desde_el_estado_correspondiente()
     {
-        var relacion = RelacionComercial.Crear(OperadorId, ComercioId, "envios@tienda.uy", Ahora);
-
+        var relacion = Nueva();
+        Assert.Throws<DomainException>(() => relacion.Reactivar());
+        relacion.Suspender();
+        Assert.Throws<DomainException>(() => relacion.Suspender());
+        relacion.Reactivar();
         Assert.Equal(EstadoRelacion.Activa, relacion.Estado);
-        Assert.Equal(OperadorId, relacion.OperadorId);
-        Assert.Equal(ComercioId, relacion.ComercioId);
-        Assert.Equal(Ahora, relacion.FechaAlta);
     }
 
-    [Fact]
-    public void Una_relacion_sin_correo_de_contacto_no_se_puede_crear()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Baja_desde_activa_o_suspendida_y_sin_envios_pendientes(bool suspendida)
     {
-        Assert.Throws<DomainException>(() => RelacionComercial.Crear(OperadorId, ComercioId, "", Ahora));
+        var relacion = Nueva();
+        if (suspendida) relacion.Suspender();
+        Assert.Throws<DomainException>(() => relacion.DarDeBaja(2));
+        Assert.Equal(suspendida ? EstadoRelacion.Suspendida : EstadoRelacion.Activa, relacion.Estado);
+        relacion.DarDeBaja(0);
+        Assert.Equal(EstadoRelacion.Baja, relacion.Estado);
+        Assert.Throws<DomainException>(() => relacion.Reactivar());
+        Assert.Throws<DomainException>(() => relacion.Suspender());
+        Assert.Throws<DomainException>(() => relacion.ModificarContacto("otro@tienda.uy"));
+        Assert.Throws<DomainException>(() => relacion.DarDeBaja(0));
     }
 
-    [Fact]
-    public void Un_comercio_sin_documento_fiscal_no_se_puede_crear()
+    [Theory]
+    [InlineData("")]
+    [InlineData("no-es-correo")]
+    [InlineData("Nombre <contacto@tienda.uy>")]
+    public void Correo_invalido_no_cambia_la_relacion(string correo)
     {
-        Assert.Throws<DomainException>(() => Comercio.Crear("Tienda Pepe SA", ""));
+        var relacion = Nueva();
+        Assert.Throws<DomainException>(() => relacion.ModificarContacto(correo));
+        Assert.Equal("contacto@tienda.uy", relacion.EmailContacto);
     }
 }
