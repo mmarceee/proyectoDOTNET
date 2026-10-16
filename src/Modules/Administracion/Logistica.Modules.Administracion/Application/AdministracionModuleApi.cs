@@ -14,7 +14,7 @@ internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lecto
         var datos = await lector.LeerRecursosAsync(ct);
         var repartidores = datos.Repartidores; var vehiculos = datos.Vehiculos;
         var zonas = datos.Zonas; var franjas = datos.Franjas;
-        return new(repartidores.Select(r => new RepartidorPlanificacion(r.Id, r.Nombre, r.Activo)).ToList(),
+        return new(repartidores.Select(r => new RepartidorPlanificacion(r.Id, r.Nombre, r.Activo, r.UsuarioId.HasValue)).ToList(),
             vehiculos.Select(v => new VehiculoPlanificacion(v.Id, v.Matricula, v.Activo, v.CapacidadPesoKg,
                 v.CapacidadVolumenM3, v.LargoCargaCm, v.AnchoCargaCm, v.AltoCargaCm)).ToList(),
             zonas.Select(z => new ZonaPlanificacion(z.Id, z.Nombre, z.CodigosPostales)).ToList(),

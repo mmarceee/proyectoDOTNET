@@ -70,6 +70,81 @@ public class DespacharRutaTests(PostgresApiFactory factory) : IClassFixture<Post
     }
 
     [Fact]
+    public async Task Repartidor_sin_usuario_puede_planificarse_pero_no_prevalidar_ni_despachar()
+    {
+        using var client = Cliente();
+        var ruta = await CrearAsync(client, Guid.Parse("42222222-2222-2222-2222-222222222222"));
+        var prevalidacion = await client.PostAsJsonAsync($"/api/planificacion/rutas/{ruta.Id}/despacho/prevalidacion",
+            new DespacharRutaRequest(ruta.Revision));
+        Assert.Equal(HttpStatusCode.BadRequest, prevalidacion.StatusCode);
+        Assert.Contains("usuario vinculado", await prevalidacion.Content.ReadAsStringAsync());
+        var rechazo = await DespacharAsync(client, ruta);
+        Assert.Equal(HttpStatusCode.BadRequest, rechazo.StatusCode);
+        Assert.Contains("usuario vinculado", await rechazo.Content.ReadAsStringAsync());
+
+        var url = $"/backoffice/rutas/{ruta.Id}";
+        var html = await client.GetStringAsync(url);
+        var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+        Assert.True(token.Success);
+        var formulario = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = WebUtility.HtmlDecode(token.Groups[1].Value),
+            ["RevisionEsperada"] = ruta.Revision.ToString(), ["Fecha"] = ruta.Fecha.ToString("yyyy-MM-dd")
+        };
+        foreach (var handler in new[] { "PrepararDespacho", "Despachar" })
+        {
+            var pantalla = await client.PostAsync(url + "?handler=" + handler, new FormUrlEncodedContent(formulario));
+            pantalla.EnsureSuccessStatusCode();
+            var mensaje = WebUtility.HtmlDecode(await pantalla.Content.ReadAsStringAsync());
+            Assert.Contains("Repartidor Demo 2 no tiene un usuario vinculado", mensaje);
+            Assert.DoesNotContain("Confirmar despacho", mensaje);
+        }
+        await ExigirSinDespachoAsync(ruta);
+    }
+
+    [Fact]
+    public async Task Recomprueba_el_usuario_al_confirmar_aunque_la_prevalidacion_haya_sido_valida()
+    {
+        using var client = Cliente();
+        var ruta = await CrearAsync(client);
+        (await client.PostAsJsonAsync($"/api/planificacion/rutas/{ruta.Id}/despacho/prevalidacion",
+            new DespacharRutaRequest(ruta.Revision))).EnsureSuccessStatusCode();
+        using var scope = factory.Services.CreateScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdministracionDbContext>();
+        var repartidor = await admin.Repartidores.SingleAsync(r => r.Id == ruta.RepartidorId);
+        var usuario = repartidor.UsuarioId;
+        Assert.NotNull(usuario);
+        admin.Entry(repartidor).Property(r => r.UsuarioId).CurrentValue = null;
+        await admin.SaveChangesAsync();
+        try
+        {
+            var rechazo = await DespacharAsync(client, ruta);
+            Assert.Equal(HttpStatusCode.BadRequest, rechazo.StatusCode);
+            Assert.Contains("usuario vinculado", await rechazo.Content.ReadAsStringAsync());
+            await ExigirSinDespachoAsync(ruta);
+        }
+        finally
+        {
+            admin.Entry(repartidor).Property(r => r.UsuarioId).CurrentValue = usuario;
+            await admin.SaveChangesAsync();
+        }
+    }
+
+    private async Task ExigirSinDespachoAsync(RutaResponse ruta)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+        var actual = await db.Rutas.AsNoTracking().SingleAsync(r => r.Id == ruta.Id);
+        Assert.Equal(Logistica.Modules.Planificacion.Domain.Rutas.EstadoRuta.Planificada, actual.Estado);
+        Assert.Equal(ruta.Revision, actual.Revision);
+        Assert.Null(actual.DespachadaEn);
+        Assert.False(await db.Validaciones.AnyAsync(v => v.RutaId == ruta.Id
+            && v.Operacion == Logistica.Modules.Planificacion.Domain.Rutas.OperacionValidacionRuta.Despacho));
+        Assert.DoesNotContain(await db.Outbox.Where(m => m.Tipo == "RutaDespachada.v1").ToListAsync(),
+            m => JsonDocument.Parse(m.Contenido).RootElement.GetProperty("RutaId").GetGuid() == ruta.Id);
+    }
+
+    [Fact]
     public async Task Quitar_una_parada_invalida_la_confirmacion_y_ruta_vacia_no_despacha()
     {
         using var client = Cliente();
@@ -207,7 +282,7 @@ public class DespacharRutaTests(PostgresApiFactory factory) : IClassFixture<Post
         => client.SendAsync(new HttpRequestMessage(HttpMethod.Delete,
             $"/api/planificacion/rutas/{ruta.Id}/envios/{ruta.Paradas[0].Envios[0].EnvioId}")
             { Content = JsonContent.Create(new QuitarEnvioDeRutaRequest(ruta.Revision)) });
-    private static async Task<RutaResponse> CrearAsync(HttpClient client)
+    private static async Task<RutaResponse> CrearAsync(HttpClient client, Guid? repartidorId = null)
     {
         var creado = await client.PostAsJsonAsync("/api/envios", new CrearEnvioRequest(
             new DestinatarioRequest("Ana CU43", "099123456", null, null),
@@ -218,7 +293,7 @@ public class DespacharRutaTests(PostgresApiFactory factory) : IClassFixture<Post
         (await client.PostAsJsonAsync("/api/deposito/recepciones", new RecibirBultoRequest(envio.Numero + "-1", null))).EnsureSuccessStatusCode();
         var fecha = new DateOnly(2039, 1, 1).AddDays(Interlocked.Increment(ref _dia));
         var response = await client.PostAsJsonAsync("/api/planificacion/rutas", new CrearRutaRequest(fecha,
-            Guid.Parse("41111111-1111-1111-1111-111111111111"), Guid.Parse("51111111-1111-1111-1111-111111111111"), [envio.Id]));
+            repartidorId ?? Guid.Parse("41111111-1111-1111-1111-111111111111"), Guid.Parse("51111111-1111-1111-1111-111111111111"), [envio.Id]));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<RutaResponse>())!;
     }

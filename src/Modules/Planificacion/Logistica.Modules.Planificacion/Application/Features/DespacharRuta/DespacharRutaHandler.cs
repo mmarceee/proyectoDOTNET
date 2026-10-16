@@ -47,6 +47,8 @@ internal sealed class DespacharRutaHandler(IRutaRepository rutas, IAdministracio
     {
         var datos = await evaluador.CargarAsync(ruta.Fecha, ruta.RepartidorId, ruta.VehiculoId,
             ruta.EnvioIds.ToArray(), [], ruta.Id, ct);
+        if (!datos.Repartidor.TieneUsuarioVinculado)
+            throw new DomainException($"No se puede despachar la ruta: {datos.Repartidor.Nombre} no tiene un usuario vinculado para acceder a la PWA. Vinculá su cuenta o elegí otro repartidor antes de despachar.");
         ExigirValida(datos.Evaluacion);
         return datos;
     }

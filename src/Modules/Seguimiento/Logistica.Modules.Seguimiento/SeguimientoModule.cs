@@ -3,6 +3,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.BuildingBlocks.Infrastructure.Messaging;
+using Logistica.Modules.Planificacion.Contracts.Events;
+using Logistica.Modules.Seguimiento.Application.Abstractions;
+using Logistica.Modules.Seguimiento.Application.Features.ConsultarAvisos;
+using Logistica.Modules.Seguimiento.Infrastructure.Messaging;
+using Logistica.Modules.Seguimiento.Infrastructure.Persistence;
 
 namespace Logistica.Modules.Seguimiento;
 
@@ -11,15 +18,17 @@ public static class SeguimientoModule
 {
     public static IServiceCollection AddSeguimientoModule(this IServiceCollection services, IConfiguration configuration)
     {
-        // Registrar acá handlers, DbContext y adaptadores del módulo.
+        services.AddModuleDbContext<SeguimientoDbContext>(configuration.GetConnectionString("Postgres"), SeguimientoDbContext.Schema);
+        services.AddScoped<IAvisosRepository, AvisosRepository>();
+        services.AddScoped<ConsultarAvisosHandler>();
+        services.AddKeyedScoped<IConsumidorIntegracion, NotificarRutaDespachada>(NotificarRutaDespachada.Cola);
+        services.AddSingleton(new SuscripcionIntegracion(NotificarRutaDespachada.Cola, RutaDespachada.Tipo));
         return services;
     }
 
     public static IEndpointRouteBuilder MapSeguimientoEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/seguimiento").WithTags("Seguimiento");
-
-        // Mapear acá los endpoints de Presentation/Features, por ejemplo: CrearEnvioEndpoint.Map(group);
+        Presentation.Features.ConsultarAvisos.ConsultarAvisosEndpoint.Map(endpoints);
         return endpoints;
     }
 }
