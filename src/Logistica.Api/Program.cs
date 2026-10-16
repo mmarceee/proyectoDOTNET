@@ -19,15 +19,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHealthChecks();
 
 // Trazas distribuidas (letra, sección 6.12): cada request, sus consultas a PostgreSQL y las fuentes propias de los
-// módulos, como la sincronización de la PWA (ADR-0004, sección 2.9). Se exportan por OTLP a Aspire Dashboard cuando
-// OTEL_EXPORTER_OTLP_ENDPOINT está configurado (docker-compose.yml). Métricas y logs llegan con el hito del 5/11.
+// módulos, como la sincronización de la PWA (ADR-0004, sección 2.9), y la publicación del outbox, que el Worker
+// continúa (ADR-0003, sección 2.9). Se exportan por OTLP a Aspire Dashboard cuando OTEL_EXPORTER_OTLP_ENDPOINT está
+// configurado (docker-compose.yml). Métricas y logs llegan con el hito del 5/11.
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(recurso => recurso.AddService("logistica-api"))
     .WithTracing(trazas =>
     {
         trazas.AddAspNetCoreInstrumentation()
             .AddNpgsql()
-            .AddSource(EjecucionModule.FuenteDeTrazas);
+            .AddSource(EjecucionModule.FuenteDeTrazas, TrazasMensajeria.Fuente);
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
         {

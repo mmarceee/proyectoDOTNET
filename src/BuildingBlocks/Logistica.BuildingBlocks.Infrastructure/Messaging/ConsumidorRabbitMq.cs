@@ -23,12 +23,17 @@ public sealed class ConsumidorRabbitMq(IServiceScopeFactory ambitos, IConfigurat
                 // Canal secuencial: nunca hay publicaciones o acks concurrentes sobre el mismo canal.
                 while (canal.IsOpen && !stoppingToken.IsCancellationRequested)
                 {
+                    var procesados = 0;
                     foreach (var s in suscripciones)
                     {
                         var entrega = await canal.BasicGetAsync(s.Cola, autoAck: false, stoppingToken);
-                        if (entrega is not null) await ProcesarEntregaAsync(canal, s, entrega, stoppingToken);
+                        if (entrega is null) continue;
+                        await ProcesarEntregaAsync(canal, s, entrega, stoppingToken);
+                        procesados++;
                     }
-                    await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken);
+                    // Espera sólo si todas las colas estaban vacías: con mensajes pendientes, la vuelta siguiente
+                    // arranca enseguida, y la demora no limita cuántos mensajes por segundo procesa cada cola.
+                    if (procesados == 0) await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
@@ -43,11 +48,13 @@ public sealed class ConsumidorRabbitMq(IServiceScopeFactory ambitos, IConfigurat
 
     private async Task ProcesarEntregaAsync(IChannel canal, SuscripcionIntegracion s, BasicGetResult entrega, CancellationToken ct)
     {
+        Activity? traza = null;
         try
         {
             var mensaje = RabbitMqTransport.Leer(entrega.BasicProperties, entrega.Body);
+            // Hijo del span de publicación (cabecera traceparent): la operación se sigue de la API al Worker.
+            traza = TrazasMensajeria.IniciarProcesamiento(s.Cola, mensaje);
             if (mensaje.Tipo != s.Tipo) throw new InvalidDataException("Tipo de evento inesperado.");
-            using var traza = new Activity("mensaje.consumir").SetParentId(mensaje.TraceParent ?? "").Start();
             await using var ambito = ambitos.CreateAsyncScope();
             ambito.ServiceProvider.GetRequiredService<InquilinoMensaje>().Fijar(mensaje);
             await ambito.ServiceProvider.GetRequiredKeyedService<IConsumidorIntegracion>(s.Cola).ProcesarAsync(mensaje, ct);
@@ -65,10 +72,19 @@ public sealed class ConsumidorRabbitMq(IServiceScopeFactory ambitos, IConfigurat
             propiedades.Headers["cola-origen"] = s.Cola;
             propiedades.Headers["ultimo-error"] = e.GetType().Name;
             propiedades.Persistent = true;
-            logger.LogWarning(e, "Mensaje {MessageId} de {Cola} enviado a {Destino}, intento {Intento}.",
-                propiedades.MessageId, s.Cola, destino, intento + 1);
+            traza?.SetStatus(ActivityStatusCode.Error, e.GetType().Name);
+            traza?.SetTag("logistica.mensaje.intento", intento + 1);
+            traza?.SetTag("logistica.mensaje.destino", destino);
+            // ADR-0003, sección 2.9: MessageId, tipo, cola, inquilino e intento. Nunca el contenido del evento.
+            logger.LogWarning(e, "Mensaje {MessageId} ({Tipo}, operador {OperadorId}) de {Cola} enviado a {Destino}, intento {Intento}.",
+                propiedades.MessageId, propiedades.Type, RabbitMqTransport.Cabecera(propiedades, "operador-id"),
+                s.Cola, destino, intento + 1);
             // No se confirma el original hasta que el broker confirme la copia durable.
             await canal.BasicPublishAsync("", destino, mandatory: true, propiedades, entrega.Body, ct);
+        }
+        finally
+        {
+            traza?.Dispose();
         }
         await canal.BasicAckAsync(entrega.DeliveryTag, multiple: false, ct);
     }

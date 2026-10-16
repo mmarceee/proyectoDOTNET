@@ -270,6 +270,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Las versiones 1.20.0 de OpenTelemetry, publicadas el día anterior. Métricas y logs: quedan para el hito de observabilidad del 5/11. Colgar las operaciones del request del lote: un lote junta operaciones registradas en momentos y trazas distintas. |
 | **Verificación** | Prueba nueva: con un `CorrelacionId` del dispositivo, el `TraceParent` del evento `EnvioEntregado` del outbox pertenece a la misma traza. 353 pruebas (87 unitarias, 54 de arquitectura y 212 de integración), todas pasan. |
 
+## **3.17 Revisión de la mensajería y trazas del publicador y del consumidor**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 16/10/2026 |
+| **Archivos** | `TrazasMensajeria.cs` (nuevo), `PublicadorOutbox.cs`, `ConsumidorRabbitMq.cs` y `RabbitMqTransport.cs` (BuildingBlocks); `Program.cs` de la API y del Worker; `Logistica.Worker.csproj`; `TrazasMensajeriaTests` (nuevo); ADR-0003 v1.2 |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Revisar contra el ADR-0003 la mensajería que implementó Lucas Ottonello con CU-43 y completar la sección 2.9: seguir una operación de la API a RabbitMQ y al Worker en una sola traza. |
+| **Cómo se trabajó** | La IA comparó el código con cada sección del ADR. Confirmó lo que cumple: `SKIP LOCKED`, confirmaciones del broker, el sobre en cabeceras, la inbox en la misma transacción y la copia al reintento confirmada antes del *ack*. Encontró dos problemas: las actividades se creaban sin `ActivitySource`, así que OpenTelemetry no las exportaba, y el Worker no tenía OpenTelemetry; y el consumidor esperaba 250 ms en cada vuelta aunque hubiera mensajes, lo que lo limitaba a unos 4 mensajes por segundo por cola. Escribió las correcciones y la prueba, actualizó el ADR y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | Fuente `Logistica.Mensajeria` con un span productor hijo del request y un span consumidor hijo de la publicación; la cabecera `traceparent` lleva el span de publicación. Error, intento y destino en el span de un mensaje que falla. El log del reintento con tipo e inquilino, nunca con el contenido. Espera del consumidor sólo cuando todas las colas están vacías. |
+| **Modificado** | — |
+| **Descartado** | Reemplazar `BasicGet` por `BasicConsume`: con la espera corregida alcanza, y un solo canal evita publicaciones y confirmaciones simultáneas. Llevar `OcurridoEn` con milisegundos en una cabecera: se documenta la precisión en segundos de `timestamp`. |
+| **Verificación** | Prueba nueva: el span del consumidor del Worker es hijo del span de publicación, que es hijo del request que guardó el evento. 385 pruebas (90 unitarias, 54 de arquitectura y 241 de integración), todas pasan. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -286,3 +301,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.10 | 15/10/2026 | Entrada del endpoint de sincronización (CU-52). | Ezequiel Marcenal |
 | 0.11 | 16/10/2026 | Entrada de `UnidadDeTrabajo.Sumar`. | Ezequiel Marcenal |
 | 0.12 | 16/10/2026 | Entrada de las trazas y la correlación de la sincronización. | Ezequiel Marcenal |
+| 0.13 | 16/10/2026 | Entrada de la revisión de la mensajería y sus trazas. | Ezequiel Marcenal |
