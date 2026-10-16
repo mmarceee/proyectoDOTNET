@@ -1,4 +1,3 @@
-using System.Data.Common;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -17,34 +16,18 @@ internal sealed class IdentidadDbContext(DbContextOptions<IdentidadDbContext> op
 {
     public const string Schema = "identidad";
 
-    // La transacción compartida a la que este contexto está sumado, para no volver a sumarlo.
-    private DbTransaction? _transaccionCompartida;
-
+    // Igual que ModuleDbContext: dentro de una unidad de trabajo usa la transacción compartida; fuera de ella,
+    // la suya propia. La lógica está una sola vez, en UnidadDeTrabajo.Sumar.
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        await SumarseATransaccionCompartidaAsync(cancellationToken);
+        await unidadDeTrabajo.SumarAsync(this, cancellationToken);
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        SumarseATransaccionCompartidaAsync(CancellationToken.None).GetAwaiter().GetResult();
+        unidadDeTrabajo.Sumar(this);
         return base.SaveChanges(acceptAllChangesOnSuccess);
-    }
-
-    // Igual que ModuleDbContext: dentro de una unidad de trabajo usa la transacción compartida; fuera de ella,
-    // la suya propia.
-    private async Task SumarseATransaccionCompartidaAsync(CancellationToken ct)
-    {
-        var compartida = unidadDeTrabajo.Transaccion;
-
-        if (compartida == _transaccionCompartida)
-        {
-            return;
-        }
-
-        await Database.UseTransactionAsync(compartida, ct);
-        _transaccionCompartida = compartida;
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
