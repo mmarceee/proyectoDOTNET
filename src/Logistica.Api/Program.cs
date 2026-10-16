@@ -9,10 +9,30 @@ using Logistica.Modules.Envios;
 using Logistica.Modules.Planificacion;
 using Logistica.Modules.Seguimiento;
 using Logistica.SharedKernel;
+using Npgsql;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
+
+// Trazas distribuidas (letra, sección 6.12): cada request, sus consultas a PostgreSQL y las fuentes propias de los
+// módulos, como la sincronización de la PWA (ADR-0004, sección 2.9). Se exportan por OTLP a Aspire Dashboard cuando
+// OTEL_EXPORTER_OTLP_ENDPOINT está configurado (docker-compose.yml). Métricas y logs llegan con el hito del 5/11.
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(recurso => recurso.AddService("logistica-api"))
+    .WithTracing(trazas =>
+    {
+        trazas.AddAspNetCoreInstrumentation()
+            .AddNpgsql()
+            .AddSource(EjecucionModule.FuenteDeTrazas);
+
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+        {
+            trazas.AddOtlpExporter();
+        }
+    });
 
 // Errores como ProblemDetails; las reglas de negocio violadas responden 400. Una escritura sobre datos
 // de otro inquilino responde 404, igual que un recurso inexistente (ADR-0002, sección 2.9).

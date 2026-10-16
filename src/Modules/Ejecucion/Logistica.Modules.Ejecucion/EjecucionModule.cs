@@ -15,6 +15,9 @@ namespace Logistica.Modules.Ejecucion;
 // Punto de entrada del módulo: lo único público que usa el host (ADR-0001, addendum 2).
 public static class EjecucionModule
 {
+    // Nombre de la fuente de trazas del módulo: el host la suma a OpenTelemetry (ADR-0004, sección 2.9).
+    public const string FuenteDeTrazas = "Logistica.Ejecucion";
+
     public static IServiceCollection AddEjecucionModule(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddModuleDbContext<EjecucionDbContext>(configuration.GetConnectionString("Postgres"), EjecucionDbContext.Schema);

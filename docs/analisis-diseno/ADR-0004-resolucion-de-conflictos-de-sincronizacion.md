@@ -283,3 +283,4 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 | 1.0 | 15/10/2026 | Aprobado por el equipo (Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes). | Ezequiel Marcenal |
 | 1.1 | 15/10/2026 | Sección 2.7: la hora del dispositivo se guarda como el mismo instante en UTC. | Ezequiel Marcenal |
 | 1.2 | 15/10/2026 | Sección 7: el lado del servidor y la autenticación del repartidor quedan implementados. | Ezequiel Marcenal |
+| 1.3 | 16/10/2026 | Sección 2.9: la correlación está implementada. Cada operación es una actividad de la fuente `Logistica.Ejecucion` cuyo padre es el `CorrelacionId` del dispositivo; el request de la sincronización queda como vínculo, y el evento del outbox guarda esa traza. | Ezequiel Marcenal |

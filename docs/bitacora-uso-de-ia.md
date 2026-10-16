@@ -255,6 +255,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Dejar la transacción pública: cualquier módulo podría confirmarla o revertirla por fuera de `EjecutarAsync`. Una clase base común para los dos contextos: `IdentidadDbContext` ya hereda de `IdentityDbContext`. |
 | **Verificación** | Dos pruebas nuevas: el mismo contexto se suma a cada unidad nueva y una falla no deshace la anterior; después de una unidad, el contexto vuelve a guardar con su propia transacción. Pasan todas las pruebas en Docker (16/10); cobertura: 94,1 % de líneas y 77,5 % de ramas. |
 
+## **3.16 Trazas: OpenTelemetry en la API y correlación de la sincronización**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 16/10/2026 |
+| **Archivos** | `Directory.Packages.props`, `Logistica.Api.csproj` y `Program.cs`; `EjecucionModule.cs` y `ProcesadorEnAmbitoPropio.cs` (Ejecución); prueba en `SincronizacionTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que una operación de la PWA se pueda seguir de punta a punta con un identificador de correlación (letra, sección 6.12; ADR-0004, sección 2.9). La IA detectó que OpenTelemetry todavía no estaba configurado, así que no había traza que continuar. |
+| **Cómo se trabajó** | La IA propuso sumar sólo las trazas, eligió versiones de los paquetes publicadas hace más de dos semanas, escribió la configuración, la actividad por operación y la prueba, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | OpenTelemetry con instrumentación de ASP.NET Core y Npgsql y la fuente `Logistica.Ejecucion`; exportador OTLP sólo si `OTEL_EXPORTER_OTLP_ENDPOINT` está configurado (Docker Compose apunta a Aspire Dashboard). Cada operación es una actividad hija del `traceparent` del dispositivo, con un vínculo al request del lote; el evento del outbox hereda esa traza. |
+| **Modificado** | — |
+| **Descartado** | Las versiones 1.20.0 de OpenTelemetry, publicadas el día anterior. Métricas y logs: quedan para el hito de observabilidad del 5/11. Colgar las operaciones del request del lote: un lote junta operaciones registradas en momentos y trazas distintas. |
+| **Verificación** | Prueba nueva: con un `CorrelacionId` del dispositivo, el `TraceParent` del evento `EnvioEntregado` del outbox pertenece a la misma traza. 353 pruebas (87 unitarias, 54 de arquitectura y 212 de integración), todas pasan. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -270,3 +285,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.9 | 15/10/2026 | Entrada de la política de CU-30 en la pantalla del Backoffice. | Ezequiel Marcenal |
 | 0.10 | 15/10/2026 | Entrada del endpoint de sincronización (CU-52). | Ezequiel Marcenal |
 | 0.11 | 16/10/2026 | Entrada de `UnidadDeTrabajo.Sumar`. | Ezequiel Marcenal |
+| 0.12 | 16/10/2026 | Entrada de las trazas y la correlación de la sincronización. | Ezequiel Marcenal |
