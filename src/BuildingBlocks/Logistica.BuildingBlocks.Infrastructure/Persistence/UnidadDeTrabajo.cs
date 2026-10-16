@@ -12,8 +12,8 @@ public sealed class UnidadDeTrabajo(string? connectionString) : IUnidadDeTrabajo
 {
     public NpgsqlConnection Conexion { get; } = new(connectionString);
 
-    // La lee ModuleDbContext antes de guardar, para sumarse a la transacción en curso.
-    internal DbTransaction? Transaccion { get; private set; }
+    // La leen ModuleDbContext y el DbContext de Identity antes de guardar, para sumarse a la transacción en curso.
+    public DbTransaction? Transaccion { get; private set; }
 
     public async Task EjecutarAsync(Func<Task> trabajo, CancellationToken ct)
     {
