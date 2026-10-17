@@ -290,6 +290,25 @@ public class PlanificacionIdentityTests(PostgresApiFactory factory) : IClassFixt
         Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/repartidor/")).StatusCode);
     }
 
+    [Fact]
+    public async Task Manifiesto_del_repartidor_es_json_publico_sin_habilitar_la_aplicacion()
+    {
+        using var client = factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false"))
+            .CreateClient(new WebApplicationFactoryClientOptions
+                { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        var respuesta = await client.GetAsync("/repartidor/manifest.webmanifest");
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        using var manifiesto = JsonDocument.Parse(await respuesta.Content.ReadAsStringAsync());
+        Assert.Equal("Repartidor", manifiesto.RootElement.GetProperty("short_name").GetString());
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/repartidor/")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/repartidor/index.html")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/repartidor/hoja-de-ruta")).StatusCode);
+
+        await IngresarAsync(client, "despacho@operador-demo.uy");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/repartidor/manifest.webmanifest")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/repartidor/")).StatusCode);
+    }
+
     private static async Task<HttpResponseMessage> IngresarAsync(HttpClient client, string email, string? retorno = null)
     {
         var login = email.StartsWith("repartidor@") ? "/repartidor/ingresar"

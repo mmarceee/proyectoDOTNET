@@ -7,10 +7,11 @@
 <div class="text-center">
     <h1 class="h3 mb-4">Cerrar sesión</h1>
     <p>¿Querés cerrar la sesión de @User.Identity?.Name?</p>
-    <form method="post" asp-antiforgery="true">
+    <form method="post" asp-antiforgery="true" data-cerrar-espacio>
         <input asp-for="Portal" type="hidden" />
         <input asp-for="Repartidor" type="hidden" />
         <button class="btn btn-danger" type="submit">Cerrar sesión</button>
         <a class="btn btn-outline-secondary" href="@(Model.Repartidor ? "/repartidor/" : Model.Portal ? "/portal/" : "/backoffice")">Cancelar</a>
     </form>
 </div>
+<script type="module" src="~/_content/Logistica.Backoffice/js/repartidor-cuenta.js"></script>

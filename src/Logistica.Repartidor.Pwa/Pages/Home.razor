@@ -37,6 +37,9 @@
             <span class="badge text-bg-success mb-2">Planificación cerrada</span>
             <h2 class="h4">Ruta del @aviso.FechaRuta.ToString("dd/MM/yyyy")</h2>
             <p>Tenés una ruta despachada para esta fecha. El despachador cerró su planificación.</p>
+            @if (aviso.FechaRuta == fechaOperativa) {
+                <p><a class="btn btn-outline-primary" href="hoja-de-ruta">Ver mi ruta</a></p>
+            }
             <dl class="row mb-0">
                 <dt class="col-md-4">Despachada</dt><dd class="col-md-8">@aviso.DespachadaEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd>
             </dl>
@@ -62,6 +65,7 @@
     private string? error;
     private int pagina = 1;
     private DateTimeOffset? consultadoEn;
+    private DateOnly? fechaOperativa;
 
     protected override Task OnInitializedAsync() => CargarAsync();
     private async Task ActualizarAsync() { pagina = 1; await CargarAsync(); }
@@ -75,6 +79,10 @@
         avisos = [];
         try
         {
+            fechaOperativa = null;
+            using var sesion = await Http.GetAsync("/api/repartidor/sesion");
+            if (sesion.IsSuccessStatusCode)
+                fechaOperativa = (await sesion.Content.ReadFromJsonAsync<SesionRepartidorResponse>())?.FechaOperativa;
             using var response = await Http.GetAsync($"/api/repartidor/avisos?pagina={pagina}");
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {

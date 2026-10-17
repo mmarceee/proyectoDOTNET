@@ -1,0 +1,70 @@
+@page "/hoja-de-ruta"
+@using Logistica.Repartidor.Pwa.Services
+@implements IDisposable
+@inject HojaDeRutaService Hoja
+
+<PageTitle>Mi ruta</PageTitle>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <h1 class="mb-0">Mi ruta</h1>
+    <button class="btn btn-primary" @onclick="Hoja.ActualizarAsync" disabled="@Hoja.Cargando">Actualizar descarga</button>
+</div>
+@if (Hoja.Cargando) { <p role="status">Descargando y guardando tu hoja de ruta…</p> }
+@if (Hoja.Error is not null) { <div class="alert alert-warning" role="alert">@Hoja.Error</div> }
+@if (Hoja.RequiereIngreso) {
+    <a class="btn btn-primary" href="/repartidor/ingresar">Iniciar sesión</a>
+} else {
+    @if (Hoja.SinRuta) { <div class="alert alert-info">No tenés una ruta despachada para hoy.</div> }
+    @if (Hoja.Copia is { } copia) {
+        var ruta = copia.Hoja;
+        var anterior = Hoja.SinConexion || Hoja.SinRuta || ruta.FechaRuta != Hoja.Sesion?.FechaOperativa;
+        <section class="card mb-4">
+            <div class="card-body">
+                <h2 class="h4">@(anterior ? "Última ruta descargada" : "Ruta") del @ruta.FechaRuta.ToString("dd/MM/yyyy")</h2>
+                <p class="mb-2">
+                    <span class="badge text-bg-secondary">@Estado(ruta.EstadoRuta)</span>
+                    @if (Hoja.SinConexion) { <span class="badge text-bg-warning">Sin conexión</span> }
+                </p>
+                <p class="mb-1">Vehículo: <strong>@ruta.Vehiculo.Matricula</strong> · @string.Join(", ", ruta.Zonas.Select(z => z.Nombre))</p>
+                <p class="mb-1">@Cantidad(ruta.Paradas.Count, "parada", "paradas") · @Cantidad(ruta.Paradas.Sum(p => p.Envios.Count), "envío", "envíos")</p>
+                <p class="small text-muted mb-0">Guardada en este dispositivo: @copia.DescargadaEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                @if (Hoja.SinConexion) { <p class="text-muted mb-0 mt-2">Estás viendo la última descarga. Los cambios del servidor se verán al recuperar la conexión.</p> }
+                else if (anterior) { <p class="text-warning mb-0 mt-2">Esta copia es una consulta anterior; no confirma una ruta activa para hoy.</p> }
+            </div>
+        </section>
+        @foreach (var parada in ruta.Paradas.OrderBy(p => p.Orden)) {
+            <details class="card mb-3">
+                <summary class="card-header p-3">
+                    <strong>Parada @parada.Orden · @parada.Direccion</strong>
+                    <span class="d-block text-muted small">@Cantidad(parada.Envios.Count, "envío", "envíos") @Horario(parada.Desde, parada.Hasta)</span>
+                </summary>
+                <div class="card-body">
+                    @foreach (var envio in parada.Envios) {
+                        <section class="mb-4">
+                            <h3 class="h5">Envío @envio.Numero <span class="badge text-bg-secondary">@Estado(envio.Estado)</span></h3>
+                            <p class="mb-1"><strong>@envio.DestinatarioNombre</strong> · <a href="@("tel:" + Uri.EscapeDataString(envio.DestinatarioTelefono))">@envio.DestinatarioTelefono</a></p>
+                            <p class="mb-1">@envio.Direccion.Calle @envio.Direccion.Numero, @envio.Direccion.Localidad, @envio.Direccion.Departamento · CP @envio.Direccion.CodigoPostal</p>
+                            @if (!string.IsNullOrWhiteSpace(envio.Direccion.Referencia)) { <p class="mb-1">Referencia: @envio.Direccion.Referencia</p> }
+                            @if (envio.Franja is { } franja) { <p class="mb-1">Franja: @franja.Desde.ToString("HH:mm")–@franja.Hasta.ToString("HH:mm")</p> }
+                            <p class="mb-1">Bultos (@envio.Bultos.Count): @string.Join(", ", envio.Bultos.Select(b => b.Codigo))</p>
+                        </section>
+                    }
+                </div>
+            </details>
+        }
+    } else if (!Hoja.Cargando && !Hoja.SinRuta) {
+        <p>No hay una hoja guardada para usar sin conexión. Descargala cuando tengas conexión y una ruta despachada para hoy.</p>
+    }
+}
+@code {
+    protected override void OnInitialized() => Hoja.Cambio += ActualizarVista;
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await Hoja.ActualizarAsync(); }
+    private void ActualizarVista() => _ = InvokeAsync(StateHasChanged);
+    private static string Horario(TimeOnly? desde, TimeOnly? hasta) => desde is null || hasta is null ? "" : $"· {desde:HH:mm}–{hasta:HH:mm}";
+    private static string Cantidad(int cantidad, string singular, string plural) => $"{cantidad} {(cantidad == 1 ? singular : plural)}";
+    private static string Estado(string estado) => estado switch {
+        "AsignadoARuta" => "Asignado a ruta", "EnCurso" => "En curso", "EnTransito" => "En tránsito",
+        "EnDeposito" => "En depósito", "NoEntregado" => "No entregado", "EnDevolucion" => "En devolución",
+        _ => estado
+    };
+    public void Dispose() => Hoja.Cambio -= ActualizarVista;
+}

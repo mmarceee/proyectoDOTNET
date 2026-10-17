@@ -10,6 +10,7 @@
 # Resultados de pruebas y reporte de cobertura
 TestResults/
 /coverage/
+**/node_modules/
 
 # Configuración local
 .env

@@ -7,6 +7,7 @@ namespace Logistica.Modules.Envios.Application;
 // (ReglasDeEntregaProvisorias); después se reemplaza por una que las pida a Administración, sin tocar el dominio.
 internal interface IReglasDeEntrega
 {
+    Task<Contracts.ReglasParaHoja> ParaHojaAsync(Envio envio, CancellationToken ct);
     Task<ReglasEntrega> DelEnvioAsync(Envio envio, CancellationToken ct);
 
     // null si el motivo no está en el catálogo de la versión de reglas del envío.

@@ -1,0 +1,10 @@
+{
+  "name": "logistica-pruebas-pwa",
+  "private": true,
+  "scripts": {
+    "test": "node --test repartidor-hoja-ruta.test.mjs repartidor-service-worker.test.cjs"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.6"
+  }
+}

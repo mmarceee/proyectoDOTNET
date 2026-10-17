@@ -15,7 +15,10 @@ internal sealed class AccesoAplicacionesMiddleware(RequestDelegate next)
             || http.Request.Path.StartsWithSegments("/api/deposito");
         // El ingreso del Portal tiene que poder abrirse sin sesión.
         if (http.Request.Path.Equals(new PathString("/portal/ingresar"))
-            || http.Request.Path.Equals(new PathString("/repartidor/ingresar")))
+            || http.Request.Path.Equals(new PathString("/repartidor/ingresar"))
+            // El navegador solicita el manifiesto sin credenciales por defecto.
+            // Sólo contiene metadatos públicos; la app y las APIs conservan su protección.
+            || http.Request.Path.Equals(new PathString("/repartidor/manifest.webmanifest")))
         {
             await next(http);
             return;

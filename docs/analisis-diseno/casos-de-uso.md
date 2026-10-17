@@ -501,6 +501,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujos alternativos** | **A1 · Sin ruta despachada (paso 3).** El sistema informa que no hay ruta para el día.<br><br>**A2 · Sin conexión (paso 2).** La PWA muestra la última ruta descargada e indica cuándo se descargó.<br><br>**A3 · La ruta cambió después de descargarla.** En la siguiente sincronización (CU-52), la PWA recibe la versión actualizada. |
 | **Requerimientos especiales** | 1. **Cifrado en reposo** de los datos personales guardados en el dispositivo (sección 6.3).<br>2. Se descarga sólo lo necesario para trabajar: minimización de datos personales.<br>3. La aplicación misma queda en caché por el service worker (addendum 5). |
 
+**Implementación de CU-50 (17/10/2026):** la PWA incorpora Mi ruta, descarga completa y almacenamiento cifrado en IndexedDB. Consulta sólo la ruta propia del día operativo; admite Despachada y EnCurso para poder recuperar la hoja durante la jornada. La descarga no cambia estados ni genera eventos. Se acordó usar el proveedor de reglas de entrega actual, declarado provisorio, preparando el contrato para CU-06. Véanse [alcance y verificación](cu-50/README.md) y [diseño](cu-50/diseno-cu-50.md).
+
 ### **CU-51 · Escanear la carga del vehículo**
 
 | Campo | Contenido |
