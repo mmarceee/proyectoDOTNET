@@ -32,4 +32,9 @@ internal sealed class PlanificacionModuleApi(IRutaRepository rutas) : IPlanifica
             && ruta.Estado is EstadoRuta.Despachada or EstadoRuta.EnCurso
             && ruta.EnvioIds.Contains(envioId);
     }
+
+    public Task<bool> HayRutasActivasConEnviosAsync(IReadOnlyCollection<Guid> envioIds, DateOnly desde, CancellationToken ct)
+    {
+        return envioIds.Count == 0 ? Task.FromResult(false) : rutas.HayActivasConEnviosAsync(envioIds, desde, ct);
+    }
 }

@@ -1,7 +1,9 @@
 using Logistica.BuildingBlocks.Infrastructure.Tenancy;
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Administracion.Domain.Comercios;
 using Logistica.Modules.Administracion.Domain.Operadores;
 using Logistica.Modules.Administracion.Domain.Planificacion;
+using Logistica.Modules.Administracion.Domain.Tarifas;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -28,6 +30,9 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
         await SembrarComercioAsync(ct);
         await SembrarOperadorDemoAsync(ct);
         await SembrarOperadorEsteAsync(ct);
+        await SembrarTarifarioAsync(OperadorDemoId, DatosTarifarioDemo(), [], ct);
+        await SembrarTarifarioAsync(OperadorEsteId, DatosTarifarioEste(),
+            [new DatosAjusteTarifa(TipoAjuste.Recargo, true, 30, Modalidad.Urgente)], ct);
     }
 
     // El comercio es global y trabaja con los dos operadores (letra, §3.3): se crea una sola vez.
@@ -159,6 +164,60 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
             db.ReglasPlanificacion.Add(reglas);
         }
 
+        await db.SaveChangesAsync(ct);
+    }
+
+    // CU-05. Demo: precios por modalidad, dos tramos de peso. Este: los mismos precios para las dos modalidades, con
+    // tramos más grandes y un recargo del 30 % a Urgente. Así los dos operadores cobran distinto el mismo bulto.
+    private static DatosReglaTarifa[] DatosTarifarioDemo()
+    {
+        var zona = Guid.Parse("61111111-1111-1111-1111-111111111111");
+        return
+        [
+            new(zona, Modalidad.Estandar, 0, 5, 0, 0.1m, 150),
+            new(zona, Modalidad.Estandar, 5, 30, 0, 0.5m, 300),
+            new(zona, Modalidad.Urgente, 0, 5, 0, 0.1m, 250),
+            new(zona, Modalidad.Urgente, 5, 30, 0, 0.5m, 450),
+        ];
+    }
+
+    private static DatosReglaTarifa[] DatosTarifarioEste()
+    {
+        var zona = Guid.Parse("63333333-3333-3333-3333-333333333333");
+        return
+        [
+            new(zona, Modalidad.Estandar, 0, 10, 0, 0.2m, 180),
+            new(zona, Modalidad.Estandar, 10, 30, 0, 0.5m, 350),
+            new(zona, Modalidad.Urgente, 0, 10, 0, 0.2m, 180),
+            new(zona, Modalidad.Urgente, 10, 30, 0, 0.5m, 350),
+        ];
+    }
+
+    // La versión 1 vigente desde el 1/1/2026, sembrada con el operador como inquilino, como el resto.
+    private async Task SembrarTarifarioAsync(Guid operadorId, DatosReglaTarifa[] reglas, DatosAjusteTarifa[] ajustes,
+        CancellationToken ct)
+    {
+        await using var db = ContextoDe(operadorId);
+        if (await db.VersionesTarifario.AnyAsync(ct))
+        {
+            return;
+        }
+
+        var version = VersionTarifario.CrearBorrador(operadorId, 1, null);
+        foreach (var regla in reglas)
+        {
+            version.AgregarRegla(regla);
+        }
+
+        foreach (var ajuste in ajustes)
+        {
+            version.AgregarAjuste(ajuste);
+        }
+
+        // Se publica "como si fuera" el 1/1/2026: por eso ese mismo día se pasa como "ahora" y A3 no lo rechaza.
+        var inicio = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        version.Publicar(inicio, inicio, null);
+        db.VersionesTarifario.Add(version);
         await db.SaveChangesAsync(ct);
     }
 

@@ -14,7 +14,9 @@ internal sealed class Zona : Entity, IOperadorOwned
     public static Zona Crear(Guid operador, string codigo, string nombre, string[] postales, Guid? id = null)
     {
         if (operador == Guid.Empty || string.IsNullOrWhiteSpace(codigo)) throw new DomainException("La zona necesita código, nombre y cobertura.");
-        var zona = new Zona(id ?? Guid.CreateVersion7()) { OperadorId = operador, Codigo = codigo.Trim(), Activa = true };
+        // El código se guarda en mayúsculas: "mvd-1" y "MVD-1" son la misma zona (A1).
+        var zona = new Zona(id ?? Guid.CreateVersion7())
+            { OperadorId = operador, Codigo = codigo.Trim().ToUpperInvariant(), Activa = true };
         zona.Modificar(nombre, postales);
         return zona;
     }

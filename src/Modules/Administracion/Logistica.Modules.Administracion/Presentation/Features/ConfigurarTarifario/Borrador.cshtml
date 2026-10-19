@@ -1,0 +1,149 @@
+@page "/backoffice/tarifario/borrador"
+@model Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario.BorradorModel
+@using Logistica.Modules.Administracion.Contracts
+@using Logistica.Modules.Administracion.Domain.Tarifas
+@using Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = $"Borrador · versión {Model.Borrador.Numero}";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Versión @Model.Borrador.Numero <span class="badge text-bg-warning align-middle">Borrador</span></h1>
+    <a href="/backoffice/tarifario" class="btn btn-outline-secondary">Volver a las versiones</a>
+</div>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+
+<h2 class="h5">Reglas</h2>
+<p class="text-muted small">Precio base de un bulto según zona, modalidad, peso y volumen. "Desde" incluido, "hasta" excluido.</p>
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr><th>Zona</th><th>Modalidad</th><th>Peso (kg)</th><th>Volumen (m³)</th><th>Precio</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var regla in Model.Borrador.Reglas)
+            {
+                <tr>
+                    <td>@regla.Zona</td>
+                    <td>@TextosTarifario.Modalidad(regla.Modalidad)</td>
+                    <td>@TextosTarifario.Numero(regla.PesoDesdeKg) a @TextosTarifario.Numero(regla.PesoHastaKg)</td>
+                    <td>@TextosTarifario.Numero(regla.VolumenDesdeM3) a @TextosTarifario.Numero(regla.VolumenHastaM3)</td>
+                    <td>$ @TextosTarifario.Numero(regla.PrecioBase)</td>
+                    <td>
+                        <form method="post" asp-page-handler="QuitarRegla" asp-route-id="@regla.Id">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Quitar</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<form method="post" asp-page-handler="Regla" class="row g-2 align-items-end mb-4">
+    <div class="col-md-3">
+        <label asp-for="ZonaId" class="form-label">Zona</label>
+        <select asp-for="ZonaId" class="form-select">
+            @foreach (var zona in Model.Zonas)
+            {
+                <option value="@zona.Id">@zona.Codigo · @zona.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="Modalidad" class="form-label">Modalidad</label>
+        <select asp-for="Modalidad" class="form-select">
+            <option value="@Modalidad.Estandar">Estándar</option>
+            <option value="@Modalidad.Urgente">Urgente</option>
+        </select>
+    </div>
+    <div class="col-6 col-md-1"><label asp-for="PesoDesde" class="form-label">Kg desde</label><input asp-for="PesoDesde" class="form-control" inputmode="decimal" /></div>
+    <div class="col-6 col-md-1"><label asp-for="PesoHasta" class="form-label">Kg hasta</label><input asp-for="PesoHasta" class="form-control" inputmode="decimal" /></div>
+    <div class="col-6 col-md-1"><label asp-for="VolumenDesde" class="form-label">m³ desde</label><input asp-for="VolumenDesde" class="form-control" inputmode="decimal" /></div>
+    <div class="col-6 col-md-1"><label asp-for="VolumenHasta" class="form-label">m³ hasta</label><input asp-for="VolumenHasta" class="form-control" inputmode="decimal" /></div>
+    <div class="col-6 col-md-1"><label asp-for="Precio" class="form-label">Precio</label><input asp-for="Precio" class="form-control" inputmode="decimal" /></div>
+    <div class="col-md-2"><button type="submit" class="btn btn-outline-primary">Agregar regla</button></div>
+</form>
+
+<h2 class="h5">Ajustes</h2>
+<p class="text-muted small">Recargos y bonificaciones por modalidad. El porcentaje se calcula sobre el precio base.</p>
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead><tr><th>Tipo</th><th>Valor</th><th>Modalidad</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var ajuste in Model.Borrador.Ajustes)
+            {
+                <tr>
+                    <td>@TextosTarifario.Ajuste(ajuste.Tipo)</td>
+                    <td>@TextosTarifario.Valor(ajuste)</td>
+                    <td>@TextosTarifario.Modalidad(ajuste.Modalidad)</td>
+                    <td>
+                        <form method="post" asp-page-handler="QuitarAjuste" asp-route-id="@ajuste.Id">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Quitar</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<form method="post" asp-page-handler="Ajuste" class="row g-2 align-items-end mb-4">
+    <div class="col-md-2">
+        <label asp-for="TipoAjuste" class="form-label">Tipo</label>
+        <select asp-for="TipoAjuste" class="form-select">
+            <option value="@TipoAjuste.Recargo">Recargo</option>
+            <option value="@TipoAjuste.Bonificacion">Bonificación</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="ValorAjuste" class="form-label">Valor</label>
+        <input asp-for="ValorAjuste" class="form-control" inputmode="decimal" />
+    </div>
+    <div class="col-md-2 form-check ms-2 mb-2">
+        <input asp-for="EsPorcentaje" class="form-check-input" />
+        <label asp-for="EsPorcentaje" class="form-check-label">Es porcentaje</label>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="ModalidadAjuste" class="form-label">Modalidad</label>
+        <select asp-for="ModalidadAjuste" class="form-select">
+            <option value="@Modalidad.Estandar">Estándar</option>
+            <option value="@Modalidad.Urgente">Urgente</option>
+        </select>
+    </div>
+    <div class="col-md-2"><button type="submit" class="btn btn-outline-primary">Agregar ajuste</button></div>
+</form>
+
+<h2 class="h5">Publicar</h2>
+<p class="text-muted small">Una versión publicada no se modifica. Los envíos ya admitidos conservan su precio.</p>
+@if (Model.SinTarifa.Count > 0)
+{
+    <div class="alert alert-warning" role="alert">
+        <strong>Hay zonas sin precio para alguna modalidad.</strong> Los envíos a esas combinaciones se rechazarían en el alta:
+        <ul class="mb-0">
+            @foreach (var faltante in Model.SinTarifa)
+            {
+                <li>@faltante.Zona · @TextosTarifario.Modalidad(faltante.Modalidad)</li>
+            }
+        </ul>
+    </div>
+}
+<form method="post" asp-page-handler="Publicar" class="row g-2 align-items-end">
+    <div class="col-md-3">
+        <label asp-for="Fecha" class="form-label">Rige desde (vacío: de inmediato)</label>
+        <input asp-for="Fecha" type="date" class="form-control" />
+    </div>
+    @if (Model.SinTarifa.Count > 0)
+    {
+        <input type="hidden" name="ConfirmaSinTarifa" value="true" />
+    }
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-primary">@(Model.SinTarifa.Count > 0 ? "Publicar igual" : "Publicar")</button>
+    </div>
+</form>

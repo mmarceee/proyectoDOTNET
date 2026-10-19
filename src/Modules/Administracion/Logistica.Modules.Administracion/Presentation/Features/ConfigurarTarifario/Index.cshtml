@@ -1,0 +1,98 @@
+@page "/backoffice/tarifario"
+@model Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario.IndexModel
+@using Logistica.Modules.Administracion.Contracts
+@using Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Cuadro tarifario";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Cuadro tarifario</h1>
+    <form method="post" asp-page-handler="Nueva">
+        <button type="submit" class="btn btn-primary">@(Model.HayBorrador ? "Seguir el borrador" : "Nueva versión")</button>
+    </form>
+</div>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+
+@if (Model.Versiones.Count == 0)
+{
+    <p class="text-muted">Todavía no hay versiones. Creá la primera con "Nueva versión".</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Versión</th>
+                    <th>Situación</th>
+                    <th>Rige desde</th>
+                    <th>Rige hasta</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var version in Model.Versiones)
+                {
+                    var (texto, clase) = TextosTarifario.Situacion(version.Situacion);
+                    <tr>
+                        <td>
+                            @if (version.Situacion == Logistica.Modules.Administracion.Application.Features.ConfigurarTarifario.SituacionVersion.Borrador)
+                            {
+                                <a href="/backoffice/tarifario/borrador">Versión @version.Numero</a>
+                            }
+                            else
+                            {
+                                <a href="/backoffice/tarifario/@version.Numero">Versión @version.Numero</a>
+                            }
+                        </td>
+                        <td><span class="badge @clase">@texto</span></td>
+                        <td>@TextosTarifario.Fecha(version.VigenteDesde)</td>
+                        <td>@TextosTarifario.Fecha(version.VigenteHasta)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<h2 class="h5 mt-4">Calcular un precio</h2>
+<p class="text-muted small">Usa la versión que rige ahora, igual que el alta de envíos.</p>
+<form method="post" asp-page-handler="Calcular" class="row g-2 align-items-end">
+    <div class="col-md-3">
+        <label asp-for="ZonaId" class="form-label">Zona</label>
+        <select asp-for="ZonaId" class="form-select">
+            @foreach (var zona in Model.Zonas)
+            {
+                <option value="@zona.Id">@zona.Codigo · @zona.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="Modalidad" class="form-label">Modalidad</label>
+        <select asp-for="Modalidad" class="form-select">
+            <option value="@Modalidad.Estandar">Estándar</option>
+            <option value="@Modalidad.Urgente">Urgente</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="PesoKg" class="form-label">Peso (kg)</label>
+        <input asp-for="PesoKg" class="form-control" inputmode="decimal" />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="VolumenM3" class="form-label">Volumen (m³)</label>
+        <input asp-for="VolumenM3" class="form-control" inputmode="decimal" />
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary">Calcular</button>
+    </div>
+</form>
+@if (Model.Precio is not null)
+{
+    <div class="alert alert-info mt-3" role="status">@Model.Precio</div>
+}

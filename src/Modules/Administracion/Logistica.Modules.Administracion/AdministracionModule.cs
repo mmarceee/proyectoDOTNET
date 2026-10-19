@@ -43,6 +43,13 @@ public static class AdministracionModule
         services.AddScoped<Domain.Planificacion.IZonaRepository, ZonaRepository>();
         services.AddScoped<Application.Features.DefinirZonas.ConsultarZonasHandler>();
         services.AddScoped<Application.Features.DefinirZonas.GestionarZonasHandler>();
+
+        // CU-05: cuadro tarifario.
+        services.AddScoped<Domain.Tarifas.ITarifarioRepository, TarifarioRepository>();
+        services.AddScoped<Application.Features.ConfigurarTarifario.TarifarioVigente>();
+        services.AddScoped<Application.Features.ConfigurarTarifario.ConsultarTarifarioHandler>();
+        services.AddScoped<Application.Features.ConfigurarTarifario.GestionarBorradorHandler>();
+        services.AddScoped<Application.Features.ConfigurarTarifario.PublicarTarifarioHandler>();
         services.AddScoped<IServicioSesion, ServicioSesion>();
 
         // CU-02: gestionar usuarios.

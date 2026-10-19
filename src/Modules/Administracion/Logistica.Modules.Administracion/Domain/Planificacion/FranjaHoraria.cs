@@ -29,6 +29,15 @@ internal sealed class FranjaHoraria : Entity, IOperadorOwned
         nueva.ReemplazaAId = Id; VigenteHasta = fecha.AddDays(-1);
         return nueva;
     }
+    // CU-04, A4 desde el Backoffice: el cambio rige desde mañana o después, en el día del operador. Una fecha pasada
+    // cerraría la franja hacia atrás y cambiaría el horario de envíos ya entregados, porque Planificación sigue los
+    // reemplazos por fecha. Las más de 24 h de anticipación son de la ampliación de CU-04, pendiente.
+    public FranjaHoraria ProgramarCambio(TimeOnly desde, TimeOnly hasta, DayOfWeek[] dias, DateOnly fecha, DateOnly hoy)
+    {
+        if (fecha <= hoy) throw new DomainException("El cambio de franja tiene que regir desde mañana o después.");
+        return Reemplazar(desde, hasta, dias, fecha);
+    }
+
     public bool Aplica(DateOnly fecha) => fecha >= VigenteDesde && (VigenteHasta is null || fecha <= VigenteHasta)
         && Dias.Contains((int)fecha.DayOfWeek);
 

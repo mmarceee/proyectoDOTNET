@@ -1,14 +1,28 @@
 using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Administracion.Contracts.Results;
 using Logistica.Modules.Administracion.Application.Features.ConsultarRecursosPlanificacion;
+using Logistica.Modules.Administracion.Application.Features.ConfigurarTarifario;
 using Logistica.Modules.Administracion.Application.Features.GestionarUsuarios;
 using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Administracion.Application;
 
 internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lector, IServicioUsuarios usuarios,
-    ICurrentTenant tenant) : IAdministracionModuleApi
+    ICurrentTenant tenant, TarifarioVigente tarifario) : IAdministracionModuleApi
 {
+    // CU-05 para CU-10: el precio sale de la versión que rige, leída de la caché.
+    public async Task<TarifaBulto?> CalcularTarifaAsync(Guid zonaId, Modalidad modalidad, decimal pesoKg,
+        decimal volumenM3, CancellationToken ct)
+    {
+        if (await tarifario.ObtenerAsync(ct) is not { } tabla
+            || tabla.Calcular(zonaId, modalidad, pesoKg, volumenM3) is not decimal monto)
+        {
+            return null;
+        }
+
+        return new TarifaBulto(tabla.VersionId, tabla.Numero, monto);
+    }
+
     public Task BloquearPlanificacionAsync(CancellationToken ct) => lector.BloquearPlanificacionAsync(ct);
     public Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct) => lector.ObtenerContextoPlanificacionAsync(ct);
     public Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct) => lector.ObtenerReglasPlanificacionAsync(ahora, ct);

@@ -28,7 +28,10 @@ public interface IEnviosModuleApi
     Task<RegistroEnCalle> RegistrarIntentoFallidoAsync(IntentoFallidoARegistrar intento, CancellationToken ct);
 
     // CU-04: ¿algún envío sin terminar tiene una de estas franjas comprometida en esa fecha o después? Administración
-    // lo pregunta antes de reemplazar una franja, para no cambiar un horario prometido sin aviso. Las rutas quedan
-    // cubiertas por sus envíos.
+    // lo pregunta antes de reemplazar una franja, para no cambiar un horario prometido sin aviso.
     Task<bool> HayEnviosComprometidosAsync(IReadOnlyCollection<Guid> franjaIds, DateOnly desde, CancellationToken ct);
+
+    // CU-04: los envíos sin terminar con una de estas franjas pero sin fecha propia. Su día lo da la ruta en la que
+    // estén: Administración se los pasa a Planificación para saber si alguna ruta desde la fecha del cambio los tiene.
+    Task<IReadOnlyList<Guid>> EnviosSinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct);
 }

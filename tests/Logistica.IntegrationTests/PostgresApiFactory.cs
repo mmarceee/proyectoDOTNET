@@ -20,6 +20,9 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Database:MigrateOnStartup", "true");
         // Los casos de mensajería habilitan su propio broker aislado; nunca usar el de user-secrets.
         builder.UseSetting("ConnectionStrings:RabbitMQ", "");
+        // Tampoco el Valkey de user-secrets: cada clase tiene su base, y una caché compartida devolvería datos de otra
+        // corrida (y ensuciaría la de desarrollo). Sin cadena de conexión, la caché es la memoria de esta API.
+        builder.UseSetting("ConnectionStrings:Valkey", "");
         // Las pruebas históricas preparan datos sin sesión; las de seguridad desactivan este respaldo.
         builder.UseSetting("Identity:PermitirTenantProvisorio", "true");
     }

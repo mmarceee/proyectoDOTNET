@@ -252,6 +252,8 @@ Zona no crea ni contiene sus franjas: FranjaHoraria es una entidad propia que gu
 
 * reemplazar(desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\], vigenteDesde: DateOnly): FranjaHoraria — crea la franja nueva, vinculada con reemplazaAId, y cierra la vigencia de esta el día anterior, conservando su historial. Sólo se reemplaza la última franja de la cadena.
 
+* programarCambio(desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\], vigenteDesde: DateOnly, hoy: DateOnly): FranjaHoraria — el reemplazo que usa el Backoffice (CU-04, A4): exige que vigenteDesde sea posterior a hoy, en el día del operador, y después reemplaza.
+
 * aplica(fecha: DateOnly): bool — la franja rige ese día.
 
 * seSuperponeCon(otra: FranjaHoraria): bool — CU-04, A3: misma zona, algún día en común, horarios que se cruzan y vigencias que se cruzan. Dos franjas contiguas (9 a 13 y 13 a 17) no se superponen.
@@ -262,7 +264,7 @@ Zona no crea ni contiene sus franjas: FranjaHoraria es una entidad propia que gu
 
 La [especificación técnica de CU-40](cu-40/especificacion-tecnica-cu-40.md), sección 8, concreta el flujo por lote, los contratos, reemplazos sucesivos y el tratamiento de envíos sin día definido. La implementación de esta ampliación corresponde a CU-04.
 
-**Mientras la ampliación esté pendiente (acordado el 18/10/2026):** la reprogramación por lote no se implementa para el hito del 22/10. Como Planificación sigue los reemplazos por fecha, reemplazar una franja podría cambiar un horario ya prometido sin aviso ni revalidación. Por eso el reemplazo se bloquea si algún envío con entrega pendiente (Admitido, EnDeposito, AsignadoARuta, EnTransito, NoEntregado o Reprogramado) tiene esa franja, o una de las que ella reemplazó, con fecha de entrega igual o posterior a la del cambio. Las rutas quedan cubiertas por sus envíos. Administración lo consulta con IEnviosModuleApi.HayEnviosComprometidosAsync.
+**Mientras la ampliación esté pendiente (acordado el 18/10/2026):** la reprogramación por lote no se implementa para el hito del 22/10. Como Planificación sigue los reemplazos por fecha, reemplazar una franja podría cambiar un horario ya prometido sin aviso ni revalidación. Por eso el reemplazo se bloquea si algún envío con entrega pendiente (Admitido, EnDeposito, AsignadoARuta, EnTransito, NoEntregado o Reprogramado) tiene esa franja, o una de las que ella reemplazó, con fecha de entrega igual o posterior a la del cambio, o si un envío así sin fecha propia está en una ruta Planificada, Despachada o EnCurso con fecha igual o posterior (19/10/2026, pedido de Lucas Ottonello). Administración lo consulta con IEnviosModuleApi.HayEnviosComprometidosAsync y EnviosSinFechaConFranjasAsync, y con IPlanificacionModuleApi.HayRutasActivasConEnviosAsync, dentro de una transacción con el bloqueo de planificación del operador.
 
 **VersionTarifario**
 
