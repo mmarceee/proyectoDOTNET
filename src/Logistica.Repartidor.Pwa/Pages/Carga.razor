@@ -1,0 +1,116 @@
+@page "/carga"
+@using Logistica.Repartidor.Pwa.Services
+@using Logistica.Http.Contracts.Repartidor
+@implements IAsyncDisposable
+@inject CargaService Cargas
+@inject HojaDeRutaService Hoja
+@inject IJSRuntime JS
+
+<PageTitle>Cargar vehículo</PageTitle>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1>Cargar vehículo</h1>
+    <NavLink href="hoja-de-ruta" class="btn btn-outline-secondary">Ver mi ruta</NavLink>
+</div>
+@if (Cargas.Mensaje is not null) { <div class="alert alert-info" role="status">@Cargas.Mensaje</div> }
+@if (errorCamara is not null) { <div class="alert alert-warning" role="alert">@errorCamara</div> }
+@if (Hoja.SinConexion && !Hoja.RequiereIngreso) { <div class="alert alert-warning">Sin conexión con el servidor. Podés continuar; el avance y la confirmación se guardan en este dispositivo.</div> }
+@if (Hoja.RequiereIngreso) { <a class="btn btn-primary" href="/repartidor/ingresar">Iniciar sesión</a> }
+else if (Cargas.Borrador is { } borrador && Hoja.Copia is { } copia)
+{
+    var envios = copia.Hoja.Paradas.SelectMany(p => p.Envios).Where(e => e.Estado == "AsignadoARuta").ToArray();
+    var codigos = borrador.Lecturas.Select(l => l.CodigoBulto).ToHashSet(StringComparer.Ordinal);
+    var esperados = envios.SelectMany(e => e.Bultos).Select(b => b.Codigo).ToHashSet(StringComparer.Ordinal);
+    var faltantes = esperados.Except(codigos).ToArray();
+    var sobrantes = codigos.Except(esperados).ToArray();
+    <p>Ruta del @copia.Hoja.FechaRuta.ToString("dd/MM/yyyy") · Vehículo <strong>@copia.Hoja.Vehiculo.Matricula</strong></p>
+    @if (borrador.Resultado == "Pendiente")
+    {
+        <div class="alert alert-warning">Carga guardada, pendiente de sincronizar. Los estados del servidor todavía no se confirmaron.</div>
+        <button class="btn btn-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.SincronizarAsync">Sincronizar carga</button>
+    }
+    else if (borrador.Resultado == "Rechazada")
+    {
+        <div class="alert alert-danger" role="alert">El servidor rechazó la carga: @borrador.Detalle. No se aplicaron cambios de esta confirmación.</div>
+        <button class="btn btn-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.RevisarAsync">Actualizar hoja y revisar carga</button>
+    }
+    else if (borrador.Resultado == "Aplicada")
+    {
+        <div class="alert alert-success">Carga confirmada por el servidor.</div>
+        <button class="btn btn-outline-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.AbrirAsync">Revisar carga restante</button>
+    }
+    else if (envios.Length == 0) { <div class="alert alert-success">No quedan envíos pendientes de cargar en esta hoja.</div> }
+    else
+    {
+        <p class="lead">@codigos.Intersect(esperados).Count() de @esperados.Count bultos · @envios.Count(e => e.Bultos.All(b => codigos.Contains(b.Codigo))) de @envios.Length envíos completos</p>
+        <form @onsubmit="LeerManual" @onsubmit:preventDefault>
+            <label for="codigo-bulto" class="form-label">Código del bulto</label>
+            <div class="d-flex gap-2 mb-3">
+                <input id="codigo-bulto" class="form-control" @bind="codigo" @bind:event="oninput" maxlength="200" autocomplete="off" disabled="@Cargas.Ocupado" />
+                <button type="submit" class="btn btn-primary" disabled="@(Cargas.Ocupado || string.IsNullOrWhiteSpace(codigo))">Registrar</button>
+            </div>
+        </form>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <button class="btn btn-outline-primary" @onclick="IniciarCamara" disabled="@(camaraActiva || Cargas.Ocupado)">Escanear con cámara</button>
+            @if (camaraActiva) { <button class="btn btn-outline-secondary" @onclick="DetenerCamara">Detener cámara</button> }
+            <button class="btn btn-outline-secondary" @onclick="Cargas.AbrirAsync" disabled="@Cargas.Ocupado">Recuperar avance guardado</button>
+        </div>
+        @foreach (var envio in envios)
+        {
+            <section class="card mb-2"><div class="card-body">
+                <h2 class="h5">@envio.Numero · @(envio.Bultos.All(b => codigos.Contains(b.Codigo)) ? "Completo" : "Incompleto")</h2>
+                <ul class="mb-0">@foreach (var b in envio.Bultos) { <li>@b.Codigo — @(codigos.Contains(b.Codigo) ? "Cargado" : "Faltante")</li> }</ul>
+            </div></section>
+        }
+        @if (sobrantes.Length > 0)
+        {
+            <div class="alert alert-warning"><strong>Sobrantes: separalos del vehículo.</strong><ul class="mb-0">@foreach (var s in sobrantes) { <li>@s</li> }</ul></div>
+        }
+        @if (faltantes.Length > 0)
+        {
+            <div class="alert alert-warning">@(faltantes.Length == 1 ? "Falta 1 bulto." : $"Faltan {faltantes.Length} bultos.") Los envíos incompletos seguirán asignados a la ruta, sin pasar a En tránsito.</div>
+            <label class="d-block mb-3"><input type="checkbox" @bind="aceptaFaltantes" /> Revisé los faltantes y confirmo que voy a continuar con la carga incompleta.</label>
+        }
+        <button class="btn btn-primary mb-4" @onclick="Confirmar" disabled="@(Cargas.Ocupado || borrador.Lecturas.Count == 0 || faltantes.Length > 0 && !aceptaFaltantes)">Confirmar carga</button>
+    }
+}
+else if (Cargas.Ocupado || Hoja.Cargando) { <p role="status">Abriendo la carga guardada…</p> }
+else { <p>Descargá tu hoja de ruta antes de comenzar.</p> }
+<video @ref="video" playsinline muted style="width:100%;max-height:320px;display:@(camaraActiva ? "block" : "none")" aria-label="Vista de la cámara para escanear bultos"></video>
+
+@code {
+    private string codigo = "";
+    private bool aceptaFaltantes, camaraActiva;
+    private string? errorCamara;
+    private ElementReference video;
+    private IJSObjectReference? camara;
+    private DotNetObjectReference<Carga>? referencia;
+    protected override void OnInitialized() { Cargas.Cambio += Actualizar; Hoja.Cambio += Actualizar; }
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await Cargas.AbrirAsync(); }
+    private void Actualizar() => _ = InvokeAsync(async () =>
+    {
+        if (Hoja.RequiereIngreso) await DetenerCamara();
+        StateHasChanged();
+    });
+    private async Task LeerManual() { await Cargas.LeerAsync(codigo); codigo=""; aceptaFaltantes=false; }
+    [JSInvokable] public async Task CodigoDetectado(string valor) { await Cargas.LeerAsync(valor); aceptaFaltantes=false; await InvokeAsync(StateHasChanged); }
+    private async Task Confirmar() { await DetenerCamara(); await Cargas.ConfirmarAsync(aceptaFaltantes); }
+    private async Task IniciarCamara()
+    {
+        errorCamara=null;
+        try
+        {
+            camara ??= await JS.InvokeAsync<IJSObjectReference>("import","/repartidor/js/camara-carga.js");
+            referencia ??= DotNetObjectReference.Create(this);
+            camaraActiva=true;
+            await camara.InvokeVoidAsync("iniciar",video,referencia);
+        }
+        catch (JSException) { camaraActiva=false; errorCamara="No pudimos abrir la cámara. Revisá el permiso o ingresá el código manualmente."; }
+    }
+    private async Task DetenerCamara() { if (camara is not null) await camara.InvokeVoidAsync("detener"); camaraActiva=false; }
+    public async ValueTask DisposeAsync()
+    {
+        Cargas.Cambio -= Actualizar; Hoja.Cambio -= Actualizar;
+        await DetenerCamara(); referencia?.Dispose();
+        if (camara is not null) await camara.DisposeAsync();
+    }
+}

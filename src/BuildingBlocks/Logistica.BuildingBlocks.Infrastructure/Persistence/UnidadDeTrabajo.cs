@@ -10,7 +10,7 @@ namespace Logistica.BuildingBlocks.Infrastructure.Persistence;
 // Una conexión por request, compartida por los DbContext de todos los módulos, y la transacción que
 // agrupa los cambios de varios módulos (ADR-0001, addendum 3). Con conexiones separadas, PostgreSQL
 // no puede confirmar los dos cambios juntos.
-public sealed class UnidadDeTrabajo(string? connectionString) : IUnidadDeTrabajo, IDisposable, IAsyncDisposable
+public sealed class UnidadDeTrabajo(string? connectionString) : IUnidadDeTrabajo, IConsultaConsistente, IDisposable, IAsyncDisposable
 {
     public NpgsqlConnection Conexion { get; } = new(connectionString);
 
@@ -90,6 +90,32 @@ public sealed class UnidadDeTrabajo(string? connectionString) : IUnidadDeTrabajo
     public void Dispose()
     {
         Conexion.Dispose();
+    }
+
+    public async Task<T> LeerAsync<T>(Func<Task<T>> consulta, CancellationToken ct)
+    {
+        if (Transaccion is not null)
+            throw new InvalidOperationException("La consulta consistente requiere su propio ámbito de lectura.");
+        if (Conexion.State != ConnectionState.Open) await Conexion.OpenAsync(ct);
+        await using var transaccion = await Conexion.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
+        Transaccion = transaccion;
+        try
+        {
+            await using var comando = new NpgsqlCommand("SET TRANSACTION READ ONLY", Conexion, transaccion);
+            await comando.ExecuteNonQueryAsync(ct);
+            var resultado = await consulta();
+            await transaccion.CommitAsync(ct);
+            return resultado;
+        }
+        finally
+        {
+            Transaccion = null;
+            foreach (var contexto in _contextosSumados.Where(p => p.Value == transaccion).Select(p => p.Key).ToArray())
+            {
+                await contexto.Database.UseTransactionAsync(null, CancellationToken.None);
+                _contextosSumados.Remove(contexto);
+            }
+        }
     }
 
     public ValueTask DisposeAsync()

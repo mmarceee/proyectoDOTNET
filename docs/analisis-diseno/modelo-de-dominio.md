@@ -891,6 +891,8 @@ Creacion, Agregado, Modificacion, Despacho, CambioFranjaProgramado
 
 * bultoId: Guid
 
+**Ampliación de implementación CU-51 (19/10/2026):** `bultoId` admite null para códigos sobrantes desconocidos dentro del operador. Se conserva `codigoBulto` tal como se leyó y `operacionId` para la evidencia idempotente de cada confirmación. No se inventan identificadores ni se consultan bultos de otro operador. Los faltantes siguen calculándose por diferencia; no se persisten como escaneos.
+
 * resultado: ResultadoEscaneo
 
 * escaneadoEn: DateTimeOffset

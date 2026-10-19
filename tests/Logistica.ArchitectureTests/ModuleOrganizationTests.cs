@@ -8,6 +8,22 @@ public class ModuleOrganizationTests
     public static TheoryData<string> ModuleNames => new(AllModules);
 
     [Theory]
+    [InlineData("Envios")]
+    [InlineData("Planificacion")]
+    public void Las_acciones_entre_modulos_se_exponen_por_ModuleApi(string module)
+    {
+        var contracts = System.Reflection.Assembly.Load($"Logistica.Modules.{module}.Contracts");
+        var interfacesDeLectura = contracts.GetTypes().Where(t => t.IsPublic && t.IsInterface
+            && t.Name != $"I{module}ModuleApi");
+
+        // Los lectores existentes de CU-01/CU-50 no pueden convertirse en una API paralela de escritura.
+        string[] prefijosDeLectura = ["Consultar", "Obtener", "Contar", "Reconocer"];
+        Assert.All(interfacesDeLectura.SelectMany(t => t.GetMethods()), method =>
+            Assert.True(prefijosDeLectura.Any(p => method.Name.StartsWith(p, StringComparison.Ordinal)),
+                $"La acción {method.DeclaringType!.Name}.{method.Name} debe pertenecer a I{module}ModuleApi (ADR-0001 §2.2)."));
+    }
+
+    [Theory]
     [MemberData(nameof(ModuleNames))]
     public void Los_handlers_de_aplicacion_se_organizan_por_feature(string module)
     {

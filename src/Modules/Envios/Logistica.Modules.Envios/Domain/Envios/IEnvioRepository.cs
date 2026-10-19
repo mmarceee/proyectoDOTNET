@@ -8,6 +8,7 @@ internal interface IEnvioRepository
 
     // Con sus bultos. El código del bulto es único dentro del operador.
     Task<Envio?> ObtenerPorCodigoBultoAsync(string codigoBulto, CancellationToken ct);
+    Task<IReadOnlyList<Bulto>> ObtenerBultosPorCodigosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct);
 
     Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct);
 

@@ -10,11 +10,13 @@ internal sealed class SincronizarOperacionesHandler(IProcesadorDeOperacion proce
     public async Task<SincronizacionResponse> HandleAsync(SincronizarOperacionesCommand command, CancellationToken ct)
     {
         var enviosConRechazo = new HashSet<Guid>();
+        var rutasConCargaRechazada = new HashSet<Guid>();
         var resultados = new List<ResultadoOperacionResponse>();
 
         foreach (var operacion in command.Operaciones.OrderBy(o => o.Secuencia))
         {
-            var rechazoPrevio = operacion.EnvioId is Guid envio && enviosConRechazo.Contains(envio);
+            var rechazoPrevio = operacion.EnvioId is Guid envio && enviosConRechazo.Contains(envio)
+                || rutasConCargaRechazada.Contains(operacion.RutaId);
             var resultado = await procesador.ProcesarAsync(
                 new ProcesarOperacionCommand(command.RepartidorId, command.UsuarioId, operacion, rechazoPrevio), ct);
 
@@ -24,6 +26,8 @@ internal sealed class SincronizarOperacionesHandler(IProcesadorDeOperacion proce
             }
 
             resultados.Add(resultado);
+            if (operacion.Tipo == "ConfirmarCarga" && resultado.Resultado is Resultados.Conflicto or Resultados.Invalida)
+                rutasConCargaRechazada.Add(operacion.RutaId);
         }
 
         return new SincronizacionResponse(resultados);

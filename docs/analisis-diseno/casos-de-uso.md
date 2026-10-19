@@ -507,6 +507,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujos alternativos** | **A1 · Sin ruta despachada (paso 3).** El sistema informa que no hay ruta para el día.<br><br>**A2 · Sin conexión (paso 2).** La PWA muestra la última ruta descargada e indica cuándo se descargó.<br><br>**A3 · La ruta cambió después de descargarla.** En la siguiente sincronización (CU-52), la PWA recibe la versión actualizada. |
 | **Requerimientos especiales** | 1. **Cifrado en reposo** de los datos personales guardados en el dispositivo (sección 6.3).<br>2. Se descarga sólo lo necesario para trabajar: minimización de datos personales.<br>3. La aplicación misma queda en caché por el service worker (addendum 5). |
 
+**Implementación de CU-50 (17/10/2026):** la PWA incorpora Mi ruta, descarga completa y almacenamiento cifrado en IndexedDB. Consulta sólo la ruta propia del día operativo; admite Despachada y EnCurso para poder recuperar la hoja durante la jornada. La descarga no cambia estados ni genera eventos. Se acordó usar el proveedor de reglas de entrega actual, declarado provisorio, preparando el contrato para CU-06. Véanse [alcance y verificación](cu-50/README.md) y [diseño](cu-50/diseno-cu-50.md).
+
 ### **CU-51 · Escanear la carga del vehículo**
 
 | Campo | Contenido |
@@ -519,6 +521,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujo de evento principal** | 1. El repartidor elige **Cargar vehículo**.<br>2. El repartidor escanea un bulto con la cámara.<br>3. La PWA verifica que el bulto pertenezca a la ruta y lo marca como cargado.<br>4. El repartidor repite los pasos 2 y 3.<br>5. La PWA muestra los bultos que faltan.<br>6. El repartidor confirma la carga.<br>7. La PWA guarda la operación localmente y la sincroniza (CU-52); el servidor pasa a *EnTransito* los envíos cargados completos (T5). |
 | **Flujos alternativos** | **A1 · Bulto sobrante (paso 3).** El bulto no pertenece a la ruta. La PWA avisa, lo registra como *Sobrante* y pide separarlo.<br><br>**A2 · Bulto repetido (paso 3).** La PWA avisa que ya se escaneó.<br><br>**A3 · Confirmar con faltantes (paso 6).** La PWA pide confirmación y lista los envíos incompletos: esos envíos no pasan a *EnTransito* y el despachador recibe el aviso para quitarlos de la ruta (CU-41) o resolverlos.<br><br>**A4 · Código ilegible (paso 2).** El repartidor puede ingresar el código a mano. |
 | **Requerimientos especiales** | 1. Funciona sin conexión; la verificación se hace en el dispositivo contra la ruta descargada.<br>2. Los faltantes no se guardan: se calculan como diferencia entre los bultos esperados y los escaneados (modelo de dominio). |
+
+**Implementación de CU-51 (19/10/2026):** Cargar vehículo permite escanear con cámara o ingresar códigos, conserva avance cifrado y confirma una operación pendiente sin red. ConfirmarCarga aplica T5 sólo a los envíos completos y registra escaneos/outbox con idempotencia y correlación W3C. Se incorporó la parte de cola/sincronización necesaria de CU-52. La visualización de discrepancias en CU-66 y la instrumentación completa del Worker siguen pendientes de integración. Véase [alcance y verificación de CU-51](cu-51/README.md).
 
 ### **CU-52 · Sincronizar las operaciones sin conexión**
 

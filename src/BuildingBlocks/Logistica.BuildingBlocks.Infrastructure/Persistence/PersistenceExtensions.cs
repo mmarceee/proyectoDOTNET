@@ -15,6 +15,7 @@ public static class PersistenceExtensions
         // Una sola unidad de trabajo (y una sola conexión) por request, para todos los módulos.
         services.TryAddScoped(_ => new UnidadDeTrabajo(connectionString));
         services.TryAddScoped<IUnidadDeTrabajo>(sp => sp.GetRequiredService<UnidadDeTrabajo>());
+        services.TryAddScoped<IConsultaConsistente>(sp => sp.GetRequiredService<UnidadDeTrabajo>());
 
         services.AddDbContext<TContext>((sp, options) => options.UseNpgsql(
             sp.GetRequiredService<UnidadDeTrabajo>().Conexion,

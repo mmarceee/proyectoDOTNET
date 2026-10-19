@@ -157,6 +157,51 @@ public sealed class UnidadDeTrabajoTests : IAsyncLifetime
         return new PruebaDbContext(options, unidad, new SinInquilino());
     }
 
+    [Fact]
+    public async Task Consulta_consistente_conserva_snapshot_entre_modulos_y_desengancha_al_final()
+    {
+        var texto = $"Snapshot-{Guid.NewGuid()}";
+        await using var unidad = new UnidadDeTrabajo(_postgres.GetConnectionString());
+        await using var primero = Crear(unidad);
+        await using var segundo = Crear(unidad);
+        await unidad.LeerAsync(async () =>
+        {
+            await unidad.SumarAsync(primero, CancellationToken.None);
+            Assert.Equal(System.Data.IsolationLevel.RepeatableRead, primero.Database.CurrentTransaction!.GetDbTransaction().IsolationLevel);
+            Assert.False(await primero.Notas.AsNoTracking().AnyAsync(n => n.Texto == texto));
+            await using var escritor = new UnidadDeTrabajo(_postgres.GetConnectionString());
+            await using var db = Crear(escritor);
+            db.Notas.Add(new Nota(texto));
+            await db.SaveChangesAsync();
+            await unidad.SumarAsync(segundo, CancellationToken.None);
+            Assert.False(await segundo.Notas.AsNoTracking().AnyAsync(n => n.Texto == texto));
+            return true;
+        }, CancellationToken.None);
+        Assert.Null(primero.Database.CurrentTransaction);
+        Assert.Null(segundo.Database.CurrentTransaction);
+        Assert.True(await segundo.Notas.AsNoTracking().AnyAsync(n => n.Texto == texto));
+    }
+
+    [Fact]
+    public async Task Consulta_consistente_no_admite_escrituras_ni_anidarse_en_otra_transaccion()
+    {
+        var texto = $"SoloLectura-{Guid.NewGuid()}";
+        await using var unidad = new UnidadDeTrabajo(_postgres.GetConnectionString());
+        await using var db = Crear(unidad);
+        await Assert.ThrowsAsync<DbUpdateException>(() => unidad.LeerAsync(async () =>
+        {
+            db.Notas.Add(new Nota(texto));
+            await db.SaveChangesAsync();
+            return true;
+        }, CancellationToken.None));
+        Assert.Equal(0L, await ContarAsync([texto]));
+        await unidad.EjecutarAsync(async () =>
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                unidad.LeerAsync(() => Task.FromResult(true), CancellationToken.None));
+        }, CancellationToken.None);
+    }
+
     // Lee con una conexión aparte: sólo ve lo que quedó confirmado.
     private async Task<long> ContarAsync(string[] textos)
     {

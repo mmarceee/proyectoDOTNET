@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Logistica.Http.Contracts.Repartidor;
 using Logistica.Modules.Ejecucion.Application.Features.SincronizarOperaciones;
 using Microsoft.EntityFrameworkCore;
@@ -10,8 +11,13 @@ namespace Logistica.Modules.Ejecucion.Infrastructure;
 // mismo envío en ese instante (concurrencia optimista), se reevalúa una vez con un ámbito limpio.
 internal sealed class ProcesadorEnAmbitoPropio(IServiceScopeFactory ambitos) : IProcesadorDeOperacion
 {
+    private static readonly ActivitySource Fuente = new(EjecucionModule.FuenteTrazas);
     public async Task<ResultadoOperacionResponse> ProcesarAsync(ProcesarOperacionCommand command, CancellationToken ct)
     {
+        var valido = ActivityContext.TryParse(command.Operacion.CorrelacionId, null, out var padre);
+        using var actividad = Fuente.StartActivity("operacion.procesar", ActivityKind.Consumer,
+            valido ? padre : Activity.Current?.Context ?? default)
+            ?? (valido ? new Activity("operacion.procesar").SetParentId(command.Operacion.CorrelacionId!).Start() : null);
         try
         {
             return await ProcesarEnAmbitoNuevoAsync(command, ct);

@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject Logistica.Repartidor.Pwa.Services.CargaService Cargas
 <div class="page">
     <header>
         <NavMenu />
@@ -10,3 +11,9 @@
         <div class="container">&copy; 2026 - VoluptaExpress</div>
     </footer>
 </div>
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Cargas.SincronizarAsync();
+    }
+}

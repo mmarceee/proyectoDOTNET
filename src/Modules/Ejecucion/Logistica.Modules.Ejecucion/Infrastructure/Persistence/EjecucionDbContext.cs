@@ -11,4 +11,5 @@ internal sealed class EjecucionDbContext(DbContextOptions<EjecucionDbContext> op
     public const string Schema = "ejecucion";
 
     public DbSet<OperacionDispositivo> Operaciones => Set<OperacionDispositivo>();
+    public DbSet<Domain.Cargas.EscaneoCarga> EscaneosCarga => Set<Domain.Cargas.EscaneoCarga>();
 }

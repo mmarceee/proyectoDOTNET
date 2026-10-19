@@ -30,6 +30,7 @@ public static class AdministracionModule
             configuration.GetConnectionString("Postgres"), AdministracionDbContext.Schema);
 
         services.AddScoped<DatosIniciales>();
+        services.AddScoped<IContextoHojaRuta, ContextoHojaRutaReader>();
         services.AddScoped<UsuariosIniciales>();
         services.AddScoped<VinculoRepartidor>();
 
