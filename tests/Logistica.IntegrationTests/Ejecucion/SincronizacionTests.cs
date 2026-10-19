@@ -7,7 +7,6 @@ using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Logistica.Modules.Ejecucion.Domain.Operaciones;
 using Logistica.Modules.Ejecucion.Infrastructure.Persistence;
 using Logistica.Modules.Envios.Domain.Envios;
-using Logistica.Modules.Administracion.Application;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
 using Logistica.Modules.Planificacion.Domain.Rutas;
 using Logistica.Modules.Planificacion.Infrastructure.Persistence;
@@ -120,7 +119,7 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
         var respuesta = await client.PostAsJsonAsync(Url, new SincronizacionRequest(
         [
             Entrega(rutaId, envios[1], secuencia: 3),
-            Intento(rutaId, envios[0], secuencia: 2, ReglasOperativasProvisorias.Ausente.Id),
+            Intento(rutaId, envios[0], secuencia: 2, await MotivoAsync("AUSENTE")),
             Entrega(rutaId, envios[0], secuencia: 1),
         ]));
         var resultados = (await respuesta.Content.ReadFromJsonAsync<SincronizacionResponse>())!.Resultados;
@@ -137,7 +136,7 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
         using var client = await RepartidorAsync();
 
         var resultado = await SincronizarAsync(client,
-            Intento(rutaId, envios[0], secuencia: 1, ReglasOperativasProvisorias.Rechazado.Id));
+            Intento(rutaId, envios[0], secuencia: 1, await MotivoAsync("RECHAZADO")));
 
         Assert.Equal("Aplicada", resultado.Resultado);
         Assert.Equal(EstadoEnvio.EnDevolucion, await EstadoAsync(envios[0]));
@@ -340,6 +339,19 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
     {
         await using var db = Contexto<EnviosDbContext>();
         return (await db.Envios.AsNoTracking().SingleAsync(e => e.Id == envioId)).Estado;
+    }
+
+    // Un motivo del catálogo de la versión de reglas vigente del operador (CU-06, datos iniciales). Los envíos de estas
+    // pruebas se crean sin versión, así que se juzgan con la vigente; el Id del motivo es el de esa versión.
+    private async Task<Guid> MotivoAsync(string codigo)
+    {
+        await using var db = Contexto<AdministracionDbContext>();
+        var ahora = DateTimeOffset.UtcNow;
+        var vigente = await db.VersionesReglas
+            .Where(v => v.VigenteDesde <= ahora && (v.VigenteHasta == null || v.VigenteHasta > ahora))
+            .OrderByDescending(v => v.VigenteDesde).Select(v => v.Id).FirstAsync();
+        return await db.MotivosNoEntrega.Where(m => m.VersionReglasId == vigente && m.Codigo == codigo)
+            .Select(m => m.Id).SingleAsync();
     }
 
     // Un DbContext del operador de demostración, como personal del operador.

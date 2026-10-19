@@ -376,6 +376,117 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                     b.ToTable("Zonas", "administracion");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Reglas.MotivoNoEntrega", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("ExigeEvidencia")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Reprogramable")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("VersionReglasId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VersionReglasId");
+
+                    b.ToTable("MotivosNoEntrega", "administracion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Reglas.VersionReglas", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AnticipacionReprogramacionHoras")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("MaxIntentos")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MaxParadasPorRuta")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PlazoEntreIntentosHoras")
+                        .HasColumnType("integer");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset?>("VigenteDesde")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("VigenteHasta")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("_plazos")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("Plazos");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "PoliticaDevolucion", "Logistica.Modules.Administracion.Domain.Reglas.VersionReglas.PoliticaDevolucion#PoliticaDevolucion", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<bool>("DevolverTrasIntentosAgotados")
+                                .HasColumnType("boolean");
+
+                            b1.Property<int>("PlazoDevolucionDias")
+                                .HasColumnType("integer");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "PruebaExigida", "Logistica.Modules.Administracion.Domain.Reglas.VersionReglas.PruebaExigida#PruebaExigida", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<bool>("ExigeFoto")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ExigeNombreYDocumento")
+                                .HasColumnType("boolean");
+                        });
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_VersionesReglas_Borrador")
+                        .HasFilter("\"Estado\" = 'Borrador'");
+
+                    b.HasIndex("OperadorId", "Numero")
+                        .IsUnique();
+
+                    b.ToTable("VersionesReglas", "administracion");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Tarifas.AjusteTarifa", b =>
                 {
                     b.Property<Guid>("Id")
@@ -503,6 +614,15 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Reglas.MotivoNoEntrega", b =>
+                {
+                    b.HasOne("Logistica.Modules.Administracion.Domain.Reglas.VersionReglas", null)
+                        .WithMany("Motivos")
+                        .HasForeignKey("VersionReglasId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Tarifas.AjusteTarifa", b =>
                 {
                     b.HasOne("Logistica.Modules.Administracion.Domain.Tarifas.VersionTarifario", null)
@@ -519,6 +639,11 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                         .HasForeignKey("VersionTarifarioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Reglas.VersionReglas", b =>
+                {
+                    b.Navigation("Motivos");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Tarifas.VersionTarifario", b =>

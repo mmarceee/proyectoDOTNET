@@ -1,6 +1,7 @@
 using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Administracion.Contracts.Results;
 using Logistica.Modules.Administracion.Application.Features.ConsultarRecursosPlanificacion;
+using Logistica.Modules.Administracion.Application.Features.ConfigurarReglas;
 using Logistica.Modules.Administracion.Application.Features.ConfigurarTarifario;
 using Logistica.Modules.Administracion.Application.Features.GestionarUsuarios;
 using Logistica.SharedKernel;
@@ -8,8 +9,14 @@ using Logistica.SharedKernel;
 namespace Logistica.Modules.Administracion.Application;
 
 internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lector, IServicioUsuarios usuarios,
-    ICurrentTenant tenant, TarifarioVigente tarifario) : IAdministracionModuleApi
+    ICurrentTenant tenant, TarifarioVigente tarifario, ReglasVigentes reglas) : IAdministracionModuleApi
 {
+    // CU-06: las reglas con que se admitió un envío, y las que rigen ahora para el alta. Las dos, desde la caché.
+    public Task<ReglasOperativas?> ReglasDeEntregaAsync(Guid versionReglasId, CancellationToken ct) =>
+        reglas.DeVersionAsync(versionReglasId, ct);
+
+    public Task<ReglasOperativas?> ReglasDeEntregaVigentesAsync(CancellationToken ct) => reglas.VigentesAsync(ct);
+
     // CU-05 para CU-10: el precio sale de la versión que rige, leída de la caché.
     public async Task<TarifaBulto?> CalcularTarifaAsync(Guid zonaId, Modalidad modalidad, decimal pesoKg,
         decimal volumenM3, CancellationToken ct)
@@ -22,15 +29,6 @@ internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lecto
 
         return new TarifaBulto(tabla.VersionId, tabla.Numero, monto);
     }
-
-    // CU-06 para Envíos (CU-10, CU-17 y CU-18). PROVISORIO hasta el PR de CU-06: ver ReglasOperativasProvisorias.
-    public Task<ReglasOperativas?> ReglasDeEntregaAsync(Guid versionReglasId, CancellationToken ct)
-        => Task.FromResult<ReglasOperativas?>(versionReglasId == ReglasOperativasProvisorias.VersionId
-            ? ReglasOperativasProvisorias.Vigentes
-            : null);
-
-    public Task<ReglasOperativas?> ReglasDeEntregaVigentesAsync(CancellationToken ct)
-        => Task.FromResult<ReglasOperativas?>(ReglasOperativasProvisorias.Vigentes);
 
     public Task BloquearPlanificacionAsync(CancellationToken ct) => lector.BloquearPlanificacionAsync(ct);
     public Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct) => lector.ObtenerContextoPlanificacionAsync(ct);
