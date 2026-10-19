@@ -1,8 +1,8 @@
 # **ADR-0003 · Outbox, mensajería y consistencia entre módulos**
 
-| Estado | Aceptado — aprobado por el equipo el 12/10/2026. La tabla outbox (secciones 2.1 y 2.2) ya está implementada; el resto se implementa para el 29/10 (sección 7). |
+| Estado | Aceptado — aprobado por el equipo el 12/10/2026. Implementados: la tabla outbox (secciones 2.1 y 2.2) y, desde el 16/10, el publicador, la topología, la inbox de Seguimiento, los reintentos, la cola de fallidos y las trazas. El registrador de fallidos, la retención y las métricas se implementan para el 29/10 (sección 7). |
 | :---- | :---- |
-| **Fecha** | 30 de septiembre de 2026 (actualizado el 12 de octubre de 2026) |
+| **Fecha** | 30 de septiembre de 2026 (actualizado el 16 de octubre de 2026) |
 | **Autor** | Ezequiel Marcenal |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Decisión relacionada** | Garantía de consistencia entre persistencia y publicación de eventos (Propuesta de stack, sección 8) |
@@ -88,7 +88,8 @@ Un `BackgroundService` en el proceso de la API publica los mensajes pendientes d
 •  Para cada módulo, dentro de una transacción, toma un lote de hasta 50 filas pendientes en orden de llegada con `SELECT ... WHERE "PublicadoEn" IS NULL ORDER BY "OcurridoEn" LIMIT 50 FOR UPDATE SKIP LOCKED`. Es SQL fijo, sin datos del usuario, sobre una tabla sin filtro de inquilino; es el caso revisado de SQL crudo que admite el ADR-0002 (sección 4).  
 •  Publica cada mensaje con confirmación del broker (*publisher confirms*) y recién entonces le asigna `PublicadoEn`. Al terminar el lote, confirma la transacción.  
 •  Si la publicación falla, la fila queda pendiente y se reintenta en la siguiente pasada. Si RabbitMQ no está disponible, los eventos se acumulan en el outbox y se publican cuando vuelve.  
-•  El ámbito del publicador usa un inquilino vacío (`InquilinoFijo(null, null)`): sólo toca el outbox, y si por error intentara escribir una entidad de un operador, el interceptor la rechazaría.
+•  El ámbito del publicador usa un inquilino vacío (`InquilinoMensaje.SinInquilino()`, sección 2.5): sólo toca el outbox, y si por error intentara escribir una entidad de un operador, el interceptor la rechazaría.  
+•  **Sólo publica los tipos que tienen un consumidor declarado** (una `SuscripcionIntegracion` registrada). Publica con `mandatory`: un mensaje que ninguna cola recibe vuelve como no enrutable y haría fallar el lote. Los eventos sin consumidor quedan pendientes en el outbox y se publican cuando su consumidor existe. Por eso la API registra también las suscripciones del Worker; hoy lo hace porque las dos llaman a `AddSeguimientoModule`.
 
 El publicador no se ubica en el Worker porque el Worker no tiene acceso a los `DbContext` de los módulos, y así debe seguir. Como la API corre en una sola instancia no hay competencia entre publicadores; `SKIP LOCKED` deja preparado el caso de varias instancias.
 
@@ -100,7 +101,7 @@ El publicador no se ubica en el Worker porque el Worker no tiene acceso a los `D
 
 RabbitMQ garantiza entrega **al menos una vez**: un mensaje puede llegar más de una vez. Cada consumidor:
 
-1\.  Abre un ámbito de DI por mensaje y fija el inquilino con los metadatos del sobre (`InquilinoFijo` con `OperadorId` y `ComercioId`), antes de resolver cualquier `DbContext` (ADR-0002, sección 2.5).
+1\.  Abre un ámbito de DI por mensaje y fija el inquilino con los metadatos del sobre (`InquilinoMensaje.Fijar` con `OperadorId` y `ComercioId`), antes de resolver cualquier `DbContext` (ADR-0002, sección 2.5). `InquilinoMensaje` se registra con alcance de ámbito y se fija una sola vez, porque el inquilino se conoce recién después de crear el ámbito; en la API, `ICurrentTenant` es `InquilinoMensaje` cuando está fijado y, si no, la sesión.
 
 2\.  Si el sobre no trae inquilino, o el contenido no se puede leer, el mensaje es inválido: va directo a la cola de fallidos (sección 2.6), sin reintentos y sin procesarse jamás sin filtro.
 
@@ -109,6 +110,8 @@ RabbitMQ garantiza entrega **al menos una vez**: un mensaje puede llegar más de
 4\.  Confirma el mensaje (*ack* manual) recién después de confirmar la transacción.
 
 Como el outbox, `inbox_messages` es una tabla técnica: no implementa `IOperadorOwned` ni guarda datos del operador.
+
+El consumidor pide los mensajes a cada cola (`BasicGet`) en lugar de suscribirse (`BasicConsume`), en un solo canal: así nunca hay publicaciones ni confirmaciones simultáneas en el mismo canal. Recorre las colas tomando un mensaje de cada una y espera 250 ms sólo cuando todas estaban vacías, para que la espera no limite cuántos mensajes por segundo procesa.
 
 ## **2.6 Reintentos con espera creciente y cola de fallidos**
 
@@ -140,7 +143,7 @@ El outbox, el publicador, la inbox, los reintentos, el registrador de fallidos y
 | :---- | :---- |
 | `Id` | Propiedad `message-id` |
 | `Tipo` | Propiedad `type` y routing key |
-| `OcurridoEn` | Propiedad `timestamp` |
+| `OcurridoEn` | Propiedad `timestamp` (en segundos: el consumidor no ve los milisegundos) |
 | `OperadorId`, `ComercioId` | Cabeceras `operador-id` y `comercio-id` |
 | `TraceParent` | Cabecera `traceparent` (W3C Trace Context) |
 | `Contenido` | Cuerpo, en JSON (`content-type: application/json`) |
@@ -159,7 +162,7 @@ Todos los mensajes son persistentes (`delivery-mode` 2). El consumidor lee el in
 
 ## **2.9 Observabilidad**
 
-•  El `traceparent` del sobre continúa la traza del request en el publicador y en el consumidor, así una operación se sigue de la API a RabbitMQ y al Worker en Aspire Dashboard.  
+•  El `traceparent` del sobre continúa la traza del request en el publicador y en el consumidor, así una operación se sigue de la API a RabbitMQ y al Worker en Aspire Dashboard. La fuente de trazas `Logistica.Mensajeria` (BuildingBlocks), que registran la API y el Worker, genera un span *Publicar \<tipo\>* (productor), hijo del request que guardó el evento, y un span *Procesar \<cola\>* (consumidor), hijo de la publicación: la cabecera `traceparent` lleva el id del span de publicación. Un mensaje que falla marca su span con error, el intento y la cola de destino.  
 •  Métricas de OpenTelemetry: mensajes pendientes en el outbox por módulo, antigüedad del pendiente más viejo, mensajes publicados, reintentos y fallidos.  
 •  Cada reintento y cada mensaje fallido se registra en el log con su `MessageId`, tipo, cola, inquilino e intento.
 
@@ -248,17 +251,18 @@ Es de licencia MIT y muy completo, con Outbox para EF Core y transporte RabbitMQ
 
 La decisión se considera verificada cuando existan pruebas automatizadas que demuestren lo siguiente:
 
-| # | Comprobación | Estado al 12/10 |
+| # | Comprobación | Estado al 16/10 |
 | :---: | :---- | :---- |
 | 1 | Si el `SaveChanges` falla, no queda ninguna fila en el outbox, también cuando el caso de uso escribe en dos módulos | Cubierta: `OutboxTests` y `ArmarRutaTests` (CU-40) |
 | 2 | El publicador lee sin inquilino los pendientes de todos los operadores, con los metadatos de la sesión que los generó | Cubierta: `OutboxTests` |
 | 3 | Sin operador en la sesión no se puede registrar un evento | Cubierta: `OutboxTests` |
 | 4 | Cada módulo tiene su tabla outbox, en su schema y sin filtro "Tenant" | Cubierta: `OutboxTests` |
-| 5 | Si RabbitMQ no está disponible, las filas quedan pendientes y se publican cuando vuelve | 29/10 (también es parte de las pruebas de resiliencia) |
-| 6 | Un mismo mensaje entregado dos veces produce el efecto una sola vez | 29/10 |
-| 7 | Un mensaje que falla recorre los reintentos con espera creciente y termina en la cola de fallidos y en `mensajes_fallidos` | 29/10 |
-| 8 | El `OperadorId` del sobre determina el inquilino del consumidor, y un mensaje sin inquilino nunca se procesa | 29/10 |
+| 5 | Si RabbitMQ no está disponible, las filas quedan pendientes y se publican cuando vuelve | Cubierta: `AvisosRutaTests` (con el canal cerrado). Las pruebas de resiliencia lo extienden a la caída del broker |
+| 6 | Un mismo mensaje entregado dos veces produce el efecto una sola vez | Cubierta: `AvisosRutaTests` |
+| 7 | Un mensaje que falla recorre los reintentos con espera creciente y termina en la cola de fallidos y en `mensajes_fallidos` | Reintentos y cola de fallidos cubiertos en `AvisosRutaTests`; `mensajes_fallidos`, 29/10 |
+| 8 | El `OperadorId` del sobre determina el inquilino del consumidor, y un mensaje sin inquilino nunca se procesa | Cubierta: `AvisosRutaTests` |
 | 9 | Cada administrador ve sólo los fallidos de su operador, y reintentar conserva el `MessageId` sin duplicar efectos | 29/10 (CU-09) |
+| 10 | La traza del request continúa en la publicación y en el consumidor del Worker | Cubierta: `TrazasMensajeriaTests` |
 
 # **6\. Decisiones a revisar al medir**
 
@@ -278,7 +282,9 @@ Las preguntas abiertas de la versión 0.1 quedaron resueltas:
 | Hito | Qué | Responsable |
 | :---- | :---- | :---- |
 | 15/10 | Tabla outbox por módulo en `ModuleDbContext`, `AgregarAlOutbox` y migraciones. CU-40 registra `EnvioAsignadoARuta`. **Hecho el 12/10.** | Ezequiel |
-| 29/10 | `IIntegrationEventPublisher` por módulo, publicador, topología, inbox, consumidores con inquilino del sobre, reintentos, cola de fallidos, registrador y tabla `mensajes_fallidos` | Ezequiel |
+| 16/10 | Publicador, topología, inbox de Seguimiento, consumidor con inquilino del sobre, reintentos y cola de fallidos, con el primer consumidor (`RutaDespachada`, CU-43). **Hecho el 16/10.** | Lucas |
+| 16/10 | Trazas del publicador y del consumidor, OpenTelemetry en el Worker y espera del consumidor sólo con las colas vacías. **Hecho el 16/10.** | Ezequiel |
+| 29/10 | Registrador de fallidos, tabla `mensajes_fallidos`, cola `logistica.fallidos.sin-inquilino`, retención y consumidores de Seguimiento para los demás eventos | Ezequiel |
 | 29/10 | CU-09 en el Backoffice sobre `mensajes_fallidos` | Ezequiel |
 | 5/11 | Métricas del outbox y de los fallidos en el entorno productivo | Ezequiel |
 
@@ -289,3 +295,4 @@ Las preguntas abiertas de la versión 0.1 quedaron resueltas:
 | 0.1 | 30/09/2026 | Propuesta inicial. | Ezequiel Marcenal |
 | 1.0 | 12/10/2026 | Se completa la decisión: el outbox sin filtro de inquilino y con el inquilino del sobre tomado de la sesión (`AgregarAlOutbox`), columnas e índice de la tabla, `IIntegrationEventPublisher` por módulo, semántica de entrega y orden, clave de la inbox, reintentos con colas de espera, cola de fallidos con registrador y tabla `mensajes_fallidos` para CU-09, propiedades AMQP del mensaje, retención, observabilidad y estado de la verificación. Se agregan las alternativas 3.5 a 3.10 y se resuelven las preguntas abiertas. | Ezequiel Marcenal |
 | 1.1 | 12/10/2026 | Aprobado por el equipo (Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes), incluidos la tabla `mensajes_fallidos` con su registrador, `IIntegrationEventPublisher` por módulo y el sobre en cabeceras AMQP. | Ezequiel Marcenal |
+| 1.2 | 16/10/2026 | Se documenta cómo quedó la implementación (Lucas Ottonello, CU-43): el publicador sólo publica los tipos con consumidor declarado; `InquilinoMensaje` reemplaza a `InquilinoFijo` en el publicador y el consumidor; consumo con `BasicGet` y espera sólo con las colas vacías; `timestamp` en segundos. Se detallan los spans de la fuente `Logistica.Mensajeria` (sección 2.9) y se actualizan la verificación y el plan. | Ezequiel Marcenal |

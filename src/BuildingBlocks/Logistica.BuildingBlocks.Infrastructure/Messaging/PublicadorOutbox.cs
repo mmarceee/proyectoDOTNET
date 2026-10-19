@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -56,9 +55,9 @@ public sealed class PublicadorOutbox(IServiceScopeFactory ambitos, IConfiguratio
 #pragma warning restore EF1002
             foreach (var fila in pendientes)
             {
+                using var traza = TrazasMensajeria.IniciarPublicacion(fila.Tipo, fila.Id, fila.TraceParent);
                 var mensaje = new MensajeIntegracion(fila.Id, fila.Tipo, fila.OperadorId, fila.ComercioId,
-                    fila.OcurridoEn, fila.TraceParent, fila.Contenido);
-                using var traza = new Activity("outbox.publicar").SetParentId(fila.TraceParent ?? "").Start();
+                    fila.OcurridoEn, traza?.Id ?? fila.TraceParent, fila.Contenido);
                 // mandatory + confirms: una publicación no enrutada también deja la fila pendiente.
                 await canal.BasicPublishAsync(RabbitMqTransport.Exchange, fila.Tipo, mandatory: true,
                     RabbitMqTransport.Propiedades(mensaje), Encoding.UTF8.GetBytes(fila.Contenido), ct);

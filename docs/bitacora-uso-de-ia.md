@@ -255,6 +255,51 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Dejar la transacción pública: cualquier módulo podría confirmarla o revertirla por fuera de `EjecutarAsync`. Una clase base común para los dos contextos: `IdentidadDbContext` ya hereda de `IdentityDbContext`. |
 | **Verificación** | Dos pruebas nuevas: el mismo contexto se suma a cada unidad nueva y una falla no deshace la anterior; después de una unidad, el contexto vuelve a guardar con su propia transacción. Pasan todas las pruebas en Docker (16/10); cobertura: 94,1 % de líneas y 77,5 % de ramas. |
 
+## **3.16 Trazas: OpenTelemetry en la API y correlación de la sincronización**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 16/10/2026 |
+| **Archivos** | `Directory.Packages.props`, `Logistica.Api.csproj` y `Program.cs`; `EjecucionModule.cs` y `ProcesadorEnAmbitoPropio.cs` (Ejecución); prueba en `SincronizacionTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que una operación de la PWA se pueda seguir de punta a punta con un identificador de correlación (letra, sección 6.12; ADR-0004, sección 2.9). La IA detectó que OpenTelemetry todavía no estaba configurado, así que no había traza que continuar. |
+| **Cómo se trabajó** | La IA propuso sumar sólo las trazas, eligió versiones de los paquetes publicadas hace más de dos semanas, escribió la configuración, la actividad por operación y la prueba, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | OpenTelemetry con instrumentación de ASP.NET Core y Npgsql y la fuente `Logistica.Ejecucion`; exportador OTLP sólo si `OTEL_EXPORTER_OTLP_ENDPOINT` está configurado (Docker Compose apunta a Aspire Dashboard). Cada operación es una actividad hija del `traceparent` del dispositivo, con un vínculo al request del lote; el evento del outbox hereda esa traza. |
+| **Modificado** | — |
+| **Descartado** | Las versiones 1.20.0 de OpenTelemetry, publicadas el día anterior. Métricas y logs: quedan para el hito de observabilidad del 5/11. Colgar las operaciones del request del lote: un lote junta operaciones registradas en momentos y trazas distintas. |
+| **Verificación** | Prueba nueva: con un `CorrelacionId` del dispositivo, el `TraceParent` del evento `EnvioEntregado` del outbox pertenece a la misma traza. 353 pruebas (87 unitarias, 54 de arquitectura y 212 de integración), todas pasan. |
+
+## **3.17 Revisión de la mensajería y trazas del publicador y del consumidor**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 16/10/2026 |
+| **Archivos** | `TrazasMensajeria.cs` (nuevo), `PublicadorOutbox.cs`, `ConsumidorRabbitMq.cs` y `RabbitMqTransport.cs` (BuildingBlocks); `Program.cs` de la API y del Worker; `Logistica.Worker.csproj`; `TrazasMensajeriaTests` (nuevo); ADR-0003 v1.2 |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Revisar contra el ADR-0003 la mensajería que implementó Lucas Ottonello con CU-43 y completar la sección 2.9: seguir una operación de la API a RabbitMQ y al Worker en una sola traza. |
+| **Cómo se trabajó** | La IA comparó el código con cada sección del ADR. Confirmó lo que cumple: `SKIP LOCKED`, confirmaciones del broker, el sobre en cabeceras, la inbox en la misma transacción y la copia al reintento confirmada antes del *ack*. Encontró dos problemas: las actividades se creaban sin `ActivitySource`, así que OpenTelemetry no las exportaba, y el Worker no tenía OpenTelemetry; y el consumidor esperaba 250 ms en cada vuelta aunque hubiera mensajes, lo que lo limitaba a unos 4 mensajes por segundo por cola. Escribió las correcciones y la prueba, actualizó el ADR y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | Fuente `Logistica.Mensajeria` con un span productor hijo del request y un span consumidor hijo de la publicación; la cabecera `traceparent` lleva el span de publicación. Error, intento y destino en el span de un mensaje que falla. El log del reintento con tipo e inquilino, nunca con el contenido. Espera del consumidor sólo cuando todas las colas están vacías. |
+| **Modificado** | — |
+| **Descartado** | Reemplazar `BasicGet` por `BasicConsume`: con la espera corregida alcanza, y un solo canal evita publicaciones y confirmaciones simultáneas. Llevar `OcurridoEn` con milisegundos en una cabecera: se documenta la precisión en segundos de `timestamp`. |
+| **Verificación** | Prueba nueva: el span del consumidor del Worker es hijo del span de publicación, que es hijo del request que guardó el evento. 385 pruebas (90 unitarias, 54 de arquitectura y 241 de integración), todas pasan. |
+
+## **3.18 Caché distribuida sobre Valkey con métrica de aciertos**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 19/10/2026 |
+| **Archivos** | `ICacheDistribuida.cs` (SharedKernel, nuevo); `CacheDistribuida.cs`, `MetricasCache.cs` y `CachingExtensions.cs` (BuildingBlocks, nuevos); `Program.cs` de la API; `Directory.Packages.props`; `docker-compose.yml`; `CacheDistribuidaTests` (nuevo) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Dejar la base de la caché del hito del 22/10 ("caché en funcionamiento con su métrica de aciertos") para que los casos de uso la usen sin conocer Valkey: el seguimiento público (CU-60) y el cuadro tarifario (CU-05). |
+| **Cómo se trabajó** | Se pidió expresamente que la IA escribiera el código. Escribió la interfaz, la implementación, el registro, las métricas y las pruebas, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | `ICacheDistribuida` en SharedKernel, con `ObtenerOCrearAsync` e `InvalidarAsync`, implementada sobre `IDistributedCache`: Valkey con cadena de conexión y memoria del proceso sin ella. El operador de la sesión forma parte de la clave, y sin operador falla cerrado (ADR-0002). Si Valkey no responde, la lectura sigue desde la fuente: `AbortOnConnectFail` desactivado, `BacklogPolicy.FailFast` y un segundo de espera como máximo. Medidor `Logistica.Cache` con los contadores de aciertos, fallos y errores, etiquetados por caché y exportados a Aspire Dashboard cada 10 segundos. Un null no se guarda. |
+| **Modificado** | — |
+| **Descartado** | `HybridCache`: suma una capa en memoria por instancia, y su invalidación entre instancias complica la explicación. Incluir el comercio en la clave automáticamente: una invalidación del Backoffice, que no tiene comercio, no borraría lo guardado desde el Portal. Si el dato depende del comercio, el caso de uso lo pone en la clave. Un indicador con la tasa de aciertos ya calculada: alcanza con los dos contadores. Qué se guarda en la caché, con qué duración y cuándo se invalida lo decide el ADR de caché (Cristian Reyes). |
+| **Verificación** | Ocho pruebas nuevas: un fallo seguido de un acierto sin volver a la fuente, el aislamiento entre operadores, el fallo cerrado sin operador, la invalidación, que un null no se guarda, una caché que falla a mitad de camino, dos instancias que comparten un Valkey real (Testcontainers) y Valkey inalcanzable, que responde desde la fuente en menos de 5 segundos. 407 pruebas (98 unitarias, 54 de arquitectura y 255 de integración), todas pasan. Falta verlo en Aspire Dashboard cuando un caso de uso use la caché. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -270,3 +315,6 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.9 | 15/10/2026 | Entrada de la política de CU-30 en la pantalla del Backoffice. | Ezequiel Marcenal |
 | 0.10 | 15/10/2026 | Entrada del endpoint de sincronización (CU-52). | Ezequiel Marcenal |
 | 0.11 | 16/10/2026 | Entrada de `UnidadDeTrabajo.Sumar`. | Ezequiel Marcenal |
+| 0.12 | 16/10/2026 | Entrada de las trazas y la correlación de la sincronización. | Ezequiel Marcenal |
+| 0.13 | 16/10/2026 | Entrada de la revisión de la mensajería y sus trazas. | Ezequiel Marcenal |
+| 0.14 | 19/10/2026 | Entrada de la caché distribuida con su métrica de aciertos. | Ezequiel Marcenal |
