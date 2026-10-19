@@ -6,7 +6,7 @@ async function bloquearEspacio() {
     }
     if (!globalThis.indexedDB) return;
     await new Promise((resolve, reject) => {
-        const r = indexedDB.open('logistica-repartidor-v1', 1);
+        const r = indexedDB.open('logistica-repartidor-v1');
         let inexistente = false;
         r.onupgradeneeded = () => { inexistente = true; r.transaction.abort(); };
         r.onerror = () => inexistente ? resolve() : reject(r.error);

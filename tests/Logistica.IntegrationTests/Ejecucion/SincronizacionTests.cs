@@ -196,7 +196,7 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
         var entrega = Entrega(rutaId, envios[0], secuencia: 1);
         var operacion = caso switch
         {
-            "TipoDesconocido" => entrega with { Tipo = "ConfirmarCarga" },
+            "TipoDesconocido" => entrega with { Tipo = "TipoDesconocido" },
             "SinPosicion" => entrega with { Latitud = null },
             "SinDatosDeEntrega" => entrega with { Entrega = null },
             "FirmaNoBase64" => entrega with { Entrega = new EntregaRequest(new ArchivoRequest("image/png", "no es base64!")) },

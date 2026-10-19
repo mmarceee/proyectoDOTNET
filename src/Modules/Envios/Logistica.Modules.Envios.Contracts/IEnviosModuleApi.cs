@@ -6,6 +6,11 @@ namespace Logistica.Modules.Envios.Contracts;
 // (ADR-0001, addendum 3). Los otros módulos nunca tocan las tablas ni las entidades de Envíos.
 public interface IEnviosModuleApi
 {
+    // CU-51: lectura y T5 dentro de la transacción compartida de confirmación de carga.
+    Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
+    Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct);
+    Task<bool> RegistrarCargaAsync(IReadOnlyCollection<Guid> ids, Guid? responsable, DateTimeOffset ocurridoEn, CancellationToken ct);
+
     // null si el código no es de un bulto del operador actual (CU-30, A1).
     Task<EnvioParaRecepcion?> ObtenerParaRecepcionAsync(string codigoBulto, CancellationToken ct);
 

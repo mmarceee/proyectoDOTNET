@@ -55,10 +55,18 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
 
     public async Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct)
     {
+        await db.ParticiparEnTransaccionAsync(ct);
         var consulta = db.Envios.Include(e => e.Bultos).AsQueryable();
         consulta = envioIds is null ? consulta.Where(e => e.Estado == EstadoEnvio.EnDeposito || e.Estado == EstadoEnvio.Reprogramado)
             : consulta.Where(e => envioIds.Contains(e.Id));
         return await consulta.OrderBy(e => e.Numero).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Bulto>> ObtenerBultosPorCodigosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        // Partir de Envíos conserva el filtro del operador también para los códigos sobrantes.
+        return await db.Envios.SelectMany(e => e.Bultos).Where(b => codigos.Contains(b.Codigo)).ToListAsync(ct);
     }
 
     // Se resuelve en la base, sin traer los envíos: sólo importa si existe alguno.

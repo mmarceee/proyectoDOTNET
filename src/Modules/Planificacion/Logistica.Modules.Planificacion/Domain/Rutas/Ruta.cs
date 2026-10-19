@@ -79,6 +79,13 @@ internal sealed class Ruta : Entity, IOperadorOwned
         if (Estado is not (EstadoRuta.EnCurso or EstadoRuta.Despachada)) throw new DomainException("La ruta no está en ejecución.");
         Estado = EstadoRuta.Finalizada; Actualizar();
     }
+    public void RegistrarCarga(bool tieneEnviosCargados)
+    {
+        if (Estado is not (EstadoRuta.Despachada or EstadoRuta.EnCurso))
+            throw new DomainException("La ruta no está disponible para cargar.");
+        if (tieneEnviosCargados) Estado = EstadoRuta.EnCurso;
+        Actualizar();
+    }
     private void Reorganizar(IReadOnlyList<EnvioRuta> envios)
     {
         var anteriores = _paradas.OrderBy(p => p.Orden).ToList();

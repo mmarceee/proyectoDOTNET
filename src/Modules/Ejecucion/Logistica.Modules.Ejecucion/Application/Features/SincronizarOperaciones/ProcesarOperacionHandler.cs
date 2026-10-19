@@ -16,7 +16,8 @@ internal sealed class ProcesarOperacionHandler(
     IPlanificacionModuleApi planificacion,
     IUnidadDeTrabajo unidadDeTrabajo,
     ICurrentTenant tenant,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    Features.ConfirmarCarga.ConfirmarCargaHandler cargas)
 {
     public const string TipoEntrega = "RegistrarEntrega";
     public const string TipoIntentoFallido = "RegistrarIntentoFallido";
@@ -31,6 +32,8 @@ internal sealed class ProcesarOperacionHandler(
         // Sección 2.2: si ya se recibió, se responde lo mismo que la primera vez, sin volver a procesarla.
         if (await operaciones.ObtenerAsync(op.OperacionId, ct) is { } existente)
         {
+            if (existente.RepartidorId != command.RepartidorId)
+                return new(op.OperacionId, Resultados.Conflicto, "RutaNoAsignada");
             return existente.Resultado == ResultadoOperacion.Aplicada
                 ? new(op.OperacionId, Resultados.YaAplicada)
                 : new(op.OperacionId, Nombre(existente.Resultado), existente.Motivo, existente.Detalle);
@@ -42,6 +45,8 @@ internal sealed class ProcesarOperacionHandler(
         {
             return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "DependeDeOperacionRechazada", null, ct);
         }
+
+        if (op.Tipo == "ConfirmarCarga") return await cargas.HandleAsync(command, datos, ct);
 
         if (op.Tipo is not (TipoEntrega or TipoIntentoFallido))
         {

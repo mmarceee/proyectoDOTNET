@@ -1,6 +1,6 @@
 # CU-51 · Escanear la carga del vehículo
 
-Propuesta de implementación para el 18/10/2026. Preparada el 17/10/2026; pendiente de revisión de Lucas. Este documento no acredita una implementación.
+Diseño preparado el 17/10/2026 e implementado el 19/10/2026 por indicación de Lucas. El estado real, las comprobaciones y los límites se describen en [implementación de CU-51](README.md). Las secciones siguientes conservan las decisiones que guiaron el trabajo.
 
 ## Base documental y estado real
 
@@ -46,7 +46,7 @@ EscaneoCarga pertenece a Ejecución según el modelo. Guardar código leído, fe
 6. Una incompatibilidad de estado/pertenencia/revisión rechaza la operación completa; no deja algunos efectos confirmados y otros sin registrar. Se conserva el payload rechazado para CU-52.
 7. Conservar los avisos de discrepancias de forma durable mediante un evento de integración. Su visualización en el tablero corresponde a CU-66; no darla por implementada sólo por publicar el evento.
 
-Planificación expone la consulta de carga y la transición de ruta por Contracts; Envíos expone la transición T5 y es dueño de sus eventos. No modificar estados desde la PWA ni desde SQL ajeno al módulo.
+Planificación expone la consulta de carga y la transición de ruta por IPlanificacionModuleApi; Envíos expone la transición T5 por IEnviosModuleApi y es dueño de sus eventos. Ambas API se implementan como clases internal en Application, con resultados inmutables en Contracts/Results y repositorios propios para persistencia (ADR-0001 §2.2). No modificar estados desde la PWA ni desde SQL ajeno al módulo.
 
 Para posteriores confirmaciones de carga de la misma ruta, la hoja debe actualizarse antes de abrir un nuevo borrador. Reenviar la misma confirmación usa siempre el mismo OperacionId y no repite T5. Un envío ya cargado no se retrocede ni vuelve a cargar; los envíos aún AsignadoARuta pueden completarse en una nueva operación sobre la base actualizada. Verificar esta combinación con la revisión de ruta y los bloqueos de transacción.
 
