@@ -1,0 +1,48 @@
+@page "/backoffice/reglas/{numero:int}"
+@model Logistica.Modules.Administracion.Presentation.Features.ConfigurarReglas.DetalleModel
+@using Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = $"Reglas · versión {Model.Version.Numero}";
+    var (texto, clase) = TextosTarifario.Situacion(Model.Version.Situacion);
+    var v = Model.Version.Valores;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Reglas · versión @Model.Version.Numero <span class="badge @clase align-middle">@texto</span></h1>
+    <a href="/backoffice/reglas" class="btn btn-outline-secondary">Volver a las versiones</a>
+</div>
+
+<p>Rige desde <strong>@TextosTarifario.Fecha(Model.Version.VigenteDesde)</strong> hasta <strong>@TextosTarifario.Fecha(Model.Version.VigenteHasta)</strong>.
+    Una versión publicada no se modifica: para cambiar reglas, creá una nueva versión.</p>
+
+<dl class="row">
+    <dt class="col-sm-4">Máximo de intentos</dt><dd class="col-sm-8">@v.MaxIntentos</dd>
+    <dt class="col-sm-4">Horas entre intentos</dt><dd class="col-sm-8">@v.PlazoEntreIntentosHoras</dd>
+    <dt class="col-sm-4">Pruebas exigidas</dt>
+    <dd class="col-sm-8">Firma@(v.PruebaExigida.ExigeFoto ? ", foto" : "")@(v.PruebaExigida.ExigeNombreYDocumento ? ", nombre y documento" : "")</dd>
+    <dt class="col-sm-4">Devolución</dt>
+    <dd class="col-sm-8">@(v.PoliticaDevolucion.DevolverTrasIntentosAgotados ? $"Al agotar los intentos, en {v.PoliticaDevolucion.PlazoDevolucionDias} días" : "No se devuelve automáticamente")</dd>
+    <dt class="col-sm-4">Plazos por modalidad</dt>
+    <dd class="col-sm-8">@string.Join(" · ", v.Plazos.Select(p => $"{TextosTarifario.Modalidad(p.Modalidad)} {p.PlazoHoras} h"))</dd>
+    <dt class="col-sm-4">Anticipación para reprogramar</dt><dd class="col-sm-8">@v.AnticipacionReprogramacionHoras h</dd>
+    <dt class="col-sm-4">Máximo de paradas por ruta</dt><dd class="col-sm-8">@v.MaxParadasPorRuta</dd>
+</dl>
+
+<h2 class="h5">Motivos de no entrega</h2>
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead><tr><th>Código</th><th>Descripción</th><th>Reprogramable</th><th>Exige evidencia</th></tr></thead>
+        <tbody>
+            @foreach (var motivo in Model.Version.Motivos)
+            {
+                <tr>
+                    <td>@motivo.Codigo</td>
+                    <td>@motivo.Descripcion</td>
+                    <td>@(motivo.Reprogramable ? "Sí" : "No")</td>
+                    <td>@(motivo.ExigeEvidencia ? "Sí" : "No")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

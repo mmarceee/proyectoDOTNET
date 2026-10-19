@@ -23,4 +23,6 @@ internal sealed class AdministracionDbContext(DbContextOptions<AdministracionDbC
     public DbSet<Domain.Tarifas.VersionTarifario> VersionesTarifario => Set<Domain.Tarifas.VersionTarifario>();
     public DbSet<Domain.Tarifas.ReglaTarifa> ReglasTarifa => Set<Domain.Tarifas.ReglaTarifa>();
     public DbSet<Domain.Tarifas.AjusteTarifa> AjustesTarifa => Set<Domain.Tarifas.AjusteTarifa>();
+    public DbSet<Domain.Reglas.VersionReglas> VersionesReglas => Set<Domain.Reglas.VersionReglas>();
+    public DbSet<Domain.Reglas.MotivoNoEntrega> MotivosNoEntrega => Set<Domain.Reglas.MotivoNoEntrega>();
 }

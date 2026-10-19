@@ -122,6 +122,12 @@ Cada caso de uso se describe con los campos: caso de uso, descripción, pre-cond
 | **Flujos alternativos** | **A1 · Valores inválidos (paso 6).** La cantidad de intentos es menor que 1, algún plazo no es mayor que cero, falta el plazo de una modalidad o hay códigos de motivo repetidos. El sistema lo indica.<br><br>**A2 · Catálogo de motivos vacío (paso 6).** El sistema no publica: el repartidor necesita al menos un motivo para registrar un intento fallido (CU-18).<br><br>**A3 · Fecha de vigencia en el pasado, borrador existente o conflicto de concurrencia.** Igual que en CU-05 (A3, A4 y A5). |
 | **Requerimientos especiales** | 1. Versionado inmutable (sección 6.6).<br>2. La caché de reglas se invalida al publicar (sección 6.7).<br>3. Es el otro caso del escenario 5 de la defensa: modificar una regla operativa en caliente.<br>4. Incluye la anticipación mínima para que el destinatario reprograme (CU-61) y el máximo de paradas por ruta (CU-40). |
 
+**Implementación de CU-06 (19/10/2026, Cristian Reyes).** Igual que CU-05: borrador único por operador, publicación de inmediato o desde un día en la zona horaria del operador, versiones inmutables y caché invalidada por el handler (ADR-0006). Decisiones:
+* Los valores se guardan tal como se escriben y se validan al publicar (A1 y A2), mostrando todos los problemas juntos.
+* El código de motivo se guarda en mayúsculas y no se repite dentro de una versión.
+* Contrato para Envíos (acordado con Ezequiel Marcenal): `ReglasDeEntregaAsync(versionReglasId)` devuelve las reglas y el catálogo de motivos de la versión que guardó el envío al admitirse (letra 6.6); `ReglasDeEntregaVigentesAsync()`, las que rigen, para el alta y para los envíos anteriores sin versión.
+* El máximo de paradas por ruta se guarda en la versión de reglas; Planificación lo toma de acá cuando se acuerde con su responsable (mientras tanto sigue usando `VersionReglasPlanificacion`).
+
 ### **CU-07 · Gestionar la identidad visual**
 
 | Campo | Contenido |
@@ -804,3 +810,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 0.7 | 18/10/2026 | CU-04: alcance para el 22/10. La reprogramación por lote de la ampliación queda pendiente y, mientras tanto, el reemplazo de una franja con envíos comprometidos se bloquea. | Cristian Reyes |
 | 0.8 | 19/10/2026 | CU-04, revisión de Lucas y Ezequiel: el bloqueo cubre envíos sin fecha en rutas activas, con el bloqueo de planificación; fechas futuras en la zona horaria del operador; validar antes de modificar; código de zona en mayúsculas. | Cristian Reyes |
 | 0.9 | 19/10/2026 | CU-05: decisiones de implementación (rangos, ajustes, versión programada, invalidación de la caché, A5). | Cristian Reyes |
+| 1.0 | 19/10/2026 | CU-06: decisiones de implementación y contrato de reglas para Envíos. | Cristian Reyes |

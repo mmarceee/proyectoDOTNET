@@ -3,6 +3,7 @@ using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Administracion.Domain.Comercios;
 using Logistica.Modules.Administracion.Domain.Operadores;
 using Logistica.Modules.Administracion.Domain.Planificacion;
+using Logistica.Modules.Administracion.Domain.Reglas;
 using Logistica.Modules.Administracion.Domain.Tarifas;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,13 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
         await SembrarTarifarioAsync(OperadorDemoId, DatosTarifarioDemo(), [], ct);
         await SembrarTarifarioAsync(OperadorEsteId, DatosTarifarioEste(),
             [new DatosAjusteTarifa(TipoAjuste.Recargo, true, 30, Modalidad.Urgente)], ct);
+
+        // CU-06. Demo: 3 intentos cada 24 h, sólo la firma. Este: 2 intentos cada 48 h y foto, nombre y documento
+        // obligatorios. Los máximos de paradas son los mismos que las reglas de planificación de Lucas (20 y 8).
+        await SembrarReglasAsync(OperadorDemoId, new DatosReglas(3, 24, new PruebaExigida(false, false),
+            new PoliticaDevolucion(true, 5), [new(Modalidad.Estandar, 72), new(Modalidad.Urgente, 24)], 24, 20), ct);
+        await SembrarReglasAsync(OperadorEsteId, new DatosReglas(2, 48, new PruebaExigida(true, true),
+            new PoliticaDevolucion(true, 3), [new(Modalidad.Estandar, 96), new(Modalidad.Urgente, 48)], 48, 8), ct);
     }
 
     // El comercio es global y trabaja con los dos operadores (letra, §3.3): se crea una sola vez.
@@ -218,6 +226,31 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
         var inicio = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         version.Publicar(inicio, inicio, null);
         db.VersionesTarifario.Add(version);
+        await db.SaveChangesAsync(ct);
+    }
+
+    // Los mismos códigos que usaba ReglasDeEntregaProvisorias de Envíos, para que el cambio no se note en la PWA.
+    private static readonly DatosMotivo[] MotivosIniciales =
+    [
+        new("AUSENTE", "Destinatario ausente", Reprogramable: true, ExigeEvidencia: false),
+        new("SIN_ACCESO", "Sin acceso al domicilio", Reprogramable: true, ExigeEvidencia: true),
+        new("DIRECCION_INEXISTENTE", "La dirección no existe", Reprogramable: false, ExigeEvidencia: false),
+        new("RECHAZADO", "El destinatario rechazó el envío", Reprogramable: false, ExigeEvidencia: false),
+    ];
+
+    // La versión 1 vigente desde el 1/1/2026, con el operador como inquilino, como el tarifario.
+    private async Task SembrarReglasAsync(Guid operadorId, DatosReglas valores, CancellationToken ct)
+    {
+        await using var db = ContextoDe(operadorId);
+        if (await db.VersionesReglas.AnyAsync(ct))
+        {
+            return;
+        }
+
+        var version = VersionReglas.CrearBorrador(operadorId, 1, valores, MotivosIniciales);
+        var inicio = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        version.Publicar(inicio, inicio, null);
+        db.VersionesReglas.Add(version);
         await db.SaveChangesAsync(ct);
     }
 

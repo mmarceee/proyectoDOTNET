@@ -1,0 +1,89 @@
+@page "/backoffice/reglas/borrador"
+@model Logistica.Modules.Administracion.Presentation.Features.ConfigurarReglas.BorradorModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = $"Reglas · borrador {Model.Borrador.Numero}";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Reglas · versión @Model.Borrador.Numero <span class="badge text-bg-warning align-middle">Borrador</span></h1>
+    <a href="/backoffice/reglas" class="btn btn-outline-secondary">Volver a las versiones</a>
+</div>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+@if (Model.Borrador.Errores.Count > 0)
+{
+    <div class="alert alert-warning" role="alert">
+        <strong>Para publicar falta corregir:</strong>
+        <ul class="mb-0">
+            @foreach (var error in Model.Borrador.Errores)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
+
+<h2 class="h5">Valores</h2>
+<form method="post" asp-page-handler="Valores" class="row g-3 mb-4">
+    <div class="col-6 col-md-3"><label asp-for="MaxIntentos" class="form-label">Máximo de intentos</label><input asp-for="MaxIntentos" type="number" class="form-control" /></div>
+    <div class="col-6 col-md-3"><label asp-for="PlazoEntreIntentosHoras" class="form-label">Horas entre intentos</label><input asp-for="PlazoEntreIntentosHoras" type="number" class="form-control" /></div>
+    <div class="col-6 col-md-3"><label asp-for="PlazoEstandarHoras" class="form-label">Plazo Estándar (h)</label><input asp-for="PlazoEstandarHoras" type="number" class="form-control" /></div>
+    <div class="col-6 col-md-3"><label asp-for="PlazoUrgenteHoras" class="form-label">Plazo Urgente (h)</label><input asp-for="PlazoUrgenteHoras" type="number" class="form-control" /></div>
+    <div class="col-6 col-md-3"><label asp-for="AnticipacionReprogramacionHoras" class="form-label">Anticipación para reprogramar (h)</label><input asp-for="AnticipacionReprogramacionHoras" type="number" class="form-control" /></div>
+    <div class="col-6 col-md-3"><label asp-for="MaxParadasPorRuta" class="form-label">Máximo de paradas por ruta</label><input asp-for="MaxParadasPorRuta" type="number" class="form-control" /></div>
+    <div class="col-6 col-md-3"><label asp-for="PlazoDevolucionDias" class="form-label">Plazo de devolución (días)</label><input asp-for="PlazoDevolucionDias" type="number" class="form-control" /></div>
+    <div class="col-12">
+        <div class="form-check form-check-inline"><input asp-for="ExigeFoto" class="form-check-input" /><label asp-for="ExigeFoto" class="form-check-label">Exigir foto</label></div>
+        <div class="form-check form-check-inline"><input asp-for="ExigeNombreYDocumento" class="form-check-input" /><label asp-for="ExigeNombreYDocumento" class="form-check-label">Exigir nombre y documento del receptor</label></div>
+        <div class="form-check form-check-inline"><input asp-for="DevolverTrasIntentosAgotados" class="form-check-input" /><label asp-for="DevolverTrasIntentosAgotados" class="form-check-label">Devolver al agotar los intentos</label></div>
+        <div class="form-text">La firma del receptor es siempre obligatoria.</div>
+    </div>
+    <div class="col-12"><button type="submit" class="btn btn-outline-primary">Guardar valores</button></div>
+</form>
+
+<h2 class="h5">Motivos de no entrega</h2>
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead><tr><th>Código</th><th>Descripción</th><th>Reprogramable</th><th>Exige evidencia</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var motivo in Model.Borrador.Motivos)
+            {
+                <tr>
+                    <td>@motivo.Codigo</td>
+                    <td>@motivo.Descripcion</td>
+                    <td>@(motivo.Reprogramable ? "Sí" : "No")</td>
+                    <td>@(motivo.ExigeEvidencia ? "Sí" : "No")</td>
+                    <td>
+                        <form method="post" asp-page-handler="QuitarMotivo" asp-route-id="@motivo.Id">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Quitar</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+<form method="post" asp-page-handler="Motivo" class="row g-2 align-items-end mb-4">
+    <div class="col-md-2"><label asp-for="Codigo" class="form-label">Código</label><input asp-for="Codigo" class="form-control" /></div>
+    <div class="col-md-4"><label asp-for="Descripcion" class="form-label">Descripción</label><input asp-for="Descripcion" class="form-control" /></div>
+    <div class="col-md-4">
+        <div class="form-check form-check-inline"><input asp-for="Reprogramable" class="form-check-input" /><label asp-for="Reprogramable" class="form-check-label">Reprogramable</label></div>
+        <div class="form-check form-check-inline"><input asp-for="ExigeEvidencia" class="form-check-input" /><label asp-for="ExigeEvidencia" class="form-check-label">Exige evidencia</label></div>
+    </div>
+    <div class="col-md-2"><button type="submit" class="btn btn-outline-primary">Agregar motivo</button></div>
+</form>
+
+<h2 class="h5">Publicar</h2>
+<p class="text-muted small">Una versión publicada no se modifica. Los envíos ya admitidos conservan sus reglas.</p>
+<form method="post" asp-page-handler="Publicar" class="row g-2 align-items-end">
+    <div class="col-md-3">
+        <label asp-for="Fecha" class="form-label">Rige desde (vacío: de inmediato)</label>
+        <input asp-for="Fecha" type="date" class="form-control" />
+    </div>
+    <div class="col-md-3"><button type="submit" class="btn btn-primary">Publicar</button></div>
+</form>
