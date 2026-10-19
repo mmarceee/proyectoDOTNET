@@ -20,6 +20,9 @@ internal interface IEnvioRepository
     void Agregar(ArchivoEvidencia archivo);
     void Agregar(Devoluciones.Devolucion devolucion);
     Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct);
+
+    // CU-04: ¿hay envíos con entrega pendiente en alguna de estas franjas, en esa fecha o después?
+    Task<bool> HayComprometidosAsync(IReadOnlyCollection<Guid> franjaIds, DateOnly desde, CancellationToken ct);
 // Los metadatos del sobre se toman de la sesión al registrar el evento.
     void RegistrarAsignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);
     void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);

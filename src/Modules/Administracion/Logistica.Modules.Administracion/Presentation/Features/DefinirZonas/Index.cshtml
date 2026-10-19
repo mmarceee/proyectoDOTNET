@@ -1,0 +1,51 @@
+@page "/backoffice/zonas"
+@model Logistica.Modules.Administracion.Presentation.Features.DefinirZonas.IndexModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Zonas";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Zonas</h1>
+    <a href="/backoffice/zonas/nueva" class="btn btn-primary">Nueva zona</a>
+</div>
+
+@if (Model.Zonas.Count == 0)
+{
+    <p class="text-muted">Todavía no hay zonas.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Códigos postales</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var zona in Model.Zonas)
+                {
+                    <tr>
+                        <td><a href="/backoffice/zonas/@zona.Id">@zona.Codigo</a></td>
+                        <td>@zona.Nombre</td>
+                        <td>@zona.CantidadCodigosPostales</td>
+                        <td>
+                            @if (zona.Activa)
+                            {
+                                <span class="badge text-bg-success">Activa</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Inactiva</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

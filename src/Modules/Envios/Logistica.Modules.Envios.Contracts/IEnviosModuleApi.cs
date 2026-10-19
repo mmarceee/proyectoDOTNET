@@ -21,4 +21,9 @@ public interface IEnviosModuleApi
     // trabajo en curso, junto con el registro de la operación.
     Task<RegistroEnCalle> RegistrarEntregaAsync(EntregaARegistrar entrega, CancellationToken ct);
     Task<RegistroEnCalle> RegistrarIntentoFallidoAsync(IntentoFallidoARegistrar intento, CancellationToken ct);
+
+    // CU-04: ¿algún envío sin terminar tiene una de estas franjas comprometida en esa fecha o después? Administración
+    // lo pregunta antes de reemplazar una franja, para no cambiar un horario prometido sin aviso. Las rutas quedan
+    // cubiertas por sus envíos.
+    Task<bool> HayEnviosComprometidosAsync(IReadOnlyCollection<Guid> franjaIds, DateOnly desde, CancellationToken ct);
 }
