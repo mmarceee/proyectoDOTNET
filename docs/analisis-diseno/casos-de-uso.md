@@ -100,6 +100,15 @@ Cada caso de uso se describe con los campos: caso de uso, descripción, pre-cond
 | **Flujos alternativos** | **A1 · Rangos superpuestos (paso 8).** Dos reglas de la misma zona y modalidad tienen rangos de peso o volumen superpuestos, de modo que un bulto tendría dos precios. El sistema indica las reglas en conflicto y no publica.<br><br>**A2 · Zonas o modalidades sin tarifa (paso 8).** Alguna zona activa no tiene reglas para alguna modalidad. El sistema advierte que esos envíos serán rechazados en el alta (CU-10, A3) y pide confirmación.<br><br>**A3 · Fecha de vigencia en el pasado (paso 7).** El sistema no lo permite.<br><br>**A4 · Ya existe un borrador (paso 3).** El sistema abre el borrador existente en lugar de crear otro: hay a lo sumo un borrador por operador.<br><br>**A5 · Otro administrador publicó antes (paso 9).** El sistema detecta el conflicto de concurrencia, informa que la versión vigente cambió y pide revisar el borrador. |
 | **Requerimientos especiales** | 1. **Versionado inmutable** (sección 6.6): una versión publicada no se edita; cada envío guarda la versión con que fue admitido.<br>2. **Tarifa por bulto:** cada regla se aplica a un bulto según su peso y volumen; la tarifa del envío es la suma de sus bultos (CU-10).<br>3. La configuración se hace desde la interfaz, sin tocar código ni desplegar (RF 3). Es el escenario 5 de la defensa (sección 9.3).<br>4. La caché del cuadro tarifario se invalida al publicar (sección 6.7).<br>5. Control de concurrencia optimista sobre la versión vigente (sección 6.4). |
 
+**Implementación de CU-05 (19/10/2026, Cristian Reyes).** Decisiones que la ficha no fijaba:
+* **Rangos:** el "desde" está incluido y el "hasta" excluido: 0–5 kg y 5–10 kg no se superponen, y un bulto de 5 kg va al segundo.
+* **Ajustes:** el porcentaje se calcula sobre el precio base de la regla y el monto fijo se suma o resta tal cual; se aplican sólo los de la modalidad del bulto y el precio nunca es menor que cero.
+* **Programada:** una versión publicada con fecha futura queda Vigente con esa fecha de inicio y se muestra como "programada"; cuál rige en un momento lo deciden las fechas de vigencia.
+* **Fecha de publicación:** de inmediato, o desde el comienzo de un día en la zona horaria del operador.
+* **Caché:** el handler la invalida después de guardar la publicación (no hay un despachador de eventos en memoria). Claves y duraciones según el ADR-0006.
+* **A5:** como hay un solo borrador por operador, el conflicto es que otro administrador publique el mismo borrador. Se detecta porque el borrador ya no existe o, si publican a la vez, por el control optimista sobre `xmin`.
+* El listado incluye un simulador de precio que usa la misma lectura con caché que CU-10, para mostrar el escenario 5 y la métrica de aciertos.
+
 ### **CU-06 · Configurar las reglas operativas**
 
 | Campo | Contenido |
@@ -794,3 +803,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 0.6 | 12/10/2026 | CU-52: la política de conflictos remite al ADR-0004 y los ejemplos de conflicto se ajustan a las transiciones posibles después del despacho. | Ezequiel Marcenal |
 | 0.7 | 18/10/2026 | CU-04: alcance para el 22/10. La reprogramación por lote de la ampliación queda pendiente y, mientras tanto, el reemplazo de una franja con envíos comprometidos se bloquea. | Cristian Reyes |
 | 0.8 | 19/10/2026 | CU-04, revisión de Lucas y Ezequiel: el bloqueo cubre envíos sin fecha en rutas activas, con el bloqueo de planificación; fechas futuras en la zona horaria del operador; validar antes de modificar; código de zona en mayúsculas. | Cristian Reyes |
+| 0.9 | 19/10/2026 | CU-05: decisiones de implementación (rangos, ajustes, versión programada, invalidación de la caché, A5). | Cristian Reyes |

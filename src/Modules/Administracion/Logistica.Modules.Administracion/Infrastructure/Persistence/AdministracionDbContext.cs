@@ -20,4 +20,7 @@ internal sealed class AdministracionDbContext(DbContextOptions<AdministracionDbC
     public DbSet<Domain.Planificacion.Zona> Zonas => Set<Domain.Planificacion.Zona>();
     public DbSet<Domain.Planificacion.FranjaHoraria> Franjas => Set<Domain.Planificacion.FranjaHoraria>();
     public DbSet<Domain.Planificacion.VersionReglasPlanificacion> ReglasPlanificacion => Set<Domain.Planificacion.VersionReglasPlanificacion>();
+    public DbSet<Domain.Tarifas.VersionTarifario> VersionesTarifario => Set<Domain.Tarifas.VersionTarifario>();
+    public DbSet<Domain.Tarifas.ReglaTarifa> ReglasTarifa => Set<Domain.Tarifas.ReglaTarifa>();
+    public DbSet<Domain.Tarifas.AjusteTarifa> AjustesTarifa => Set<Domain.Tarifas.AjusteTarifa>();
 }
