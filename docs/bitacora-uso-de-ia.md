@@ -285,6 +285,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Reemplazar `BasicGet` por `BasicConsume`: con la espera corregida alcanza, y un solo canal evita publicaciones y confirmaciones simultáneas. Llevar `OcurridoEn` con milisegundos en una cabecera: se documenta la precisión en segundos de `timestamp`. |
 | **Verificación** | Prueba nueva: el span del consumidor del Worker es hijo del span de publicación, que es hijo del request que guardó el evento. 385 pruebas (90 unitarias, 54 de arquitectura y 241 de integración), todas pasan. |
 
+## **3.18 Caché distribuida sobre Valkey con métrica de aciertos**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 19/10/2026 |
+| **Archivos** | `ICacheDistribuida.cs` (SharedKernel, nuevo); `CacheDistribuida.cs`, `MetricasCache.cs` y `CachingExtensions.cs` (BuildingBlocks, nuevos); `Program.cs` de la API; `Directory.Packages.props`; `docker-compose.yml`; `CacheDistribuidaTests` (nuevo) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Dejar la base de la caché del hito del 22/10 ("caché en funcionamiento con su métrica de aciertos") para que los casos de uso la usen sin conocer Valkey: el seguimiento público (CU-60) y el cuadro tarifario (CU-05). |
+| **Cómo se trabajó** | Se pidió expresamente que la IA escribiera el código. Escribió la interfaz, la implementación, el registro, las métricas y las pruebas, y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | `ICacheDistribuida` en SharedKernel, con `ObtenerOCrearAsync` e `InvalidarAsync`, implementada sobre `IDistributedCache`: Valkey con cadena de conexión y memoria del proceso sin ella. El operador de la sesión forma parte de la clave, y sin operador falla cerrado (ADR-0002). Si Valkey no responde, la lectura sigue desde la fuente: `AbortOnConnectFail` desactivado, `BacklogPolicy.FailFast` y un segundo de espera como máximo. Medidor `Logistica.Cache` con los contadores de aciertos, fallos y errores, etiquetados por caché y exportados a Aspire Dashboard cada 10 segundos. Un null no se guarda. |
+| **Modificado** | — |
+| **Descartado** | `HybridCache`: suma una capa en memoria por instancia, y su invalidación entre instancias complica la explicación. Incluir el comercio en la clave automáticamente: una invalidación del Backoffice, que no tiene comercio, no borraría lo guardado desde el Portal. Si el dato depende del comercio, el caso de uso lo pone en la clave. Un indicador con la tasa de aciertos ya calculada: alcanza con los dos contadores. Qué se guarda en la caché, con qué duración y cuándo se invalida lo decide el ADR de caché (Cristian Reyes). |
+| **Verificación** | Ocho pruebas nuevas: un fallo seguido de un acierto sin volver a la fuente, el aislamiento entre operadores, el fallo cerrado sin operador, la invalidación, que un null no se guarda, una caché que falla a mitad de camino, dos instancias que comparten un Valkey real (Testcontainers) y Valkey inalcanzable, que responde desde la fuente en menos de 5 segundos. 407 pruebas (98 unitarias, 54 de arquitectura y 255 de integración), todas pasan. Falta verlo en Aspire Dashboard cuando un caso de uso use la caché. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -302,3 +317,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.11 | 16/10/2026 | Entrada de `UnidadDeTrabajo.Sumar`. | Ezequiel Marcenal |
 | 0.12 | 16/10/2026 | Entrada de las trazas y la correlación de la sincronización. | Ezequiel Marcenal |
 | 0.13 | 16/10/2026 | Entrada de la revisión de la mensajería y sus trazas. | Ezequiel Marcenal |
+| 0.14 | 19/10/2026 | Entrada de la caché distribuida con su métrica de aciertos. | Ezequiel Marcenal |
