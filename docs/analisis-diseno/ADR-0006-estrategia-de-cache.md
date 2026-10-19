@@ -2,7 +2,7 @@
 
 | Estado | Propuesto — borrador pendiente de revisión por el responsable y el equipo |
 | :---- | :---- |
-| **Versión** | 0.2 |
+| **Versión** | 0.3 |
 | **Fecha** | 19 de octubre de 2026 |
 | **Responsable** | Cristian Reyes |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
@@ -52,12 +52,12 @@ El acceso a la caché se concentra en **una sola pieza** común a todos los mód
 | Aspecto | Decisión |
 | :---- | :---- |
 | Qué se guarda | La vista pública del envío: estado, ventana estimada, historial sin datos del personal, nombre de pila y localidad (CU-60, paso 3). Nunca la dirección completa ni el teléfono. |
-| Clave | `seguimiento:{OperadorId}:{EnvioId}`. El operador y el envío salen del token firmado, después de validar la firma; nunca de un valor sin verificar. **[a confirmar]** |
+| Clave | `seguimiento:{OperadorId}:{EnvioId}`. El operador y el envío salen del token firmado, después de validar la firma; nunca de un valor sin verificar. *(Confirmado el 19/10 al implementar CU-60.)* |
 | Expiración | **60 segundos, absoluta.** **[a confirmar el valor]** |
 | Invalidación | Cada cambio de estado del envío borra su clave, con un evento en memoria publicado por Envíos después de confirmar (ADR-0001, sección 2.5). |
 | Por qué así | La invalidación cubre los cambios del propio envío. Pero la ventana estimada en tránsito incluye *cuántas entregas quedan antes de la suya* (CU-60, requerimiento 5), que cambia cuando se entregan **otros** envíos de la ruta. No se invalidan todos los envíos de la ruta en cada entrega: la expiración corta acota ese dato a un minuto de antigüedad. Es el componente de más tráfico: aunque dure poco, absorbe las recargas repetidas del destinatario. |
 
-**Sobre el ADR-0002, sección 4.** Allí se dice que el seguimiento usa *el token como clave*. Este borrador propone usar `OperadorId` y `EnvioId` (que el token contiene), porque Envíos conoce el `EnvioId` al cambiar el estado, pero no necesariamente el token. Si se acepta, hay que actualizar esa línea del ADR-0002. **[a confirmar]**
+**Sobre el ADR-0002, sección 4.** Allí se dice que el seguimiento usa *el token como clave*. Este borrador propone usar `OperadorId` y `EnvioId` (que el token contiene), porque Envíos conoce el `EnvioId` al cambiar el estado, pero no necesariamente el token. Se aceptó al implementar CU-60 (19/10/2026) y se actualizó esa línea del ADR-0002.
 
 ## **2.4 Caso 2 · Configuración del operador: se lee mucho y casi no cambia**
 
@@ -75,7 +75,7 @@ Incluye el cuadro tarifario (CU-05), las reglas operativas (CU-06), las zonas y 
 - **La vigencia futura no se resuelve con un evento:** una versión publicada hoy para regir el 1/11 no dispara nada el 1/11. Por eso el puntero `vigente` se guarda con una expiración que **no supera la fecha de inicio de la próxima versión programada**: ese día la caché vence sola y se lee la nueva.
 - **Un envío ya admitido no consulta el puntero:** usa la versión que guardó (`VersionTarifarioId`), así que nunca le afecta una publicación posterior.
 
-**[a confirmar]** Para el 22/10 alcanza con el tarifario; reglas, zonas e identidad visual pueden sumarse en el mismo hito o después, con el mismo mecanismo.
+**Implementado para el 22/10:** el tarifario (CU-05), las reglas operativas (CU-06, también por Id de versión, porque cada envío guarda la suya) y el seguimiento (CU-60). Zonas e identidad visual pueden sumarse después, con el mismo mecanismo.
 
 ## **2.5 Invalidación: después de confirmar, y con un límite de tiempo siempre**
 
@@ -135,7 +135,6 @@ El Aspire Dashboard muestra los tres por grupo y, con ellos, la tasa de aciertos
 
 | Tema | Por qué importa |
 | :---- | :---- |
-| Clave del seguimiento (`EnvioId` o token) | Cambia cómo invalida Envíos y requiere actualizar el ADR-0002, sección 4. |
 | Valores de expiración (60 s, 10 min, 24 h) | Son propuestas razonables, no medidas. Se pueden ajustar con las métricas del tablero. |
 | Alcance para el 22/10 | Mínimo exigido: seguimiento y tarifario. Reglas, zonas e identidad visual con el mismo mecanismo, en el mismo hito o después. |
 | Quién publica el evento de cambio de estado para el seguimiento | Lo emite Envíos (Ezequiel); lo consume Seguimiento (Cristian). Hay que acordar el nombre y dónde se suscribe. |
@@ -155,3 +154,4 @@ El Aspire Dashboard muestra los tres por grupo y, con ellos, la tasa de aciertos
 | :---: | :---: | :---- | :---- |
 | 0.1 | 18/10/2026 | Borrador inicial, escrito con IA a pedido del responsable, para revisar con el equipo. | Cristian Reyes |
 | 0.2 | 19/10/2026 | Se alinea con la pieza común implementada por Ezequiel Marcenal (PR #36): `ICacheDistribuida`, falla cerrado con excepción, memoria del proceso sin Valkey, espera máxima de 1 s, nombres de los contadores y comercio en la clave a cargo del caso de uso. | Cristian Reyes |
+| 0.3 | 19/10/2026 | Se confirma la clave del seguimiento (EnvioId) y se registra qué usa la caché para el 22/10: tarifario, reglas y seguimiento. En el seguimiento, los eventos de Envíos se consumen en el Worker sólo para borrar la entrada. | Cristian Reyes |

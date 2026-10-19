@@ -96,6 +96,33 @@ public class ConfigurarReglasTests(PostgresApiFactory factory) : IClassFixture<P
         Assert.Equal("AUSENTE", Assert.Single(vigentes.Motivos).Codigo);
     }
 
+    // Acordado con Lucas (19/10): Planificación toma el máximo de paradas y el Id de versión de las reglas que rigen,
+    // con el mismo contrato de siempre (ObtenerReglasPlanificacionAsync).
+    [Fact]
+    public async Task Planificacion_usa_el_maximo_de_paradas_de_las_reglas_vigentes()
+    {
+        factory.CreateClient(); // arranca la API: migraciones y datos iniciales
+        using var scope = factory.Services.CreateScope();
+        var administracion = scope.ServiceProvider.GetRequiredService<IAdministracionModuleApi>();
+
+        var planificacion = await administracion.ObtenerReglasPlanificacionAsync(DateTimeOffset.UtcNow, CancellationToken.None);
+
+        // Se compara con la base y no con ReglasDeEntregaVigentesAsync: esa lectura pasa por la caché, que las demás
+        // pruebas de la clase comparten, y otra prueba puede publicar una versión nueva.
+        await using var conexion = new NpgsqlConnection(factory.ConnectionString);
+        await conexion.OpenAsync();
+        await using var comando = new NpgsqlCommand("""
+            SELECT "Id" FROM administracion."VersionesReglas"
+            WHERE "OperadorId" = @operador AND "Estado" <> 'Borrador' AND "VigenteDesde" <= now()
+              AND ("VigenteHasta" IS NULL OR now() < "VigenteHasta")
+            ORDER BY "Numero" DESC LIMIT 1
+            """, conexion);
+        comando.Parameters.AddWithValue("operador", DatosIniciales.OperadorDemoId);
+
+        Assert.Equal((Guid)(await comando.ExecuteScalarAsync())!, planificacion.VersionId);
+        Assert.Equal(20, planificacion.MaxParadasPorRuta);
+    }
+
     // Con fecha futura: queda programada y, hasta ese día, siguen las reglas anteriores.
     [Fact]
     public async Task Unas_reglas_con_fecha_futura_quedan_programadas()

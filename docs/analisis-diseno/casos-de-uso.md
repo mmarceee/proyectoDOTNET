@@ -126,7 +126,8 @@ Cada caso de uso se describe con los campos: caso de uso, descripción, pre-cond
 * Los valores se guardan tal como se escriben y se validan al publicar (A1 y A2), mostrando todos los problemas juntos.
 * El código de motivo se guarda en mayúsculas y no se repite dentro de una versión.
 * Contrato para Envíos (acordado con Ezequiel Marcenal): `ReglasDeEntregaAsync(versionReglasId)` devuelve las reglas y el catálogo de motivos de la versión que guardó el envío al admitirse (letra 6.6); `ReglasDeEntregaVigentesAsync()`, las que rigen, para el alta y para los envíos anteriores sin versión.
-* El máximo de paradas por ruta se guarda en la versión de reglas; Planificación lo toma de acá cuando se acuerde con su responsable (mientras tanto sigue usando `VersionReglasPlanificacion`).
+* El máximo de paradas por ruta se guarda en la versión de reglas, y Planificación lo toma de la versión que rige al confirmar la operación, con el mismo contrato `ObtenerReglasPlanificacionAsync` (acordado con Lucas Ottonello, 19/10/2026). Sigue contando paradas agrupadas, no envíos; el historial de cada ruta conserva la versión y el límite que usó. `VersionReglasPlanificacion` queda sin uso y se retira después.
+* Los motivos se validan contra el catálogo de la versión que guardó el envío; la PWA sigue enviando el Id del motivo. Los catálogos históricos se conservan y el código del motivo se mantiene estable entre versiones.
 
 ### **CU-07 · Gestionar la identidad visual**
 
@@ -608,6 +609,13 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujos alternativos** | **A1 · Token inválido o alterado (paso 2).** El sistema muestra *enlace no válido*, sin dar más detalles.<br><br>**A2 · El envío no existe (paso 2).** El sistema muestra el mismo mensaje que en A1, para no permitir enumerar envíos.<br><br>**A3 · Demasiadas consultas (paso 1).** Se superó el límite de consultas por dirección IP. El sistema responde con un error de límite de tasa. |
 | **Requerimientos especiales** | 1. **Sin autenticación:** el token firmado es la única credencial y sólo da acceso a su envío.<br>2. **Protección contra la enumeración** de envíos y **limitación de tasa** (sección 6.3).<br>3. **Caché** de corta duración, invalidada ante cada cambio de estado (sección 6.7). Es el componente de más tráfico.<br>4. Los datos salen de la tabla de lectura del módulo de Seguimiento, alimentada por los eventos de Envíos (catálogo, sección 4).<br>5. **Ventana estimada**, sin estimar tiempos de viaje: con fecha y franja asignadas, esa fecha y franja; sin fecha, *antes de* la fecha que surge del plazo comprometido de su modalidad; en tránsito, la franja del día y cuántas entregas quedan antes de la suya. |
 
+**Implementación de CU-60 (19/10/2026, Cristian Reyes).** Decisiones para el hito del 22/10:
+* **Origen de los datos (requerimiento 4):** en lugar de una tabla de lectura en Seguimiento, el caso de uso consulta a Envíos con `IEnviosModuleApi.SeguimientoDeAsync` (sólo nombre de pila, localidad, estado, fecha y franja, e historial sin el personal) y guarda la respuesta en la caché 1 minuto. Los eventos de Envíos (asignado, en tránsito, entregado, intento fallido, reprogramado, cancelado, desasignado) se consumen en el Worker **sólo para borrar** esa entrada. La tabla de lectura queda para el tablero (CU-66), que necesita combinar datos de varios módulos.
+* **Token:** HMAC-SHA256 con una clave de la configuración (`Seguimiento:ClaveToken`) sobre el Id del envío y el del operador. El mismo envío da siempre el mismo token y no se guarda. Un filtro del endpoint valida la firma y fija el inquilino como claim antes de leer cualquier dato (ADR-0002, sección 2.5).
+* **Límite de tasa:** 60 consultas por minuto por dirección IP (`Seguimiento:ConsultasPorMinuto`); superado, 429 (A3).
+* **Ventana estimada:** con fecha y franja asignadas, esa fecha y franja. Sin fecha todavía no se muestra, porque el plazo depende de la modalidad del envío (CU-10); "cuántas entregas quedan antes" queda para después.
+* **Enlace para el personal:** `/backoffice/seguimiento/{número}` (Administrador o Despachador) muestra el enlace para copiarlo, mientras el aviso por correo no lo incluya.
+
 ### **CU-61 · Solicitar la reprogramación de un envío**
 
 | Campo | Contenido |
@@ -811,4 +819,6 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 0.8 | 19/10/2026 | CU-04, revisión de Lucas y Ezequiel: el bloqueo cubre envíos sin fecha en rutas activas, con el bloqueo de planificación; fechas futuras en la zona horaria del operador; validar antes de modificar; código de zona en mayúsculas. | Cristian Reyes |
 | 0.9 | 19/10/2026 | CU-05: decisiones de implementación (rangos, ajustes, versión programada, invalidación de la caché, A5). | Cristian Reyes |
 | 1.0 | 19/10/2026 | CU-06: decisiones de implementación y contrato de reglas para Envíos. | Cristian Reyes |
+| 1.1 | 19/10/2026 | CU-60: decisiones de implementación (origen de los datos, token, límite de tasa, ventana estimada). | Cristian Reyes |
+| 1.2 | 19/10/2026 | CU-06: el máximo de paradas de Planificación sale de las reglas operativas; motivos validados por la versión del envío. | Cristian Reyes |
 | 1.1 | 19/10/2026 | CU-18, A2: con los intentos agotados, la devolución automática depende de la política de devolución de la versión de reglas del envío. | Ezequiel Marcenal |

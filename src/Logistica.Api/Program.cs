@@ -9,7 +9,9 @@ using Logistica.Modules.Deposito;
 using Logistica.Modules.Ejecucion;
 using Logistica.Modules.Envios;
 using Logistica.Modules.Planificacion;
+using System.Threading.RateLimiting;
 using Logistica.Modules.Seguimiento;
+using Logistica.Modules.Seguimiento.Contracts;
 using Logistica.SharedKernel;
 using Npgsql;
 using OpenTelemetry.Metrics;
@@ -98,6 +100,21 @@ builder.Services
 if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("RabbitMQ")))
     builder.Services.AddHostedService<PublicadorOutbox>();
 
+// CU-60, A3 (letra 6.3): el seguimiento público no tiene sesión, así que se limita por dirección IP. Frena a quien prueba
+// enlaces al azar y protege el componente de más tráfico. Superado el límite, responde 429.
+builder.Services.AddRateLimiter(opciones =>
+{
+    opciones.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    opciones.AddPolicy(LimitesSeguimiento.Politica, http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "sin-ip",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = builder.Configuration.GetValue("Seguimiento:ConsultasPorMinuto", 60),
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+});
+
 var app = builder.Build();
 
 // En Docker Compose la API aplica las migraciones de todos los módulos al iniciar (docker-compose.yml),
@@ -127,6 +144,7 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseMiddleware<AccesoAplicacionesMiddleware>();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 
 app.MapStaticAssets();

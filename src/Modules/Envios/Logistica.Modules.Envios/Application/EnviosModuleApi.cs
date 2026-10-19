@@ -136,6 +136,27 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         return envios.HayComprometidosAsync(franjaIds, desde, ct);
     }
 
+    // CU-60: sólo lo que el destinatario puede ver (requerimientos 1 y 3 de la ficha).
+    public async Task<SeguimientoEnvio?> SeguimientoDeAsync(Guid envioId, CancellationToken ct)
+    {
+        if (await envios.ObtenerConEventosAsync(envioId, ct) is not Envio envio)
+        {
+            return null;
+        }
+
+        var nombreDePila = envio.Destinatario.Nombre.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+        return new SeguimientoEnvio(envio.Id, envio.Numero, envio.Estado.ToString(), nombreDePila,
+            envio.Direccion.Localidad, envio.CreadoEn, envio.FechaEntregaProgramada, envio.FranjaHorariaId,
+            envio.VersionReglasId,
+            envio.Eventos.OrderBy(e => e.OcurridoEn)
+                .Select(e => new EventoSeguimiento(e.EstadoNuevo.ToString(), e.OcurridoEn)).ToList());
+    }
+
+    public Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct)
+    {
+        return envios.IdPorNumeroAsync(numero.Trim().ToUpperInvariant(), ct);
+    }
+
     public Task<IReadOnlyList<Guid>> EnviosSinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct)
     {
         return envios.SinFechaConFranjasAsync(franjaIds, ct);

@@ -78,6 +78,16 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             && e.FechaEntregaProgramada >= desde && Envio.EstadosConEntregaPendiente.Contains(e.Estado), ct);
     }
 
+    public Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct)
+    {
+        return db.Envios.Where(e => e.Numero == numero).Select(e => (Guid?)e.Id).SingleOrDefaultAsync(ct);
+    }
+
+    public Task<Envio?> ObtenerConEventosAsync(Guid id, CancellationToken ct)
+    {
+        return db.Envios.AsNoTracking().Include(e => e.Eventos).SingleOrDefaultAsync(e => e.Id == id, ct);
+    }
+
     public async Task<IReadOnlyList<Guid>> SinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct)
     {
         await db.ParticiparEnTransaccionAsync(ct);

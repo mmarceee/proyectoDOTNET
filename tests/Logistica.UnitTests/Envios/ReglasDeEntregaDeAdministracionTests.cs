@@ -128,5 +128,6 @@ public class ReglasDeEntregaDeAdministracionTests
         public Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<FranjaPlanificacion>> ResolverFranjasAsync(IReadOnlyCollection<Guid> ids, DateOnly fecha, CancellationToken ct) => throw new NotSupportedException();
         public Task<TarifaBulto?> CalcularTarifaAsync(Guid zonaId, Modalidad modalidad, decimal pesoKg, decimal volumenM3, CancellationToken ct) => throw new NotSupportedException();
+        public Task<MarcaOperador?> MarcaDelOperadorAsync(CancellationToken ct) => throw new NotSupportedException();
     }
 }

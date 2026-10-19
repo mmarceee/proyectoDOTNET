@@ -3,14 +3,23 @@ using Logistica.Modules.Administracion.Contracts.Results;
 using Logistica.Modules.Administracion.Application.Features.ConsultarRecursosPlanificacion;
 using Logistica.Modules.Administracion.Application.Features.ConfigurarReglas;
 using Logistica.Modules.Administracion.Application.Features.ConfigurarTarifario;
+using Logistica.Modules.Administracion.Application.Features.GestionarIdentidadVisual;
 using Logistica.Modules.Administracion.Application.Features.GestionarUsuarios;
 using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Administracion.Application;
 
 internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lector, IServicioUsuarios usuarios,
-    ICurrentTenant tenant, TarifarioVigente tarifario, ReglasVigentes reglas) : IAdministracionModuleApi
+    ICurrentTenant tenant, TarifarioVigente tarifario, ReglasVigentes reglas, ConsultarIdentidadVisualHandler identidad)
+    : IAdministracionModuleApi
 {
+    // CU-07 para CU-60: la misma consulta que usan los estilos de cada operador, sin el logo.
+    public async Task<MarcaOperador?> MarcaDelOperadorAsync(CancellationToken ct) =>
+        await identidad.HandleAsync(ct) is { } marca
+            ? new MarcaOperador(marca.NombreOperador, marca.ColorPrimario, marca.ColorSecundario, marca.EmailContacto,
+                marca.TelefonoContacto)
+            : null;
+
     // CU-06: las reglas con que se admitió un envío, y las que rigen ahora para el alta. Las dos, desde la caché.
     public Task<ReglasOperativas?> ReglasDeEntregaAsync(Guid versionReglasId, CancellationToken ct) =>
         reglas.DeVersionAsync(versionReglasId, ct);

@@ -1,0 +1,19 @@
+@page "/backoffice/seguimiento/{numero}"
+@model Logistica.Modules.Seguimiento.Presentation.Features.ConsultarSeguimiento.EnlaceModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = $"Seguimiento de {Model.Numero}";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Enlace de seguimiento · @Model.Numero</h1>
+    <a href="/backoffice/envios/@Model.Numero" class="btn btn-outline-secondary">Volver al envío</a>
+</div>
+
+<p class="text-muted">El destinatario lo abre sin usuario ni contraseña. El enlace está firmado: no se puede adivinar ni modificar.</p>
+
+<div class="input-group mb-3">
+    <input id="enlace" class="form-control" value="@Model.Direccion" readonly />
+    <button type="button" class="btn btn-outline-primary" onclick="navigator.clipboard.writeText(document.getElementById('enlace').value)">Copiar</button>
+    <a class="btn btn-primary" href="@Model.Direccion" target="_blank" rel="noopener">Abrir</a>
+</div>
