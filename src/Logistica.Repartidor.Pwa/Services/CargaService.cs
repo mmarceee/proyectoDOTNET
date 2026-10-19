@@ -34,12 +34,14 @@ public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsync
         }
         Borrador = null; Mensaje = null; Cambio?.Invoke();
     }
-    public async Task AbrirAsync()
+    public Task AbrirAsync() => AbrirRutaAsync(null);
+    public async Task AbrirRutaAsync(Guid? rutaId)
     {
         await Ejecutar(async () =>
         {
-            if (hoja.Copia is null) await hoja.ActualizarAsync();
+            if (rutaId is not null || hoja.Copia is null) await hoja.SeleccionarAsync(rutaId);
             if (hoja.RequiereIngreso || hoja.Copia is null) { Borrador = null; return; }
+            Borrador = null;
             Borrador = await modulo!.InvokeAsync<BorradorCarga>("abrirCarga", hoja.Copia.Hoja.RutaId);
             if (Borrador.Resultado is null) Mensaje = null;
         });

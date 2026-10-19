@@ -6,6 +6,8 @@ namespace Logistica.Modules.Planificacion.Contracts;
 // tocan sus tablas ni sus entidades.
 public interface IPlanificacionModuleApi
 {
+    Task<IReadOnlyList<RutaDelRepartidor>> ListarDelRepartidorAsync(Guid repartidorId, int pagina, CancellationToken ct);
+    Task<RutaParaHoja?> ConsultarHojaAsync(Guid rutaId, Guid repartidorId, CancellationToken ct);
     Task<RutaParaCarga?> ConsultarCargaAsync(Guid rutaId, Guid repartidorId, CancellationToken ct);
     Task RegistrarCargaAsync(Guid rutaId, bool tieneEnviosCargados, CancellationToken ct);
 

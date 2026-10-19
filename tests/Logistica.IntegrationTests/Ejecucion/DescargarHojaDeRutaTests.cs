@@ -32,7 +32,8 @@ public class DescargarHojaDeRutaTests(PostgresApiFactory factory) : IClassFixtur
 
     private sealed class Reloj(DateTimeOffset ahora) : TimeProvider { public override DateTimeOffset GetUtcNow() => ahora; }
 
-    private static DateOnly Fecha() => new DateOnly(2040, 1, 1).AddDays(Interlocked.Increment(ref dia));
+    // Cada escenario dispone de días contiguos propios para crear rutas anteriores y futuras.
+    private static DateOnly Fecha() => new DateOnly(2040, 1, 1).AddDays(10 * Interlocked.Increment(ref dia));
 
     private async Task<Guid> PrepararAsync(DateOnly fecha, string estado = "Despachada", bool incompleta = false)
     {
@@ -112,6 +113,76 @@ public class DescargarHojaDeRutaTests(PostgresApiFactory factory) : IClassFixtur
     }
 
     [Fact]
+    public async Task Una_ruta_anterior_abierta_se_descarga_por_id_sin_cambiar_la_descarga_del_dia()
+    {
+        var fecha = Fecha();
+        var id = await PrepararAsync(fecha, "EnCurso");
+        // Día sin otras rutas de esta fixture compartida.
+        using var client = Cliente(new DateTimeOffset(fecha.AddYears(1).ToDateTime(new TimeOnly(15, 0)), TimeSpan.Zero));
+        await Sesion.IngresarAsync(client, "repartidor@operador-demo.uy");
+        Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync("/api/repartidor/hoja-de-ruta")).StatusCode);
+        var respuesta = await client.GetAsync($"/api/repartidor/rutas/{id}/hoja-de-ruta");
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.True(respuesta.Headers.CacheControl?.NoStore);
+        var hoja = (await respuesta.Content.ReadFromJsonAsync<HojaDeRutaResponse>())!;
+        Assert.Equal(id, hoja.RutaId);
+        Assert.Equal(fecha, hoja.FechaRuta);
+        Assert.Equal(fecha.AddYears(1), hoja.FechaOperativa);
+    }
+
+    [Theory]
+    [InlineData("Planificada", 0)]
+    [InlineData("Finalizada", 0)]
+    [InlineData("Despachada", -1)]
+    public async Task Elegir_un_id_no_habilita_rutas_cerradas_planificadas_o_futuras(string estado, int desplazamiento)
+    {
+        var fecha = Fecha();
+        var id = await PrepararAsync(fecha, estado);
+        using var client = Cliente(new DateTimeOffset(fecha.AddDays(desplazamiento).ToDateTime(new TimeOnly(15, 0)), TimeSpan.Zero));
+        await Sesion.IngresarAsync(client, "repartidor@operador-demo.uy");
+        Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync($"/api/repartidor/rutas/{id}/hoja-de-ruta")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Mis_rutas_incluye_pendientes_anteriores_y_estado_actual_sin_depender_del_aviso()
+    {
+        var fecha = Fecha();
+        var abierta = await PrepararAsync(fecha, "EnCurso");
+        var cerrada = await PrepararAsync(fecha.AddDays(-1), "Finalizada");
+        var planificada = await PrepararAsync(fecha.AddDays(1), "Planificada");
+        using var client = Cliente(new DateTimeOffset(fecha.AddDays(2).ToDateTime(new TimeOnly(15, 0)), TimeSpan.Zero));
+        await Sesion.IngresarAsync(client, "repartidor@operador-demo.uy");
+        var todas = new List<TarjetaRutaResponse>();
+        for (var pagina = 1; ; pagina++)
+        {
+            var respuesta = await client.GetAsync($"/api/repartidor/rutas?pagina={pagina}");
+            Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+            Assert.True(respuesta.Headers.CacheControl?.NoStore);
+            var listado = (await respuesta.Content.ReadFromJsonAsync<MisRutasResponse>())!;
+            Assert.Equal(fecha.AddDays(2), listado.FechaOperativa);
+            todas.AddRange(listado.Rutas);
+            if (listado.Rutas.Count < 20) break;
+        }
+        var tarjeta = Assert.Single(todas, r => r.RutaId == abierta);
+        Assert.Equal("EnCurso", tarjeta.Estado);
+        Assert.Equal(fecha, tarjeta.FechaRuta);
+        Assert.False(string.IsNullOrWhiteSpace(tarjeta.Matricula));
+        Assert.Equal(3, tarjeta.Envios);
+        Assert.Equal(2, tarjeta.Paradas);
+        Assert.True(tarjeta.CargaPendiente);
+        Assert.False(tarjeta.RendicionIniciada);
+        Assert.Equal("Finalizada", Assert.Single(todas, r => r.RutaId == cerrada).Estado);
+        Assert.DoesNotContain(todas, r => r.RutaId == planificada);
+        Assert.True(todas.FindIndex(r => r.RutaId == abierta) < todas.FindIndex(r => r.RutaId == cerrada));
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/repartidor/rutas?pagina=0")).StatusCode);
+        using var otro = Cliente(new DateTimeOffset(fecha.ToDateTime(new TimeOnly(15, 0)), TimeSpan.Zero));
+        await Sesion.IngresarAsync(otro, "repartidor@envios-del-este.uy");
+        Assert.Equal(HttpStatusCode.NoContent, (await otro.GetAsync($"/api/repartidor/rutas/{abierta}/hoja-de-ruta")).StatusCode);
+        var ajenas = (await otro.GetFromJsonAsync<MisRutasResponse>("/api/repartidor/rutas"))!;
+        Assert.DoesNotContain(ajenas.Rutas, r => r.RutaId == abierta || r.RutaId == cerrada);
+    }
+
+    [Fact]
     public async Task Dia_operativo_usa_zona_del_operador_y_no_UTC()
     {
         var fecha = Fecha();
@@ -158,6 +229,8 @@ public class DescargarHojaDeRutaTests(PostgresApiFactory factory) : IClassFixtur
         await Sesion.IngresarAsync(client, email);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/repartidor/hoja-de-ruta")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/repartidor/sesion")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/repartidor/rutas")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/api/repartidor/rutas/{Guid.NewGuid()}/hoja-de-ruta")).StatusCode);
     }
 
     [Fact]
@@ -166,13 +239,14 @@ public class DescargarHojaDeRutaTests(PostgresApiFactory factory) : IClassFixtur
         using var client = Cliente(DateTimeOffset.UtcNow);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/repartidor/hoja-de-ruta")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/repartidor/sesion")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/repartidor/rutas")).StatusCode);
     }
 
     [Fact]
     public async Task Otro_repartidor_del_mismo_operador_no_ve_la_ruta()
     {
         var fecha = Fecha();
-        await PrepararAsync(fecha);
+        var rutaAjena = await PrepararAsync(fecha);
         using (var scope = factory.Services.CreateScope())
         {
             var usuarios = scope.ServiceProvider.GetRequiredService<UserManager<Usuario>>();
@@ -187,6 +261,8 @@ public class DescargarHojaDeRutaTests(PostgresApiFactory factory) : IClassFixtur
         using var client = Cliente(new DateTimeOffset(fecha.ToDateTime(new TimeOnly(15, 0)), TimeSpan.Zero));
         await Sesion.IngresarAsync(client, "repartidor@segundo-demo.uy");
         Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync($"/api/repartidor/hoja-de-ruta?repartidorId={Repartidor}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync($"/api/repartidor/rutas/{rutaAjena}/hoja-de-ruta")).StatusCode);
+        Assert.DoesNotContain((await client.GetFromJsonAsync<MisRutasResponse>("/api/repartidor/rutas"))!.Rutas, r => r.RutaId == rutaAjena);
     }
 
     [Fact]

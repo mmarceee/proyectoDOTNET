@@ -23,7 +23,7 @@ public sealed class ConfirmarCargaTests(PostgresApiFactory factory) : IClassFixt
     private static int dia;
     private static readonly Guid Repartidor = DatosIniciales.RepartidorDemoId;
     private const string Traza = "00-123456789012345678901234567890ab-12345678901234ab-01";
-    private sealed record Datos(Guid Ruta, long Revision, Envio[] Envios);
+    private sealed record Datos(Guid Ruta, long Revision, Envio[] Envios, DateOnly Fecha);
     private IServiceScope Scope()
     {
         var scope = factory.Services.CreateScope();
@@ -38,7 +38,7 @@ public sealed class ConfirmarCargaTests(PostgresApiFactory factory) : IClassFixt
         var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
         var ahora = DateTimeOffset.UtcNow.AddMinutes(-5);
-        var fecha = new DateOnly(2042,1,1).AddDays(Interlocked.Increment(ref dia));
+        var fecha = new DateOnly(2025,1,1).AddDays(Interlocked.Increment(ref dia));
         var envios = Enumerable.Range(0,2).Select(i =>
         {
             var e=Envio.Crear(DatosIniciales.OperadorDemoId,DatosIniciales.ComercioDemoId,$"CU51-{Guid.NewGuid():N}",
@@ -56,12 +56,12 @@ public sealed class ConfirmarCargaTests(PostgresApiFactory factory) : IClassFixt
                 new PuntoEntrega("Calle Carga","10","Montevideo","Montevideo","11300"))).ToArray(),ahora);
         ruta.Despachar(ahora); if(finalizada) ruta.Finalizar();
         plan.Rutas.Add(ruta); await plan.SaveChangesAsync();
-        return new(ruta.Id,ruta.Revision,envios);
+        return new(ruta.Id,ruta.Revision,envios,fecha);
     }
     private HttpClient Cliente() => factory.WithWebHostBuilder(b=>b.UseSetting("Identity:PermitirTenantProvisorio","false")).CreateClient(Sesion.Opciones);
     private static OperacionDispositivoRequest Operacion(Datos d, IEnumerable<string>? codigos = null, bool acepta = false)
     {
-        var ahora=DateTimeOffset.UtcNow.AddSeconds(-1);
+        var ahora=new DateTimeOffset(d.Fecha.ToDateTime(new TimeOnly(15,0)),TimeSpan.Zero);
         return new(Guid.CreateVersion7(),Guid.NewGuid(),1,"ConfirmarCarga",d.Ruta,null,ahora,null,null,Traza,
             Carga:new(d.Revision,(codigos ?? d.Envios.SelectMany(e=>e.Bultos).Select(b=>b.Codigo))
                 .Select(c=>new LecturaCargaRequest(c,ahora.AddSeconds(-1))).ToArray(),acepta));
@@ -222,5 +222,30 @@ public sealed class ConfirmarCargaTests(PostgresApiFactory factory) : IClassFixt
         var op=Operacion(d); var resultados=await Task.WhenAll(Enviar(uno,op),Enviar(dos,op));
         Assert.Contains(resultados,r=>r.Resultado=="Aplicada"); Assert.Contains(resultados,r=>r.Resultado=="YaAplicada");
         using var scope=Scope(); Assert.Equal(3,await scope.ServiceProvider.GetRequiredService<EjecucionDbContext>().EscaneosCarga.CountAsync(e=>e.OperacionId==op.OperacionId));
+    }
+
+    [Theory]
+    [InlineData(-1, 15, false)]
+    [InlineData(1, 15, false)]
+    [InlineData(1, 1, true)]
+    [InlineData(0, 1, false)]
+    public async Task La_carga_exige_su_fecha_en_la_zona_del_operador_pero_admite_sincronizar_despues(int dias, int horaUtc, bool valida)
+    {
+        var d = await PrepararAsync(); using var client = Cliente();
+        await Sesion.IngresarAsync(client,"repartidor@operador-demo.uy");
+        var momento = new DateTimeOffset(d.Fecha.AddDays(dias).ToDateTime(new TimeOnly(horaUtc,0)),TimeSpan.Zero);
+        var op = Operacion(d) with { OcurridoEn = momento };
+        op = op with { Carga = op.Carga! with { Lecturas = op.Carga.Lecturas.Select(l => l with { EscaneadoEn = momento.AddSeconds(-1) }).ToArray() } };
+        var resultado = await Enviar(client,op);
+        Assert.Equal(valida ? "Aplicada" : "Conflicto",resultado.Resultado);
+        if (valida) Assert.Equal("YaAplicada",(await Enviar(client,op)).Resultado);
+        else
+        {
+            Assert.Equal("FechaDeCargaInvalida",resultado.Motivo);
+            using var scope = Scope();
+            Assert.False(await scope.ServiceProvider.GetRequiredService<EjecucionDbContext>().EscaneosCarga.AnyAsync(e => e.OperacionId == op.OperacionId));
+            var ids = d.Envios.Select(e => e.Id).ToArray();
+            Assert.All(await scope.ServiceProvider.GetRequiredService<EnviosDbContext>().Envios.Where(e => ids.Contains(e.Id)).ToListAsync(), e => Assert.Equal(EstadoEnvio.AsignadoARuta,e.Estado));
+        }
     }
 }

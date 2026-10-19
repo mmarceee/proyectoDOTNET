@@ -581,6 +581,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujos alternativos** | **A1 · Sin conexión (paso 4).** La rendición se sincroniza cuando haya conexión.<br><br>**A2 · Un bulto no vuelve (paso 3).** El repartidor lo indica con una observación; el operario lo verá como faltante (CU-55). |
 | **Requerimientos especiales** | 1. Lo declarado por el repartidor se compara con lo recibido por el operario: control cruzado entre los dos (catálogo, sección 4). |
 
+**Implementación de CU-54 (19/10/2026):** la PWA permite declarar por bulto, observar los que no vuelven y confirmar sin conexión. IniciarRendicion se sincroniza en orden, con aislamiento, idempotencia y persistencia transaccional. La hoja distingue carga parcial y bultos nunca cargados; recepción y resultado final quedan pendientes. No aplica T8 ni finaliza o libera la ruta. Ejecución expone las consultas para CU-55. Véase [alcance, contrato y verificación](cu-54/README.md).
+
 ### **CU-55 · Confirmar la rendición**
 
 | Campo | Contenido |

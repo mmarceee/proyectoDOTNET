@@ -6,10 +6,6 @@
 <PageTitle>Mi ruta</PageTitle>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <h1 class="mb-0">Mi ruta</h1>
-    @if (Hoja.Copia is not null && !Hoja.SinRuta && !Hoja.RequiereIngreso)
-    {
-        <NavLink class="btn btn-outline-primary" href="carga">Cargar vehículo</NavLink>
-    }
     <button class="btn btn-primary" @onclick="Hoja.ActualizarAsync" disabled="@Hoja.Cargando">Actualizar descarga</button>
 </div>
 @if (Hoja.Cargando) { <p role="status">Descargando y guardando tu hoja de ruta…</p> }
@@ -17,10 +13,10 @@
 @if (Hoja.RequiereIngreso) {
     <a class="btn btn-primary" href="/repartidor/ingresar">Iniciar sesión</a>
 } else {
-    @if (Hoja.SinRuta) { <div class="alert alert-info">No tenés una ruta despachada para hoy.</div> }
+    @if (Hoja.SinRuta) { <div class="alert alert-info">La ruta consultada no está disponible para trabajar. Volvé a Mis rutas para elegir una ruta abierta.</div> }
     @if (Hoja.Copia is { } copia) {
         var ruta = copia.Hoja;
-        var anterior = Hoja.SinConexion || Hoja.SinRuta || ruta.FechaRuta != Hoja.Sesion?.FechaOperativa;
+        var anterior = Hoja.SinRuta;
         <section class="card mb-4">
             <div class="card-body">
                 <h2 class="h4">@(anterior ? "Última ruta descargada" : "Ruta") del @ruta.FechaRuta.ToString("dd/MM/yyyy")</h2>
@@ -32,7 +28,8 @@
                 <p class="mb-1">@Cantidad(ruta.Paradas.Count, "parada", "paradas") · @Cantidad(ruta.Paradas.Sum(p => p.Envios.Count), "envío", "envíos")</p>
                 <p class="small text-muted mb-0">Guardada en este dispositivo: @copia.DescargadaEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
                 @if (Hoja.SinConexion) { <p class="text-muted mb-0 mt-2">Estás viendo la última descarga. Los cambios del servidor se verán al recuperar la conexión.</p> }
-                else if (anterior) { <p class="text-warning mb-0 mt-2">Esta copia es una consulta anterior; no confirma una ruta activa para hoy.</p> }
+                else if (anterior) { <p class="text-warning mb-0 mt-2">Esta copia es una consulta anterior; no confirma que la ruta siga abierta.</p> }
+                else if (ruta.FechaRuta < Hoja.Sesion?.FechaOperativa) { <p class="text-warning mb-0 mt-2">Ruta abierta de un día anterior.</p> }
             </div>
         </section>
         @foreach (var parada in ruta.Paradas.OrderBy(p => p.Orden)) {
@@ -61,7 +58,17 @@
 }
 @code {
     protected override void OnInitialized() => Hoja.Cambio += ActualizarVista;
-    protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await Hoja.ActualizarAsync(); }
+    [SupplyParameterFromQuery] public Guid? RutaId { get; set; }
+    private bool abierta;
+    private Guid? rutaAbierta;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!abierta || rutaAbierta != RutaId)
+        {
+            abierta = true; rutaAbierta = RutaId;
+            await Hoja.SeleccionarAsync(RutaId);
+        }
+    }
     private void ActualizarVista() => _ = InvokeAsync(StateHasChanged);
     private static string Horario(TimeOnly? desde, TimeOnly? hasta) => desde is null || hasta is null ? "" : $"· {desde:HH:mm}–{hasta:HH:mm}";
     private static string Cantidad(int cantidad, string singular, string plural) => $"{cantidad} {(cantidad == 1 ? singular : plural)}";

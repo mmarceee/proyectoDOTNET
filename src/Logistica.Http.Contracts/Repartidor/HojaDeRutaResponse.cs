@@ -9,7 +9,10 @@ public sealed record SesionRepartidorResponse(Guid UsuarioId, Guid OperadorId, G
 public sealed record HojaDeRutaResponse(int SchemaVersion, Guid UsuarioId, Guid OperadorId, Guid RepartidorId,
     Guid RutaId, long RevisionRuta, DateOnly FechaRuta, DateOnly FechaOperativa, string ZonaHorariaOperador,
     string EstadoRuta, DateTimeOffset GeneradaEn, VehiculoHojaResponse Vehiculo,
-    IReadOnlyList<ZonaHojaResponse> Zonas, IReadOnlyList<ParadaHojaResponse> Paradas);
+    IReadOnlyList<ZonaHojaResponse> Zonas, IReadOnlyList<ParadaHojaResponse> Paradas)
+{
+    public PreparacionRendicionResponse? Rendicion { get; init; }
+}
 
 public sealed record VehiculoHojaResponse(Guid Id, string Matricula);
 public sealed record ZonaHojaResponse(Guid Id, string Codigo, string Nombre);

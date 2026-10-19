@@ -1,0 +1,122 @@
+@page "/rendicion"
+@using Logistica.Repartidor.Pwa.Services
+@implements IDisposable
+@inject RendicionService Rendiciones
+@inject HojaDeRutaService Hoja
+
+<PageTitle>Rendir ruta</PageTitle>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1>Rendir ruta</h1>
+    <NavLink href="" class="btn btn-outline-secondary">Mis rutas</NavLink>
+</div>
+<p>Declará los bultos que devolvés al depósito. El operario verificará lo recibido antes de cerrar la ruta.</p>
+@if (Rendiciones.Mensaje is not null) { <div class="alert alert-info" role="status">@Rendiciones.Mensaje</div> }
+@if (Hoja.SinConexion && !Hoja.RequiereIngreso) { <div class="alert alert-warning">Sin conexión. La declaración y su confirmación se guardan cifradas en este dispositivo.</div> }
+@if (Hoja.RequiereIngreso) { <a class="btn btn-primary" href="/repartidor/ingresar">Iniciar sesión</a> }
+else if (Rendiciones.Borrador is { } borrador)
+{
+    @if (Hoja.Copia is { } copia) { <p>Ruta del @copia.Hoja.FechaRuta.ToString("dd/MM/yyyy") · Vehículo <strong>@copia.Hoja.Vehiculo.Matricula</strong></p> }
+    @if (borrador.Resultado == "Pendiente")
+    {
+        <div class="alert alert-warning">Rendición guardada, pendiente de sincronizar. La ruta todavía no está rendida en el servidor.</div>
+        <button class="btn btn-primary mb-3" disabled="@Rendiciones.Ocupado" @onclick="Rendiciones.SincronizarAsync">Sincronizar rendición</button>
+    }
+    else if (borrador.Resultado == "Aplicada")
+    {
+        <div class="alert alert-success">Tu declaración está confirmada. Esperando recepción del depósito. Tu recorrido en esta ruta terminó.</div>
+    }
+    else if (borrador.Resultado == "Rechazada")
+    {
+        <div class="alert alert-danger" role="alert">El servidor rechazó la declaración: @Motivo(borrador.Detalle). No se inició la rendición.</div>
+        <button class="btn btn-outline-primary mb-3" disabled="@Rendiciones.Ocupado" @onclick="Revisar">Actualizar y revisar declaración</button>
+    }
+    @foreach (var envio in borrador.Bultos.GroupBy(b => b.NumeroEnvio))
+    {
+        <section class="card mb-3">
+            <div class="card-header"><h2 class="h5 mb-0">Envío @envio.Key</h2></div>
+            <div class="card-body">
+                @foreach (var bulto in envio)
+                {
+                    <div class="border-bottom pb-3 mb-3" @key="bulto.BultoId">
+                        <p class="mb-2"><strong>@bulto.Codigo</strong> · @Situacion(bulto.Situacion)</p>
+                        @if (bulto.RequiereDeclaracion && borrador.OperacionId is null)
+                        {
+                            <label class="form-label" for="@("devuelve-" + bulto.BultoId)">¿Devolvés este bulto?</label>
+                            <select id="@("devuelve-" + bulto.BultoId)" class="form-select mb-2" value="@(bulto.Devuelve?.ToString().ToLowerInvariant() ?? "")"
+                                    disabled="@Rendiciones.Ocupado" @onchange="e => Elegir(bulto, e)">
+                                <option value="">Elegí una opción</option><option value="true">Sí, lo devuelvo</option><option value="false">No vuelve al depósito</option>
+                            </select>
+                            @if (bulto.Devuelve == false)
+                            {
+                                <label class="form-label" for="@("observacion-" + bulto.BultoId)">Explicá por qué no vuelve</label>
+                                <textarea id="@("observacion-" + bulto.BultoId)" class="form-control" maxlength="1000" value="@bulto.Observacion"
+                                          disabled="@Rendiciones.Ocupado" @onchange="e => Rendiciones.DeclararAsync(bulto, false, e.Value?.ToString())"></textarea>
+                            }
+                        }
+                        else if (bulto.RequiereDeclaracion)
+                        {
+                            <p class="mb-1">Declaración: @(bulto.Devuelve == true ? "Lo devuelve" : "No vuelve al depósito")</p>
+                            @if (bulto.Observacion is not null) { <p class="mb-0">@bulto.Observacion</p> }
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    }
+    <section class="card mb-3"><div class="card-body">
+        <h2 class="h5">Resumen de la declaración</h2>
+        <p>@borrador.Bultos.Count(b => b.RequiereDeclaracion && b.Devuelve == true) bultos declarados para devolver · @borrador.Bultos.Count(b => b.RequiereDeclaracion && b.Devuelve == false) que no vuelven</p>
+        @if (!borrador.Bultos.Any(b => b.RequiereDeclaracion)) { <p>No hay bultos pendientes de regreso. Podés iniciar la rendición sin devoluciones.</p> }
+        @if (borrador.OperacionId is null)
+        {
+            <label for="observaciones-rendicion" class="form-label">Observaciones generales (opcional)</label>
+            <textarea id="observaciones-rendicion" class="form-control mb-3" maxlength="2000" value="@borrador.Observaciones"
+                      disabled="@Rendiciones.Ocupado" @onchange="e => Rendiciones.ObservarAsync(e.Value?.ToString())"></textarea>
+            <div class="form-check mb-3">
+                <input type="checkbox" id="confirmar-rendicion" class="form-check-input" @bind="revisada" />
+                <label for="confirmar-rendicion" class="form-check-label">Revisé la declaración y confirmo que termina mi jornada en esta ruta.</label>
+            </div>
+            <button class="btn btn-primary" disabled="@(!revisada || Rendiciones.Ocupado || Incompleta(borrador))" @onclick="Rendiciones.ConfirmarAsync">Confirmar declaración</button>
+            <button class="btn btn-outline-secondary ms-2" disabled="@Rendiciones.Ocupado" @onclick="Revisar">Actualizar declaración</button>
+        }
+        else if (borrador.Observaciones is not null) { <p>@borrador.Observaciones</p> }
+    </div></section>
+}
+else if (!Rendiciones.Ocupado) { <p>Necesitás una ruta en curso y una hoja actualizada para preparar la rendición.</p> }
+
+@code {
+    private bool revisada;
+    protected override void OnInitialized() => Rendiciones.Cambio += Actualizar;
+    [SupplyParameterFromQuery] public Guid? RutaId { get; set; }
+    private bool abierta;
+    private Guid? rutaAbierta;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!abierta || rutaAbierta != RutaId)
+        {
+            abierta = true; rutaAbierta = RutaId; revisada = false;
+            await Rendiciones.AbrirAsync(rutaId: RutaId);
+        }
+    }
+    private void Actualizar() => _ = InvokeAsync(StateHasChanged);
+    private async Task Revisar() { revisada = false; await Rendiciones.AbrirAsync(true, RutaId); }
+    private Task Elegir(BultoDeclarado b, ChangeEventArgs e) => bool.TryParse(e.Value?.ToString(), out var devuelve)
+        ? Rendiciones.DeclararAsync(b, devuelve, b.Observacion) : Task.CompletedTask;
+    private static bool Incompleta(BorradorRendicion r) => r.Bultos.Any(b => b.RequiereDeclaracion
+        && (b.Devuelve is null || b.Devuelve == false && string.IsNullOrWhiteSpace(b.Observacion)));
+    private static string Situacion(string s) => s switch
+    {
+        "NoIntentado" => "No intentado", "IntentoFallido" => "Intento fallido en esta ruta",
+        "CargaParcial" => "Carga parcial: requiere conciliación", "NoCargado" => "No se cargó: no es faltante al regreso",
+        "EntregadoEnCalle" => "Entregado en calle", "Extraviado" => "Extravío ya declarado", "Resuelto" => "Ya resuelto", _ => "Requiere revisión"
+    };
+    private static string Motivo(string? s) => s switch
+    {
+        "DependeDeOperacionRechazada" => "Hay operaciones anteriores rechazadas que requieren revisión.",
+        "ManifiestoModificado" => "Cambió la ejecución de la ruta. Actualizá y revisá los bultos.",
+        "RendicionYaIniciada" => "Esta ruta ya tiene una rendición iniciada.",
+        "RutaNoEnCurso" => "La ruta no está en curso.", "OperacionPreviaPendiente" => "Falta sincronizar una operación anterior.",
+        _ => s ?? "Revisá la declaración."
+    };
+    public void Dispose() => Rendiciones.Cambio -= Actualizar;
+}

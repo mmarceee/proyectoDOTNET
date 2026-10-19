@@ -5,7 +5,7 @@ Estado: diseño implementado el 17/10/2026. Evidencia y ajustes finales en [READ
 
 ## 1. Decisión de alcance
 
-El repartidor autenticado descarga la hoja de ruta de su día operativo, ve sus paradas y los detalles necesarios, y puede volver a abrirla sin conexión. No se cambian estados de rutas ni envíos al consultar o descargar.
+El repartidor autenticado descarga la hoja de ruta de su día operativo, ve sus paradas y los detalles necesarios, y puede volver a abrirla sin conexión. No se cambian estados de rutas ni envíos al consultar o descargar. Ampliación acordada el 19/10/2026: desde Mis rutas también puede seleccionar una ruta propia pendiente de días anteriores, conservando las hojas por separado.
 
 **Decisión del usuario:** usar las reglas de entrega actuales que valida el servidor, preparando su sustitución por las reglas versionadas de CU-06. CU-50 no implementa la gestión ni el versionado de CU-06 y no se presentará como prueba de que esa dependencia está completa.
 
@@ -38,7 +38,7 @@ CU-50 debe reutilizar este proveedor y su catálogo. No duplicará valores o ide
 
 ## 3. Pantallas y navegación
 
-Se conserva Avisos de rutas y se agrega Mi ruta, en /repartidor/hoja-de-ruta.
+El inicio es Mis rutas: tarjetas por fecha y vehículo, con estado actual y acciones por ruta. La hoja se abre en /repartidor/hoja-de-ruta?rutaId={id}. Los avisos internos de CU-43 y su procesamiento se conservan; las tarjetas consultan las rutas actuales sin depender de que se haya procesado el aviso.
 
 Al abrir Mi ruta:
 1. Recuperar la identidad local previamente verificada y su copia cifrada, si existe.
@@ -62,7 +62,7 @@ Listado:
 - Reglas y motivos viajan en el contrato para CU-51/CU-17/CU-18, sin botones operativos ficticios en esta entrega.
 - Varios envíos en una parada conservan su identidad y sus propias reglas/franjas; no se reemplazan por los datos del primer envío.
 
-Desde un aviso de CU-43 se ofrece Ver mi ruta sólo para la fecha actual, contrastada con la fecha operativa que responde el servidor. Los avisos históricos siguen siendo consultables, sin permitir descargar rutas antiguas por un ID proporcionado por el navegador.
+Mis rutas ofrece Ver ruta y Cargar vehículo para Despachada del día; para EnCurso agrega Rendir ruta y, sólo en la fecha de la ruta, Continuar carga. Una Despachada anterior sin carga confirmada queda pendiente de resolución por despacho: se consulta, sin iniciar cargas atrasadas. Una confirmación local anterior puede consultarse y sincronizarse sin crear otra carga. Una declaración pendiente ofrece sincronizar; una registrada indica que el recorrido terminó y espera recepción del depósito. Las rutas finalizadas se muestran como resumen sin acciones operativas, y las futuras esperan su fecha.
 
 ## 4. Selección del día y estados
 
@@ -73,11 +73,11 @@ Se devuelve la única ruta del repartidor para ese día en estado Despachada o E
 - EnCurso: permite recuperar/actualizar la misma hoja durante la jornada.
 - Planificada o Finalizada: no se ofrece como hoja activa.
 
-No se ofrece un parámetro de repartidor, operador ni fecha para navegar otros días. Dos rutas elegibles producen un error de integridad, no una selección silenciosa.
+La consulta predeterminada sigue devolviendo la ruta de hoy. Dos rutas elegibles producen un error de integridad, no una selección silenciosa. La consulta explícita por ID admite también rutas anteriores Despachada/EnCurso asignadas al repartidor autenticado. No acepta operador ni repartidor del navegador y rechaza las futuras, planificadas, finalizadas y ajenas.
 
 Descargar no aplica T5, no inicia ni finaliza la ruta, no marca un aviso como leído y no genera un evento Outbox.
 
-Si la copia local es de otro día, se identifica como Última ruta descargada, con fecha visible. Nunca se presenta como ruta vigente ni habilita por sí sola futuras operaciones de otro día.
+Las copias muestran su fecha y, sin red, se identifican como información guardada pendiente de verificar. Una ruta anterior que continúa abierta puede retomarse desde su tarjeta; la antigüedad no equivale a cierre. La cola conserva las operaciones por ruta y el servidor valida su estado al sincronizar.
 
 ## 5. Contratos HTTP
 
@@ -96,7 +96,11 @@ GET /api/repartidor/hoja-de-ruta
 - 403: el perfil o vínculo no habilitan la PWA.
 - 503 con ProblemDetails: no se puede construir una hoja completa por datos o reglas faltantes. No devolver una descarga parcial como exitosa.
 
-Ambas respuestas usan Cache-Control: no-store. No se guardan respuestas personales en Cache Storage ni localStorage. El único almacenamiento durable de la hoja es el repositorio cifrado.
+GET /api/repartidor/rutas?pagina=1 devuelve la fecha operativa y hasta 20 resúmenes de rutas propias, primero abiertas por fecha y luego finalizadas de más reciente a más antigua. Incluye matrícula, cantidad de paradas/envíos y los indicadores de carga/rendición actuales.
+
+GET /api/repartidor/rutas/{rutaId}/hoja-de-ruta devuelve la hoja completa de una ruta propia abierta cuya fecha ya llegó; responde 204 cuando no está disponible, sin revelar rutas ajenas. Conserva los demás controles y errores de la descarga predeterminada.
+
+Todas estas respuestas usan Cache-Control: no-store. No se guardan respuestas personales en Cache Storage ni localStorage. El único almacenamiento durable de la hoja es el repositorio cifrado.
 
 No se implementa ETag/304 en esta primera versión: Ruta.Revision sólo describe la estructura de la ruta, no todos los cambios posteriores de los envíos. Cada actualización válida consulta de nuevo el contenido completo.
 

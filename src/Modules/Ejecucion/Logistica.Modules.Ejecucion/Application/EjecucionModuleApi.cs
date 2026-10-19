@@ -1,0 +1,23 @@
+using Logistica.Modules.Ejecucion.Contracts;
+using Logistica.Modules.Ejecucion.Contracts.Results;
+using Logistica.Modules.Ejecucion.Domain.Rendiciones;
+using Logistica.SharedKernel;
+
+namespace Logistica.Modules.Ejecucion.Application;
+
+internal sealed class EjecucionModuleApi(IRendicionRepository rendiciones) : IEjecucionModuleApi
+{
+    public async Task<RendicionPendiente?> ConsultarRendicionAsync(Guid rutaId, CancellationToken ct)
+    {
+        var r = await rendiciones.ObtenerAsync(rutaId, ct);
+        return r is null ? null : Mapear(r);
+    }
+    public async Task<IReadOnlyList<RendicionPendiente>> ListarRendicionesPendientesAsync(int pagina, CancellationToken ct)
+    {
+        if (pagina is < 1 or > 10000) throw new DomainException("La página no es válida.");
+        return (await rendiciones.PendientesAsync(pagina, ct)).Select(Mapear).ToArray();
+    }
+    private static RendicionPendiente Mapear(Rendicion r) => new(r.Id, r.RutaId, r.RepartidorId, r.IniciadaEn,
+        r.FinalizadaEn, r.Observaciones, r.Lineas.Select(l => new LineaRendicionPendiente(l.EnvioId, l.BultoId,
+            l.Situacion, l.Declarada, l.Observacion, l.Recibida, l.EstadoFinal?.ToString())).ToArray());
+}

@@ -355,6 +355,7 @@ public class QuitarEnvioDeRutaTests(PostgresApiFactory factory) : IClassFixture<
     }
     private sealed class RepositorioQueFalla(IRutaRepository original) : IRutaRepository
     {
+        public Task<IReadOnlyList<Ruta>> ListarDelRepartidorAsync(Guid id, int pagina, CancellationToken ct) => original.ListarDelRepartidorAsync(id, pagina, ct);
         public Task<Ruta?> ObtenerAsync(Guid id, CancellationToken ct) => original.ObtenerAsync(id, ct);
         public Task<IReadOnlyList<Ruta>> ListarAsync(DateOnly? fecha, EstadoRuta? estado, CancellationToken ct) => original.ListarAsync(fecha, estado, ct);
         public Task<IReadOnlyList<Guid>> EnviosOcupadosAsync(IReadOnlyCollection<Guid> ids, Guid? propia, CancellationToken ct) => original.EnviosOcupadosAsync(ids, propia, ct);

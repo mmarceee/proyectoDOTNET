@@ -163,6 +163,104 @@ namespace Logistica.Modules.Ejecucion.Infrastructure.Persistence.Migrations
 
                     b.ToTable("operaciones_dispositivo", "ejecucion");
                 });
+
+            modelBuilder.Entity("Logistica.Modules.Ejecucion.Domain.Rendiciones.LineaRendicion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BultoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Declarada")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EstadoFinal")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Observacion")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool?>("Recibida")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("RendicionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Situacion")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RendicionId");
+
+                    b.HasIndex("OperadorId", "RendicionId", "BultoId")
+                        .IsUnique();
+
+                    b.ToTable("lineas_rendicion", "ejecucion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Ejecucion.Domain.Rendiciones.Rendicion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("FinalizadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("IniciadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Observaciones")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("OperacionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RepartidorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RutaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "OperacionId")
+                        .IsUnique();
+
+                    b.HasIndex("OperadorId", "RutaId")
+                        .IsUnique();
+
+                    b.ToTable("rendiciones", "ejecucion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Ejecucion.Domain.Rendiciones.LineaRendicion", b =>
+                {
+                    b.HasOne("Logistica.Modules.Ejecucion.Domain.Rendiciones.Rendicion", null)
+                        .WithMany("Lineas")
+                        .HasForeignKey("RendicionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Ejecucion.Domain.Rendiciones.Rendicion", b =>
+                {
+                    b.Navigation("Lineas");
+                });
 #pragma warning restore 612, 618
         }
     }

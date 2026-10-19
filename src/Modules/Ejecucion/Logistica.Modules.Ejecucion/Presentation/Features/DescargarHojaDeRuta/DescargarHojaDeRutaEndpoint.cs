@@ -16,9 +16,12 @@ internal static class DescargarHojaDeRutaEndpoint
             => ConsultarAsync(http, handler, true, ct)).RequireAuthorization(Politicas.Repartidor).WithTags("Ejecucion");
         endpoints.MapGet("/api/repartidor/hoja-de-ruta", (HttpContext http, DescargarHojaDeRutaHandler handler, CancellationToken ct)
             => ConsultarAsync(http, handler, false, ct)).RequireAuthorization(Politicas.Repartidor).WithTags("Ejecucion");
+        endpoints.MapGet("/api/repartidor/rutas/{rutaId:guid}/hoja-de-ruta", (Guid rutaId, HttpContext http,
+            DescargarHojaDeRutaHandler handler, CancellationToken ct) => ConsultarAsync(http, handler, false, ct, rutaId))
+            .RequireAuthorization(Politicas.Repartidor).WithTags("Ejecucion");
     }
 
-    private static async Task<IResult> ConsultarAsync(HttpContext http, DescargarHojaDeRutaHandler handler, bool sesion, CancellationToken ct)
+    private static async Task<IResult> ConsultarAsync(HttpContext http, DescargarHojaDeRutaHandler handler, bool sesion, CancellationToken ct, Guid? rutaId = null)
     {
         http.Response.Headers.CacheControl = "no-store";
         if (!Guid.TryParse(http.User.FindFirstValue(ClaimTypes.NameIdentifier), out var usuario)
@@ -31,7 +34,7 @@ internal static class DescargarHojaDeRutaEndpoint
                 var datos = await handler.SesionAsync(usuario, repartidor, ct);
                 return Results.Ok(datos with { NombreUsuario = http.User.Identity?.Name });
             }
-            var hoja = await handler.HandleAsync(usuario, repartidor, ct);
+            var hoja = await handler.HandleAsync(usuario, repartidor, ct, rutaId);
             return hoja is null ? Results.NoContent() : Results.Ok(hoja);
         }
         catch (VinculoRepartidorInvalidoException) { return Results.Forbid(); }

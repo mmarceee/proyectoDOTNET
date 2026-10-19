@@ -933,6 +933,8 @@ Creacion, Agregado, Modificacion, Despacho, CambioFranjaProgramado
 
 * observaciones: string (opcional)
 
+**Concreción de CU-54 (19/10/2026):** incorpora operadorId, repartidorId y operacionId para pertenencia y auditoría. Hay una rendición por ruta; iniciarla no aplica T8 ni finaliza la ruta. Las líneas cubren el manifiesto completo, distinguiendo bultos no cargados, carga parcial, no intentados, intento fallido de esta ruta y resultados resueltos. Una rendición puede no tener devoluciones físicas aunque conserve líneas de envíos entregados.
+
 **Métodos**
 
 * cerrar(): void
@@ -945,13 +947,19 @@ Creacion, Agregado, Modificacion, Despacho, CambioFranjaProgramado
 
 * rendicionId: Guid
 
+* envioId: Guid
+
 * bultoId: Guid
 
 * declarada: bool (el repartidor declaró que devuelve el bulto — CU-54)
 
-* recibida: bool (el operario confirmó que llegó — CU-55)
+* situacion: string (clasificación al declarar, comprobada por el servidor; no es el estado final)
 
-* estadoFinal: EstadoLineaRendicion
+* observacion: string (obligatoria cuando un bulto que debe volver no se devuelve)
+
+* recibida: bool opcional (nulo hasta que el operario verifique en CU-55)
+
+* estadoFinal: EstadoLineaRendicion opcional (nulo mientras no exista resolución en CU-55; no se asigna Extraviado por una declaración de faltante)
 
 ## **Enumerados**
 
