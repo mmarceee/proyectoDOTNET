@@ -26,6 +26,14 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // Después de un intento fallido reprogramado (T9): no se vuelve a intentar antes de esta hora (CU-18).
     public DateTimeOffset? ReintentoDesde { get; private set; }
 
+    // CU-04: los estados en que el envío todavía tiene una entrega por delante, así que su franja es un horario
+    // prometido. Entregado, EnDevolucion, Devuelto, Extraviado y Cancelado ya no esperan una entrega.
+    public static readonly EstadoEnvio[] EstadosConEntregaPendiente =
+    [
+        EstadoEnvio.Admitido, EstadoEnvio.EnDeposito, EstadoEnvio.AsignadoARuta, EstadoEnvio.EnTransito,
+        EstadoEnvio.NoEntregado, EstadoEnvio.Reprogramado
+    ];
+
     public IReadOnlyList<Bulto> Bultos => _bultos;
     public IReadOnlyList<EventoEnvio> Eventos => _eventos;
     public IReadOnlyList<IntentoEntrega> Intentos => _intentos;
