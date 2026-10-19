@@ -12,7 +12,12 @@ internal sealed record ReglasEntrega
     public int MaxIntentos { get; }
     public TimeSpan PlazoEntreIntentos { get; }
 
-    public ReglasEntrega(bool exigeFoto, bool exigeNombreYDocumento, int maxIntentos, TimeSpan plazoEntreIntentos)
+    // Política de devolución (modelo de dominio, PoliticaDevolucion): al agotar los intentos, true inicia la devolución
+    // sola (T10); false deja el envío Reprogramado para que el despachador decida (CU-19, A2, y CU-20).
+    public bool DevolverTrasIntentosAgotados { get; }
+
+    public ReglasEntrega(bool exigeFoto, bool exigeNombreYDocumento, int maxIntentos, TimeSpan plazoEntreIntentos,
+        bool devolverTrasIntentosAgotados = true)
     {
         if (maxIntentos < 1)
         {
@@ -28,5 +33,6 @@ internal sealed record ReglasEntrega
         ExigeNombreYDocumento = exigeNombreYDocumento;
         MaxIntentos = maxIntentos;
         PlazoEntreIntentos = plazoEntreIntentos;
+        DevolverTrasIntentosAgotados = devolverTrasIntentosAgotados;
     }
 }

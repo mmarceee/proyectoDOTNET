@@ -35,6 +35,27 @@ public class EnvioTests
     }
 
     [Fact]
+    public void El_envio_guarda_la_version_de_reglas_con_que_se_admitio()
+    {
+        var version = Guid.NewGuid();
+
+        var envio = Envio.Crear(OperadorId, ComercioId, "ENV-1", new Destinatario("Ana Pérez", "099123456"),
+            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "11300"), [UnBulto],
+            OrigenEvento.PortalComercio, responsableId: null, Ahora, versionReglasId: version);
+
+        Assert.Equal(version, envio.VersionReglasId);
+    }
+
+    [Fact]
+    public void Una_version_de_reglas_vacia_no_es_valida()
+    {
+        Assert.Throws<DomainException>(() => Envio.Crear(OperadorId, ComercioId, "ENV-1",
+            new Destinatario("Ana Pérez", "099123456"),
+            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "11300"), [UnBulto],
+            OrigenEvento.PortalComercio, responsableId: null, Ahora, versionReglasId: Guid.Empty));
+    }
+
+    [Fact]
     public void Un_envio_sin_bultos_no_se_puede_crear()
     {
         Assert.Throws<DomainException>(() => CrearEnvio());
