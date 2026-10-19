@@ -19,6 +19,9 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // Nullable para los envíos admitidos con la tarifa provisoria del esqueleto inicial.
     public Guid? VersionTarifarioId { get; private set; }
     public int? VersionTarifarioNumero { get; private set; }
+    // La versión de reglas operativas con que se admitió (letra 6.6): CU-17 y CU-18 aplican las de esa versión aunque
+    // después se publique otra. Nullable para los envíos admitidos antes de guardarla; esos usan la vigente.
+    public Guid? VersionReglasId { get; private set; }
     public DateTimeOffset CreadoEn { get; private set; }
     public Guid? ZonaId { get; private set; }
     public Guid? FranjaHorariaId { get; private set; }
@@ -51,7 +54,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
 
     public static Envio Crear(Guid operadorId, Guid comercioId, string numero, Destinatario destinatario,
         Direccion direccion, IReadOnlyList<DatosBulto> bultos, OrigenEvento origen, Guid? responsableId,
-        DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null)
+        DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null, Guid? versionReglasId = null)
     {
         if (string.IsNullOrWhiteSpace(numero))
         {
@@ -68,6 +71,11 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             throw new DomainException("La versión tarifaria debe tener identificador y número válidos.");
         }
 
+        if (versionReglasId == Guid.Empty)
+        {
+            throw new DomainException("La versión de reglas debe tener un identificador válido.");
+        }
+
         var envio = new Envio
         {
             OperadorId = operadorId,
@@ -80,6 +88,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             CreadoEn = ahora.ToUniversalTime(),
             VersionTarifarioId = versionTarifario?.Id,
             VersionTarifarioNumero = versionTarifario?.Numero,
+            VersionReglasId = versionReglasId,
         };
 
         foreach (var datos in bultos)
@@ -149,9 +158,9 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         return intento;
     }
 
-    // CU-18 (T7 y, en la misma operación, T9 o T10): el repartidor no pudo entregar. Según el motivo y los intentos,
-    // el envío queda Reprogramado, para después del plazo entre intentos, o EnDevolucion. Si queda EnDevolucion,
-    // quien llama inicia la Devolucion (CU-20), que es otro agregado.
+    // CU-18 (T7 y, en la misma operación, T9 o T10): el repartidor no pudo entregar. Según el motivo, los intentos y la
+    // política de devolución, el envío queda Reprogramado, para después del plazo entre intentos, o EnDevolucion. Si
+    // queda EnDevolucion, quien llama inicia la Devolucion (CU-20), que es otro agregado.
     public IntentoEntrega RegistrarIntentoFallido(MotivoNoEntrega motivo, PruebaEntrega? evidencia, string? observaciones,
         Ubicacion ubicacion, ReglasEntrega reglas, Guid? responsableId, DateTimeOffset ocurridoEn)
     {
@@ -169,8 +178,10 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
 
         // NoEntregado es transitorio (T11 se eliminó): la regla del operador decide el estado siguiente.
         var fallidos = _intentos.Count(i => i.Resultado == ResultadoIntento.Fallido);
+        var agotados = fallidos >= reglas.MaxIntentos;
 
-        if (!motivo.Reprogramable || fallidos >= reglas.MaxIntentos)
+        // Un motivo no reprogramable devuelve siempre; los intentos agotados, sólo si la política lo dice.
+        if (!motivo.Reprogramable || (agotados && reglas.DevolverTrasIntentosAgotados))
         {
             var causa = motivo.Reprogramable
                 ? $"Se agotaron los {reglas.MaxIntentos} intentos."
@@ -182,8 +193,10 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             // En UTC, como todos los instantes que se guardan: la hora del dispositivo trae su desfase local.
             var reintento = (ocurridoEn + reglas.PlazoEntreIntentos).ToUniversalTime();
             ReintentoDesde = reintento;
-            Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.Sistema, null, ocurridoEn,
-                detalle: $"Intento {fallidos} de {reglas.MaxIntentos}. Nuevo intento desde {reintento:yyyy-MM-dd HH:mm} UTC.");
+            var detalle = agotados
+                ? $"Se agotaron los {reglas.MaxIntentos} intentos: la política del operador no devuelve sola, decide el despachador."
+                : $"Intento {fallidos} de {reglas.MaxIntentos}. Nuevo intento desde {reintento:yyyy-MM-dd HH:mm} UTC.";
+            Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.Sistema, null, ocurridoEn, detalle: detalle);
         }
 
         return intento;

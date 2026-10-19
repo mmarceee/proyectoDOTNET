@@ -7,7 +7,7 @@ using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Logistica.Modules.Ejecucion.Domain.Operaciones;
 using Logistica.Modules.Ejecucion.Infrastructure.Persistence;
 using Logistica.Modules.Envios.Domain.Envios;
-using Logistica.Modules.Envios.Infrastructure;
+using Logistica.Modules.Administracion.Application;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
 using Logistica.Modules.Planificacion.Domain.Rutas;
 using Logistica.Modules.Planificacion.Infrastructure.Persistence;
@@ -120,7 +120,7 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
         var respuesta = await client.PostAsJsonAsync(Url, new SincronizacionRequest(
         [
             Entrega(rutaId, envios[1], secuencia: 3),
-            Intento(rutaId, envios[0], secuencia: 2, ReglasDeEntregaProvisorias.Ausente.Id),
+            Intento(rutaId, envios[0], secuencia: 2, ReglasOperativasProvisorias.Ausente.Id),
             Entrega(rutaId, envios[0], secuencia: 1),
         ]));
         var resultados = (await respuesta.Content.ReadFromJsonAsync<SincronizacionResponse>())!.Resultados;
@@ -137,7 +137,7 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
         using var client = await RepartidorAsync();
 
         var resultado = await SincronizarAsync(client,
-            Intento(rutaId, envios[0], secuencia: 1, ReglasDeEntregaProvisorias.Rechazado.Id));
+            Intento(rutaId, envios[0], secuencia: 1, ReglasOperativasProvisorias.Rechazado.Id));
 
         Assert.Equal("Aplicada", resultado.Resultado);
         Assert.Equal(EstadoEnvio.EnDevolucion, await EstadoAsync(envios[0]));

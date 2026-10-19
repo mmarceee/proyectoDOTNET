@@ -23,6 +23,15 @@ internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lecto
         return new TarifaBulto(tabla.VersionId, tabla.Numero, monto);
     }
 
+    // CU-06 para Envíos (CU-10, CU-17 y CU-18). PROVISORIO hasta el PR de CU-06: ver ReglasOperativasProvisorias.
+    public Task<ReglasOperativas?> ReglasDeEntregaAsync(Guid versionReglasId, CancellationToken ct)
+        => Task.FromResult<ReglasOperativas?>(versionReglasId == ReglasOperativasProvisorias.VersionId
+            ? ReglasOperativasProvisorias.Vigentes
+            : null);
+
+    public Task<ReglasOperativas?> ReglasDeEntregaVigentesAsync(CancellationToken ct)
+        => Task.FromResult<ReglasOperativas?>(ReglasOperativasProvisorias.Vigentes);
+
     public Task BloquearPlanificacionAsync(CancellationToken ct) => lector.BloquearPlanificacionAsync(ct);
     public Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct) => lector.ObtenerContextoPlanificacionAsync(ct);
     public Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct) => lector.ObtenerReglasPlanificacionAsync(ahora, ct);

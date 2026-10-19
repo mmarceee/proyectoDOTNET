@@ -170,6 +170,31 @@ public class EntregaEIntentosTests
     }
 
     [Fact]
+    public void Si_la_politica_no_devuelve_sola_al_agotar_los_intentos_queda_Reprogramado_para_el_despachador()
+    {
+        var envio = EnTransito();
+        var unIntentoSinDevolucion = new ReglasEntrega(false, false, maxIntentos: 1, TimeSpan.FromHours(24),
+            devolverTrasIntentosAgotados: false);
+
+        envio.RegistrarIntentoFallido(Ausente, null, null, EnLaPuerta, unIntentoSinDevolucion, null, EnLaCalle);
+
+        Assert.Equal(EstadoEnvio.Reprogramado, envio.Estado);
+        Assert.Contains("decide el despachador", envio.Eventos[^1].Detalle ?? "");
+    }
+
+    [Fact]
+    public void Un_motivo_no_reprogramable_devuelve_aunque_la_politica_no_devuelva_sola()
+    {
+        var envio = EnTransito();
+        var sinDevolucion = new ReglasEntrega(false, false, maxIntentos: 3, TimeSpan.FromHours(24),
+            devolverTrasIntentosAgotados: false);
+
+        envio.RegistrarIntentoFallido(Rechazado, null, null, EnLaPuerta, sinDevolucion, null, EnLaCalle);
+
+        Assert.Equal(EstadoEnvio.EnDevolucion, envio.Estado);
+    }
+
+    [Fact]
     public void Un_motivo_que_exige_evidencia_sin_foto_se_rechaza_y_el_envio_no_cambia()
     {
         var envio = EnTransito();

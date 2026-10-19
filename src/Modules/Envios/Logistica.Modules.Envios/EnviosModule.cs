@@ -40,8 +40,8 @@ public static class EnviosModule
         services.AddScoped<CancelarEnvioHandler>();
         services.AddScoped<ReprogramarEnvioHandler>();
 
-        // Provisorio hasta CU-06: las reglas de entrega y el catálogo de motivos (ver ReglasDeEntregaProvisorias).
-        services.AddSingleton<IReglasDeEntrega, Infrastructure.ReglasDeEntregaProvisorias>();
+        // Las reglas de entrega y el catálogo de motivos de la versión del envío, pedidos a Administración (CU-06).
+        services.AddScoped<IReglasDeEntrega, Infrastructure.ReglasDeEntregaDeAdministracion>();
         services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 
         // Contrato para los otros módulos (ADR-0001, addendum 3).

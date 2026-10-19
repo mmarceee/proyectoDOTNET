@@ -14,4 +14,11 @@ public interface IAdministracionModuleApi
     // caché (ADR-0006). null si no hay versión vigente o ninguna regla cubre el bulto (CU-10, A3).
     Task<TarifaBulto?> CalcularTarifaAsync(Guid zonaId, Modalidad modalidad, decimal pesoKg, decimal volumenM3,
         CancellationToken ct);
+
+    // CU-06: las reglas de una versión, con su catálogo de motivos. null si la versión no existe o es de otro operador.
+    Task<ReglasOperativas?> ReglasDeEntregaAsync(Guid versionReglasId, CancellationToken ct);
+
+    // CU-06 para el alta (CU-10): la versión que rige ahora, para guardar su VersionId en el envío.
+    // También para los envíos viejos sin versión. null si el operador no tiene reglas vigentes.
+    Task<ReglasOperativas?> ReglasDeEntregaVigentesAsync(CancellationToken ct);
 }

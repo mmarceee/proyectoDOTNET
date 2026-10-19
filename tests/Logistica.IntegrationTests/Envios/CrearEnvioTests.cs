@@ -36,6 +36,9 @@ public class CrearEnvioTests(PostgresApiFactory factory) : IClassFixture<Postgre
         Assert.Equal(OperadorProvisorio, await ConsultarAsync<Guid>("""SELECT "OperadorId" FROM envios."Envios" WHERE "Id" = @id""", creado.Id));
         Assert.Equal(2L, await ConsultarAsync<long>("""SELECT count(*) FROM envios."Bultos" WHERE "EnvioId" = @id""", creado.Id));
         Assert.Equal(1L, await ConsultarAsync<long>("""SELECT count(*) FROM envios."EventosEnvio" WHERE "EnvioId" = @id""", creado.Id));
+
+        // Letra 6.6: el envío guarda la versión de reglas que regía al admitirlo.
+        Assert.NotEqual(Guid.Empty, await ConsultarAsync<Guid>("""SELECT "VersionReglasId" FROM envios."Envios" WHERE "Id" = @id""", creado.Id));
     }
 
     [Fact]
