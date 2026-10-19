@@ -4,7 +4,7 @@ Implementado sobre PR #36 de Ezequiel, conservando su caché e instrumentación 
 
 ## Flujo
 
-El inicio Mis rutas presenta tarjetas por fecha y matrícula. Cada tarjeta abre su propia hoja, carga o rendición, también cuando quedó abierta de un día anterior. Rendir ruta aparece para EnCurso; las futuras esperan su fecha y las finalizadas no ofrecen acciones operativas. El menú conserva Mis rutas, usuario y cierre de sesión. Las tarjetas leen el estado actual de Planificación, sin depender de la entrega del aviso interno de CU-43.
+El inicio Mis rutas presenta tarjetas por fecha y matrícula. Cada tarjeta abre su propia hoja, carga o rendición. Las cargas nuevas se limitan al día de la ruta; una Despachada anterior sin confirmación local queda pendiente de resolución por despacho. Las confirmaciones de carga ya guardadas se pueden consultar y sincronizar otro día. Rendir ruta aparece para EnCurso, incluso anterior; las futuras esperan su fecha y las finalizadas no ofrecen acciones operativas. El menú conserva Mis rutas, usuario y cierre de sesión. Las tarjetas leen el estado actual de Planificación, sin depender de la entrega del aviso interno de CU-43.
 
 Desde la carga también se ofrece Rendir ruta cuando ya está en curso o una confirmación local incluye un envío completo. Así se puede continuar hasta la declaración sin red, aunque el servidor todavía informe Despachada. La preparación cifrada y la validación al sincronizar siguen comprobando las dependencias y el estado real.
 

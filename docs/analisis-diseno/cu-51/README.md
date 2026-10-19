@@ -16,6 +16,14 @@ Ejecución coordina IPlanificacionModuleApi e IEnviosModuleApi mediante sus impl
 
 ## Almacenamiento y sincronización
 
+### Fecha de carga · ajuste acordado el 19/10/2026
+
+Sólo se inician o continúan cargas nuevas para la fecha operativa actual. Mis rutas conserva las rutas anteriores para consulta y rendición: una Despachada anterior sin confirmación local queda «Pendiente de resolución por despacho», sin Cargar vehículo. Una EnCurso anterior permite rendir, sin continuar cargando. Entrar directamente al enlace tampoco permite escanear ni confirmar. La PWA comprueba nuevamente la fecha al abrir, escanear, revisar un rechazo y confirmar; sin conexión también comprueba el cambio de día en la zona del operador.
+
+Las confirmaciones ya guardadas son inmutables y pueden consultarse y sincronizarse después. El servidor compara la fecha de la ruta con OcurridoEn efectivo de la operación convertido a la zona horaria del operador (conservando la corrección de reloj de ADR-0004). Una fecha diferente produce Conflicto/FechaDeCargaInvalida sin escaneos ni transiciones. No se compara con el día en que llega la sincronización. Una operación ya procesada conserva su resultado por idempotencia.
+
+Verificación del ajuste: 77 pruebas de integración de Ejecución, 56 de arquitectura y 35 JavaScript correctas. Incluyen rechazo de confirmaciones de otra fecha sin efectos parciales, sincronización posterior, idempotencia, límite de día en America/Montevideo, borrador abierto al cambiar de día y conservación de la operación anterior. Tras ajustar la fecha operativa del listado sin red también pasaron las cinco pruebas del servicio MisRutasService.
+
 IndexedDB mantiene el nombre logistica-repartidor-v1, pero su versión de esquema pasa a 2. Se agregan borradores, operaciones e instalacion conservando espacios, hojas y claves. El script de ingreso/cierre abre la versión existente, sin forzar la anterior.
 
 Borrador y operación se cifran con AES-GCM usando la clave no exportable de su espacio usuario/operador/repartidor. El tipo y la clave del registro se autentican como datos asociados. Una revisión local impide que dos pestañas sobrescriban silenciosamente el borrador. Confirmar guarda el borrador confirmado y su operación en una sola transacción; una escritura abortada conserva el avance previo.

@@ -318,12 +318,25 @@ async function escribirBorrador(valor, esperado, s, operacion = null) {
     } finally { db.close(); }
     return valor;
 }
+export function fechaOperativaActual(s) {
+    const partes = new Intl.DateTimeFormat('en', { timeZone:s.zonaHorariaOperador,year:'numeric',month:'2-digit',day:'2-digit' })
+        .formatToParts(new Date());
+    const parte = tipo => partes.find(p => p.type === tipo).value;
+    const local = `${parte('year')}-${parte('month')}-${parte('day')}`;
+    return local > s.fechaOperativa ? local : s.fechaOperativa;
+}
+async function exigirFechaDeCarga(ruta, copia = null) {
+    const s = await activo(); copia ??= await cargar();
+    if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta || copia.hoja.fechaRuta !== fechaOperativaActual(s))
+        throw new Error('Sólo podés registrar cargas para la fecha de hoy. Esta ruta queda para consulta o resolución por despacho.');
+}
 export async function abrirCarga(ruta) {
     const s = await activo(), copia = await cargar();
-    if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta || copia.hoja.fechaRuta > s.fechaOperativa)
-        throw new Error('Descargá una ruta asignada cuya fecha ya haya llegado antes de iniciar la carga.');
-    await exigirJornadaAbierta(ruta, copia);
     const anterior = await borradorCarga(ruta);
+    // Consultar una confirmación anterior no crea otra carga ni modifica la operación pendiente.
+    if (copia?.hoja.fechaRuta !== fechaOperativaActual(s) && anterior?.operacionId && anterior.resultado) return anterior;
+    await exigirFechaDeCarga(ruta, copia);
+    await exigirJornadaAbierta(ruta, copia);
     if (anterior && (!anterior.resultado || anterior.resultado === 'Rechazada')) return anterior;
     if (anterior && anterior.revisionRuta === copia.hoja.revisionRuta) return anterior;
     const pendientes = new Set(copia.hoja.paradas.flatMap(p => p.envios).filter(e => e.estado === 'AsignadoARuta')
@@ -334,6 +347,7 @@ export async function abrirCarga(ruta) {
     return escribirBorrador(valor, anterior?.revision ?? 0, s);
 }
 export async function escanearCarga(ruta, revision, codigo) {
+    await exigirFechaDeCarga(ruta);
     await exigirJornadaAbierta(ruta);
     codigo = codigo.trim();
     if (!codigo || codigo.length > 200) throw new Error('Ingresá un código de bulto válido.');
@@ -358,6 +372,7 @@ async function instalacion() {
     } finally { db.close(); }
 }
 export async function confirmarCarga(ruta, revision, aceptaFaltantes) {
+    await exigirFechaDeCarga(ruta);
     await exigirJornadaAbierta(ruta);
     const s = await activo(), actual = await borradorCarga(ruta), copia = await cargar();
     if (!actual || actual.operacionId || actual.revision !== revision || !actual.lecturas.length)
@@ -476,6 +491,7 @@ export async function sincronizarCargas() {
     }
 }
 export async function revisarRechazo(ruta, revision) {
+    await exigirFechaDeCarga(ruta);
     const s = await activo(), actual = await borradorCarga(ruta), copia = await cargar();
     if (!actual || actual.revision !== revision || actual.resultado !== 'Rechazada' || !copia || copia.sinRuta || copia.hoja.rutaId !== ruta)
         throw new Error('Actualizá la hoja para revisar el rechazo.');

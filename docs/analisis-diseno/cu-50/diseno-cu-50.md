@@ -62,7 +62,7 @@ Listado:
 - Reglas y motivos viajan en el contrato para CU-51/CU-17/CU-18, sin botones operativos ficticios en esta entrega.
 - Varios envíos en una parada conservan su identidad y sus propias reglas/franjas; no se reemplazan por los datos del primer envío.
 
-Mis rutas ofrece Ver ruta y Cargar vehículo para Despachada; para EnCurso agrega Rendir ruta y, si faltan envíos por cargar, Continuar carga. Una declaración pendiente ofrece sincronizar; una registrada indica que el recorrido terminó y espera recepción del depósito. Las rutas finalizadas se muestran como resumen sin acciones operativas, y las futuras esperan su fecha.
+Mis rutas ofrece Ver ruta y Cargar vehículo para Despachada del día; para EnCurso agrega Rendir ruta y, sólo en la fecha de la ruta, Continuar carga. Una Despachada anterior sin carga confirmada queda pendiente de resolución por despacho: se consulta, sin iniciar cargas atrasadas. Una confirmación local anterior puede consultarse y sincronizarse sin crear otra carga. Una declaración pendiente ofrece sincronizar; una registrada indica que el recorrido terminó y espera recepción del depósito. Las rutas finalizadas se muestran como resumen sin acciones operativas, y las futuras esperan su fecha.
 
 ## 4. Selección del día y estados
 

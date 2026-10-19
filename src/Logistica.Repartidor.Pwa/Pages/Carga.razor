@@ -37,14 +37,14 @@ else if (Cargas.Borrador is { } borrador && Hoja.Copia is { } copia)
     else if (borrador.Resultado == "Rechazada")
     {
         <div class="alert alert-danger" role="alert">El servidor rechazó la carga: @borrador.Detalle. No se aplicaron cambios de esta confirmación.</div>
-        <button class="btn btn-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.RevisarAsync">Actualizar hoja y revisar carga</button>
+        @if (copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa) { <button class="btn btn-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.RevisarAsync">Actualizar hoja y revisar carga</button> }
     }
     else if (borrador.Resultado == "Aplicada")
     {
         <div class="alert alert-success">Carga confirmada por el servidor.</div>
-        <button class="btn btn-outline-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.AbrirAsync">Revisar carga restante</button>
+        @if (copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa) { <button class="btn btn-outline-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.AbrirAsync">Revisar carga restante</button> }
     }
-    else if (envios.Length == 0) { <div class="alert alert-success">No quedan envíos pendientes de cargar en esta hoja.</div> }
+else if (envios.Length == 0) { <div class="alert alert-success">No quedan envíos pendientes de cargar en esta hoja.</div> }
     else
     {
         <p class="lead">@codigos.Intersect(esperados).Count() de @esperados.Count bultos · @envios.Count(e => e.Bultos.All(b => codigos.Contains(b.Codigo))) de @envios.Length envíos completos</p>
@@ -80,7 +80,7 @@ else if (Cargas.Borrador is { } borrador && Hoja.Copia is { } copia)
     }
 }
 else if (Cargas.Ocupado || Hoja.Cargando) { <p role="status">Abriendo la carga guardada…</p> }
-else { <p>Descargá tu hoja de ruta antes de comenzar.</p> }
+else { <p>@(Hoja.Copia is null ? "Descargá tu hoja de ruta antes de comenzar." : "No hay una carga habilitada para esta ruta.")</p> }
 <video @ref="video" playsinline muted style="width:100%;max-height:320px;display:@(camaraActiva ? "block" : "none")" aria-label="Vista de la cámara para escanear bultos"></video>
 
 @code {

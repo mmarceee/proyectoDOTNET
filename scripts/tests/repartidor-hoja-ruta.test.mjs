@@ -9,7 +9,10 @@ globalThis.isSecureContext = true;
 globalThis.BroadcastChannel = class { postMessage() {} };
 const source = await readFile(new URL('../../src/Logistica.Repartidor.Pwa/wwwroot/js/hoja-ruta.js', import.meta.url), 'utf8');
 const store = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
-beforeEach(() => { globalThis.indexedDB = new IDBFactory(); });
+beforeEach(t => {
+    globalThis.indexedDB = new IDBFactory();
+    t.mock.timers.enable({ apis:['Date'], now:new Date('2026-10-17T15:00:00Z') });
+});
 const id = n => '10000000-0000-4000-8000-' + String(n).padStart(12, '0');
 const sesion = (n = 1) => ({ usuarioId: id(n), operadorId: id(2), repartidorId: id(n + 2),
     fechaOperativa: '2026-10-17', zonaHorariaOperador: 'America/Montevideo', verificadaEn: '2026-10-17T12:00:00Z' });
@@ -39,20 +42,22 @@ function hoja54(situacion = 'NoIntentado') {
     return h;
 }
 
-test('Mis rutas conserva hojas y cargas separadas al alternar rutas, incluso de días anteriores', async () => {
+test('Mis rutas conserva hojas y cargas separadas al alternar rutas, incluso de días anteriores', async t => {
     let token = await store.activar(sesion());
-    const primera = hoja(); primera.fechaRuta = '2026-10-15';
+    const primera = hoja();
     await store.guardar(primera,token);
     let carga = await store.abrirCarga(primera.rutaId);
     carga = await store.escanearCarga(primera.rutaId,carga.revision,'ENV-001-1');
     await store.confirmarCarga(primera.rutaId,carga.revision,false);
     const [operacion] = await store.pendientesCarga();
+    t.mock.timers.setTime(new Date('2026-10-19T15:00:00Z').getTime());
+    token = await store.activar({ ...sesion(),fechaOperativa:'2026-10-19' });
     const segunda = hoja(); segunda.rutaId = id(30);
     await store.guardar(segunda,token);
     assert.equal((await store.rutasGuardadas()).length,2);
     assert.equal((await store.cargar()).hoja.rutaId,segunda.rutaId);
     await store.seleccionarRuta(primera.rutaId);
-    assert.equal((await store.cargar()).hoja.fechaRuta,'2026-10-15');
+    assert.equal((await store.cargar()).hoja.fechaRuta,'2026-10-17');
     assert.equal((await store.abrirCarga(primera.rutaId)).resultado,'Pendiente');
     assert.deepEqual((await store.pendientesCarga())[0],operacion);
     assert.deepEqual(await store.estadosLocalesRutas(),[{rutaId:primera.rutaId,tipo:'carga',resultado:'Pendiente'}]);
@@ -67,6 +72,42 @@ test('Mis rutas conserva hojas y cargas separadas al alternar rutas, incluso de 
     assert.equal(await store.rutaSeleccionada(),null);
     assert.deepEqual(await store.rutasGuardadas(),[]);
     assert.deepEqual(await store.estadosLocalesRutas(),[]);
+});
+
+test('Una carga de otro día no se abre ni continúa aunque la identidad sin conexión sea del día anterior', async t => {
+    const token = await store.activar(sesion()), h = hoja();
+    await store.guardar(h,token);
+    let carga = await store.abrirCarga(h.rutaId);
+    carga = await store.escanearCarga(h.rutaId,carga.revision,'ENV-001-1');
+    t.mock.timers.setTime(new Date('2026-10-19T15:00:00Z').getTime());
+    await assert.rejects(store.abrirCarga(h.rutaId),/fecha de hoy/);
+    await assert.rejects(store.escanearCarga(h.rutaId,carga.revision,'OTRO'),/fecha de hoy/);
+    await assert.rejects(store.confirmarCarga(h.rutaId,carga.revision,false),/fecha de hoy/);
+    assert.deepEqual(await store.borradorCarga(h.rutaId),carga);
+    assert.equal((await store.pendientesCarga()).length,0);
+});
+
+test('Una carga confirmada en su fecha conserva su operación y se sincroniza otro día', async t => {
+    const token = await store.activar(sesion()), h = hoja(); await store.guardar(h,token);
+    let carga = await store.abrirCarga(h.rutaId);
+    carga = await store.escanearCarga(h.rutaId,carga.revision,'ENV-001-1');
+    carga = await store.confirmarCarga(h.rutaId,carga.revision,false);
+    const [op] = await store.pendientesCarga();
+    t.mock.timers.setTime(new Date('2026-10-19T15:00:00Z').getTime());
+    await store.activar({ ...sesion(),fechaOperativa:'2026-10-19' });
+    assert.deepEqual(await store.abrirCarga(h.rutaId),carga);
+    const anterior = globalThis.fetch;
+    try {
+        globalThis.fetch = async (_,request) => {
+            assert.deepEqual(JSON.parse(request.body).operaciones,[op]);
+            assert.match(op.ocurridoEn,/^2026-10-17/);
+            return { ok:true,json:async () => ({ resultados:[{ operacionId:op.operacionId,resultado:'Aplicada' }] }) };
+        };
+        await store.sincronizarCargas();
+        assert.equal((await store.pendientesCarga()).length,0);
+        assert.equal((await store.borradorCarga(h.rutaId)).resultado,'Aplicada');
+        await assert.rejects(store.escanearCarga(h.rutaId,carga.revision,'OTRO'),/fecha de hoy/);
+    } finally { globalThis.fetch = anterior; }
 });
 
 test('Mis rutas no habilita carga futura y actualizar una copia no duplica el archivo', async () => {

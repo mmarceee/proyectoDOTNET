@@ -87,6 +87,7 @@ public sealed class MisRutasServiceTests
             {
                 "import" => this,
                 "sesionLocal" => Activa,
+                "fechaOperativaActual" => Sesion.FechaOperativa,
                 "estadosLocalesRutas" => new EstadoLocalRuta[] { new(Ruta, "carga", "Pendiente") },
                 "rutasGuardadas" => new CopiaHoja[] { new(new(1, Sesion.UsuarioId, Sesion.OperadorId, Sesion.RepartidorId, Ruta, 2,
                     Sesion.FechaOperativa.AddDays(-2), Sesion.FechaOperativa, Sesion.ZonaHorariaOperador, "Despachada", DateTimeOffset.UtcNow,

@@ -68,7 +68,7 @@ public sealed class MisRutasService(HttpClient http, IJSRuntime js, CargaService
                 {
                     var identidad = await modulo.InvokeAsync<SesionRepartidorResponse?>("sesionLocal");
                     if (identidad is null) { RequiereIngreso = true; return; }
-                    FechaOperativa = identidad.FechaOperativa;
+                    FechaOperativa = await modulo.InvokeAsync<DateOnly>("fechaOperativaActual", identidad);
                     propietaria = identidad;
                     var copias = await modulo.InvokeAsync<CopiaHoja[]>("rutasGuardadas");
                     Rutas = copias.OrderBy(c => c.Hoja.FechaRuta).Select(c => new TarjetaRutaResponse(c.Hoja.RutaId,

@@ -24,7 +24,7 @@ namespace Logistica.IntegrationTests.Ejecucion;
 public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFixture<PostgresApiFactory>
 {
     private static int dia;
-    private sealed record Datos(Guid Ruta, long Revision, Envio[] Envios);
+    private sealed record Datos(Guid Ruta, long Revision, Envio[] Envios, DateOnly Fecha);
     private IServiceScope Scope(Guid? operador = null)
     {
         var scope = factory.Services.CreateScope();
@@ -37,7 +37,7 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         using var inicial = factory.CreateClient(); await inicial.GetAsync("/health");
         using var scope = Scope();
         var ahora = DateTimeOffset.UtcNow.AddMinutes(-5);
-        var fecha = new DateOnly(2044, 1, 1).AddDays(Interlocked.Increment(ref dia));
+        var fecha = new DateOnly(2025, 6, 1).AddDays(Interlocked.Increment(ref dia));
         var envios = Enumerable.Range(0, 2).Select(i =>
         {
             var e = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId, $"CU54-{Guid.NewGuid():N}",
@@ -58,7 +58,7 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         ruta.Despachar(ahora); if (cargada) ruta.RegistrarCarga(true);
         var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
         plan.Rutas.Add(ruta); await plan.SaveChangesAsync();
-        return new(ruta.Id, ruta.Revision, envios);
+        return new(ruta.Id, ruta.Revision, envios, fecha);
     }
     private HttpClient Cliente() => factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false")).CreateClient(Sesion.Opciones);
     private async Task<OperacionDispositivoRequest> OperacionAsync(Datos d)
@@ -142,7 +142,7 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
     public async Task Carga_pendiente_se_aplica_antes_de_rendir_sin_rechazar_por_la_revision_que_ella_cambio()
     {
         var d = await PrepararAsync(false); using var client = Cliente(); await Sesion.IngresarAsync(client, "repartidor@operador-demo.uy");
-        var ahora = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var ahora = new DateTimeOffset(d.Fecha.ToDateTime(new TimeOnly(15,0)),TimeSpan.Zero);
         var carga = new OperacionDispositivoRequest(Guid.CreateVersion7(), Guid.NewGuid(), 1, "ConfirmarCarga", d.Ruta, null, ahora,
             null, null, Carga: new(d.Revision, d.Envios.SelectMany(e => e.Bultos).Select(b => new LecturaCargaRequest(b.Codigo, ahora)).ToArray()));
         var op = await OperacionAsync(d);

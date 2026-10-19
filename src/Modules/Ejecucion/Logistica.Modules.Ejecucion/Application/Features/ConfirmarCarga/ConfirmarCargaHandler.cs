@@ -45,10 +45,15 @@ internal sealed class ConfirmarCargaHandler(IUnidadDeTrabajo unidad, IAdministra
                     || l.CodigoBulto != l.CodigoBulto.Trim() || l.EscaneadoEn == default || l.EscaneadoEn > op.OcurridoEn)
                 || carga.Lecturas.Select(l => l.CodigoBulto).Distinct(StringComparer.Ordinal).Count() != carga.Lecturas.Count)
             { await Rechazar("CargaInvalida"); return; }
-            if (command.UsuarioId is not Guid usuario || await contexto.ConsultarAsync(usuario, command.RepartidorId, null, ct) is null)
+            var identidad = command.UsuarioId is Guid usuario ? await contexto.ConsultarAsync(usuario, command.RepartidorId, null, ct) : null;
+            if (identidad is null)
             { await Rechazar("RutaNoAsignada", true); return; }
             var ruta = await rutas.ConsultarCargaAsync(op.RutaId, command.RepartidorId, ct);
             if (ruta is null) { await Rechazar("RutaNoAsignada", true); return; }
+            // Se valida cuándo se confirmó, no cuándo llega el lote: la cola puede sincronizar otro día.
+            var fechaCarga = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(datos.OcurridoEn,
+                TimeZoneInfo.FindSystemTimeZoneById(identidad.ZonaHoraria)).DateTime);
+            if (ruta.Fecha != fechaCarga) { await Rechazar("FechaDeCargaInvalida", true); return; }
             if (ruta.Revision != carga.RevisionRuta) { await Rechazar("RutaModificada", true); return; }
             var lista = await envios.ConsultarCargaAsync(ruta.Envios.ToArray(), ct);
             if (lista.Count != ruta.Envios.Count) { await Rechazar("EnvioNoEncontrado", true); return; }

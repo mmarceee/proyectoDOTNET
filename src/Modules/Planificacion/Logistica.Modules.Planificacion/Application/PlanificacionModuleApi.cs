@@ -26,7 +26,7 @@ internal sealed class PlanificacionModuleApi(IRutaRepository rutas) : IPlanifica
     {
         var ruta = await rutas.ObtenerAsync(rutaId, ct);
         return ruta is null || ruta.RepartidorId != repartidorId || ruta.Estado is not (EstadoRuta.Despachada or EstadoRuta.EnCurso)
-            ? null : new(ruta.Revision, ruta.Estado.ToString(), ruta.EnvioIds.ToArray());
+            ? null : new(ruta.Revision, ruta.Estado.ToString(), ruta.EnvioIds.ToArray(), ruta.Fecha);
     }
 
     public async Task RegistrarCargaAsync(Guid rutaId, bool tieneEnviosCargados, CancellationToken ct)
