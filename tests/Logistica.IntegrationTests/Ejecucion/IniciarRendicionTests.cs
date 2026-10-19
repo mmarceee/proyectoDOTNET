@@ -10,8 +10,8 @@ using Logistica.Modules.Ejecucion.Domain.Operaciones;
 using Logistica.Modules.Ejecucion.Domain.Cargas;
 using Logistica.Modules.Ejecucion.Infrastructure.Persistence;
 using Logistica.Modules.Envios.Domain.Envios;
+using Logistica.Modules.Envios.Application;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
-using Logistica.Modules.Envios.Infrastructure;
 using Logistica.Modules.Planificacion.Domain.Rutas;
 using Logistica.Modules.Planificacion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -61,6 +61,16 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         return new(ruta.Id, ruta.Revision, envios, fecha);
     }
     private HttpClient Cliente() => factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false")).CreateClient(Sesion.Opciones);
+    private async Task<MotivoNoEntrega> MotivoAusenteAsync(Envio envio)
+    {
+        using var scope = Scope();
+        var reglas = scope.ServiceProvider.GetRequiredService<IReglasDeEntrega>();
+        var hoja = await reglas.ParaHojaAsync(envio, default);
+        var motivoId = hoja.Motivos.Single(m => m.Codigo == "AUSENTE").Id;
+        var motivo = await reglas.MotivoAsync(envio, motivoId, default);
+        Assert.NotNull(motivo);
+        return motivo;
+    }
     private async Task<OperacionDispositivoRequest> OperacionAsync(Datos d)
     {
         using var scope = Scope();
@@ -214,14 +224,14 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         var d = await PrepararAsync(); using var client = Cliente(); await Sesion.IngresarAsync(client, "repartidor@operador-demo.uy");
         var intento = new OperacionDispositivoRequest(Guid.CreateVersion7(), Guid.NewGuid(), 1, "RegistrarIntentoFallido",
             d.Ruta, d.Envios[0].Id, DateTimeOffset.UtcNow, -34.9m, -56.16m,
-            IntentoFallido: new(ReglasDeEntregaProvisorias.Ausente.Id));
+            IntentoFallido: new((await MotivoAusenteAsync(d.Envios[0])).Id));
         Assert.Equal("Aplicada", (await Enviar(client, intento)).Resultado);
         using (var s = Scope())
         {
             var envios = s.ServiceProvider.GetRequiredService<EnviosDbContext>();
             var otro = await envios.Envios.Include(e => e.Intentos).SingleAsync(e => e.Id == d.Envios[1].Id);
             var antes = DateTimeOffset.UtcNow.AddDays(-2);
-            otro.RegistrarIntentoFallido(ReglasDeEntregaProvisorias.Ausente, null, null, new(-34.9m, -56.16m),
+            otro.RegistrarIntentoFallido(await MotivoAusenteAsync(otro), null, null, new(-34.9m, -56.16m),
                 new(false, false, 3, TimeSpan.FromDays(1)), null, antes);
             otro.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, antes.AddDays(1));
             otro.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, antes.AddDays(1));
