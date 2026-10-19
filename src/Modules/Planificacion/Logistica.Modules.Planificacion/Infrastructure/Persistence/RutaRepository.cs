@@ -7,6 +7,16 @@ internal sealed class RutaRepository(PlanificacionDbContext db) : IRutaRepositor
 {
     // El filtro global Tenant protege raíces, paradas y evidencia, incluidas sus navegaciones.
     private IQueryable<Ruta> Consulta => db.Rutas;
+    public async Task<IReadOnlyList<Ruta>> ListarDelRepartidorAsync(Guid repartidor, int pagina, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await Consulta.AsNoTracking().Include(r => r.Paradas).ThenInclude(p => p.Envios)
+            .Where(r => r.RepartidorId == repartidor && r.Estado != EstadoRuta.Planificada)
+            .OrderBy(r => r.Estado == EstadoRuta.Finalizada)
+            .ThenBy(r => r.Estado == EstadoRuta.Finalizada ? DateOnly.MinValue : r.Fecha)
+            .ThenByDescending(r => r.Fecha).ThenBy(r => r.Id)
+            .Skip((pagina - 1) * 20).Take(20).ToListAsync(ct);
+    }
     public async Task<Ruta?> ObtenerAsync(Guid id, CancellationToken ct)
     {
         await db.ParticiparEnTransaccionAsync(ct);

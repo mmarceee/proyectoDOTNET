@@ -19,7 +19,8 @@ public sealed record OperacionDispositivoRequest(
     string? CorrelacionId = null,
     EntregaRequest? Entrega = null,
     IntentoFallidoRequest? IntentoFallido = null,
-    CargaRequest? Carga = null);
+    CargaRequest? Carga = null,
+    IniciarRendicionRequest? Rendicion = null);
 
 public sealed record CargaRequest(long RevisionRuta, IReadOnlyList<LecturaCargaRequest> Lecturas, bool AceptaFaltantes = false);
 public sealed record LecturaCargaRequest(string CodigoBulto, DateTimeOffset EscaneadoEn);

@@ -22,6 +22,12 @@ public static class EjecucionModule
     {
         services.AddModuleDbContext<EjecucionDbContext>(configuration.GetConnectionString("Postgres"), EjecucionDbContext.Schema);
         services.AddScoped<IOperacionRepository, OperacionRepository>();
+        services.AddScoped<Domain.Rendiciones.IRendicionRepository, RendicionRepository>();
+        services.AddScoped<Contracts.IEjecucionModuleApi, Application.EjecucionModuleApi>();
+        services.AddScoped<Application.Features.IniciarRendicion.PrepararRendicion>();
+        services.AddScoped<Application.Features.IniciarRendicion.IniciarRendicionHandler>();
+        services.AddScoped<Application.Features.ConsultarRendicion.ConsultarRendicionHandler>();
+        services.AddScoped<Application.Features.ConsultarMisRutas.ConsultarMisRutasHandler>();
         services.AddScoped<Application.Features.ConfirmarCarga.IRegistroCarga, RegistroCarga>();
         services.AddScoped<Application.Features.ConfirmarCarga.ConfirmarCargaHandler>();
         services.AddScoped<Application.Features.DescargarHojaDeRuta.DescargarHojaDeRutaHandler>();
@@ -39,6 +45,8 @@ public static class EjecucionModule
         // La PWA del repartidor sincroniza en /api/repartidor (ADR-0004, sección 2.9).
         SincronizarOperacionesEndpoint.Map(endpoints);
         Presentation.Features.DescargarHojaDeRuta.DescargarHojaDeRutaEndpoint.Map(endpoints);
+        Presentation.Features.ConsultarRendicion.ConsultarRendicionEndpoint.Map(endpoints);
+        Presentation.Features.ConsultarMisRutas.ConsultarMisRutasEndpoint.Map(endpoints);
 
         return endpoints;
     }

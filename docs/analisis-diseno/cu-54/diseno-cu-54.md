@@ -1,6 +1,6 @@
 # CU-54 · Iniciar la rendición
 
-Propuesta de implementación del 19/10/2026. No se implementa código en esta etapa. Las decisiones propuestas deben acordarse antes de codificar, especialmente el contrato con Ezequiel para CU-55.
+Diseño del 19/10/2026, aceptado por Lucas e implementado sobre los cambios de Ezequiel incorporados en PR #36. El alcance y la verificación se describen en [implementación de CU-54](README.md). Las propuestas siguientes documentan las decisiones de partida; el contrato de consulta para CU-55 ya está disponible y su confirmación sigue a cargo de ese caso de uso.
 
 ## Base documental
 
@@ -33,7 +33,7 @@ Propuesta de implementación del 19/10/2026. No se implementa código en esta et
 | Rendición iniciada | La ruta permanece EnCurso, pero la PWA entra en modo de rendición y bloquea nuevas operaciones de jornada para esa ruta. Debe acordarse la guarda equivalente de servidor con CU-17/18/51/55. |
 | Estados resueltos antes de rendir | Mostrar el resultado conocido; no pedir que se devuelva un envío Entregado o Devuelto ni tratar un Extraviado ya declarado como una nueva pérdida. Un cambio incompatible con la declaración exige revisión. |
 
-La documentación no define todos estos casos límite. Son propuestas, no reglas ya aprobadas del ADR.
+Lucas aceptó estas decisiones para CU-54. Complementan sus casos límite; no se presentan como texto normativo ya incluido en los ADR.
 
 ## Ajustes al modelo a acordar con CU-55
 
@@ -49,7 +49,7 @@ La entidad y las tablas siguen siendo de Ejecución. Si el Backoffice de CU-55 s
 
 ## Flujo propuesto de la PWA
 
-1. En Mi ruta, ofrecer Rendir ruta para la ruta en curso.
+1. En Mis rutas, ofrecer Rendir ruta en la tarjeta de cada ruta en curso. Los enlaces llevan su ID y permiten retomar pendientes de días anteriores. El inicio distingue declaración pendiente de sincronizar, pendiente de depósito y ruta finalizada; CU-55 mantiene el cierre definitivo.
 2. Mostrar envíos y bultos a conciliar, distinguiendo no intentados, intento fallido y carga incompleta. Mostrar los resueltos como referencia.
 3. Permitir declarar por bulto cuáles vuelven y exigir observaciones para los que deberían volver pero no vuelven.
 4. Mostrar un resumen antes de confirmar: devueltos, no devueltos con observación y operaciones anteriores pendientes o rechazadas.

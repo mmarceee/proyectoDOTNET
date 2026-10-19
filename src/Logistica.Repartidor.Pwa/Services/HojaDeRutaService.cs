@@ -20,6 +20,7 @@ public sealed class HojaDeRutaService(HttpClient http, IJSRuntime js) : IAsyncDi
     public bool RequiereIngreso { get; private set; }
     public bool SinRuta { get; private set; }
     public bool Cargando { get; private set; }
+    public Guid? RutaSeleccionada { get; private set; }
     public event Action? Cambio;
 
     private async Task InicializarAsync()
@@ -30,22 +31,43 @@ public sealed class HojaDeRutaService(HttpClient http, IJSRuntime js) : IAsyncDi
         await modulo.InvokeVoidAsync("escuchar", referencia);
     }
 
-    public async Task ActualizarAsync()
+    public Task ActualizarAsync() => ActualizarAsync(null);
+    public async Task SeleccionarAsync(Guid? rutaId)
     {
-        if (!await mutex.WaitAsync(0)) return;
+        await ActualizarAsync(rutaId);
+    }
+    private async Task ActualizarAsync(Guid? rutaId)
+    {
+        await mutex.WaitAsync();
         Cargando = true; Error = null; SinConexion = false; RequiereIngreso = false; Copia = null; SinRuta = false;
         Cambio?.Invoke();
         try
         {
             await InicializarAsync();
+            if (rutaId is Guid seleccion)
+            {
+                // Una primera visita puede no tener identidad local aún: se selecciona después de verificarla.
+                RutaSeleccionada = seleccion;
+            }
+            else RutaSeleccionada ??= await modulo!.InvokeAsync<Guid?>("rutaSeleccionada");
             using var limite = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             using var identidad = await http.GetAsync("/api/repartidor/sesion", limite.Token);
             if (await RechazadaAsync(identidad)) return;
             identidad.EnsureSuccessStatusCode();
             Sesion = await identidad.Content.ReadFromJsonAsync<SesionRepartidorResponse>(limite.Token)
                 ?? throw new JsonException();
+            var anterior = await modulo!.InvokeAsync<SesionRepartidorResponse?>("sesionLocal");
+            if (rutaId is null && (anterior is null || anterior.UsuarioId != Sesion.UsuarioId
+                || anterior.OperadorId != Sesion.OperadorId || anterior.RepartidorId != Sesion.RepartidorId))
+                RutaSeleccionada = null;
             var token = await modulo!.InvokeAsync<string>("activar", Sesion);
-            using var respuesta = await http.GetAsync("/api/repartidor/hoja-de-ruta", limite.Token);
+            if (RutaSeleccionada is Guid elegida)
+            {
+                await modulo!.InvokeVoidAsync("seleccionarRuta", elegida);
+                token = await modulo!.InvokeAsync<string>("activar", Sesion);
+            }
+            using var respuesta = await http.GetAsync(RutaSeleccionada is Guid id
+                ? $"/api/repartidor/rutas/{id}/hoja-de-ruta" : "/api/repartidor/hoja-de-ruta", limite.Token);
             if (await RechazadaAsync(respuesta)) return;
             if (respuesta.StatusCode == HttpStatusCode.NoContent)
             {
@@ -82,6 +104,7 @@ public sealed class HojaDeRutaService(HttpClient http, IJSRuntime js) : IAsyncDi
                         Error = "Necesitás iniciar sesión con conexión antes de abrir una hoja guardada.";
                         return;
                     }
+                    if (rutaId is Guid elegida) await modulo.InvokeVoidAsync("seleccionarRuta", elegida);
                     Copia = await modulo.InvokeAsync<CopiaHoja?>("cargar");
                     SinRuta = Copia?.SinRuta == true;
                 }
@@ -104,6 +127,7 @@ public sealed class HojaDeRutaService(HttpClient http, IJSRuntime js) : IAsyncDi
     {
         if (response.StatusCode is not (HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)) return false;
         Copia = null; Sesion = null; RequiereIngreso = true;
+        RutaSeleccionada = null;
         await modulo!.InvokeVoidAsync("bloquear");
         Error = "Iniciá sesión con una cuenta de repartidor habilitada para volver a abrir tu hoja.";
         return true;
@@ -113,6 +137,7 @@ public sealed class HojaDeRutaService(HttpClient http, IJSRuntime js) : IAsyncDi
     public void InvalidarEspacio()
     {
         Copia = null; Sesion = null;
+        RutaSeleccionada = null;
         RequiereIngreso = true;
         Error = "La sesión cambió o se cerró en otra pestaña. Volvé a ingresar para abrir tu hoja.";
         Cambio?.Invoke();

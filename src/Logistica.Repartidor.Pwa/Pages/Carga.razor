@@ -9,7 +9,7 @@
 <PageTitle>Cargar vehículo</PageTitle>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1>Cargar vehículo</h1>
-    <NavLink href="hoja-de-ruta" class="btn btn-outline-secondary">Ver mi ruta</NavLink>
+    <NavLink href="" class="btn btn-outline-secondary">Mis rutas</NavLink>
 </div>
 @if (Cargas.Mensaje is not null) { <div class="alert alert-info" role="status">@Cargas.Mensaje</div> }
 @if (errorCamara is not null) { <div class="alert alert-warning" role="alert">@errorCamara</div> }
@@ -23,6 +23,12 @@ else if (Cargas.Borrador is { } borrador && Hoja.Copia is { } copia)
     var faltantes = esperados.Except(codigos).ToArray();
     var sobrantes = codigos.Except(esperados).ToArray();
     <p>Ruta del @copia.Hoja.FechaRuta.ToString("dd/MM/yyyy") · Vehículo <strong>@copia.Hoja.Vehiculo.Matricula</strong></p>
+    @if (copia.Hoja.Rendicion?.Iniciada is null && (copia.Hoja.EstadoRuta == "EnCurso"
+        || borrador.Resultado is "Pendiente" or "Aplicada" && envios.Any(e => e.Bultos.All(b => codigos.Contains(b.Codigo)))))
+    {
+        <p>Cuando termines el recorrido, declará los bultos que devolvés al depósito.</p>
+        <a class="btn btn-outline-primary mb-3" href="@($"rendicion?rutaId={copia.Hoja.RutaId}")">Rendir ruta</a>
+    }
     @if (borrador.Resultado == "Pendiente")
     {
         <div class="alert alert-warning">Carga guardada, pendiente de sincronizar. Los estados del servidor todavía no se confirmaron.</div>
@@ -85,7 +91,18 @@ else { <p>Descargá tu hoja de ruta antes de comenzar.</p> }
     private IJSObjectReference? camara;
     private DotNetObjectReference<Carga>? referencia;
     protected override void OnInitialized() { Cargas.Cambio += Actualizar; Hoja.Cambio += Actualizar; }
-    protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await Cargas.AbrirAsync(); }
+    [SupplyParameterFromQuery] public Guid? RutaId { get; set; }
+    private bool abierta;
+    private Guid? rutaAbierta;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!abierta || rutaAbierta != RutaId)
+        {
+            abierta = true; rutaAbierta = RutaId;
+            await DetenerCamara();
+            await Cargas.AbrirRutaAsync(RutaId);
+        }
+    }
     private void Actualizar() => _ = InvokeAsync(async () =>
     {
         if (Hoja.RequiereIngreso) await DetenerCamara();

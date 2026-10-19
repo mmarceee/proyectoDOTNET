@@ -4,8 +4,8 @@ Actualización: 17/10/2026. Implementado sobre el [diseño acordado](diseno-cu-5
 
 ## Comportamiento
 
-- La PWA conserva Avisos de rutas y agrega Mi ruta en /repartidor/hoja-de-ruta.
-- El aviso del día permite abrir la hoja. Los avisos antiguos no habilitan descargas de otras fechas.
+- Desde el 19/10/2026 el inicio es Mis rutas, con tarjetas por fecha, vehículo y estado actual; sus botones abren la ruta seleccionada. Los avisos internos de CU-43 se conservan.
+- Una ruta propia Despachada/EnCurso de días anteriores también se puede descargar y retomar; futuras, planificadas y finalizadas no se descargan como hoja operativa.
 - Descarga automática al abrir Mi ruta y actualización manual, con una sola descarga en curso.
 - Se muestra la ruta por fecha, vehículo, zonas, paradas ordenadas, envíos, destinatario/teléfono, dirección/referencia, franja y bultos. Los GUID no se usan como nombre visible.
 - La descarga se confirma recién al terminar el guardado cifrado. Se puede abandonar la página y volver a abrirla sin servidor.
@@ -23,7 +23,7 @@ La lectura usa IConsultaConsistente, implementada por la misma UnidadDeTrabajo: 
 
 Una ruta puede contener envíos de varias zonas. Se devuelve Zonas[]; el modelo no guarda una zona única de ruta. Las zonas y vehículos ya usados se consultan aunque dejen de estar activos; desactivarlos no elimina la hoja despachada.
 
-Se admiten Despachada y EnCurso del día operativo; Planificada y Finalizada no se descargan como hoja activa. Las consultas de otros operadores y otros repartidores quedan fuera del alcance. Datos faltantes producen 503, sin documento parcial.
+La descarga predeterminada conserva Despachada/EnCurso del día operativo. GET /api/repartidor/rutas lista resúmenes propios paginados, y GET /api/repartidor/rutas/{rutaId}/hoja-de-ruta admite elegir una ruta propia abierta cuya fecha ya llegó. La ampliación usa IPlanificacionModuleApi, implementada internal en Application y protegida por el filtro Tenant. Planificada y Finalizada no se descargan como hoja activa. Las consultas de otros operadores y otros repartidores quedan fuera del alcance. Datos faltantes producen 503, sin documento parcial.
 
 ## Reglas de entrega
 
@@ -35,7 +35,7 @@ IReglasDeEntrega.ParaHojaAsync prepara la sustitución por CU-06. Esto no acredi
 
 ## Almacenamiento e identidad local
 
-IndexedDB logistica-repartidor-v1: espacios, claves y hojas. El espacio se identifica por usuario + operador + repartidor. Se conserva una hoja por espacio, no un historial de direcciones.
+IndexedDB logistica-repartidor-v1: espacios, claves y hojas (CU-51/54 agregan borradores, operaciones y recibos). El espacio se identifica por usuario + operador + repartidor. Desde Mis rutas se conserva una copia cifrada por ruta: al cambiar de selección se archiva la copia previa atómicamente y se mantiene su cola. Las copias ya existentes migran al elegir otra ruta sin borrar claves ni operaciones. El listado de tarjetas sólo se reconstruye sin red con las hojas que se descargaron en este dispositivo.
 
 El módulo JS cifra el documento con AES-GCM de 256 bits, IV aleatorio de 96 bits y etiqueta de 128 bits. La clave se guarda como CryptoKey no exportable; los identificadores, esquema, ruta y fecha se autentican como datos asociados. No hay contraseñas ni claves en texto/JWK, y no se usan localStorage o Cache Storage para documentos personales.
 

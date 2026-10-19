@@ -15,7 +15,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
     {
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
         return lista.Select(e => new EnvioParaCarga(e.Id, e.Estado.ToString(),
-            e.Bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray())).ToArray();
+            e.Bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray()) { Numero = e.Numero }).ToArray();
     }
 
     public async Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct)

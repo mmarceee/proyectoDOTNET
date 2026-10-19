@@ -1,6 +1,6 @@
 // CU-50: sólo este módulo persiste la hoja personal. Cache Storage guarda únicamente el shell.
 const DB = 'logistica-repartidor-v1';
-const STORES = ['espacios', 'claves', 'hojas', 'borradores', 'operaciones', 'instalacion'];
+const STORES = ['espacios', 'claves', 'hojas', 'borradores', 'operaciones', 'instalacion', 'recibos'];
 const listeners = new Set();
 const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('logistica-repartidor') : null;
 const encoder = new TextEncoder();
@@ -22,7 +22,7 @@ function identity(s) {
 }
 export function validarHoja(h) {
     identity({ ...h, verificadaEn: h?.generadaEn });
-    if (h.schemaVersion !== 1 || !guid(h.rutaId) || !Number.isSafeInteger(h.revisionRuta) || h.revisionRuta < 0
+    if (![1,2].includes(h.schemaVersion) || !guid(h.rutaId) || !Number.isSafeInteger(h.revisionRuta) || h.revisionRuta < 0
         || !date(h.fechaRuta) || !['Despachada', 'EnCurso'].includes(h.estadoRuta)
         || !guid(h.vehiculo?.id) || !text(h.vehiculo?.matricula)
         || !Array.isArray(h.zonas) || h.zonas.length === 0 || h.zonas.some(z => !guid(z.id) || !text(z.nombre) || !text(z.codigo))
@@ -54,12 +54,22 @@ export function validarHoja(h) {
             }
         }
     }
+    if (h.schemaVersion === 2) {
+        const declarables = new Set(['NoIntentado','IntentoFallido','CargaParcial']);
+        const situaciones = new Set([...declarables,'NoCargado','EntregadoEnCalle','Extraviado','Resuelto','Revisar']);
+        const manifiesto = new Map(h.paradas.flatMap(p => p.envios).flatMap(e => e.bultos.map(b => [b.id, { envio:e.id, codigo:b.codigo }])));
+        const lista = h.rendicion?.bultos;
+        if (!Array.isArray(lista) || lista.length !== bultos.size || new Set(lista.map(b => b.bultoId)).size !== bultos.size
+            || lista.some(b => manifiesto.get(b.bultoId)?.envio !== b.envioId || manifiesto.get(b.bultoId)?.codigo !== b.codigo
+                || !text(b.numeroEnvio) || !situaciones.has(b.situacion) || b.requiereDeclaracion !== declarables.has(b.situacion)))
+            throw new Error('La base de rendición está incompleta. Se conserva la hoja anterior.');
+    }
 }
 function open() {
     if (!globalThis.indexedDB || !globalThis.crypto?.subtle || !globalThis.isSecureContext)
         return Promise.reject(new Error('Este navegador necesita almacenamiento local y un contexto seguro para guardar la ruta.'));
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB, 2);
+        const request = indexedDB.open(DB, 3);
         request.onupgradeneeded = () => { for (const name of STORES) if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name); };
         request.onsuccess = () => { request.result.onversionchange = () => request.result.close(); resolve(request.result); };
         request.onerror = () => reject(request.error);
@@ -93,6 +103,7 @@ export async function activar(sesion) {
     try {
         const tx = db.transaction('espacios', 'readwrite'), done = completed(tx);
         tx.objectStore('espacios').put({ ...identidadLocal, token,
+            rutaSeleccionada: anterior && key(anterior) === key(sesion) ? anterior.rutaSeleccionada ?? null : null,
             sinRuta: anterior && key(anterior) === key(sesion) && anterior.fechaOperativa === sesion.fechaOperativa
                 ? anterior.sinRuta === true : false }, 'activo');
         await done;
@@ -143,8 +154,14 @@ export async function guardar(hoja, token) {
         const r = tx.objectStore('espacios').get('activo');
         r.onsuccess = () => {
             if (!r.result || r.result.token !== token || key(r.result) !== key(hoja)) { tx.abort(); return; }
-            tx.objectStore('hojas').put({ meta, iv, contenido, descargadaEn: new Date().toISOString() }, key(sesion));
-            tx.objectStore('espacios').put({ ...r.result, sinRuta: false }, 'activo');
+            const hojas = tx.objectStore('hojas'), anterior = hojas.get(key(sesion));
+            anterior.onsuccess = () => {
+                if (anterior.result && anterior.result.meta.rutaId !== hoja.rutaId)
+                    hojas.put(anterior.result, `${key(sesion)}:ruta:${anterior.result.meta.rutaId}`);
+                hojas.put({ meta, iv, contenido, descargadaEn: new Date().toISOString() }, key(sesion));
+                hojas.delete(`${key(sesion)}:ruta:${hoja.rutaId}`);
+                tx.objectStore('espacios').put({ ...r.result, rutaSeleccionada:hoja.rutaId, sinRuta:false }, 'activo');
+            };
         };
         await done;
     } finally { db.close(); }
@@ -162,10 +179,12 @@ export async function sinRuta(token) {
         await done;
     } finally { db.close(); }
 }
-export async function cargar() {
+export async function cargar(rutaId = null) {
     const sesion = await sesionLocal();
     if (!sesion) return null;
-    const guardada = await read('hojas', key(sesion));
+    const ruta = rutaId ?? sesion.rutaSeleccionada;
+    let guardada = await read('hojas', key(sesion));
+    if (ruta && guardada?.meta.rutaId !== ruta) guardada = await read('hojas', `${key(sesion)}:ruta:${ruta}`);
     if (!guardada) return null;
     const clave = await read('claves', key(sesion));
     if (!clave || guardada.meta.espacio !== key(sesion)) throw new Error('No se puede abrir esta copia de la ruta.');
@@ -177,7 +196,47 @@ export async function cargar() {
         throw new Error('La copia no pertenece a esta cuenta.');
     const actual = await sesionLocal();
     if (!actual || actual.token !== sesion.token) throw new Error('La sesión local cambió.');
-    return { hoja, descargadaEn: guardada.descargadaEn, sinRuta: actual.sinRuta === true };
+    return { hoja, descargadaEn: guardada.descargadaEn,
+        sinRuta: actual.sinRuta === true && (!actual.rutaSeleccionada || actual.rutaSeleccionada === hoja.rutaId) };
+}
+
+export async function seleccionarRuta(rutaId) {
+    if (!guid(rutaId)) throw new Error('La ruta no es válida.');
+    const s = await activo(), db = await open();
+    try {
+        const tx = db.transaction('espacios','readwrite'), done = completed(tx);
+        comprobarToken(tx.objectStore('espacios'),s,() => tx.objectStore('espacios')
+            .put({ ...s,rutaSeleccionada:rutaId,sinRuta:false,token:crypto.randomUUID() },'activo'),tx);
+        await done;
+    } finally { db.close(); }
+}
+export async function rutaSeleccionada() { return (await sesionLocal())?.rutaSeleccionada ?? null; }
+export async function rutasGuardadas() {
+    const s = await sesionLocal();
+    if (!s) return [];
+    const db = await open(); let filas;
+    try {
+        const tx = db.transaction('hojas','readonly'), done = completed(tx);
+        filas = await requestResult(tx.objectStore('hojas').getAll()); await done;
+    } finally { db.close(); }
+    const ids = [...new Set(filas.filter(f => f.meta.espacio === key(s)).map(f => f.meta.rutaId))];
+    return (await Promise.all(ids.map(id => cargar(id)))).filter(Boolean);
+}
+export async function estadosLocalesRutas() {
+    const s = await sesionLocal();
+    if (!s) return [];
+    const db = await open(); let filas;
+    try {
+        const tx = db.transaction('borradores','readonly'), done = completed(tx);
+        filas = await requestResult(tx.objectStore('borradores').getAll()); await done;
+    } finally { db.close(); }
+    const estados = [];
+    for (const f of filas.filter(f => f.meta.espacio === key(s))) {
+        const b = await descifrar(f,'borrador',f.meta.id,s);
+        estados.push({ rutaId:b.rutaId,tipo:b.tipoBorrador ?? 'carga',resultado:b.resultado });
+    }
+    if ((await activo()).token !== s.token) throw new Error('La sesión cambió.');
+    return estados;
 }
 
 // CU-51/52. Identificadores en claro para indexar; borrador y operación completos siempre cifrados.
@@ -201,7 +260,7 @@ async function activo() {
     if (!s) throw new Error('Iniciá sesión con conexión para acceder a la carga.');
     return s;
 }
-function draftKey(s, ruta) { return `${key(s)}:${ruta}`; }
+function draftKey(s, ruta, tipo = 'carga') { return `${key(s)}:${ruta}${tipo === 'rendicion' ? ':rendicion' : ''}`; }
 async function cifrar(tipo, id, valor, s) {
     const meta = { espacio: key(s), tipo, id }, iv = randomBytes(12);
     const clave = await encryptionKey(key(s));
@@ -227,13 +286,16 @@ function comprobarToken(store, s, fn, tx) {
     };
 }
 export async function borradorCarga(ruta) {
-    const s = await activo(), id = draftKey(s, ruta);
+    return leerBorrador(ruta, 'carga');
+}
+async function leerBorrador(ruta, tipo) {
+    const s = await activo(), id = draftKey(s, ruta, tipo);
     const valor = await descifrar(await read('borradores', id), 'borrador', id, s);
     if ((await activo()).token !== s.token) throw new Error('La sesión cambió.');
     return valor;
 }
 async function escribirBorrador(valor, esperado, s, operacion = null) {
-    const id = draftKey(s, valor.rutaId), registro = await cifrar('borrador', id, valor, s);
+    const id = draftKey(s, valor.rutaId, valor.tipoBorrador), registro = await cifrar('borrador', id, valor, s);
     const op = operacion ? await cifrar('operacion', operacion.operacionId, operacion, s) : null;
     const db = await open();
     try {
@@ -242,8 +304,14 @@ async function escribirBorrador(valor, esperado, s, operacion = null) {
             const store = tx.objectStore('borradores'), r = store.get(id);
             r.onsuccess = () => {
                 if ((r.result?.revision ?? 0) !== esperado) { tx.abort(); return; }
-                store.put({ ...registro, revision:valor.revision }, id);
-                if (op) tx.objectStore('operaciones').add({ ...op, estado:'Pendiente', secuencia:operacion.secuencia }, operacion.operacionId);
+                const escribir = () => {
+                    store.put({ ...registro, revision:valor.revision, bloqueaRuta:valor.tipoBorrador === 'rendicion' && !!valor.operacionId && valor.resultado !== 'Rechazada' }, id);
+                    if (op) tx.objectStore('operaciones').add({ ...op, estado:'Pendiente', secuencia:operacion.secuencia }, operacion.operacionId);
+                };
+                if (operacion?.tipo === 'ConfirmarCarga') {
+                    const rendicion = store.get(draftKey(s, valor.rutaId, 'rendicion'));
+                    rendicion.onsuccess = () => { if (rendicion.result?.bloqueaRuta) tx.abort(); else escribir(); };
+                } else escribir();
             };
         }, tx);
         try { await done; } catch { throw new Error('No se pudo guardar: la carga cambió en otra pestaña, cambió la sesión o no hay espacio. Actualizá para revisar.'); }
@@ -252,8 +320,9 @@ async function escribirBorrador(valor, esperado, s, operacion = null) {
 }
 export async function abrirCarga(ruta) {
     const s = await activo(), copia = await cargar();
-    if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta || copia.hoja.fechaRuta !== s.fechaOperativa)
-        throw new Error('Descargá la ruta del día antes de iniciar la carga.');
+    if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta || copia.hoja.fechaRuta > s.fechaOperativa)
+        throw new Error('Descargá una ruta asignada cuya fecha ya haya llegado antes de iniciar la carga.');
+    await exigirJornadaAbierta(ruta, copia);
     const anterior = await borradorCarga(ruta);
     if (anterior && (!anterior.resultado || anterior.resultado === 'Rechazada')) return anterior;
     if (anterior && anterior.revisionRuta === copia.hoja.revisionRuta) return anterior;
@@ -265,6 +334,7 @@ export async function abrirCarga(ruta) {
     return escribirBorrador(valor, anterior?.revision ?? 0, s);
 }
 export async function escanearCarga(ruta, revision, codigo) {
+    await exigirJornadaAbierta(ruta);
     codigo = codigo.trim();
     if (!codigo || codigo.length > 200) throw new Error('Ingresá un código de bulto válido.');
     const s = await activo(), actual = await borradorCarga(ruta);
@@ -288,6 +358,7 @@ async function instalacion() {
     } finally { db.close(); }
 }
 export async function confirmarCarga(ruta, revision, aceptaFaltantes) {
+    await exigirJornadaAbierta(ruta);
     const s = await activo(), actual = await borradorCarga(ruta), copia = await cargar();
     if (!actual || actual.operacionId || actual.revision !== revision || !actual.lecturas.length)
         throw new Error('Revisá el avance de carga antes de confirmar.');
@@ -303,14 +374,16 @@ export async function confirmarCarga(ruta, revision, aceptaFaltantes) {
         carga:{ revisionRuta:actual.revisionRuta, lecturas:actual.lecturas, aceptaFaltantes } };
     return escribirBorrador({ ...actual, revision:revision+1, operacionId:op.operacionId, resultado:'Pendiente' }, revision, s, op);
 }
-async function listaOperaciones(s) {
+async function listaOperaciones(s, todas = false) {
     const db = await open();
     try {
-        const tx = db.transaction('operaciones','readonly'), done = completed(tx);
+        const tx = db.transaction(todas ? ['operaciones','recibos'] : ['operaciones'],'readonly'), done = completed(tx);
         const filas = await requestResult(tx.objectStore('operaciones').getAll());
+        if (todas) filas.push(...await requestResult(tx.objectStore('recibos').getAll()));
         await done;
-        return filas.filter(r => r.meta.espacio === key(s) && ['Pendiente','Enviando'].includes(r.estado))
-            .sort((a,b) => a.secuencia-b.secuencia).slice(0,20);
+        const propias = filas.filter(r => r.meta.espacio === key(s) && (todas || ['Pendiente','Enviando'].includes(r.estado)))
+            .sort((a,b) => a.secuencia-b.secuencia);
+        return todas ? propias : propias.slice(0,20);
     } finally { db.close(); }
 }
 export async function pendientesCarga() {
@@ -319,21 +392,26 @@ export async function pendientesCarga() {
     return Promise.all((await listaOperaciones(s)).map(r => descifrar(r,'operacion',r.meta.id,s)));
 }
 async function aceptarResultado(op, respuesta, s) {
-    const id = draftKey(s, op.rutaId), anterior = await borradorCarga(op.rutaId);
+    const tipo = op.tipo === 'IniciarRendicion' ? 'rendicion' : 'carga';
+    const id = draftKey(s, op.rutaId, tipo), anterior = await leerBorrador(op.rutaId, tipo);
+    if (!['ConfirmarCarga','IniciarRendicion'].includes(op.tipo)) return aceptarSinBorrador(op, respuesta, s);
     if (!anterior || anterior.operacionId !== op.operacionId) throw new Error('La confirmación local cambió.');
     const aplicada = ['Aplicada','YaAplicada'].includes(respuesta.resultado);
     const valor = { ...anterior, revision:anterior.revision+1, resultado:aplicada ? 'Aplicada' : 'Rechazada',
         detalle:respuesta.motivo ?? respuesta.detalle ?? null };
-    const cifrada = await cifrar('borrador',id,valor,s), db = await open();
+    const cifrada = await cifrar('borrador',id,valor,s), recibo = aplicada ? await cifrar('operacion',op.operacionId,op,s) : null, db = await open();
     try {
-        const tx = db.transaction(['espacios','borradores','operaciones'],'readwrite'), done = completed(tx);
+        const tx = db.transaction(['espacios','borradores','operaciones','recibos'],'readwrite'), done = completed(tx);
         comprobarToken(tx.objectStore('espacios'),s,() => {
             const borradores = tx.objectStore('borradores'), actual = borradores.get(id);
             actual.onsuccess = () => {
                 if (actual.result?.revision !== anterior.revision) { tx.abort(); return; }
-                borradores.put({ ...cifrada, revision:valor.revision },id);
+                borradores.put({ ...cifrada, revision:valor.revision, bloqueaRuta:tipo === 'rendicion' && aplicada },id);
                 const store = tx.objectStore('operaciones');
-                if (aplicada) store.delete(op.operacionId);
+                if (aplicada) {
+                    tx.objectStore('recibos').put({ ...recibo, estado:'Aplicada', secuencia:op.secuencia },op.operacionId);
+                    store.delete(op.operacionId);
+                }
                 else {
                     const r = store.get(op.operacionId);
                     r.onsuccess = () => { if (r.result) store.put({ ...r.result, estado:'Rechazada', motivo:respuesta.motivo },op.operacionId); };
@@ -373,15 +451,27 @@ async function enviarPendientes() {
         await aceptarResultado(op,r,s);
         if (['Aplicada','YaAplicada'].includes(r.resultado)) aplicadas++;
     }
-    return { mensaje:aplicadas ? 'Carga confirmada por el servidor.' : 'Revisá el resultado de la carga.', aplicadas };
+    return { mensaje:aplicadas ? 'Operaciones confirmadas por el servidor.' : 'Revisá las operaciones rechazadas.', aplicadas };
 }
 export async function sincronizarCargas() {
     try {
+        const enviar = async () => {
+            let aplicadas = 0, mensaje = null;
+            for (let lote = 0; lote < 100; lote++) {
+                const s = await sesionLocal();
+                if (!s) break;
+                const antes = (await listaOperaciones(s)).map(r => r.meta.id).join(':');
+                if (!antes) break;
+                const r = await enviarPendientes(); aplicadas += r.aplicadas; mensaje = r.mensaje;
+                if ((await listaOperaciones(s)).map(r => r.meta.id).join(':') === antes) break;
+            }
+            return { mensaje, aplicadas };
+        };
         return globalThis.navigator?.locks
-            ? await navigator.locks.request('logistica-sincronizar-cargas', enviarPendientes) : await enviarPendientes();
+            ? await navigator.locks.request('logistica-sincronizar-cargas', enviar) : await enviar();
     } catch (e) {
         if (e instanceof TypeError || e.name === 'TimeoutError' || e.name === 'AbortError')
-            throw new Error('Sin conexión con el servidor. La carga quedó guardada y pendiente de sincronizar.');
+            throw new Error('Sin conexión con el servidor. La operación quedó guardada y pendiente de sincronizar.');
         throw e;
     }
 }
@@ -396,3 +486,107 @@ let cargaRef;
 function conexionRecuperada() { cargaRef?.invokeMethodAsync('Reconectar').catch(() => {}); }
 export function escucharConexion(ref) { cargaRef=ref; globalThis.addEventListener?.('online',conexionRecuperada); }
 export function dejarConexion() { globalThis.removeEventListener?.('online',conexionRecuperada); cargaRef=null; }
+
+// CU-54: mismo almacén cifrado y mismo transporte, con un borrador separado del de carga.
+export async function borradorRendicion(ruta) { return leerBorrador(ruta, 'rendicion'); }
+async function exigirJornadaAbierta(ruta, copia = null) {
+    const r = await borradorRendicion(ruta), h = copia ?? await cargar();
+    if (h?.hoja.rendicion?.iniciada || r?.operacionId && r.resultado !== 'Rechazada')
+        throw new Error('La ruta está en rendición. Ya no admite nuevas cargas.');
+}
+async function aceptarSinBorrador(op, respuesta, s) {
+    const aplicada = ['Aplicada','YaAplicada'].includes(respuesta.resultado);
+    const recibo = aplicada ? await cifrar('operacion',op.operacionId,op,s) : null, db = await open();
+    try {
+        const tx = db.transaction(['espacios','operaciones','recibos'],'readwrite'), done = completed(tx);
+        comprobarToken(tx.objectStore('espacios'),s,() => {
+            const store = tx.objectStore('operaciones'), r = store.get(op.operacionId);
+            r.onsuccess = () => {
+                if (!r.result) { tx.abort(); return; }
+                if (aplicada) {
+                    tx.objectStore('recibos').put({ ...recibo, estado:'Aplicada', secuencia:op.secuencia },op.operacionId);
+                    store.delete(op.operacionId);
+                } else store.put({ ...r.result, estado:'Rechazada', motivo:respuesta.motivo },op.operacionId);
+            };
+        },tx);
+        await done;
+    } finally { db.close(); }
+}
+async function baseRendicion(ruta) {
+    const s = await activo(), copia = await cargar();
+    if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta || !copia.hoja.rendicion)
+        throw new Error('Actualizá la hoja con conexión antes de preparar la rendición. La copia anterior sigue disponible.');
+    const h = copia.hoja, bultos = structuredClone(h.rendicion.bultos), envios = h.paradas.flatMap(p => p.envios);
+    if (h.rendicion.iniciada) return { bultos, dependencias:[], iniciada:h.rendicion.iniciada };
+    let enCurso = h.estadoRuta === 'EnCurso';
+    const dependencias = [], filas = await listaOperaciones(s, true);
+    for (const fila of filas) {
+        const op = await descifrar(fila, 'operacion', fila.meta.id, s);
+        if (op.rutaId !== ruta || !['ConfirmarCarga','RegistrarEntrega','RegistrarIntentoFallido'].includes(op.tipo)) continue;
+        if (fila.estado === 'Rechazada') throw new Error('Revisá las operaciones rechazadas de la ruta antes de rendir.');
+        dependencias.push(op.operacionId);
+        if (op.tipo === 'ConfirmarCarga') {
+            const leidos = new Set(op.carga.lecturas.map(l => l.codigoBulto));
+            for (const envio of envios) {
+                const completos = envio.bultos.every(b => leidos.has(b.codigo));
+                for (const b of bultos.filter(b => b.envioId === envio.id)) {
+                    if (b.situacion !== 'NoCargado' && b.situacion !== 'CargaParcial') continue;
+                    if (completos) { b.situacion = 'NoIntentado'; b.requiereDeclaracion = true; enCurso = true; }
+                    else if (leidos.has(b.codigo)) { b.situacion = 'CargaParcial'; b.requiereDeclaracion = true; }
+                }
+            }
+        } else if (['RegistrarEntrega','RegistrarIntentoFallido'].includes(op.tipo)) {
+            for (const b of bultos.filter(b => b.envioId === op.envioId)) {
+                b.situacion = op.tipo === 'RegistrarEntrega' ? 'EntregadoEnCalle' : 'IntentoFallido';
+                b.requiereDeclaracion = op.tipo !== 'RegistrarEntrega';
+            }
+        }
+    }
+    if (!enCurso) throw new Error('La ruta debe estar en curso antes de iniciar la rendición.');
+    if (bultos.some(b => b.situacion === 'Revisar')) throw new Error('Hay envíos que requieren revisión antes de rendir. Actualizá la hoja.');
+    return { bultos, dependencias, iniciada:h.rendicion.iniciada };
+}
+export async function abrirRendicion(ruta, revisar = false) {
+    const s = await activo(), anterior = await borradorRendicion(ruta);
+    const iniciada = (await cargar())?.hoja.rendicion?.iniciada;
+    if (anterior && !revisar && (!iniciada || anterior.resultado === 'Aplicada')) return anterior;
+    if (revisar && anterior?.operacionId && anterior.resultado !== 'Rechazada') throw new Error('Esta rendición no admite cambios.');
+    const base = await baseRendicion(ruta);
+    const recibidas = new Map(base.iniciada?.lineas.map(l => [l.bultoId, l]) ?? []);
+    const valor = { tipoBorrador:'rendicion', rutaId:ruta, revision:(anterior?.revision ?? 0)+1,
+        bultos:base.bultos.map(b => ({ ...b, devuelve:recibidas.get(b.bultoId)?.declarada ?? (b.requiereDeclaracion ? null : false),
+            observacion:recibidas.get(b.bultoId)?.observacion ?? null })), dependencias:base.dependencias,
+        observaciones:base.iniciada?.observaciones ?? null, operacionId:base.iniciada?.id ?? null,
+        resultado:base.iniciada ? 'Aplicada' : null, detalle:null };
+    return escribirBorrador(valor, anterior?.revision ?? 0, s);
+}
+export async function declararBulto(ruta, revision, id, devuelve, observacion) {
+    const s = await activo(), actual = await borradorRendicion(ruta);
+    if (!actual || actual.revision !== revision || actual.operacionId || !actual.bultos.some(b => b.bultoId === id && b.requiereDeclaracion)
+        || typeof devuelve !== 'boolean' || (observacion?.length ?? 0) > 1000)
+        throw new Error('La rendición cambió o los datos no son válidos. Actualizá para revisar.');
+    return escribirBorrador({ ...actual, revision:revision+1, bultos:actual.bultos.map(b => b.bultoId === id
+        ? { ...b, devuelve, observacion:observacion?.trim() || null } : b) }, revision, s);
+}
+export async function observarRendicion(ruta, revision, observaciones) {
+    const s = await activo(), actual = await borradorRendicion(ruta);
+    if (!actual || actual.revision !== revision || actual.operacionId || (observaciones?.length ?? 0) > 2000)
+        throw new Error('No se puede modificar esta rendición.');
+    return escribirBorrador({ ...actual, revision:revision+1, observaciones:observaciones?.trim() || null }, revision, s);
+}
+export async function confirmarRendicion(ruta, revision) {
+    const s = await activo(), actual = await borradorRendicion(ruta), base = await baseRendicion(ruta);
+    if (!actual || actual.revision !== revision || actual.operacionId || base.iniciada)
+        throw new Error('Esta rendición ya fue confirmada o cambió en otra pestaña.');
+    const vigentes = new Map(base.bultos.map(b => [b.bultoId, b.situacion]));
+    if (actual.bultos.length !== vigentes.size || actual.bultos.some(b => vigentes.get(b.bultoId) !== b.situacion))
+        throw new Error('Cambió la ejecución de la ruta. Volvé a abrir la rendición para revisar las declaraciones.');
+    if (actual.bultos.some(b => b.requiereDeclaracion && (typeof b.devuelve !== 'boolean' || !b.devuelve && !b.observacion?.trim())))
+        throw new Error('Indicá qué bultos devolvés y explicá los que no vuelven.');
+    const dispositivo = await instalacion();
+    const op = { ...dispositivo, operacionId:uuidv7(), tipo:'IniciarRendicion', rutaId:ruta, envioId:null,
+        ocurridoEn:new Date().toISOString(), latitud:null, longitud:null, correlacionId:traceparent(),
+        rendicion:{ bultos:actual.bultos.map(b => ({ bultoId:b.bultoId, situacion:b.situacion, devuelve:b.devuelve, observacion:b.observacion })),
+            dependencias:base.dependencias, observaciones:actual.observaciones } };
+    return escribirBorrador({ ...actual, revision:revision+1, operacionId:op.operacionId, resultado:'Pendiente' }, revision, s, op);
+}

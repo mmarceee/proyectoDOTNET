@@ -10,7 +10,8 @@ internal sealed class HojaIncompletaException() : Exception("No se pudo construi
 internal sealed class VinculoRepartidorInvalidoException() : Exception("La cuenta no está vinculada a un repartidor activo.");
 
 internal sealed class DescargarHojaDeRutaHandler(IConsultaConsistente lectura, IContextoHojaRuta administracion,
-    IHojaRutaPlanificacion planificacion, IEnviosHojaRuta envios, TimeProvider reloj)
+    IHojaRutaPlanificacion planificacion, IEnviosHojaRuta envios, TimeProvider reloj,
+    IniciarRendicion.PrepararRendicion rendiciones, IPlanificacionModuleApi rutas)
 {
     public Task<SesionRepartidorResponse> SesionAsync(Guid usuario, Guid repartidor, CancellationToken ct)
         => lectura.LeerAsync(async () =>
@@ -20,14 +21,15 @@ internal sealed class DescargarHojaDeRutaHandler(IConsultaConsistente lectura, I
             return CrearSesion(usuario, repartidor, contexto);
         }, ct);
 
-    public Task<HojaDeRutaResponse?> HandleAsync(Guid usuario, Guid repartidor, CancellationToken ct)
+    public Task<HojaDeRutaResponse?> HandleAsync(Guid usuario, Guid repartidor, CancellationToken ct, Guid? rutaId = null)
         => lectura.LeerAsync<HojaDeRutaResponse?>(async () =>
         {
             var contexto = await administracion.ConsultarAsync(usuario, repartidor, null, ct)
                 ?? throw new VinculoRepartidorInvalidoException();
             var sesion = CrearSesion(usuario, repartidor, contexto);
-            var ruta = await planificacion.ConsultarAsync(repartidor, sesion.FechaOperativa, ct);
-            if (ruta is null) return null;
+            var ruta = rutaId is Guid id ? await rutas.ConsultarHojaAsync(id, repartidor, ct)
+                : await planificacion.ConsultarAsync(repartidor, sesion.FechaOperativa, ct);
+            if (ruta is null || ruta.Fecha > sesion.FechaOperativa) return null;
             contexto = await administracion.ConsultarAsync(usuario, repartidor, ruta.VehiculoId, ct)
                 ?? throw new VinculoRepartidorInvalidoException();
             if (string.IsNullOrWhiteSpace(contexto.Matricula) || ruta.Paradas.Count == 0) throw new HojaIncompletaException();
@@ -74,9 +76,10 @@ internal sealed class DescargarHojaDeRutaHandler(IConsultaConsistente lectura, I
             }
             var paradas = ruta.Paradas.OrderBy(p => p.Orden).Select(p => new ParadaHojaResponse(p.Id, p.Orden, p.Estado,
                 p.Direccion, p.Desde, p.Hasta, p.Envios.Select(id => Mapear(porId[id])).ToArray())).ToArray();
-            return new(1, usuario, contexto.OperadorId, repartidor, ruta.Id, ruta.Revision, ruta.Fecha, sesion.FechaOperativa,
+            return new HojaDeRutaResponse(2, usuario, contexto.OperadorId, repartidor, ruta.Id, ruta.Revision, ruta.Fecha, sesion.FechaOperativa,
                 contexto.ZonaHoraria, ruta.Estado, reloj.GetUtcNow(), new(ruta.VehiculoId, contexto.Matricula),
-                zonas.Values.OrderBy(z => z.Nombre).ToArray(), paradas);
+                zonas.Values.OrderBy(z => z.Nombre).ToArray(), paradas)
+            { Rendicion = await rendiciones.ConsultarAsync(ruta.Id, ids, ct) };
         }, ct);
 
     private SesionRepartidorResponse CrearSesion(Guid usuario, Guid repartidor, ContextoHojaRuta contexto)

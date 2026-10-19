@@ -29,6 +29,188 @@ function hoja(n = 1) {
             }] }]
     };
 }
+function hoja54(situacion = 'NoIntentado') {
+    const h = hoja(); h.schemaVersion = 2; h.estadoRuta = 'EnCurso';
+    h.paradas[0].envios[0].estado = situacion === 'EntregadoEnCalle' ? 'Entregado' : situacion === 'NoCargado' ? 'AsignadoARuta' : 'EnTransito';
+    h.rendicion = { iniciada:null, bultos:h.paradas.flatMap(p => p.envios).flatMap(e => e.bultos.map(b => ({
+        envioId:e.id, numeroEnvio:e.numero, bultoId:b.id, codigo:b.codigo, situacion,
+        requiereDeclaracion:['NoIntentado','IntentoFallido','CargaParcial'].includes(situacion)
+    }))) };
+    return h;
+}
+
+test('Mis rutas conserva hojas y cargas separadas al alternar rutas, incluso de días anteriores', async () => {
+    let token = await store.activar(sesion());
+    const primera = hoja(); primera.fechaRuta = '2026-10-15';
+    await store.guardar(primera,token);
+    let carga = await store.abrirCarga(primera.rutaId);
+    carga = await store.escanearCarga(primera.rutaId,carga.revision,'ENV-001-1');
+    await store.confirmarCarga(primera.rutaId,carga.revision,false);
+    const [operacion] = await store.pendientesCarga();
+    const segunda = hoja(); segunda.rutaId = id(30);
+    await store.guardar(segunda,token);
+    assert.equal((await store.rutasGuardadas()).length,2);
+    assert.equal((await store.cargar()).hoja.rutaId,segunda.rutaId);
+    await store.seleccionarRuta(primera.rutaId);
+    assert.equal((await store.cargar()).hoja.fechaRuta,'2026-10-15');
+    assert.equal((await store.abrirCarga(primera.rutaId)).resultado,'Pendiente');
+    assert.deepEqual((await store.pendientesCarga())[0],operacion);
+    assert.deepEqual(await store.estadosLocalesRutas(),[{rutaId:primera.rutaId,tipo:'carga',resultado:'Pendiente'}]);
+    await assert.rejects(store.guardar(segunda,token),/sesión/);
+    token = await store.activar(sesion());
+    await store.sinRuta(token);
+    assert.equal((await store.cargar()).sinRuta,true);
+    assert.equal((await store.cargar(segunda.rutaId)).sinRuta,false);
+    await store.seleccionarRuta(segunda.rutaId);
+    assert.equal((await store.cargar()).hoja.rutaId,segunda.rutaId);
+    await store.bloquear(); await store.activar(sesion(20));
+    assert.equal(await store.rutaSeleccionada(),null);
+    assert.deepEqual(await store.rutasGuardadas(),[]);
+    assert.deepEqual(await store.estadosLocalesRutas(),[]);
+});
+
+test('Mis rutas no habilita carga futura y actualizar una copia no duplica el archivo', async () => {
+    const token = await store.activar(sesion());
+    const futura = hoja(); futura.fechaRuta = '2026-10-18';
+    await store.guardar(futura,token);
+    await assert.rejects(store.abrirCarga(futura.rutaId));
+    const otra = hoja(); otra.rutaId = id(30);
+    await store.guardar(otra,token);
+    await store.guardar(futura,token);
+    const copias = await store.rutasGuardadas();
+    assert.equal(copias.length,2);
+    assert.equal(copias.filter(c => c.hoja.rutaId === futura.rutaId).length,1);
+    assert.equal((await registros('hojas')).length,2);
+    assert.equal(JSON.stringify(await registros('hojas')).includes('Nombre privado'),false);
+});
+
+test('CU-54 declara por bulto, exige observación, cifra y conserva la misma operación hasta el ack', async () => {
+    const token = await store.activar(sesion()), h = hoja54(); await store.guardar(h,token);
+    let b = await store.abrirRendicion(h.rutaId);
+    await assert.rejects(store.confirmarRendicion(h.rutaId,b.revision), /Indicá/);
+    b = await store.declararBulto(h.rutaId,b.revision,id(15),false,null);
+    await assert.rejects(store.confirmarRendicion(h.rutaId,b.revision), /explicá/);
+    b = await store.declararBulto(h.rutaId,b.revision,id(15),false,'Observación privada de regreso');
+    b = await store.confirmarRendicion(h.rutaId,b.revision);
+    const [op] = await store.pendientesCarga();
+    assert.equal(op.tipo,'IniciarRendicion'); assert.equal(op.envioId,null);
+    assert.match(op.operacionId,/^[0-9a-f-]{14}7/); assert.match(op.correlacionId,/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+    assert.equal(b.resultado,'Pendiente');
+    assert.equal(JSON.stringify(await registros('borradores')).includes('Observación privada'),false);
+    await assert.rejects(store.declararBulto(h.rutaId,b.revision,id(15),true,null));
+    await assert.rejects(store.abrirCarga(h.rutaId),/rendición/);
+    const anterior = globalThis.fetch;
+    try {
+        globalThis.fetch = async () => { throw new TypeError('Sin red'); };
+        await assert.rejects(store.sincronizarCargas(),/guardada/);
+        assert.deepEqual((await store.pendientesCarga())[0],op);
+        globalThis.fetch = async (_,request) => {
+            assert.deepEqual(JSON.parse(request.body).operaciones,[op]);
+            return { ok:true, json:async () => ({ resultados:[{ operacionId:op.operacionId,resultado:'Aplicada' }] }) };
+        };
+        await store.sincronizarCargas();
+        assert.equal((await store.borradorRendicion(h.rutaId)).resultado,'Aplicada');
+        assert.equal((await store.pendientesCarga()).length,0);
+        assert.equal((await registros('recibos')).length,1);
+        assert.equal(JSON.stringify(await registros('recibos')).includes('Observación privada'),false);
+    } finally { globalThis.fetch = anterior; }
+});
+
+test('CU-54 permite rendición sin devoluciones y recupera el borrador separado de la carga', async () => {
+    const token = await store.activar(sesion()), h = hoja54('EntregadoEnCalle'); await store.guardar(h,token);
+    const b = await store.abrirRendicion(h.rutaId);
+    assert.equal(b.bultos[0].requiereDeclaracion,false);
+    const confirmada = await store.confirmarRendicion(h.rutaId,b.revision);
+    assert.equal(confirmada.resultado,'Pendiente');
+    assert.equal(await store.borradorCarga(h.rutaId),null);
+    assert.deepEqual(await store.abrirRendicion(h.rutaId),confirmada);
+});
+
+test('CU-54 una carga pendiente se proyecta antes de rendir y ambas se envían en orden', async () => {
+    const token = await store.activar(sesion()), h = hoja54('NoCargado'); h.estadoRuta = 'Despachada'; await store.guardar(h,token);
+    let carga = await store.abrirCarga(h.rutaId);
+    carga = await store.escanearCarga(h.rutaId,carga.revision,'ENV-001-1');
+    carga = await store.confirmarCarga(h.rutaId,carga.revision,false);
+    let r = await store.abrirRendicion(h.rutaId);
+    assert.equal(r.bultos[0].situacion,'NoIntentado');
+    r = await store.declararBulto(h.rutaId,r.revision,id(15),true,null);
+    await store.confirmarRendicion(h.rutaId,r.revision);
+    const anterior = globalThis.fetch;
+    try {
+        globalThis.fetch = async (_,request) => {
+            const ops = JSON.parse(request.body).operaciones;
+            assert.deepEqual(ops.map(o => o.tipo),['ConfirmarCarga','IniciarRendicion']);
+            assert.deepEqual(ops[1].rendicion.dependencias,[ops[0].operacionId]);
+            assert.notEqual(ops[0].correlacionId,ops[1].correlacionId);
+            return { ok:true,json:async () => ({ resultados:ops.map(o => ({ operacionId:o.operacionId,resultado:'Aplicada' })) }) };
+        };
+        await store.sincronizarCargas();
+        assert.equal((await store.borradorRendicion(h.rutaId)).resultado,'Aplicada');
+        assert.equal((await store.borradorCarga(h.rutaId)).resultado,'Aplicada');
+    } finally { globalThis.fetch = anterior; }
+});
+
+test('CU-54 sincronización drena más de un lote y deja la rendición después de sus dependencias', async () => {
+    const token = await store.activar(sesion()); let h;
+    for (let i = 0; i < 21; i++) {
+        h = hoja54('NoCargado'); h.rutaId = id(100+i); h.estadoRuta = 'Despachada'; await store.guardar(h,token);
+        let carga = await store.abrirCarga(h.rutaId);
+        carga = await store.escanearCarga(h.rutaId,carga.revision,'ENV-001-1');
+        await store.confirmarCarga(h.rutaId,carga.revision,false);
+    }
+    let r = await store.abrirRendicion(h.rutaId);
+    r = await store.declararBulto(h.rutaId,r.revision,id(15),true,null);
+    await store.confirmarRendicion(h.rutaId,r.revision);
+    const anterior = globalThis.fetch, lotes = [];
+    try {
+        globalThis.fetch = async (_,request) => {
+            const ops = JSON.parse(request.body).operaciones; lotes.push(ops);
+            if (lotes.length === 2) throw new TypeError('Corte después del primer lote');
+            return { ok:true,json:async () => ({ resultados:ops.map(o => ({ operacionId:o.operacionId,resultado:'Aplicada' })) }) };
+        };
+        await assert.rejects(store.sincronizarCargas(),/guardada/);
+        assert.equal((await store.pendientesCarga()).length,2);
+        assert.equal((await registros('recibos')).length,20);
+        await store.sincronizarCargas();
+        assert.deepEqual(lotes.map(l => l.length),[20,2,2]);
+        assert.deepEqual(lotes[1],lotes[2]);
+        assert.equal(lotes[1][1].tipo,'IniciarRendicion');
+        assert.deepEqual(lotes[1][1].rendicion.dependencias,[lotes[1][0].operacionId]);
+        assert.equal((await store.pendientesCarga()).length,0);
+    } finally { globalThis.fetch = anterior; }
+});
+
+test('CU-54 una escritura abortada y dos pestañas no pierden la declaración anterior', async () => {
+    const token = await store.activar(sesion()), h = hoja54(); await store.guardar(h,token);
+    const base = await store.abrirRendicion(h.rutaId);
+    const cambios = await Promise.allSettled([
+        store.declararBulto(h.rutaId,base.revision,id(15),true,null),
+        store.declararBulto(h.rutaId,base.revision,id(15),false,'No vuelve')
+    ]);
+    assert.equal(cambios.filter(c => c.status === 'fulfilled').length,1);
+    let r = await store.borradorRendicion(h.rutaId);
+    r = await store.declararBulto(h.rutaId,r.revision,id(15),true,null);
+    const add = IDBObjectStore.prototype.add;
+    try {
+        IDBObjectStore.prototype.add = function(...args) { if (this.name === 'operaciones') this.transaction.abort(); return add.apply(this,args); };
+        await assert.rejects(store.confirmarRendicion(h.rutaId,r.revision));
+    } finally { IDBObjectStore.prototype.add = add; }
+    assert.deepEqual(await store.borradorRendicion(h.rutaId),r);
+    assert.equal((await store.pendientesCarga()).length,0);
+});
+
+test('CU-54 no inicia con una copia antigua sin base de rendición ni expone datos al cambiar cuenta', async () => {
+    const token = await store.activar(sesion()); await store.guardar(hoja(),token);
+    await assert.rejects(store.abrirRendicion(id(10)),/Actualizá/);
+    await store.guardar(hoja54(),token); let r = await store.abrirRendicion(id(10));
+    r = await store.declararBulto(id(10),r.revision,id(15),true,null);
+    await store.confirmarRendicion(id(10),r.revision);
+    await store.bloquear(); await store.activar(sesion(20));
+    assert.equal(await store.borradorRendicion(id(10)),null);
+    assert.equal((await store.pendientesCarga()).length,0);
+    await store.activar(sesion());
+    assert.equal((await store.borradorRendicion(id(10))).resultado,'Pendiente');
+});
 async function db() {
     return new Promise((resolve, reject) => {
         const r = indexedDB.open('logistica-repartidor-v1');
@@ -43,6 +225,50 @@ async function registros(nombre) {
             r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
         });
     } finally { conexion.close(); }
+}
+
+// Fixture: una operación en calle que guardaría su pantalla, usando el formato cifrado compartido de CU-52.
+async function encolarEnCalle(op) {
+    const s = sesion(), espacio = [s.usuarioId,s.operadorId,s.repartidorId].join(':');
+    const meta = { espacio,tipo:'operacion',id:op.operacionId }, iv = crypto.getRandomValues(new Uint8Array(12));
+    const clave = (await registros('claves'))[0];
+    const contenido = await crypto.subtle.encrypt({ name:'AES-GCM',iv,additionalData:new TextEncoder().encode(JSON.stringify(meta)) },
+        clave,new TextEncoder().encode(JSON.stringify(op)));
+    const conexion = await db();
+    try {
+        await new Promise((resolve,reject) => {
+            const tx = conexion.transaction(['operaciones','instalacion'],'readwrite');
+            tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error);
+            tx.objectStore('operaciones').add({ meta,iv,contenido,estado:'Pendiente',secuencia:op.secuencia },op.operacionId);
+            tx.objectStore('instalacion').put({ dispositivoId:op.dispositivoId,secuencia:op.secuencia },'actual');
+        });
+    } finally { conexion.close(); }
+}
+
+for (const tipo of ['RegistrarEntrega','RegistrarIntentoFallido']) {
+    test(`CU-54 proyecta ${tipo} pendiente y confirma la rendición después sin requerir un borrador de carga`, async () => {
+        const token = await store.activar(sesion()), h = hoja54(); await store.guardar(h,token);
+        const op = { operacionId:store.uuidv7(),dispositivoId:id(90),secuencia:1,tipo,rutaId:h.rutaId,envioId:id(14),
+            ocurridoEn:new Date().toISOString(),latitud:-34.9,longitud:-56.1,correlacionId:store.traceparent() };
+        await encolarEnCalle(op);
+        let r = await store.abrirRendicion(h.rutaId);
+        assert.equal(r.bultos[0].situacion,tipo === 'RegistrarEntrega' ? 'EntregadoEnCalle' : 'IntentoFallido');
+        if (tipo === 'RegistrarIntentoFallido') r = await store.declararBulto(h.rutaId,r.revision,id(15),true,null);
+        await store.confirmarRendicion(h.rutaId,r.revision);
+        const anterior = globalThis.fetch;
+        try {
+            globalThis.fetch = async (_,request) => {
+                const ops = JSON.parse(request.body).operaciones;
+                assert.deepEqual(ops.map(o => o.tipo),[tipo,'IniciarRendicion']);
+                assert.deepEqual(ops[1].rendicion.dependencias,[op.operacionId]);
+                return { ok:true,json:async () => ({ resultados:ops.map(o => ({ operacionId:o.operacionId,resultado:'Aplicada' })) }) };
+            };
+            await store.sincronizarCargas();
+            assert.equal((await store.borradorRendicion(h.rutaId)).resultado,'Aplicada');
+            assert.equal((await registros('operaciones')).length,0);
+            assert.equal((await registros('recibos')).length,2);
+        } finally { globalThis.fetch = anterior; }
+    });
 }
 test('guarda, cifra y recupera la hoja sin información personal en claro', async () => {
     const token = await store.activar(sesion());

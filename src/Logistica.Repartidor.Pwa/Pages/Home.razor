@@ -1,107 +1,86 @@
-﻿@page "/"
-
-@using System.Net
+@page "/"
+@using Logistica.Repartidor.Pwa.Services
 @using Logistica.Http.Contracts.Repartidor
-@inject HttpClient Http
-@inject NavigationManager Navigation
+@implements IDisposable
+@inject MisRutasService MisRutas
+@inject CargaService Cola
 
-<PageTitle>Avisos de rutas</PageTitle>
-
+<PageTitle>Mis rutas</PageTitle>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-    <div>
-        <h1>Avisos de rutas</h1>
-        <p class="text-muted mb-0">Consultá las rutas que te asignaron y ya fueron despachadas.</p>
-    </div>
-    <button class="btn btn-primary" @onclick="ActualizarAsync" disabled="@cargando">Actualizar</button>
+    <div><h1>Mis rutas</h1><p class="text-muted mb-0">Elegí una ruta para ver su hoja, cargar el vehículo o terminar tu recorrido.</p></div>
+    <button class="btn btn-primary" @onclick="Actualizar" disabled="@MisRutas.Cargando">Actualizar rutas</button>
 </div>
-
-@if (cargando)
+@if (MisRutas.Cargando) { <p role="status">Consultando tus rutas…</p> }
+@if (MisRutas.Error is not null) { <div class="alert alert-warning" role="alert">@MisRutas.Error</div> }
+@if (MisRutas.RequiereIngreso) { <a class="btn btn-primary" href="/repartidor/ingresar">Iniciar sesión</a> }
+else
 {
-    <p role="status">Consultando tus avisos…</p>
-}
-@if (error is not null)
-{
-    <div class="alert alert-warning" role="alert">@error</div>
-}
-@if (!cargando && error is null && avisos.Count == 0)
-{
-    <div class="card"><div class="card-body">
-        <h2 class="h5">@(pagina == 1 ? "Todavía no tenés avisos" : "No hay más avisos")</h2>
-        <p class="mb-0">@(pagina == 1 ? "Cuando despachen una ruta para vos, el aviso aparecerá aquí. Usá Actualizar para consultar las novedades." : "Volvé a las páginas anteriores para consultar los avisos más recientes.")</p>
-    </div></div>
-}
-@foreach (var aviso in avisos)
-{
-    <section class="card mb-3" aria-label="Ruta despachada">
-        <div class="card-body">
-            <span class="badge text-bg-success mb-2">Planificación cerrada</span>
-            <h2 class="h4">Ruta del @aviso.FechaRuta.ToString("dd/MM/yyyy")</h2>
-            <p>Tenés una ruta despachada para esta fecha. El despachador cerró su planificación.</p>
-            @if (aviso.FechaRuta == fechaOperativa) {
-                <p><a class="btn btn-outline-primary" href="hoja-de-ruta">Ver mi ruta</a></p>
-            }
-            <dl class="row mb-0">
-                <dt class="col-md-4">Despachada</dt><dd class="col-md-8">@aviso.DespachadaEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd>
-            </dl>
-        </div>
-    </section>
-}
-@if (avisos.Count == 20 || pagina > 1)
-{
-    <nav aria-label="Páginas de avisos" class="d-flex align-items-center gap-3 my-3">
-        <button class="btn btn-outline-secondary" @onclick="AnteriorAsync" disabled="@(cargando || pagina == 1)">Más recientes</button>
-        <span>Página @pagina</span>
-        <button class="btn btn-outline-secondary" @onclick="SiguienteAsync" disabled="@(cargando || avisos.Count < 20)">Más antiguos</button>
-    </nav>
-}
-@if (consultadoEn is not null)
-{
-    <p class="text-muted small" role="status">Última consulta: @consultadoEn.Value.ToString("dd/MM/yyyy HH:mm").</p>
-}
-
-@code {
-    private List<AvisoRutaResponse> avisos = [];
-    private bool cargando;
-    private string? error;
-    private int pagina = 1;
-    private DateTimeOffset? consultadoEn;
-    private DateOnly? fechaOperativa;
-
-    protected override Task OnInitializedAsync() => CargarAsync();
-    private async Task ActualizarAsync() { pagina = 1; await CargarAsync(); }
-    private async Task AnteriorAsync() { pagina--; await CargarAsync(); }
-    private async Task SiguienteAsync() { pagina++; await CargarAsync(); }
-
-    private async Task CargarAsync()
+    @if (!MisRutas.Cargando && MisRutas.Rutas.Count == 0 && MisRutas.Error is null)
     {
-        cargando = true;
-        error = null;
-        avisos = [];
-        try
-        {
-            fechaOperativa = null;
-            using var sesion = await Http.GetAsync("/api/repartidor/sesion");
-            if (sesion.IsSuccessStatusCode)
-                fechaOperativa = (await sesion.Content.ReadFromJsonAsync<SesionRepartidorResponse>())?.FechaOperativa;
-            using var response = await Http.GetAsync($"/api/repartidor/avisos?pagina={pagina}");
-            if (response.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                Navigation.NavigateTo("/repartidor/ingresar", forceLoad: true);
-                return;
-            }
-            if (response.StatusCode == HttpStatusCode.Forbidden)
-            {
-                error = "Tu sesión no tiene acceso a los avisos de un repartidor. Iniciá sesión con tu cuenta de repartidor.";
-                return;
-            }
-            response.EnsureSuccessStatusCode();
-            avisos = await response.Content.ReadFromJsonAsync<List<AvisoRutaResponse>>() ?? [];
-            consultadoEn = DateTimeOffset.Now;
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
-        {
-            error = "No pudimos consultar tus avisos. Comprobá la conexión y volvé a intentarlo con Actualizar.";
-        }
-        finally { cargando = false; }
+        <div class="card"><div class="card-body"><h2 class="h5">@(pagina == 1 ? "No tenés rutas pendientes" : "No hay más rutas")</h2>
+            <p class="mb-0">Cuando despacho te asigne y despache una ruta, aparecerá aquí.</p></div></div>
     }
+    @foreach (var ruta in MisRutas.Rutas)
+    {
+        var rendicion = MisRutas.EstadosLocales.LastOrDefault(e => e.RutaId == ruta.RutaId && e.Tipo == "rendicion")?.Resultado;
+        var carga = MisRutas.EstadosLocales.LastOrDefault(e => e.RutaId == ruta.RutaId && e.Tipo == "carga")?.Resultado;
+        var cerrada = ruta.Estado == "Finalizada" || ruta.RendicionCerrada;
+        var pendiente = rendicion == "Pendiente";
+        var esperaDeposito = ruta.RendicionIniciada || rendicion == "Aplicada";
+        var futura = ruta.FechaRuta > MisRutas.FechaOperativa;
+        var activa = !cerrada && (ruta.Estado is "Despachada" or "EnCurso") && !futura;
+        <section class="card mb-3" @key="ruta.RutaId" aria-label="@($"Ruta del {ruta.FechaRuta:dd/MM/yyyy}")">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <h2 class="h4 mb-0">Ruta del @ruta.FechaRuta.ToString("dd/MM/yyyy")</h2>
+                    <span class="badge @(cerrada ? "text-bg-secondary" : pendiente ? "text-bg-warning" : esperaDeposito ? "text-bg-info" : "text-bg-primary")">
+                        @(cerrada ? "Finalizada" : pendiente ? "Pendiente de sincronizar" : esperaDeposito ? "Pendiente de depósito" : futura ? "Próxima ruta" : ruta.Estado == "EnCurso" ? "En curso" : ruta.Estado == "Despachada" ? "Pendiente de carga" : "Copia anterior")
+                    </span>
+                </div>
+                <p class="text-muted mb-2">Vehículo @(ruta.Matricula ?? "sin información") · @ruta.Envios @(ruta.Envios == 1 ? "envío" : "envíos") · @ruta.Paradas @(ruta.Paradas == 1 ? "parada" : "paradas")</p>
+                @if (cerrada) { <p>Depósito completó el cierre de esta ruta.</p> }
+                else if (pendiente) { <p>Tu declaración está guardada en este dispositivo. Falta enviarla al servidor.</p> }
+                else if (esperaDeposito) { <p>Tu declaración está confirmada. Esperando recepción del depósito. Tu recorrido en esta ruta terminó.</p> }
+                else if (futura) { <p>Podrás comenzar cuando llegue la fecha de esta ruta.</p> }
+                else if (activa && ruta.FechaRuta < MisRutas.FechaOperativa) { <p class="text-warning">Pendiente desde el @ruta.FechaRuta.ToString("dd/MM/yyyy"). Podés continuar y rendir esta ruta aunque sea de otro día.</p> }
+                @if (activa)
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (pendiente || esperaDeposito)
+                        {
+                            <a class="btn btn-outline-primary" href="@Enlace("rendicion", ruta.RutaId)">Ver declaración</a>
+                            @if (pendiente) { <button class="btn btn-primary" @onclick="Sincronizar" disabled="@(Cola.Ocupado || MisRutas.Cargando)">Sincronizar</button> }
+                        }
+                        else
+                        {
+                            <a class="btn btn-outline-primary" href="@Enlace("hoja-de-ruta", ruta.RutaId)">Ver ruta</a>
+                            @if (carga == "Pendiente") { <a class="btn btn-primary" href="@Enlace("carga", ruta.RutaId)">Ver carga pendiente</a> }
+                            else if (ruta.CargaPendiente) { <a class="btn btn-primary" href="@Enlace("carga", ruta.RutaId)">@(ruta.Estado == "EnCurso" ? "Continuar carga" : "Cargar vehículo")</a> }
+                            @if (ruta.Estado == "EnCurso") { <a class="btn btn-outline-primary" href="@Enlace("rendicion", ruta.RutaId)">@(rendicion == "Rechazada" ? "Revisar rendición" : "Rendir ruta")</a> }
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    }
+    @if (!MisRutas.SinConexion && (MisRutas.Rutas.Count == 20 || pagina > 1))
+    {
+        <nav aria-label="Páginas de rutas" class="d-flex align-items-center gap-3 my-3">
+            <button class="btn btn-outline-secondary" @onclick="Anterior" disabled="@(MisRutas.Cargando || pagina == 1)">Anterior</button>
+            <span>Página @pagina</span>
+            <button class="btn btn-outline-secondary" @onclick="Siguiente" disabled="@(MisRutas.Cargando || MisRutas.Rutas.Count < 20)">Siguiente</button>
+        </nav>
+    }
+}
+@code {
+    private int pagina = 1;
+    protected override void OnInitialized() => MisRutas.Cambio += Refrescar;
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await MisRutas.ActualizarAsync(); }
+    private static string Enlace(string pagina, Guid ruta) => $"{pagina}?rutaId={ruta}";
+    private void Refrescar() => _ = InvokeAsync(StateHasChanged);
+    private async Task Actualizar() { pagina = 1; await MisRutas.ActualizarAsync(); }
+    private async Task Anterior() { pagina--; await MisRutas.ActualizarAsync(pagina); }
+    private async Task Siguiente() { pagina++; await MisRutas.ActualizarAsync(pagina); }
+    private async Task Sincronizar() { await Cola.SincronizarAsync(); await MisRutas.ActualizarAsync(pagina); }
+    public void Dispose() => MisRutas.Cambio -= Refrescar;
 }

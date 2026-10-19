@@ -4,6 +4,8 @@ using Logistica.Modules.Ejecucion.Domain.Operaciones;
 using Logistica.Modules.Envios.Contracts;
 using Logistica.Modules.Envios.Contracts.Results;
 using Logistica.Modules.Planificacion.Contracts;
+using Logistica.Modules.Administracion.Contracts;
+using Logistica.Modules.Ejecucion.Domain.Rendiciones;
 using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Ejecucion.Application.Features.SincronizarOperaciones;
@@ -17,7 +19,10 @@ internal sealed class ProcesarOperacionHandler(
     IUnidadDeTrabajo unidadDeTrabajo,
     ICurrentTenant tenant,
     TimeProvider reloj,
-    Features.ConfirmarCarga.ConfirmarCargaHandler cargas)
+    Features.ConfirmarCarga.ConfirmarCargaHandler cargas,
+    Features.IniciarRendicion.IniciarRendicionHandler rendir,
+    IRendicionRepository rendiciones,
+    IAdministracionModuleApi administracion)
 {
     public const string TipoEntrega = "RegistrarEntrega";
     public const string TipoIntentoFallido = "RegistrarIntentoFallido";
@@ -26,6 +31,18 @@ internal sealed class ProcesarOperacionHandler(
     private static readonly TimeSpan ToleranciaReloj = TimeSpan.FromMinutes(2);
 
     public async Task<ResultadoOperacionResponse> HandleAsync(ProcesarOperacionCommand command, CancellationToken ct)
+    {
+        ResultadoOperacionResponse? resultado = null;
+        await unidadDeTrabajo.EjecutarAsync(async () =>
+        {
+            // El cierre de jornada y sus operaciones anteriores no pueden adelantarse mutuamente.
+            await administracion.BloquearPlanificacionAsync(ct);
+            resultado = await ProcesarAsync(command, ct);
+        }, ct);
+        return resultado!;
+    }
+
+    private async Task<ResultadoOperacionResponse> ProcesarAsync(ProcesarOperacionCommand command, CancellationToken ct)
     {
         var op = command.Operacion;
 
@@ -46,6 +63,11 @@ internal sealed class ProcesarOperacionHandler(
             return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "DependeDeOperacionRechazada", null, ct);
         }
 
+        if (op.Tipo == "IniciarRendicion") return await rendir.HandleAsync(command, datos, ct);
+        if (op.Tipo is "ConfirmarCarga" or TipoEntrega or TipoIntentoFallido
+            && await rendiciones.ObtenerAsync(op.RutaId, ct) is { } rendicion)
+            return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto,
+                rendicion.RepartidorId == command.RepartidorId ? "RutaEnRendicion" : "RutaNoAsignada", null, ct);
         if (op.Tipo == "ConfirmarCarga") return await cargas.HandleAsync(command, datos, ct);
 
         if (op.Tipo is not (TipoEntrega or TipoIntentoFallido))
