@@ -15,7 +15,7 @@
             <div class="alert alert-danger" role="alert">@Model.Error</div>
         }
 
-        <form method="post">
+        <form method="post" data-inicio-sesion>
             <div class="mb-3">
                 <label asp-for="Email" class="form-label">Correo</label>
                 <input asp-for="Email" class="form-control" autocomplete="username" autofocus />
@@ -32,3 +32,4 @@
         </form>
     </div>
 </div>
+<script type="module" src="~/_content/Logistica.Backoffice/js/repartidor-cuenta.js"></script>

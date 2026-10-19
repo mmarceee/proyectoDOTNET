@@ -29,6 +29,7 @@ public static class PlanificacionModule
     {
         services.AddModuleDbContext<PlanificacionDbContext>(configuration.GetConnectionString("Postgres"), PlanificacionDbContext.Schema);
         services.AddScoped<IRutaRepository, RutaRepository>();
+        services.AddScoped<Contracts.IHojaRutaPlanificacion, HojaRutaPlanificacion>();
 
         // Contrato para los otros módulos (ADR-0001, addendum 3).
         services.AddScoped<Contracts.IPlanificacionModuleApi, Application.PlanificacionModuleApi>();

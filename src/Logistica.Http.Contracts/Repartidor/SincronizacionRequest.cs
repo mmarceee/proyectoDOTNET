@@ -18,7 +18,11 @@ public sealed record OperacionDispositivoRequest(
     decimal? Longitud,
     string? CorrelacionId = null,
     EntregaRequest? Entrega = null,
-    IntentoFallidoRequest? IntentoFallido = null);
+    IntentoFallidoRequest? IntentoFallido = null,
+    CargaRequest? Carga = null);
+
+public sealed record CargaRequest(long RevisionRuta, IReadOnlyList<LecturaCargaRequest> Lecturas, bool AceptaFaltantes = false);
+public sealed record LecturaCargaRequest(string CodigoBulto, DateTimeOffset EscaneadoEn);
 
 // Tipo "RegistrarEntrega" (CU-17). La firma es siempre obligatoria.
 public sealed record EntregaRequest(ArchivoRequest Firma, ArchivoRequest? Foto = null,

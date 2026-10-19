@@ -11,6 +11,16 @@
     align-items: center;
     gap: 1rem;
 }
+.cuenta-usuario {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .75rem;
+}
+.cuenta-usuario .navbar-text {
+    color: rgba(255, 255, 255, .85);
+    overflow-wrap: anywhere;
+}
 .navbar-nav ::deep .nav-link {
     color: rgba(255, 255, 255, .85);
     border-radius: .25rem;

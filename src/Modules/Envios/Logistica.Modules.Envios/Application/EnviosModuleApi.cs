@@ -11,6 +11,34 @@ namespace Logistica.Modules.Envios.Application;
 internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj, IReglasDeEntrega reglasDeEntrega,
     IIntegrationEventPublisher eventos) : IEnviosModuleApi
 {
+    public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
+    {
+        var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
+        return lista.Select(e => new EnvioParaCarga(e.Id, e.Estado.ToString(),
+            e.Bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray())).ToArray();
+    }
+
+    public async Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct)
+    {
+        var bultos = await envios.ObtenerBultosPorCodigosAsync(codigos, ct);
+        return bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray();
+    }
+
+    public async Task<bool> RegistrarCargaAsync(IReadOnlyCollection<Guid> ids, Guid? responsable, DateTimeOffset ocurridoEn, CancellationToken ct)
+    {
+        var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
+        // Validar todos antes de modificar alguno: una carga rechazada no deja transiciones parciales.
+        if (lista.Count != ids.Count || lista.Any(e => e.Estado != EstadoEnvio.AsignadoARuta)) return false;
+        foreach (var envio in lista)
+        {
+            envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, responsable, ocurridoEn);
+            eventos.Registrar(EnvioEnTransito.Tipo,
+                new EnvioEnTransito(envio.Id, envio.Numero, ocurridoEn, responsable), ocurridoEn);
+        }
+        await envios.GuardarCambiosAsync(ct);
+        return true;
+    }
+
     // CU-17 (T6). Las reglas de negocio no lanzan hacia afuera: vuelven como resultado, para que Ejecución aplique la
     // política de conflictos (ADR-0004, sección 2.4). Los archivos se agregan recién cuando el dominio aceptó la entrega.
     public async Task<RegistroEnCalle> RegistrarEntregaAsync(EntregaARegistrar entrega, CancellationToken ct)

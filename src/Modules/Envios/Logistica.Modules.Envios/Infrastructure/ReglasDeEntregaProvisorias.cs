@@ -26,6 +26,11 @@ internal sealed class ReglasDeEntregaProvisorias : IReglasDeEntrega
 
     private static readonly IReadOnlyList<MotivoNoEntrega> Catalogo = [Ausente, SinAcceso, DireccionInexistente, Rechazado];
 
+    public Task<Contracts.ReglasParaHoja> ParaHojaAsync(Envio envio, CancellationToken ct)
+        => Task.FromResult(new Contracts.ReglasParaHoja("Provisorias", null, Reglas.ExigeFoto, Reglas.ExigeNombreYDocumento,
+            Reglas.MaxIntentos, Reglas.PlazoEntreIntentos, Catalogo.Select(m => new Contracts.MotivoParaHoja(
+                m.Id, m.Codigo, m.Codigo.Replace('_', ' '), m.Reprogramable, m.ExigeEvidencia)).ToArray()));
+
     public Task<ReglasEntrega> DelEnvioAsync(Envio envio, CancellationToken ct)
     {
         return Task.FromResult(Reglas);

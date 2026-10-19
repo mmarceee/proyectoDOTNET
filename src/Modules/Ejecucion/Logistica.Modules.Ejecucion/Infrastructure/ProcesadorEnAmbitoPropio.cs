@@ -12,6 +12,8 @@ namespace Logistica.Modules.Ejecucion.Infrastructure;
 // Cada operación es además un tramo de la traza que empezó en el dispositivo (sección 2.9; letra, sección 6.12).
 internal sealed class ProcesadorEnAmbitoPropio(IServiceScopeFactory ambitos) : IProcesadorDeOperacion
 {
+    private const string NombreActividad = "operacion.procesar";
+
     private static readonly ActivitySource Trazas = new(EjecucionModule.FuenteDeTrazas);
 
     public async Task<ResultadoOperacionResponse> ProcesarAsync(ProcesarOperacionCommand command, CancellationToken ct)
@@ -44,15 +46,18 @@ internal sealed class ProcesadorEnAmbitoPropio(IServiceScopeFactory ambitos) : I
     // registrarla, aunque llegue horas después. Así la entrega, su evento en el outbox (que guarda Activity.Current) y
     // más adelante el Worker quedan en la misma traza. El request de la sincronización queda como vínculo, porque un
     // lote junta operaciones de trazas distintas. Sin CorrelacionId válido, la operación cuelga del request.
+    // Es un consumidor: procesa lo que el dispositivo produjo antes. Si nadie escucha la fuente (StartActivity devuelve
+    // null), una actividad sin registrar igual lleva el traceparent del dispositivo hasta el outbox.
     private static Activity? IniciarActividad(OperacionDispositivoRequest operacion)
     {
         var request = Activity.Current?.Context;
         var delDispositivo = ActivityContext.TryParse(operacion.CorrelacionId, null, out var padre);
 
         var actividad = delDispositivo
-            ? Trazas.StartActivity("Sincronizar operación", ActivityKind.Internal, padre,
+            ? Trazas.StartActivity(NombreActividad, ActivityKind.Consumer, padre,
                 links: request is ActivityContext contexto ? [new ActivityLink(contexto)] : null)
-            : Trazas.StartActivity("Sincronizar operación");
+              ?? new Activity(NombreActividad).SetParentId(operacion.CorrelacionId!).Start()
+            : Trazas.StartActivity(NombreActividad, ActivityKind.Consumer);
 
         actividad?.SetTag("logistica.operacion.id", operacion.OperacionId);
         actividad?.SetTag("logistica.operacion.tipo", operacion.Tipo);

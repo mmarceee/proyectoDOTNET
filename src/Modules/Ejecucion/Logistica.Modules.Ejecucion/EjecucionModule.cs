@@ -22,6 +22,9 @@ public static class EjecucionModule
     {
         services.AddModuleDbContext<EjecucionDbContext>(configuration.GetConnectionString("Postgres"), EjecucionDbContext.Schema);
         services.AddScoped<IOperacionRepository, OperacionRepository>();
+        services.AddScoped<Application.Features.ConfirmarCarga.IRegistroCarga, RegistroCarga>();
+        services.AddScoped<Application.Features.ConfirmarCarga.ConfirmarCargaHandler>();
+        services.AddScoped<Application.Features.DescargarHojaDeRuta.DescargarHojaDeRutaHandler>();
 
         // CU-52 (ADR-0004): el lote y cada operación en su propio ámbito.
         services.AddScoped<SincronizarOperacionesHandler>();
@@ -35,6 +38,7 @@ public static class EjecucionModule
     {
         // La PWA del repartidor sincroniza en /api/repartidor (ADR-0004, sección 2.9).
         SincronizarOperacionesEndpoint.Map(endpoints);
+        Presentation.Features.DescargarHojaDeRuta.DescargarHojaDeRutaEndpoint.Map(endpoints);
 
         return endpoints;
     }

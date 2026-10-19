@@ -61,6 +61,46 @@ namespace Logistica.Modules.Ejecucion.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "ejecucion");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Ejecucion.Domain.Cargas.EscaneoCarga", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BultoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodigoBulto")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("EscaneadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperacionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Resultado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("RutaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "RutaId");
+
+                    b.HasIndex("OperadorId", "OperacionId", "CodigoBulto")
+                        .IsUnique();
+
+                    b.ToTable("escaneos_carga", "ejecucion");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Ejecucion.Domain.Operaciones.OperacionDispositivo", b =>
                 {
                     b.Property<Guid>("Id")
