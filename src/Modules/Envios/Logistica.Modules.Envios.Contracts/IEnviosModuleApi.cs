@@ -34,4 +34,12 @@ public interface IEnviosModuleApi
     // CU-04: los envíos sin terminar con una de estas franjas pero sin fecha propia. Su día lo da la ruta en la que
     // estén: Administración se los pasa a Planificación para saber si alguna ruta desde la fecha del cambio los tiene.
     Task<IReadOnlyList<Guid>> EnviosSinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct);
+
+    // CU-60: lo que el seguimiento público muestra de un envío. null si no existe o es de otro operador: el inquilino
+    // sale del token firmado del enlace, y el filtro "Tenant" hace el resto.
+    Task<SeguimientoEnvio?> SeguimientoDeAsync(Guid envioId, CancellationToken ct);
+
+    // CU-60: el Id de un envío del operador a partir de su número (ENV-000001), para armar su enlace de seguimiento desde
+    // el Backoffice. null si no existe o es de otro operador.
+    Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct);
 }

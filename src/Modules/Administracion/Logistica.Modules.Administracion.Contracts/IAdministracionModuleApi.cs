@@ -21,4 +21,8 @@ public interface IAdministracionModuleApi
     // CU-06 para el alta (CU-10): la versión que rige ahora, para guardar su VersionId en el envío. También para los
     // envíos viejos sin versión. null si el operador no tiene reglas vigentes.
     Task<ReglasOperativas?> ReglasDeEntregaVigentesAsync(CancellationToken ct);
+
+    // CU-07 para CU-60: la marca del operador del inquilino actual (el del token, en el seguimiento público). null si no
+    // hay inquilino.
+    Task<MarcaOperador?> MarcaDelOperadorAsync(CancellationToken ct);
 }

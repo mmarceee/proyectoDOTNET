@@ -1,0 +1,105 @@
+@page "/{Token}"
+@using System.Net
+@using Logistica.Http.Contracts.Seguimiento
+@inject HttpClient Http
+
+@* CU-60: lo que ve la destinataria al abrir su enlace, con la marca del operador. Sin usuario ni contraseña: el token
+   del enlace es la única credencial. Un enlace alterado y uno de un envío que no existe se ven igual (A1 y A2). *@
+
+<PageTitle>@(seguimiento is null ? "Seguimiento de envíos" : $"Envío {seguimiento.Numero}")</PageTitle>
+
+@if (estado == Estado.Cargando)
+{
+    <p class="text-muted">Buscando tu envío…</p>
+}
+else if (estado == Estado.NoValido)
+{
+    <h1 class="h4">Enlace no válido</h1>
+    <p class="text-muted">Revisá que el enlace esté completo, tal como lo recibiste.</p>
+}
+else if (estado == Estado.Demasiadas)
+{
+    <h1 class="h4">Demasiadas consultas</h1>
+    <p class="text-muted">Esperá un minuto y volvé a intentar.</p>
+}
+else if (estado == Estado.Error)
+{
+    <h1 class="h4">No pudimos cargar tu envío</h1>
+    <p class="text-muted">Probá de nuevo en unos minutos.</p>
+}
+else if (seguimiento is not null)
+{
+    <header class="rounded-3 p-3 mb-4 text-white" style="background-color: @seguimiento.Marca.ColorPrimario">
+        <div class="small opacity-75">@seguimiento.Marca.Operador</div>
+        <h1 class="h4 mb-0">@seguimiento.Estado</h1>
+    </header>
+
+    <p>Hola, <strong>@seguimiento.NombreDePila</strong>. Tu envío <strong>@seguimiento.Numero</strong> va a @seguimiento.Localidad.</p>
+
+    @if (seguimiento.VentanaEstimada is not null)
+    {
+        <div class="alert alert-light border" role="status">
+            <div class="small text-muted">Entrega estimada</div>
+            <div class="fw-semibold">@seguimiento.VentanaEstimada</div>
+        </div>
+    }
+
+    @if (seguimiento.PuedeReprogramar)
+    {
+        <p class="small text-muted">¿No vas a estar? Pronto vas a poder elegir otro día desde esta página.</p>
+    }
+
+    <h2 class="h6 mt-4">Historial</h2>
+    <ol class="list-group list-group-numbered mb-4">
+        @foreach (var hito in seguimiento.Historial.Reverse())
+        {
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+                <span class="ms-2 me-auto">@hito.Estado</span>
+                <span class="text-muted small">@hito.OcurridoEn.ToLocalTime().ToString("dd/MM HH:mm")</span>
+            </li>
+        }
+    </ol>
+
+    @if (seguimiento.Marca.EmailContacto is not null || seguimiento.Marca.TelefonoContacto is not null)
+    {
+        <footer class="small text-muted border-top pt-2" style="border-color: @seguimiento.Marca.ColorSecundario !important">
+            ¿Dudas? @seguimiento.Marca.Operador · @seguimiento.Marca.EmailContacto @seguimiento.Marca.TelefonoContacto
+        </footer>
+    }
+}
+
+@code {
+    private enum Estado { Cargando, Listo, NoValido, Demasiadas, Error }
+
+    [Parameter] public string Token { get; set; } = "";
+
+    private Estado estado = Estado.Cargando;
+    private SeguimientoPublicoResponse? seguimiento;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        estado = Estado.Cargando;
+        try
+        {
+            var respuesta = await Http.GetAsync($"/api/seguimiento/{Uri.EscapeDataString(Token)}");
+            if (respuesta.IsSuccessStatusCode)
+            {
+                seguimiento = await respuesta.Content.ReadFromJsonAsync<SeguimientoPublicoResponse>();
+                estado = seguimiento is null ? Estado.Error : Estado.Listo;
+            }
+            else
+            {
+                estado = respuesta.StatusCode switch
+                {
+                    HttpStatusCode.NotFound => Estado.NoValido,
+                    HttpStatusCode.TooManyRequests => Estado.Demasiadas,
+                    _ => Estado.Error,
+                };
+            }
+        }
+        catch (HttpRequestException)
+        {
+            estado = Estado.Error;
+        }
+    }
+}

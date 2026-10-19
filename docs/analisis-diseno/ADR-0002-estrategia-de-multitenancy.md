@@ -162,7 +162,7 @@ Un intento de acceder a un recurso de otro inquilino responde igual que si el re
 | :---- | :---- | :---- |
 | SQL crudo (FromSqlRaw, ExecuteSqlRaw) | No pasa por el filtro ni por el interceptor | Prohibido salvo un caso revisado que incluya el OperadorId explícitamente |
 | ExecuteUpdate / ExecuteDelete | El filtro sí agrega el WHERE del inquilino, pero el interceptor no se ejecuta | Nunca modifican OperadorId ni ComercioId, y nunca se combinan con IgnoreQueryFilters() |
-| Caché (Valkey) | El filtro no protege lo que ya está en caché | Toda clave de datos de un operador incluye su OperadorId (por ejemplo, tarifario:{OperadorId}); el seguimiento usa el token como clave |
+| Caché (Valkey) | El filtro no protege lo que ya está en caché | Toda clave de datos de un operador incluye su OperadorId (por ejemplo, tarifario:{OperadorId}); el seguimiento usa el Id del envío, que sale del token ya verificado, con el OperadorId del token (ADR-0006, sección 2.3; aclaración del 19/10/2026) |
 | SignalR | El filtro no protege lo que se transmite | Grupos por operador y por comercio (sección 2.5) |
 | Mensajes a los consumidores | El inquilino no llega por una cookie | Metadatos escritos desde el Outbox (sección 2.5) |
 | Usuario (Identity) | No tiene filtro ni pasa por el interceptor | Consultas del personal en un único servicio que filtra por OperadorId; alta con el OperadorId de ICurrentTenant (sección 2.4) |

@@ -1,3 +1,4 @@
+using Logistica.BuildingBlocks.Infrastructure.Caching;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.Modules.Seguimiento;
 using Logistica.SharedKernel;
@@ -25,6 +26,8 @@ builder.Services.AddOpenTelemetry()
 builder.Services.AddScoped<InquilinoMensaje>();
 builder.Services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<InquilinoMensaje>());
 builder.Services.AddSeguimientoModule(builder.Configuration);
+// CU-60: el Worker borra el seguimiento de la caché ante cada cambio de estado (InvalidarSeguimiento).
+builder.Services.AddCacheDistribuida(builder.Configuration.GetConnectionString("Valkey"));
 builder.Services.AddHostedService<ConsumidorRabbitMq>();
 
 var host = builder.Build();

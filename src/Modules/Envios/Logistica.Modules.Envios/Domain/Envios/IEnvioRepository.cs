@@ -27,6 +27,12 @@ internal interface IEnvioRepository
 
     // CU-04: los envíos con entrega pendiente en alguna de estas franjas, pero sin fecha propia.
     Task<IReadOnlyList<Guid>> SinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct);
+
+    // CU-60: el envío con sus eventos, sólo para leer.
+    Task<Envio?> ObtenerConEventosAsync(Guid id, CancellationToken ct);
+
+    // CU-60: el Id de un envío por su número, sin traer el envío.
+    Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct);
 // Los metadatos del sobre se toman de la sesión al registrar el evento.
     void RegistrarAsignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);
     void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);

@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Logistica.Modules.Seguimiento.Contracts\Logistica.Modules.Seguimiento.Contracts.csproj" />
     <ProjectReference Include="..\..\Planificacion\Logistica.Modules.Planificacion.Contracts\Logistica.Modules.Planificacion.Contracts.csproj" />
     <ProjectReference Include="..\..\Administracion\Logistica.Modules.Administracion.Contracts\Logistica.Modules.Administracion.Contracts.csproj" />
+    <ProjectReference Include="..\..\Envios\Logistica.Modules.Envios.Contracts\Logistica.Modules.Envios.Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.SharedKernel\Logistica.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Logistica.Http.Contracts\Logistica.Http.Contracts.csproj" />

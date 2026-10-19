@@ -1,4 +1,5 @@
 using Logistica.Modules.Administracion.Contracts;
+using Logistica.Modules.Administracion.Domain;
 using Logistica.Modules.Administracion.Contracts.Results;
 using Logistica.Modules.Administracion.Application.Features.ConsultarRecursosPlanificacion;
 using Logistica.SharedKernel;
@@ -24,11 +25,16 @@ internal sealed class RecursosPlanificacionReader(AdministracionDbContext db, IC
             ?? throw new DomainException("El operador no está disponible.");
         return new(operador.Id, operador.ZonaHoraria);
     }
+    // El máximo de paradas sale de las reglas operativas de CU-06 que rigen al confirmar la operación (acordado con Lucas,
+    // 19/10). Se devuelve el Id de esa versión: el historial de la ruta conserva la versión y el límite que usó, y
+    // publicar otra versión no lo cambia, porque una versión publicada no se modifica.
     public async Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct)
     {
-        var regla = await db.ReglasPlanificacion.AsNoTracking().Where(r => r.VigenteDesde <= ahora
-            && (r.VigenteHasta == null || ahora < r.VigenteHasta)).OrderByDescending(r => r.VigenteDesde).FirstOrDefaultAsync(ct)
-            ?? throw new DomainException("El operador no tiene reglas de planificación vigentes.");
+        var regla = await db.VersionesReglas.AsNoTracking()
+            .Where(r => r.Estado != EstadoVersion.Borrador && r.VigenteDesde <= ahora
+                && (r.VigenteHasta == null || ahora < r.VigenteHasta))
+            .OrderByDescending(r => r.Numero).Select(r => new { r.Id, r.MaxParadasPorRuta }).FirstOrDefaultAsync(ct)
+            ?? throw new DomainException("El operador no tiene reglas operativas vigentes.");
         return new(regla.Id, regla.MaxParadasPorRuta);
     }
     public async Task<DatosRecursosPlanificacion> LeerRecursosAsync(CancellationToken ct)
