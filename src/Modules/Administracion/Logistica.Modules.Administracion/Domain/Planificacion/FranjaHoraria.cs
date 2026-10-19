@@ -31,4 +31,13 @@ internal sealed class FranjaHoraria : Entity, IOperadorOwned
     }
     public bool Aplica(DateOnly fecha) => fecha >= VigenteDesde && (VigenteHasta is null || fecha <= VigenteHasta)
         && Dias.Contains((int)fecha.DayOfWeek);
+
+    // CU-04, A3: dos franjas de la misma zona se superponen si comparten un día, se cruzan sus horarios y rigen
+    // a la vez. Una franja reemplazada no choca con la que la reemplaza: termina el día anterior.
+    public bool SeSuperponeCon(FranjaHoraria otra) => ZonaId == otra.ZonaId
+        && Dias.Intersect(otra.Dias).Any()
+        && HoraDesde < otra.HoraHasta && otra.HoraDesde < HoraHasta
+        && (VigenteHasta is null || otra.VigenteDesde <= VigenteHasta)
+        && (otra.VigenteHasta is null || VigenteDesde <= otra.VigenteHasta);
+
 }

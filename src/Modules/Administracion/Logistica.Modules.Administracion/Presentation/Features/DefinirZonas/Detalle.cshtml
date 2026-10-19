@@ -1,0 +1,135 @@
+@page "/backoffice/zonas/{id:guid}"
+@model Logistica.Modules.Administracion.Presentation.Features.DefinirZonas.DetalleModel
+@using Logistica.Modules.Administracion.Presentation.Features.DefinirZonas
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = Model.Zona.Nombre;
+    var vigentes = Model.Zona.Franjas.Where(f => f.VigenteHasta is null).ToList();
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">
+        @Model.Zona.Codigo · @Model.Zona.Nombre
+        @if (Model.Zona.Activa)
+        {
+            <span class="badge text-bg-success align-middle">Activa</span>
+        }
+        else
+        {
+            <span class="badge text-bg-secondary align-middle">Inactiva</span>
+        }
+    </h1>
+    <a href="/backoffice/zonas" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+
+<h2 class="h5 mt-4">Franjas horarias</h2>
+@if (Model.Zona.Franjas.Count == 0)
+{
+    <p class="text-muted">Todavía no tiene franjas. Agregá al menos una para que los envíos tengan horario de entrega.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Horario</th>
+                    <th>Días</th>
+                    <th>Vigente desde</th>
+                    <th>Vigente hasta</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var franja in Model.Zona.Franjas)
+                {
+                    <tr class="@(franja.VigenteHasta is null ? "" : "text-muted")">
+                        <td>@franja.Desde.ToString("HH:mm") a @franja.Hasta.ToString("HH:mm")</td>
+                        <td>@TextosZona.Dias(franja.Dias)</td>
+                        <td>@franja.VigenteDesde.ToString("dd/MM/yyyy")</td>
+                        <td>@(franja.VigenteHasta?.ToString("dd/MM/yyyy") ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <h2 class="h6">Agregar o cambiar una franja</h2>
+        <form method="post" asp-page-handler="Franja">
+            <div class="row g-2 mb-2">
+                <div class="col">
+                    <label asp-for="Desde" class="form-label">Desde</label>
+                    <input asp-for="Desde" type="time" class="form-control" />
+                </div>
+                <div class="col">
+                    <label asp-for="Hasta" class="form-label">Hasta</label>
+                    <input asp-for="Hasta" type="time" class="form-control" />
+                </div>
+            </div>
+
+            <div class="mb-2">
+                @foreach (var dia in TextosZona.DiasDeLaSemana)
+                {
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="Dias" value="@dia" id="dia-@dia"
+                               checked="@Model.Dias.Contains(dia)" />
+                        <label class="form-check-label" for="dia-@dia">@TextosZona.NombreDia(dia)</label>
+                    </div>
+                }
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col">
+                    <label asp-for="VigenteDesde" class="form-label">Rige desde</label>
+                    <input asp-for="VigenteDesde" type="date" class="form-control" />
+                </div>
+                <div class="col">
+                    <label asp-for="ReemplazaA" class="form-label">Reemplaza a</label>
+                    <select asp-for="ReemplazaA" class="form-select">
+                        <option value="">Ninguna (franja nueva)</option>
+                        @foreach (var franja in vigentes)
+                        {
+                            <option value="@franja.Id">@franja.Desde.ToString("HH:mm") a @franja.Hasta.ToString("HH:mm") · @TextosZona.Dias(franja.Dias)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="form-text mb-2">Si reemplaza a otra, la anterior rige hasta el día antes y queda en el historial.</div>
+
+            <button type="submit" class="btn btn-primary">Guardar franja</button>
+        </form>
+    </div>
+
+    <div class="col-lg-6">
+        <h2 class="h6">Modificar la zona</h2>
+        <form method="post" asp-page-handler="Modificar">
+            <div class="mb-2">
+                <label asp-for="Nombre" class="form-label">Nombre</label>
+                <input asp-for="Nombre" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label asp-for="CodigosPostales" class="form-label">Códigos postales</label>
+                <textarea asp-for="CodigosPostales" class="form-control" rows="3"></textarea>
+                <div class="form-text">Los envíos ya admitidos conservan su zona.</div>
+            </div>
+            <button type="submit" class="btn btn-outline-primary">Guardar cambios</button>
+        </form>
+
+        @if (Model.Zona.Activa)
+        {
+            <h2 class="h6 mt-4">Desactivar</h2>
+            <p class="text-muted small mb-2">No se acepta en envíos nuevos. Los envíos existentes no se modifican.</p>
+            <form method="post" asp-page-handler="Desactivar">
+                <button type="submit" class="btn btn-outline-danger">Desactivar zona</button>
+            </form>
+        }
+    </div>
+</div>

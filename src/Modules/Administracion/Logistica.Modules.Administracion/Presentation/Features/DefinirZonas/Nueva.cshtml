@@ -1,0 +1,41 @@
+@page "/backoffice/zonas/nueva"
+@model Logistica.Modules.Administracion.Presentation.Features.DefinirZonas.NuevaModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Nueva zona";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Nueva zona</h1>
+    <a href="/backoffice/zonas" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <form method="post">
+            <div class="mb-3">
+                <label asp-for="Codigo" class="form-label">Código</label>
+                <input asp-for="Codigo" class="form-control" />
+                <div class="form-text">Único en el operador. No se puede cambiar después.</div>
+                <span asp-validation-for="Codigo" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Nombre" class="form-label">Nombre</label>
+                <input asp-for="Nombre" class="form-control" />
+                <span asp-validation-for="Nombre" class="text-danger"></span>
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="CodigosPostales" class="form-label">Códigos postales</label>
+                <textarea asp-for="CodigosPostales" class="form-control" rows="4"></textarea>
+                <div class="form-text">Separados por comas o uno por línea. Cada código postal puede estar en una sola zona activa.</div>
+                <span asp-validation-for="CodigosPostales" class="text-danger"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Crear zona</button>
+        </form>
+    </div>
+</div>
