@@ -145,6 +145,26 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
         Assert.True(await db.Devoluciones.AnyAsync(d => d.EnvioId == envios[0]));
     }
 
+    // Letra, sección 6.12; ADR-0004, sección 2.9: la operación continúa la traza que empezó en el dispositivo, y su
+    // evento sale por el outbox con esa misma traza, para seguirla hasta el Worker.
+    [Fact]
+    public async Task La_operacion_continua_la_traza_del_dispositivo_hasta_el_evento_del_outbox()
+    {
+        var (rutaId, envios) = await RutaDespachadaAsync(1);
+        using var client = await RepartidorAsync();
+        var trazaDelDispositivo = Convert.ToHexStringLower(Guid.NewGuid().ToByteArray());
+        var entrega = Entrega(rutaId, envios[0], secuencia: 1) with
+        {
+            CorrelacionId = $"00-{trazaDelDispositivo}-{Convert.ToHexStringLower(Guid.NewGuid().ToByteArray()[..8])}-01",
+        };
+
+        Assert.Equal("Aplicada", (await SincronizarAsync(client, entrega)).Resultado);
+
+        await using var db = Contexto<EnviosDbContext>();
+        var evento = await db.Outbox.SingleAsync(m => m.Tipo == "EnvioEntregado.v1" && m.Contenido.Contains(envios[0].ToString()));
+        Assert.StartsWith($"00-{trazaDelDispositivo}-", evento.TraceParent);
+    }
+
     [Fact]
     public async Task Una_hora_del_dispositivo_adelantada_se_reemplaza_por_la_de_recepcion_y_queda_marcada()
     {

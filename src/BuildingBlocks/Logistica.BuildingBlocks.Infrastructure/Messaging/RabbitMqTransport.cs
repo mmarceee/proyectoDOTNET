@@ -65,7 +65,7 @@ public static class RabbitMqTransport
             Cabecera(propiedades, "traceparent"), Encoding.UTF8.GetString(cuerpo.Span));
     }
 
-    private static string? Cabecera(IReadOnlyBasicProperties p, string nombre)
+    internal static string? Cabecera(IReadOnlyBasicProperties p, string nombre)
         => p.Headers?.TryGetValue(nombre, out var valor) == true
             ? valor is byte[] bytes ? Encoding.UTF8.GetString(bytes) : valor?.ToString() : null;
 }

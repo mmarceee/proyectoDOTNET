@@ -1,6 +1,8 @@
 using Logistica.Api.Errores;
 using Logistica.Api.Tenancy;
 using Logistica.Api.Seguridad;
+using Logistica.BuildingBlocks.Infrastructure.Caching;
+using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Administracion;
 using Logistica.Modules.Deposito;
@@ -9,11 +11,46 @@ using Logistica.Modules.Envios;
 using Logistica.Modules.Planificacion;
 using Logistica.Modules.Seguimiento;
 using Logistica.SharedKernel;
-using Logistica.BuildingBlocks.Infrastructure.Messaging;
+using Npgsql;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
+
+// Trazas distribuidas (letra, sección 6.12): cada request, sus consultas a PostgreSQL y las fuentes propias de los
+// módulos, como la sincronización de la PWA (ADR-0004, sección 2.9), y la publicación del outbox, que el Worker
+// continúa (ADR-0003, sección 2.9). Métricas, por ahora sólo las de la caché (aciertos, fallos y errores); el resto y
+// los logs llegan con el hito del 5/11. Se exportan por OTLP a Aspire Dashboard cuando OTEL_EXPORTER_OTLP_ENDPOINT
+// está configurado (docker-compose.yml).
+var exportarOtlp = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(recurso => recurso.AddService("logistica-api"))
+    .WithTracing(trazas =>
+    {
+        trazas.AddAspNetCoreInstrumentation()
+            .AddNpgsql()
+            .AddSource(EjecucionModule.FuenteDeTrazas, TrazasMensajeria.Fuente);
+
+        if (exportarOtlp)
+        {
+            trazas.AddOtlpExporter();
+        }
+    })
+    .WithMetrics(metricas =>
+    {
+        metricas.AddMeter(MetricasCache.Medidor);
+
+        if (exportarOtlp)
+        {
+            metricas.AddOtlpExporter();
+        }
+    });
+
+// Caché distribuida: Valkey si hay cadena de conexión; si no, la memoria del proceso (CachingExtensions).
+builder.Services.AddCacheDistribuida(builder.Configuration.GetConnectionString("Valkey"));
 
 // Errores como ProblemDetails; las reglas de negocio violadas responden 400. Una escritura sobre datos
 // de otro inquilino responde 404, igual que un recurso inexistente (ADR-0002, sección 2.9).
