@@ -24,6 +24,9 @@ internal interface IEnvioRepository
 
     // CU-04: ¿hay envíos con entrega pendiente en alguna de estas franjas, en esa fecha o después?
     Task<bool> HayComprometidosAsync(IReadOnlyCollection<Guid> franjaIds, DateOnly desde, CancellationToken ct);
+
+    // CU-04: los envíos con entrega pendiente en alguna de estas franjas, pero sin fecha propia.
+    Task<IReadOnlyList<Guid>> SinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct);
 // Los metadatos del sobre se toman de la sesión al registrar el evento.
     void RegistrarAsignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);
     void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora);

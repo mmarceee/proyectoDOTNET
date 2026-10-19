@@ -526,6 +526,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         public Task<Ruta?> ObtenerAsync(Guid id, CancellationToken ct) => original.ObtenerAsync(id, ct);
         public Task<IReadOnlyList<Ruta>> ListarAsync(DateOnly? fecha, EstadoRuta? estado, CancellationToken ct) => original.ListarAsync(fecha, estado, ct);
         public Task<IReadOnlyList<Guid>> EnviosOcupadosAsync(IReadOnlyCollection<Guid> ids, Guid? propia, CancellationToken ct) => original.EnviosOcupadosAsync(ids, propia, ct);
+        public Task<bool> HayActivasConEnviosAsync(IReadOnlyCollection<Guid> ids, DateOnly desde, CancellationToken ct) => original.HayActivasConEnviosAsync(ids, desde, ct);
         public Task<IReadOnlyList<string>> RecursosOcupadosAsync(DateOnly fecha, Guid repartidor, Guid vehiculo, Guid? propia, CancellationToken ct) => original.RecursosOcupadosAsync(fecha, repartidor, vehiculo, propia, ct);
         public Task<IReadOnlyList<ValidacionRuta>> ValidacionesAsync(Guid id, int pagina, CancellationToken ct) => original.ValidacionesAsync(id, pagina, ct);
         public void Agregar(Ruta ruta) => original.Agregar(ruta);
