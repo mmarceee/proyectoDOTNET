@@ -5,6 +5,8 @@ using Logistica.IntegrationTests.Identidad;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
+using Logistica.Modules.Planificacion.Domain.Rutas;
+using Logistica.Modules.Planificacion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -112,26 +114,126 @@ public class DefinirZonasTests(PostgresApiFactory factory) : IClassFixture<Postg
         await EnvioComprometidoAsync(zonaId, franjaId, new DateOnly(2035, 3, 10));
 
         var bloqueado = await TextoAsync(await FranjaAsync(demo, zonaId, "10:00", "14:00", todosLosDias, "2035-03-01", franjaId.ToString()));
-        Assert.Contains("Hay envíos comprometidos con esta franja desde esa fecha.", bloqueado);
+        Assert.Contains("Hay envíos o rutas comprometidos con esta franja desde esa fecha.", bloqueado);
 
         var permitido = await FranjaAsync(demo, zonaId, "10:00", "14:00", todosLosDias, "2035-03-11", franjaId.ToString());
         Assert.Equal(HttpStatusCode.Redirect, permitido.StatusCode);
     }
 
-    // Un envío de Demo Admitido, con la franja y la fecha de entrega comprometidas. Se guarda con el operador Demo
-    // como inquilino, igual que en ReprogramarEnvioTests.
-    private async Task EnvioComprometidoAsync(Guid zonaId, Guid franjaId, DateOnly fecha)
+    // Pedido de Lucas (19/10): un envío sin fecha propia, pero asignado a una ruta Planificada del 10/03, también
+    // bloquea el cambio desde el 01/03; la franja anterior queda como estaba.
+    [Fact]
+    public async Task Un_envio_sin_fecha_en_una_ruta_desde_esa_fecha_tambien_bloquea_el_reemplazo()
     {
+        using var demo = await AdminAsync("admin@operador-demo.uy");
+        var (zonaId, franjaId) = await ZonaConFranjaAsync(demo, "T-RUTA", "90050");
+        var envio = await EnvioComprometidoAsync(zonaId, franjaId, fecha: null, "90050");
+        await EnRutaAsync(envio, new DateOnly(2035, 3, 10));
+
+        var bloqueado = await TextoAsync(await FranjaAsync(demo, zonaId, "10:00", "14:00", TodosLosDias, "2035-03-01", franjaId.ToString()));
+
+        Assert.Contains("Hay envíos o rutas comprometidos con esta franja desde esa fecha.", bloqueado);
+        var detalle = await demo.GetStringAsync($"{Listado}/{zonaId}");
+        Assert.DoesNotContain("28/02/2035", detalle);
+        Assert.Contains($"<option value=\"{franjaId}\">09:00 a 13:00", detalle);
+    }
+
+    // Revisión de Ezequiel (19/10): si una regla falla, la página no muestra datos que no se guardaron. A2 al modificar
+    // deja el nombre anterior; A3 al reemplazar deja la franja anterior abierta y elegible.
+    [Fact]
+    public async Task Si_una_regla_falla_la_pagina_muestra_lo_guardado()
+    {
+        using var demo = await AdminAsync("admin@operador-demo.uy");
+        var (zonaId, franjaId) = await ZonaConFranjaAsync(demo, "T-VALIDA", "90060");
+        await FranjaAsync(demo, zonaId, "14:00", "18:00", TodosLosDias, "2035-01-01");
+
+        var modificar = await TextoAsync(await AccionAsync(demo, zonaId, "Modificar",
+            [new("Nombre", "Nombre rechazado"), new("CodigosPostales", "90060, 11000")]));
+        Assert.Contains("El código postal 11000 ya pertenece a la zona MVD-DEMO.", modificar);
+        // El título muestra lo guardado; el campo del formulario conserva lo que escribió, para corregirlo.
+        Assert.Contains("T-VALIDA · Zona T-VALIDA", modificar);
+        Assert.DoesNotContain("T-VALIDA · Nombre rechazado", modificar);
+
+        // 10 a 15 choca con la de la tarde (14 a 18).
+        var reemplazo = await TextoAsync(await FranjaAsync(demo, zonaId, "10:00", "15:00", TodosLosDias, "2035-03-01", franjaId.ToString()));
+        Assert.Contains("La franja se superpone con otra de la zona en el mismo día.", reemplazo);
+        Assert.DoesNotContain("28/02/2035", reemplazo);
+        // Sigue entre las que se pueden reemplazar (queda seleccionada, porque es la que eligió).
+        Assert.Matches($"<option value=\"{franjaId}\"[^>]*>09:00 a 13:00", reemplazo);
+    }
+
+    // Revisión de Ezequiel (19/10): un cambio con fecha de hoy o pasada cerraría la franja hacia atrás; una franja nueva
+    // no puede empezar en el pasado.
+    [Fact]
+    public async Task Un_cambio_o_una_franja_con_fecha_pasada_se_rechaza()
+    {
+        using var demo = await AdminAsync("admin@operador-demo.uy");
+        var (zonaId, franjaId) = await ZonaConFranjaAsync(demo, "T-PASADO", "90070");
+
+        var reemplazo = await TextoAsync(await FranjaAsync(demo, zonaId, "10:00", "14:00", TodosLosDias, "2020-01-01", franjaId.ToString()));
+        Assert.Contains("El cambio de franja tiene que regir desde mañana o después.", reemplazo);
+
+        var nueva = await TextoAsync(await FranjaAsync(demo, zonaId, "19:00", "21:00", TodosLosDias, "2020-01-01"));
+        Assert.Contains("La franja tiene que regir desde hoy o después.", nueva);
+    }
+
+    // A1 sin distinguir mayúsculas: "t-may" y "T-MAY" son la misma zona.
+    [Fact]
+    public async Task El_codigo_no_distingue_mayusculas()
+    {
+        using var demo = await AdminAsync("admin@operador-demo.uy");
+        await CrearAsync(demo, "t-may", "90080");
+
+        var html = await TextoAsync(await EnviarAltaAsync(demo, "T-MAY", "90081"));
+
+        Assert.Contains("Ya existe una zona con el código T-MAY.", html);
+    }
+
+    private static readonly string[] TodosLosDias = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    // Una zona con la franja de 9 a 13 todos los días desde el 01/01/2035, y el Id de esa franja.
+    private static async Task<(Guid ZonaId, Guid FranjaId)> ZonaConFranjaAsync(HttpClient client, string codigo, string postal)
+    {
+        var zonaId = await CrearAsync(client, codigo, postal);
+        await FranjaAsync(client, zonaId, "09:00", "13:00", TodosLosDias, "2035-01-01");
+        var detalle = await client.GetStringAsync($"{Listado}/{zonaId}");
+        return (zonaId, Guid.Parse(Regex.Match(detalle, "<option value=\"([0-9a-f-]{36})\">09:00 a 13:00").Groups[1].Value));
+    }
+
+    // Un envío de Demo con la franja comprometida, con fecha propia o sin ella. Se guarda con el operador Demo como
+    // inquilino, igual que en ReprogramarEnvioTests. Sin fecha queda AsignadoARuta, como uno que ya está en una ruta.
+    private async Task<Envio> EnvioComprometidoAsync(Guid zonaId, Guid franjaId, DateOnly? fecha, string postal = "90040")
+    {
+        var ahora = DateTimeOffset.UtcNow;
         var envio = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId, $"ENV-Z-{Guid.NewGuid():N}",
             new Destinatario("Ana Pérez", "099123456"),
-            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "90040"),
-            [new DatosBulto(2, 30, 20, 10, 150)], OrigenEvento.PortalComercio, null, DateTimeOffset.UtcNow);
+            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", postal),
+            [new DatosBulto(2, 30, 20, 10, 150)], OrigenEvento.PortalComercio, null, ahora);
         envio.DefinirPlanificacion(zonaId, franjaId, fecha);
+        if (fecha is null)
+        {
+            envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
+            envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
+        }
 
         using var scope = factory.Services.CreateScope();
         await using var db = ActivatorUtilities.CreateInstance<EnviosDbContext>(scope.ServiceProvider,
             new InquilinoFijo(DatosIniciales.OperadorDemoId, null));
         db.Envios.Add(envio);
+        await db.SaveChangesAsync();
+        return envio;
+    }
+
+    // Una ruta Planificada de Demo para esa fecha, con el envío en una de sus paradas.
+    private async Task EnRutaAsync(Envio envio, DateOnly fecha)
+    {
+        var ruta = Ruta.Crear(DatosIniciales.OperadorDemoId, fecha, Guid.NewGuid(), Guid.NewGuid(),
+            [new EnvioRuta(envio.Id, envio.Numero, null, null, null, false, [])], DateTimeOffset.UtcNow);
+
+        using var scope = factory.Services.CreateScope();
+        await using var db = ActivatorUtilities.CreateInstance<PlanificacionDbContext>(scope.ServiceProvider,
+            new InquilinoFijo(DatosIniciales.OperadorDemoId, null));
+        db.Rutas.Add(ruta);
         await db.SaveChangesAsync();
     }
 

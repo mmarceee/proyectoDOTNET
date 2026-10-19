@@ -32,8 +32,9 @@ internal sealed class DetalleModel(ConsultarZonasHandler consultar, GestionarZon
     [BindProperty]
     public List<DayOfWeek> Dias { get; set; } = [];
 
+    // Por defecto, hoy en la zona horaria del operador (se completa en OnGetAsync): el servidor puede estar en UTC.
     [BindProperty]
-    public DateOnly VigenteDesde { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    public DateOnly VigenteDesde { get; set; }
 
     [BindProperty]
     public Guid? ReemplazaA { get; set; }
@@ -45,6 +46,7 @@ internal sealed class DetalleModel(ConsultarZonasHandler consultar, GestionarZon
     {
         Mensaje = TempData["Mensaje"] as string;
         Dias = [.. TextosZona.DiasDeLaSemana.Take(5)];
+        VigenteDesde = await gestionar.HoyAsync(ct);
         return await MostrarAsync(ct);
     }
 

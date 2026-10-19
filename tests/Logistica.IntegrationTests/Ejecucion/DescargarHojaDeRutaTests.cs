@@ -98,10 +98,11 @@ public class DescargarHojaDeRutaTests(PostgresApiFactory factory) : IClassFixtur
         Assert.Equal(2, envio.Bultos.Count);
         Assert.Equal("Portón azul", envio.Direccion.Referencia);
         Assert.True(envio.ReglasEntrega.FirmaObligatoria);
-        Assert.Equal("Provisorias", envio.ReglasEntrega.Origen);
-        Assert.Null(envio.ReglasEntrega.VersionId);
-        Assert.Equal(4, envio.ReglasEntrega.MotivosNoEntrega.Count);
-        Assert.Contains(envio.ReglasEntrega.MotivosNoEntrega, m => m.Codigo == "SIN_ACCESO" && m.ExigeEvidencia);
+        // El envío de la prueba se crea sin versión de reglas: la hoja lleva la vigente del operador (CU-06).
+        Assert.Equal("Vigente", envio.ReglasEntrega.Origen);
+        Assert.NotNull(envio.ReglasEntrega.VersionId);
+        Assert.NotEmpty(envio.ReglasEntrega.MotivosNoEntrega);
+        Assert.Contains(envio.ReglasEntrega.MotivosNoEntrega, m => m.ExigeEvidencia);
         var json = await respuesta.Content.ReadAsStringAsync();
         Assert.DoesNotContain("no-descargar@", json);
         Assert.DoesNotContain("documento-privado", json);

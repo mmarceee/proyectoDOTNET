@@ -69,11 +69,21 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         return await db.Envios.SelectMany(e => e.Bultos).Where(b => codigos.Contains(b.Codigo)).ToListAsync(ct);
     }
 
-    // Se resuelve en la base, sin traer los envíos: sólo importa si existe alguno.
-    public Task<bool> HayComprometidosAsync(IReadOnlyCollection<Guid> franjaIds, DateOnly desde, CancellationToken ct)
+    // Se resuelve en la base, sin traer los envíos: sólo importa si existe alguno. Dentro de la transacción de CU-04,
+    // que tiene el bloqueo de planificación del operador.
+    public async Task<bool> HayComprometidosAsync(IReadOnlyCollection<Guid> franjaIds, DateOnly desde, CancellationToken ct)
     {
-        return db.Envios.AnyAsync(e => e.FranjaHorariaId != null && franjaIds.Contains(e.FranjaHorariaId.Value)
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Envios.AnyAsync(e => e.FranjaHorariaId != null && franjaIds.Contains(e.FranjaHorariaId.Value)
             && e.FechaEntregaProgramada >= desde && Envio.EstadosConEntregaPendiente.Contains(e.Estado), ct);
+    }
+
+    public async Task<IReadOnlyList<Guid>> SinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Envios.Where(e => e.FranjaHorariaId != null && franjaIds.Contains(e.FranjaHorariaId.Value)
+                && e.FechaEntregaProgramada == null && Envio.EstadosConEntregaPendiente.Contains(e.Estado))
+            .Select(e => e.Id).ToListAsync(ct);
     }
 
     // El operador y el comercio del sobre los pone AgregarAlOutbox desde la sesión.

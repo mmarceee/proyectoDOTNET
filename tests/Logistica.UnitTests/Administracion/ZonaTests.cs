@@ -28,6 +28,28 @@ public class ZonaTests
     }
 
     [Fact]
+    public void El_codigo_se_guarda_en_mayusculas()
+    {
+        var zona = Zona.Crear(Operador, " mvd-1 ", "Montevideo", ["11000"]);
+
+        Assert.Equal("MVD-1", zona.Codigo);
+    }
+
+    // Revisión de Ezequiel: un cambio desde el Backoffice rige desde mañana o después.
+    [Fact]
+    public void Un_cambio_de_franja_desde_hoy_o_antes_se_rechaza()
+    {
+        var franja = CrearFranja(Guid.NewGuid(), 9, 13, LunesAViernes);
+        var hoy = Inicio.AddDays(30);
+
+        Assert.Throws<DomainException>(() => franja.ProgramarCambio(new(10, 0), new(14, 0), LunesAViernes, hoy, hoy));
+        Assert.Null(franja.VigenteHasta);
+
+        var nueva = franja.ProgramarCambio(new(10, 0), new(14, 0), LunesAViernes, hoy.AddDays(1), hoy);
+        Assert.Equal(franja.Id, nueva.ReemplazaAId);
+    }
+
+    [Fact]
     public void Una_zona_sin_codigos_postales_no_se_puede_modificar()
     {
         var zona = CrearZona();

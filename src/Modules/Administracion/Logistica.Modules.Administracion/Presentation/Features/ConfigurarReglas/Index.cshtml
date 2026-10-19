@@ -1,0 +1,63 @@
+@page "/backoffice/reglas"
+@model Logistica.Modules.Administracion.Presentation.Features.ConfigurarReglas.IndexModel
+@using Logistica.Modules.Administracion.Application.Features.ConfigurarTarifario
+@using Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Reglas operativas";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Reglas operativas</h1>
+    <form method="post" asp-page-handler="Nueva">
+        <button type="submit" class="btn btn-primary">@(Model.HayBorrador ? "Seguir el borrador" : "Nueva versión")</button>
+    </form>
+</div>
+
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+
+@if (Model.Vigentes is { } vigentes)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h6 card-title">Rigen ahora: versión @vigentes.Numero</h2>
+            <ul class="mb-0">
+                <li>Hasta <strong>@vigentes.MaxIntentos</strong> intentos, con <strong>@vigentes.PlazoEntreIntentos.TotalHours h</strong> entre uno y otro.</li>
+                <li>Pruebas: firma@(vigentes.ExigeFoto ? ", foto" : "")@(vigentes.ExigeNombreYDocumento ? ", nombre y documento" : "").</li>
+                <li>Plazos: @string.Join(" · ", vigentes.Plazos.Select(p => $"{TextosTarifario.Modalidad(p.Modalidad)} {p.Plazo.TotalHours} h")).</li>
+                <li>@vigentes.Motivos.Count motivos de no entrega · hasta @vigentes.MaxParadasPorRuta paradas por ruta.</li>
+            </ul>
+        </div>
+    </div>
+}
+
+@if (Model.Versiones.Count == 0)
+{
+    <p class="text-muted">Todavía no hay versiones.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr><th>Versión</th><th>Situación</th><th>Rige desde</th><th>Rige hasta</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var version in Model.Versiones)
+                {
+                    var (texto, clase) = TextosTarifario.Situacion(version.Situacion);
+                    var enlace = version.Situacion == SituacionVersion.Borrador ? "/backoffice/reglas/borrador" : $"/backoffice/reglas/{version.Numero}";
+                    <tr>
+                        <td><a href="@enlace">Versión @version.Numero</a></td>
+                        <td><span class="badge @clase">@texto</span></td>
+                        <td>@TextosTarifario.Fecha(version.VigenteDesde)</td>
+                        <td>@TextosTarifario.Fecha(version.VigenteHasta)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

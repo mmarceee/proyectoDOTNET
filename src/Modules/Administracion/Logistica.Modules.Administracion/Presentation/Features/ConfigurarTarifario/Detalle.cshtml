@@ -1,0 +1,59 @@
+@page "/backoffice/tarifario/{numero:int}"
+@model Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario.DetalleModel
+@using Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = $"Versión {Model.Version.Numero}";
+    var (texto, clase) = TextosTarifario.Situacion(Model.Version.Situacion);
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Versión @Model.Version.Numero <span class="badge @clase align-middle">@texto</span></h1>
+    <a href="/backoffice/tarifario" class="btn btn-outline-secondary">Volver a las versiones</a>
+</div>
+
+<p>Rige desde <strong>@TextosTarifario.Fecha(Model.Version.VigenteDesde)</strong> hasta <strong>@TextosTarifario.Fecha(Model.Version.VigenteHasta)</strong>.
+    Una versión publicada no se modifica: para cambiar precios, creá una nueva versión.</p>
+
+<h2 class="h5">Reglas</h2>
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead><tr><th>Zona</th><th>Modalidad</th><th>Peso (kg)</th><th>Volumen (m³)</th><th>Precio</th></tr></thead>
+        <tbody>
+            @foreach (var regla in Model.Version.Reglas)
+            {
+                <tr>
+                    <td>@regla.Zona</td>
+                    <td>@TextosTarifario.Modalidad(regla.Modalidad)</td>
+                    <td>@TextosTarifario.Numero(regla.PesoDesdeKg) a @TextosTarifario.Numero(regla.PesoHastaKg)</td>
+                    <td>@TextosTarifario.Numero(regla.VolumenDesdeM3) a @TextosTarifario.Numero(regla.VolumenHastaM3)</td>
+                    <td>$ @TextosTarifario.Numero(regla.PrecioBase)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<h2 class="h5">Ajustes</h2>
+@if (Model.Version.Ajustes.Count == 0)
+{
+    <p class="text-muted">Sin ajustes.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Tipo</th><th>Valor</th><th>Modalidad</th></tr></thead>
+            <tbody>
+                @foreach (var ajuste in Model.Version.Ajustes)
+                {
+                    <tr>
+                        <td>@TextosTarifario.Ajuste(ajuste.Tipo)</td>
+                        <td>@TextosTarifario.Valor(ajuste)</td>
+                        <td>@TextosTarifario.Modalidad(ajuste.Modalidad)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

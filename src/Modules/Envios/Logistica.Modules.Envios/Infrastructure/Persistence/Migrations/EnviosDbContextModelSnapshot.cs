@@ -223,6 +223,9 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<Guid?>("VersionReglasId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("VersionTarifarioId")
                         .HasColumnType("uuid");
 
