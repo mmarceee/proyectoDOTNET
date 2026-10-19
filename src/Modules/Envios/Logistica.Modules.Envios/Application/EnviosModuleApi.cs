@@ -103,6 +103,11 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         }
     }
 
+    public Task<bool> HayEnviosComprometidosAsync(IReadOnlyCollection<Guid> franjaIds, DateOnly desde, CancellationToken ct)
+    {
+        return envios.HayComprometidosAsync(franjaIds, desde, ct);
+    }
+
     public async Task<IReadOnlyList<EnvioPlanificable>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct)
     {
         var lista = await envios.ObtenerParaPlanificacionAsync(envioIds, ct);

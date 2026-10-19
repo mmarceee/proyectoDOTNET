@@ -218,15 +218,19 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 
 * cubre(codigoPostal: string): bool
 
-* agregarFranja(desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\], vigenteDesde: DateOnly): FranjaHoraria
+* modificar(nombre: string, codigosPostales: string\[\]) — CU-04, A4; el código no cambia.
 
-* reemplazarFranja(franjaAnteriorId: Guid, desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\], vigenteDesde: DateOnly): FranjaHoraria — crea una nueva franja y cierra la vigencia de la anterior, conservando su historial. La aplicación coordina la comprobación de anticipación, reprogramación, revalidación y notificaciones de los envíos afectados.
+* desactivar() — CU-04, A5; la zona deja de aceptarse en envíos nuevos y los existentes no cambian.
+
+Zona no crea ni contiene sus franjas: FranjaHoraria es una entidad propia que guarda zonaId (decisión del 18/10/2026, ver más abajo).
 
 **FranjaHoraria**
 
 **Atributos**
 
 * id: Guid
+
+* operadorId: Guid
 
 * zonaId: Guid
 
@@ -242,11 +246,23 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 
 * reemplazaAId: Guid (opcional; identifica explícitamente la franja anterior de la misma zona que esta reemplaza)
 
+**Métodos**
+
+* crear(operadorId: Guid, zonaId: Guid, desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\], vigenteDesde: DateOnly): FranjaHoraria — exige que desde sea anterior a hasta y al menos un día.
+
+* reemplazar(desde: TimeOnly, hasta: TimeOnly, dias: DiaSemana\[\], vigenteDesde: DateOnly): FranjaHoraria — crea la franja nueva, vinculada con reemplazaAId, y cierra la vigencia de esta el día anterior, conservando su historial. Sólo se reemplaza la última franja de la cadena.
+
+* aplica(fecha: DateOnly): bool — la franja rige ese día.
+
+* seSuperponeCon(otra: FranjaHoraria): bool — CU-04, A3: misma zona, algún día en común, horarios que se cruzan y vigencias que se cruzan. Dos franjas contiguas (9 a 13 y 13 a 17) no se superponen.
+
 **Vigencia de franjas (acordada al definir CU-40 el 09/10/2026):** el Administrador del operador programa cambios de franjas por zona con una fecha de entrada en vigencia. Cada cambio crea una nueva franja, vinculada explícitamente a la anterior mediante reemplazaAId, sin sobrescribir sus horarios históricos. La anterior termina el día previo a vigenteDesde de su reemplazo. Las consultas de cobertura horaria se resuelven para el día de entrega o de la ruta. Los compromisos afectados desde esa fecha se reprograman y revalidan con más de 24 horas de anticipación hasta el inicio más temprano entre la franja anterior y la nueva, conservando el historial y notificando al destinatario y al comercio. No se modifican rutas Despachadas o EnCurso; se propone una vigencia posterior si impiden el cambio. Los pedidos nuevos no postergan el cambio y sólo pueden usar franjas atendidas para su fecha. Los envíos sin día definido resuelven su franja al planificar. Las firmas del flujo por lote y su coordinación técnica con rutas se definen en la especificación técnica de CU-40; el comportamiento transaccional y la aplicación de T19 se detallan en las decisiones acordadas.
 
 **Confirmación del cambio programado (acordada el 09/10/2026):** la aplicación comprueba todos los envíos y rutas afectados y confirma las nuevas vigencias, reprogramaciones, cambios necesarios en la planificación y mensajes de aviso en Outbox en una sola transacción. Si cualquier compromiso o conflicto impide el cambio, se conserva la configuración anterior sin reprogramaciones parciales. Las notificaciones se entregan después de confirmar y se reintentan si fallan, sin deshacer la operación. Las firmas objetivo de los contratos se definen en la especificación técnica de CU-40; los envíos ya asignados a rutas Planificadas se tratan mediante T19, conforme a las notas de Planificación.
 
 La [especificación técnica de CU-40](cu-40/especificacion-tecnica-cu-40.md), sección 8, concreta el flujo por lote, los contratos, reemplazos sucesivos y el tratamiento de envíos sin día definido. La implementación de esta ampliación corresponde a CU-04.
+
+**Mientras la ampliación esté pendiente (acordado el 18/10/2026):** la reprogramación por lote no se implementa para el hito del 22/10. Como Planificación sigue los reemplazos por fecha, reemplazar una franja podría cambiar un horario ya prometido sin aviso ni revalidación. Por eso el reemplazo se bloquea si algún envío con entrega pendiente (Admitido, EnDeposito, AsignadoARuta, EnTransito, NoEntregado o Reprogramado) tiene esa franja, o una de las que ella reemplazó, con fecha de entrega igual o posterior a la del cambio. Las rutas quedan cubiertas por sus envíos. Administración lo consulta con IEnviosModuleApi.HayEnviosComprometidosAsync.
 
 **VersionTarifario**
 
@@ -1163,7 +1179,7 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | Repartidor | 0..1 | asociación | 0..1 | Usuario |
 | Operador | 1 | asociación | 0..\* | Vehiculo |
 | Operador | 1 | asociación | 0..\* | Zona |
-| Zona | 1 | composición | 0..\* | FranjaHoraria |
+| Zona | 1 | asociación | 0..\* | FranjaHoraria |
 | Operador | 1 | asociación | 0..\* | VersionTarifario |
 | VersionTarifario | 1 | composición | 0..\* | ReglaTarifa |
 | VersionTarifario | 1 | composición | 0..\* | AjusteTarifa |
@@ -1233,6 +1249,8 @@ Puntos del modelo que dependen de una decisión del equipo (o, en algún caso, d
 * RelacionComercial con filtro de inquilino: implementa IOperadorOwned e IComercioOwned (ADR-0002 v2.1, sección 2.6).
 
 * Usuario y ClaveApi frente al filtro de inquilino: Usuario (Identity) no tiene filtro y la búsqueda de ClaveApi por hash es el único acceso que lo ignora (ADR-0002 v2.1, secciones 2.4 y 4).
+
+* Zona y FranjaHoraria (18/10/2026, Cristian Reyes y Lucas Ottonello): FranjaHoraria es una entidad propia asociada a Zona por zonaId, no una parte de su composición, porque Planificación y CU-19 ya la consultan y reemplazan por separado. Las reglas que comparan franjas entre sí (superposición, CU-04 A3) usan FranjaHoraria.seSuperponeCon y las coordina el caso de uso. La reprogramación por lote de la ampliación de CU-04 queda pendiente; mientras tanto, el reemplazo se bloquea si hay envíos comprometidos (sección de Zona y FranjaHoraria).
 
 **Abiertos**
 

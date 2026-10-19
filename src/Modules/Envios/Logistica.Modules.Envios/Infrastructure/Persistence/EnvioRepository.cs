@@ -61,6 +61,13 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         return await consulta.OrderBy(e => e.Numero).ToListAsync(ct);
     }
 
+    // Se resuelve en la base, sin traer los envíos: sólo importa si existe alguno.
+    public Task<bool> HayComprometidosAsync(IReadOnlyCollection<Guid> franjaIds, DateOnly desde, CancellationToken ct)
+    {
+        return db.Envios.AnyAsync(e => e.FranjaHorariaId != null && franjaIds.Contains(e.FranjaHorariaId.Value)
+            && e.FechaEntregaProgramada >= desde && Envio.EstadosConEntregaPendiente.Contains(e.Estado), ct);
+    }
+
     // El operador y el comercio del sobre los pone AgregarAlOutbox desde la sesión.
     public void RegistrarAsignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
     {
