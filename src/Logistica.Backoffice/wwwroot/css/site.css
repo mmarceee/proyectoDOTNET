@@ -37,9 +37,42 @@ body {
 /* Estilos del layout (antes en _Layout.cshtml.css) */
 
 a.navbar-brand {
-  white-space: normal;
-  text-align: center;
-  word-break: break-all;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: calc(100% - 5rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navbar-collapse {
+  gap: 1rem;
+}
+
+.navbar-nav .nav-link {
+  white-space: nowrap;
+}
+
+.cuenta-usuario {
+  min-width: 0;
+}
+
+.cuenta-usuario .navbar-text {
+  overflow-wrap: anywhere;
+}
+
+.cuenta-usuario .btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 1399.98px) {
+  .navbar-collapse {
+    padding-top: .75rem;
+  }
+
+  .cuenta-usuario {
+    padding: .75rem 0 .25rem;
+  }
 }
 
 a {

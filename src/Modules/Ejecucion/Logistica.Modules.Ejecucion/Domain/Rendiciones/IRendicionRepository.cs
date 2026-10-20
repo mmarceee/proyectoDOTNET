@@ -10,6 +10,7 @@ internal interface IRendicionRepository
     Task<Rendicion?> ObtenerAsync(Guid rutaId, CancellationToken ct);
     Task<IReadOnlyList<Rendicion>> PendientesAsync(int pagina, CancellationToken ct);
     Task<EvidenciaRuta> EvidenciaAsync(Guid rutaId, CancellationToken ct);
+    Task<bool> TieneActividadRegistradaAsync(Guid rutaId, CancellationToken ct);
     void Agregar(Rendicion rendicion);
     Task GuardarAsync(CancellationToken ct);
 }

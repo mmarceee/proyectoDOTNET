@@ -42,6 +42,7 @@ public class AplicacionesWebAssemblyTests(WebApplicationFactory<Program> factory
 
         Assert.NotEmpty(script);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
     }
 
     [Fact]
@@ -52,5 +53,28 @@ public class AplicacionesWebAssemblyTests(WebApplicationFactory<Program> factory
         var response = await client.GetAsync("/repartidor/service-worker.js");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("portal")]
+    [InlineData("seguimiento")]
+    [InlineData("repartidor")]
+    public async Task Los_archivos_propios_referenciados_por_el_arranque_existen_y_el_arranque_no_se_cachea(string app)
+    {
+        using var host = factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "true"));
+        using var client = host.CreateClient();
+        using var respuesta = await client.GetAsync($"/{app}/_framework/dotnet.js");
+        respuesta.EnsureSuccessStatusCode();
+        Assert.True(respuesta.Headers.CacheControl?.NoStore);
+        var arranque = await respuesta.Content.ReadAsStringAsync();
+        var archivos = Regex.Matches(arranque, @"Logistica\.[A-Za-z0-9_.-]+\.wasm")
+            .Select(m => m.Value).Distinct().ToArray();
+        Assert.NotEmpty(archivos);
+        foreach (var archivo in archivos)
+        {
+            using var recurso = await client.GetAsync($"/{app}/_framework/{archivo}");
+            Assert.True(recurso.StatusCode == HttpStatusCode.OK, $"El arranque de {app} referencia {archivo}, que devuelve {recurso.StatusCode}.");
+            Assert.Equal("application/wasm", recurso.Content.Headers.ContentType?.MediaType);
+        }
     }
 }

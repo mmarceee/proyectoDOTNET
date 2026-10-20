@@ -107,7 +107,13 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         var e = await PrepararAsync();
         using var client = await OperarioAsync();
 
-        Assert.Contains(e.Ruta.ToString()[^8..], await client.GetStringAsync("/backoffice/rendiciones"));
+        var listado = WebUtility.HtmlDecode(await client.GetStringAsync("/backoffice/rendiciones"));
+        Assert.Contains($"href=\"/backoffice/rendiciones/{e.Ruta}\"", listado);
+        Assert.DoesNotContain($"<code>{e.Ruta.ToString()[^8..]}</code>", listado);
+        Assert.Contains("Repartidor Demo 1", listado);
+        Assert.Contains("DEMO001", listado);
+        Assert.Contains("<th scope=\"col\">Chofer</th>", listado);
+        Assert.Contains("<th scope=\"col\">Vehículo</th>", listado);
 
         var detalle = await client.GetStringAsync($"/backoffice/rendiciones/{e.Ruta}");
         Assert.All(e.NoIntentado.Bultos, b => Assert.Contains(b.Codigo, detalle));

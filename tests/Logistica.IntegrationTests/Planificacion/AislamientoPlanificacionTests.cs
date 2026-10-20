@@ -73,7 +73,8 @@ public class AislamientoPlanificacionTests(PostgresApiFactory factory) : IClassF
         db.Rutas.AddRange(planificada, despachada, enCurso, finalizada, otroDia);
         await db.SaveChangesAsync();
         await GuardarRutaAsync(scope, Guid.NewGuid());
-        var handler = new ConsultarRutasHandler(new RutaRepository(db), scope.ServiceProvider.GetRequiredService<IEnviosModuleApi>());
+        var handler = new ConsultarRutasHandler(new RutaRepository(db), scope.ServiceProvider.GetRequiredService<IEnviosModuleApi>(),
+            scope.ServiceProvider.GetRequiredService<Logistica.Modules.Administracion.Contracts.IAdministracionModuleApi>());
         Assert.Equal(5, (await handler.ListarAsync(null, null, default)).Count);
         Assert.Equal(2, (await handler.ListarAsync(null, "Planificada", default)).Count);
         Assert.Equal(planificada.Id, Assert.Single(await handler.ListarAsync(planificada.Fecha, "Planificada", default)).Id);

@@ -57,6 +57,7 @@
 </div>
 </section>
 @await Html.PartialAsync("~/Presentation/Features/DespacharRuta/ConfirmacionDespacho.cshtml", Model)
+@await Html.PartialAsync("~/Presentation/Features/AnularDespacho/ConfirmacionAnulacion.cshtml", Model)
 @if (Model.Editable) { @await Html.PartialAsync("~/Presentation/Features/ArmarRuta/Formulario.cshtml", Model) }
 @if (Model.Editable) { @await Html.PartialAsync("~/Presentation/Features/QuitarEnvioDeRuta/ConfirmacionQuitarEnvio.cshtml", Model) }
 else { <div asp-validation-summary="All" class="text-danger mb-3" role="alert"></div> }
@@ -64,6 +65,18 @@ else { <div asp-validation-summary="All" class="text-danger mb-3" role="alert"><
 <div class="card-body p-4">
 <h2 id="historial-validaciones" class="h5">Historial de la ruta</h2>
 <p class="text-muted mb-4">Consultá los envíos quitados y las validaciones registradas al confirmar cambios en la ruta.</p>
+@if (Model.Anulaciones.Count > 0)
+{
+    <h3 class="h6">Despachos anulados</h3>
+    @foreach (var anulacion in Model.Anulaciones)
+    {
+        <div class="border rounded p-3 mb-3" data-anulacion-despacho="@anulacion.Id">
+            <strong>Despacho anulado</strong> · revisión @anulacion.RevisionRuta · @anulacion.OcurridoEn.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm")
+            <p class="mt-2 mb-1">Ruta del @anulacion.FechaRuta.ToString("dd/MM/yyyy"), despachada el @anulacion.DespachadaEn.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm"). Volvió a Planificada.</p>
+            <p class="mb-0">Motivo: @anulacion.Motivo</p>
+        </div>
+    }
+}
 @if (Model.Retiros.Count > 0)
 {
     <h3 class="h6">Envíos quitados</h3>

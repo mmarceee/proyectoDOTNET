@@ -5,7 +5,11 @@
 }
 .navbar-brand {
     color: #fff;
-    white-space: normal;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: calc(100% - 5rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .navbar-collapse {
     align-items: center;
@@ -38,7 +42,27 @@
     --bs-btn-focus-shadow-rgb: 220, 53, 69;
     white-space: nowrap;
 }
-@media (max-width: 767.98px) {
+.cuenta-usuario,
+.acciones-cuenta {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.cuenta-usuario {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.cuenta-usuario .navbar-text {
+    color: rgba(255, 255, 255, .9);
+    overflow-wrap: anywhere;
+}
+.acciones-cuenta {
+    flex-wrap: wrap;
+}
+.acciones-cuenta a {
+    white-space: nowrap;
+}
+@media (max-width: 1399.98px) {
     .navbar-collapse { padding-top: .75rem; }
-    .btn-logout { margin: .75rem 0 .25rem; }
+    .cuenta-usuario { justify-content: flex-start; padding: .75rem 0 .25rem; }
 }

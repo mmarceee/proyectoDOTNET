@@ -1,4 +1,7 @@
-<nav class="navbar navbar-expand-md navbar-dark" aria-label="Navegación principal">
+@using Logistica.Http.Contracts.Cuenta
+@inject HttpClient Http
+
+<nav class="navbar navbar-expand-xxl navbar-dark" aria-label="Navegación principal">
     <div class="container">
         <a class="navbar-brand" href="">Portal del comercio</a>
         <button type="button" class="navbar-toggler" aria-label="Mostrar navegación"
@@ -12,17 +15,40 @@
                     <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="CloseNavMenu">Inicio</NavLink>
                 </li>
                 <li class="nav-item"><NavLink class="nav-link" href="envios/nuevo" @onclick="CloseNavMenu">Nuevo envío</NavLink></li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/cuenta/operador?ReturnUrl=%2Fportal%2F">Cambiar operador</a>
-                </li>
             </ul>
-            <a class="btn btn-sm btn-logout" href="/cuenta/salir?portal=true">Cerrar sesión</a>
+            <div class="cuenta-usuario">
+                @if (!string.IsNullOrWhiteSpace(nombreUsuario))
+                {
+                    <span class="navbar-text">@nombreUsuario</span>
+                }
+                <div class="acciones-cuenta">
+                    <a class="btn btn-sm btn-outline-light" href="/cuenta/operador?ReturnUrl=%2Fportal%2F">Cambiar operador</a>
+                    <a class="btn btn-sm btn-logout" href="/cuenta/salir?portal=true">Cerrar sesión</a>
+                </div>
+            </div>
         </div>
     </div>
 </nav>
 
 @code {
     private bool collapseNavMenu = true;
+    private string? nombreUsuario;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var limite = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            using var respuesta = await Http.GetAsync("/api/portal/sesion", limite.Token);
+            if (respuesta.IsSuccessStatusCode)
+                nombreUsuario = (await respuesta.Content.ReadFromJsonAsync<SesionPortalResponse>(limite.Token))?.NombreUsuario;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            // Los accesos de la cuenta siguen disponibles si no se puede consultar la sesión.
+        }
+    }
+
     private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
     private void CloseNavMenu() => collapseNavMenu = true;
 }

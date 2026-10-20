@@ -40,6 +40,9 @@ internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lecto
     }
 
     public Task BloquearPlanificacionAsync(CancellationToken ct) => lector.BloquearPlanificacionAsync(ct);
+    public Task<NombresRecursosPlanificacion> ConsultarNombresRecursosAsync(IReadOnlyCollection<Guid> repartidorIds,
+        IReadOnlyCollection<Guid> vehiculoIds, CancellationToken ct)
+        => lector.ConsultarNombresAsync(repartidorIds, vehiculoIds, ct);
     public Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct) => lector.ObtenerContextoPlanificacionAsync(ct);
     public Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct) => lector.ObtenerReglasPlanificacionAsync(ahora, ct);
     public async Task<RecursosPlanificacion> ConsultarRecursosPlanificacionAsync(DateOnly fecha, CancellationToken ct)

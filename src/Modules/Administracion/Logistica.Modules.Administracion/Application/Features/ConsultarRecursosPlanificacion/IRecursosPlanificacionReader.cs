@@ -8,5 +8,7 @@ internal interface IRecursosPlanificacionReader
     Task BloquearPlanificacionAsync(CancellationToken ct);
     Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct);
     Task<DatosRecursosPlanificacion> LeerRecursosAsync(CancellationToken ct);
+    Task<NombresRecursosPlanificacion> ConsultarNombresAsync(IReadOnlyCollection<Guid> repartidorIds,
+        IReadOnlyCollection<Guid> vehiculoIds, CancellationToken ct);
     Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct);
 }

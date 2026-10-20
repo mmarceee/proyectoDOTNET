@@ -18,7 +18,7 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("planificacion")
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -59,6 +59,50 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                         .HasFilter("\"PublicadoEn\" IS NULL");
 
                     b.ToTable("outbox_messages", "planificacion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.AnulacionDespacho", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("DespachadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("FechaRuta")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("OcurridoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ResponsableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("RevisionAnterior")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RevisionRuta")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RutaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "RutaId");
+
+                    b.HasIndex("RutaId", "RevisionRuta")
+                        .IsUnique();
+
+                    b.ToTable("AnulacionesDespacho", "planificacion");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.BultoValidacionRuta", b =>
@@ -333,6 +377,16 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("ValidacionesRuta", "planificacion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.AnulacionDespacho", b =>
+                {
+                    b.HasOne("Logistica.Modules.Planificacion.Domain.Rutas.Ruta", null)
+                        .WithMany()
+                        .HasForeignKey("OperadorId", "RutaId")
+                        .HasPrincipalKey("OperadorId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.BultoValidacionRuta", b =>

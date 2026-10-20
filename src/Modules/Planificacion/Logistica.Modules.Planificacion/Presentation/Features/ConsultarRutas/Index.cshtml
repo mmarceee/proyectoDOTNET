@@ -16,11 +16,14 @@
     <a href="/backoffice/rutas" class="btn btn-outline-secondary text-nowrap">Limpiar filtros</a>
 </form>
 <div class="table-responsive">
-<table class="table table-hover align-middle"><thead><tr><th>Fecha</th><th>Estado</th><th>Paradas</th><th>Revisión</th><th class="text-end">Acciones</th></tr></thead><tbody>
+<table class="table table-hover align-middle"><thead><tr><th>Fecha</th><th>Estado</th><th>Repartidor</th><th>Vehículo</th><th>Paradas</th><th>Revisión</th><th class="text-end">Acciones</th></tr></thead><tbody>
 @foreach (var ruta in Model.Rutas)
 {
     <tr>
-        <td>@ruta.Fecha.ToString("dd/MM/yyyy")</td><td>@ruta.Estado</td><td>@ruta.Paradas.Count</td><td>@ruta.Revision</td>
+        <td>@ruta.Fecha.ToString("dd/MM/yyyy")</td><td>@(ruta.Estado == "EnCurso" ? "En curso" : ruta.Estado)</td>
+        <td>@Model.Repartidores.GetValueOrDefault(ruta.RepartidorId, "No asignado")</td>
+        <td class="text-nowrap">@Model.Vehiculos.GetValueOrDefault(ruta.VehiculoId, "No asignado")</td>
+        <td>@ruta.Paradas.Count</td><td>@ruta.Revision</td>
         <td class="text-end">
             <a href="/backoffice/rutas/@ruta.Id" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2 text-nowrap" aria-label="Abrir ruta del @ruta.Fecha.ToString("dd/MM/yyyy"), con @ruta.Paradas.Count paradas">
                 Abrir ruta <span aria-hidden="true">→</span>

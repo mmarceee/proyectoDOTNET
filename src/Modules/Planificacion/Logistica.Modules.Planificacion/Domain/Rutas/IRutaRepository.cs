@@ -14,5 +14,7 @@ internal interface IRutaRepository
     void Agregar(Ruta ruta);
     void Agregar(ValidacionRuta validacion);
     void Agregar(RetiroEnvioRuta retiro);
+    Task<IReadOnlyList<AnulacionDespacho>> AnulacionesAsync(Guid rutaId, int pagina, CancellationToken ct);
+    void Agregar(AnulacionDespacho anulacion);
     Task GuardarAsync(CancellationToken ct);
 }

@@ -44,7 +44,7 @@ else
                 else if (pendiente) { <p>Tu declaración está guardada en este dispositivo. Falta enviarla al servidor.</p> }
                 else if (esperaDeposito) { <p>Tu declaración está confirmada. Esperando recepción del depósito. Tu recorrido en esta ruta terminó.</p> }
                 else if (futura) { <p>Podrás comenzar cuando llegue la fecha de esta ruta.</p> }
-                else if (sinIniciarAtrasada) { <p>Esta ruta es de un día anterior y no tiene una carga confirmada. No podés cargarla ahora; despacho debe revisar la planificación pendiente.</p> }
+                else if (sinIniciarAtrasada) { <p>Esta ruta es de un día anterior y no tiene una carga confirmada. Si guardaste una carga sin conexión, sincronizala primero. Si el recorrido no comenzó, coordiná con despacho para que anule el despacho y vuelva a planificar.</p> }
                 else if (anterior && carga == "Pendiente") { <p>Hay una carga guardada pendiente de sincronizar. Podés enviarla, pero no registrar una carga nueva para esta fecha.</p> }
                 else if (activa && anterior) { <p>Esta ruta quedó en curso desde el @ruta.FechaRuta.ToString("dd/MM/yyyy"). Podés rendirla; no se permiten nuevas cargas de otro día.</p> }
                 @if (activa)
@@ -60,7 +60,7 @@ else
                             <a class="btn btn-outline-primary" href="@Enlace("hoja-de-ruta", ruta.RutaId)">Ver ruta</a>
                             @if (carga == "Pendiente") { <a class="btn btn-primary" href="@Enlace("carga", ruta.RutaId)">Ver carga pendiente</a> }
                             else if (ruta.CargaPendiente && !anterior) { <a class="btn btn-primary" href="@Enlace("carga", ruta.RutaId)">@(ruta.Estado == "EnCurso" ? "Continuar carga" : "Cargar vehículo")</a> }
-                            @if (ruta.Estado == "EnCurso") { <a class="btn btn-outline-primary" href="@Enlace("rendicion", ruta.RutaId)">@(rendicion == "Rechazada" ? "Revisar rendición" : "Rendir ruta")</a> }
+                            @if (ruta.Estado == "EnCurso") { <a class="btn @(rendicion == "Rechazada" ? "btn-outline-primary" : "btn-danger ms-auto")" href="@Enlace("rendicion", ruta.RutaId)">@(rendicion == "Rechazada" ? "Revisar rendición" : "Finalizar ruta")</a> }
                         }
                     </div>
                 }

@@ -74,6 +74,14 @@ internal sealed class Ruta : Entity, IOperadorOwned
         if (Estado != EstadoRuta.Despachada) throw new DomainException("La ruta debe estar despachada.");
         Estado = EstadoRuta.EnCurso; Actualizar();
     }
+    public void AnularDespacho(DateOnly hoy)
+    {
+        if (Estado != EstadoRuta.Despachada || Fecha >= hoy)
+            throw new DomainException("Sólo se puede anular el despacho de una ruta anterior que no se inició.");
+        Estado = EstadoRuta.Planificada;
+        DespachadaEn = null;
+        Actualizar();
+    }
     public void Finalizar()
     {
         if (Estado is not (EstadoRuta.EnCurso or EstadoRuta.Despachada)) throw new DomainException("La ruta no está en ejecución.");

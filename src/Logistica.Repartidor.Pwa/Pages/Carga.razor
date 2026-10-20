@@ -22,12 +22,12 @@ else if (Cargas.Borrador is { } borrador && Hoja.Copia is { } copia)
     var esperados = envios.SelectMany(e => e.Bultos).Select(b => b.Codigo).ToHashSet(StringComparer.Ordinal);
     var faltantes = esperados.Except(codigos).ToArray();
     var sobrantes = codigos.Except(esperados).ToArray();
+    var puedeFinalizar = copia.Hoja.Rendicion?.Iniciada is null && (copia.Hoja.EstadoRuta == "EnCurso"
+        || borrador.Resultado is "Pendiente" or "Aplicada" && envios.Any(e => e.Bultos.All(b => codigos.Contains(b.Codigo))));
     <p>Ruta del @copia.Hoja.FechaRuta.ToString("dd/MM/yyyy") · Vehículo <strong>@copia.Hoja.Vehiculo.Matricula</strong></p>
-    @if (copia.Hoja.Rendicion?.Iniciada is null && (copia.Hoja.EstadoRuta == "EnCurso"
-        || borrador.Resultado is "Pendiente" or "Aplicada" && envios.Any(e => e.Bultos.All(b => codigos.Contains(b.Codigo)))))
+    @if (puedeFinalizar)
     {
         <p>Cuando termines el recorrido, declará los bultos que devolvés al depósito.</p>
-        <a class="btn btn-outline-primary mb-3" href="@($"rendicion?rutaId={copia.Hoja.RutaId}")">Rendir ruta</a>
     }
     @if (borrador.Resultado == "Pendiente")
     {
@@ -42,7 +42,6 @@ else if (Cargas.Borrador is { } borrador && Hoja.Copia is { } copia)
     else if (borrador.Resultado == "Aplicada")
     {
         <div class="alert alert-success">Carga confirmada por el servidor.</div>
-        @if (copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa) { <button class="btn btn-outline-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.AbrirAsync">Revisar carga restante</button> }
     }
 else if (envios.Length == 0) { <div class="alert alert-success">No quedan envíos pendientes de cargar en esta hoja.</div> }
     else
@@ -77,6 +76,19 @@ else if (envios.Length == 0) { <div class="alert alert-success">No quedan envío
             <label class="d-block mb-3"><input type="checkbox" @bind="aceptaFaltantes" /> Revisé los faltantes y confirmo que voy a continuar con la carga incompleta.</label>
         }
         <button class="btn btn-primary mb-4" @onclick="Confirmar" disabled="@(Cargas.Ocupado || borrador.Lecturas.Count == 0 || faltantes.Length > 0 && !aceptaFaltantes)">Confirmar carga</button>
+    }
+    @if (puedeFinalizar || borrador.Resultado == "Aplicada" && copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa)
+    {
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mb-3">
+            @if (borrador.Resultado == "Aplicada" && copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa)
+            {
+                <button class="btn btn-outline-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.AbrirAsync">Revisar carga restante</button>
+            }
+            @if (puedeFinalizar)
+            {
+                <a class="btn btn-danger ms-auto" href="@($"rendicion?rutaId={copia.Hoja.RutaId}")">Finalizar ruta</a>
+            }
+        </div>
     }
 }
 else if (Cargas.Ocupado || Hoja.Cargando) { <p role="status">Abriendo la carga guardada…</p> }

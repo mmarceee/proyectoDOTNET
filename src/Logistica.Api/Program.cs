@@ -138,6 +138,24 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
 if (app.Environment.IsDevelopment())
 {
     app.UseWebAssemblyDebugging();
+    // El arranque WASM referencia archivos con huellas que cambian al compilar. En desarrollo no conservar
+    // respuestas de otra compilación; la política de publicación y el almacenamiento offline no se modifican.
+    app.Use(async (http, next) =>
+    {
+        if (http.Request.Path.StartsWithSegments("/portal")
+            || http.Request.Path.StartsWithSegments("/seguimiento")
+            || http.Request.Path.StartsWithSegments("/repartidor"))
+        {
+            http.Response.OnStarting(() =>
+            {
+                http.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+                http.Response.Headers.Pragma = "no-cache";
+                http.Response.Headers.Expires = "0";
+                return Task.CompletedTask;
+            });
+        }
+        await next();
+    });
 }
 
 // Lee la cookie de sesión en cada request y arma el usuario, antes de que llegue a cualquier endpoint o página.

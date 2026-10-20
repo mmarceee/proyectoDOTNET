@@ -22,6 +22,7 @@ internal sealed record ComparacionRendicion(RendicionPendiente Rendicion, IReadO
 }
 
 internal sealed record RendicionConfirmada(int Devueltos, int Reintegrados, int Faltantes);
+internal sealed record RendicionEnListado(RendicionPendiente Rendicion, string Chofer, string Vehiculo);
 
 // CU-55, nivel mínimo: el operario compara lo que volvió con lo declarado y confirma. Depósito coordina; cada módulo
 // cambia lo suyo por su contrato (ADR-0001, addendum 3), todo en una sola transacción: Ejecución cierra la rendición,
@@ -33,9 +34,21 @@ internal sealed class ConfirmarRendicionHandler(
     IAdministracionModuleApi administracion,
     IUnidadDeTrabajo unidad)
 {
-    public Task<IReadOnlyList<RendicionPendiente>> PendientesAsync(int pagina, CancellationToken ct)
+    public async Task<IReadOnlyList<RendicionEnListado>> PendientesAsync(int pagina, CancellationToken ct)
     {
-        return ejecucion.ListarRendicionesPendientesAsync(pagina, ct);
+        var pendientes = await ejecucion.ListarRendicionesPendientesAsync(pagina, ct);
+        if (pendientes.Count == 0) return [];
+        var vehiculosPorRuta = new Dictionary<Guid, Guid>();
+        foreach (var rendicion in pendientes)
+        {
+            if (await planificacion.ConsultarHojaAsync(rendicion.RutaId, rendicion.RepartidorId, ct) is { } ruta)
+                vehiculosPorRuta[ruta.Id] = ruta.VehiculoId;
+        }
+        var nombres = await administracion.ConsultarNombresRecursosAsync(
+            pendientes.Select(r => r.RepartidorId).Distinct().ToArray(), vehiculosPorRuta.Values.Distinct().ToArray(), ct);
+        return pendientes.Select(r => new RendicionEnListado(r,
+            nombres.Repartidores.GetValueOrDefault(r.RepartidorId, "No asignado"),
+            nombres.Vehiculos.GetValueOrDefault(vehiculosPorRuta.GetValueOrDefault(r.RutaId), "No asignado"))).ToArray();
     }
 
     // null si la ruta no tiene rendición o es de otro operador: la página responde 404.

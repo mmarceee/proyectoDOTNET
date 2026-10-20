@@ -5,6 +5,8 @@ namespace Logistica.Modules.Ejecucion.Contracts;
 // CU-55 consulta al dueño de Rendicion. El operador siempre proviene de la sesión.
 public interface IEjecucionModuleApi
 {
+    // CU-43: incluye cargas sin envíos completos, escaneos y rendiciones. No ve colas sin sincronizar.
+    Task<bool> TieneActividadRegistradaAsync(Guid rutaId, CancellationToken ct);
     Task<RendicionPendiente?> ConsultarRendicionAsync(Guid rutaId, CancellationToken ct);
     Task<IReadOnlyList<RendicionPendiente>> ListarRendicionesPendientesAsync(int pagina, CancellationToken ct);
 
