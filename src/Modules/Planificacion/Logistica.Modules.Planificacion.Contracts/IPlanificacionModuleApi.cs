@@ -11,6 +11,10 @@ public interface IPlanificacionModuleApi
     Task<RutaParaCarga?> ConsultarCargaAsync(Guid rutaId, Guid repartidorId, CancellationToken ct);
     Task RegistrarCargaAsync(Guid rutaId, bool tieneEnviosCargados, CancellationToken ct);
 
+    // CU-55: confirmada la rendición, la ruta queda Finalizada y deja libres al repartidor y al vehículo.
+    // DomainException si la ruta no existe, es de otro operador o no está en ejecución.
+    Task FinalizarRutaAsync(Guid rutaId, CancellationToken ct);
+
     // ADR-0004, sección 2.3, paso 1: la ruta es del repartidor, ya salió (Despachada o EnCurso) y el envío está en
     // una de sus paradas. false también si la ruta no existe o es de otro operador.
     Task<bool> EnvioEnRutaDelRepartidorAsync(Guid rutaId, Guid repartidorId, Guid envioId, CancellationToken ct);

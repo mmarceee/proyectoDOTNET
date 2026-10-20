@@ -1,0 +1,48 @@
+@page "/backoffice/rendiciones"
+@model Logistica.Modules.Deposito.Presentation.Features.ConfirmarRendicion.IndexModel
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Rendiciones";
+}
+
+<h1 class="mb-4">Rendiciones pendientes</h1>
+<p class="text-muted">
+    Los repartidores declararon qué vuelve al depósito. Elegí una ruta, escaneá lo que llegó y confirmá.
+</p>
+
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+
+@if (Model.Rendiciones.Count == 0)
+{
+    <p class="text-muted">No hay rendiciones pendientes.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Iniciada</th>
+                    <th scope="col">Ruta</th>
+                    <th scope="col">Bultos que vuelven</th>
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rendicion in Model.Rendiciones)
+                {
+                    <tr>
+                        <td>@rendicion.IniciadaEn.ToString("dd/MM/yyyy HH:mm") UTC</td>
+                        <td><code>@(rendicion.RutaId.ToString()[^8..])</code></td>
+                        <td>@rendicion.Lineas.Count(l => l.DebeVolver)</td>
+                        <td><a href="/backoffice/rendiciones/@rendicion.RutaId" class="btn btn-sm btn-primary">Revisar</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

@@ -1,0 +1,94 @@
+@page "/backoffice/rendiciones/{rutaId:guid}"
+@model Logistica.Modules.Deposito.Presentation.Features.ConfirmarRendicion.DetalleModel
+@using Logistica.Modules.Deposito.Presentation.Features.ConfirmarRendicion
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Rendición";
+    var rendicion = Model.Comparacion.Rendicion;
+    var confirmada = rendicion.FinalizadaEn is not null;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Rendición de la ruta <code>@(rendicion.RutaId.ToString()[^8..])</code></h1>
+    <a href="/backoffice/rendiciones" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" asp-validation-summary="All" role="alert"></div>
+}
+
+@if (confirmada)
+{
+    <div class="alert alert-info" role="status">Esta rendición ya se confirmó el @rendicion.FinalizadaEn?.ToString("dd/MM/yyyy HH:mm") UTC.</div>
+}
+
+@if (rendicion.Observaciones is not null)
+{
+    <p><strong>Observaciones del repartidor:</strong> @rendicion.Observaciones</p>
+}
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th scope="col">Bulto</th>
+                <th scope="col">Situación</th>
+                <th scope="col">El repartidor</th>
+                <th scope="col">Observación</th>
+                @if (Model.Comparada)
+                {
+                    <th scope="col">Recepción</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var linea in Model.Comparacion.Lineas)
+            {
+                <tr class="@(Model.Comparada && linea.Faltante ? "table-warning" : "")">
+                    <td><code>@linea.Codigo</code></td>
+                    <td>@DetalleModel.Situacion(linea.Linea.Situacion)</td>
+                    <td>@(linea.Linea.DebeVolver ? (linea.Linea.Declarada ? "Lo devuelve" : "No vuelve") : "—")</td>
+                    <td>@linea.Linea.Observacion</td>
+                    @if (Model.Comparada)
+                    {
+                        <td>@(!linea.Linea.DebeVolver ? "No se compara" : linea.Escaneado ? "Recibido" : "Faltante")</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.Comparada)
+{
+    if (Model.Comparacion.Sobrantes.Count > 0)
+    {
+        <div class="alert alert-danger" role="alert">
+            Sobrantes: <strong>@string.Join(", ", Model.Comparacion.Sobrantes)</strong>. No están en esta rendición:
+            revisalos y sacalos de la lista antes de confirmar.
+        </div>
+    }
+
+    if (Model.Comparacion.Faltantes > 0)
+    {
+        <div class="alert alert-warning" role="status">
+            Faltan @Model.Comparacion.Faltantes bultos. Al confirmar se abre una incidencia por envío y el despachador
+            decide si declara el extravío.
+        </div>
+    }
+}
+
+@if (!confirmada)
+{
+    <form method="post" class="mt-3">
+        <div class="mb-3">
+            <label asp-for="Escaneados" class="form-label">Bultos recibidos</label>
+            <textarea asp-for="Escaneados" class="form-control font-monospace" rows="6" autofocus></textarea>
+            <div class="form-text">Escaneá cada bulto: el lector escribe el código y presiona Enter.</div>
+        </div>
+        <button type="submit" asp-page-handler="Comparar" class="btn btn-outline-primary">Comparar</button>
+        <button type="submit" asp-page-handler="Confirmar" class="btn btn-primary">Confirmar la rendición</button>
+    </form>
+}

@@ -42,4 +42,12 @@ public interface IEnviosModuleApi
     // CU-60: el Id de un envío del operador a partir de su número (ENV-000001), para armar su enlace de seguimiento desde
     // el Backoffice. null si no existe o es de otro operador.
     Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct);
+
+    // CU-55 (T8): los envíos que salieron y no llegaron a intentarse vuelven al depósito, y cada uno publica
+    // EnvioReintegradoADeposito por Outbox. Si alguno ya no está EnTransito, lanza una DomainException.
+    Task ReintegrarADepositoAsync(IReadOnlyCollection<Guid> envioIds, Guid? responsableId, CancellationToken ct);
+
+    // CU-55, A1: los bultos que tenían que volver en una rendición y no llegaron. Abre una incidencia por envío con sus
+    // códigos; el despachador decide si declara el extravío (CU-21).
+    Task RegistrarFaltantesAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct);
 }

@@ -20,6 +20,12 @@ internal interface IEnvioRepository
     // La firma y la foto de una entrega o un intento (CU-17 y CU-18), y la devolución que inicia T10 (CU-18).
     void Agregar(ArchivoEvidencia archivo);
     void Agregar(Devoluciones.Devolucion devolucion);
+
+    // La incidencia de los bultos que no volvieron en una rendición (CU-55, A1).
+    void Agregar(Incidencias.Incidencia incidencia);
+
+    // CU-55: los envíos, con sus bultos, a los que pertenecen estos bultos.
+    Task<IReadOnlyList<Envio>> ObtenerPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct);
     Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct);
 
     // CU-04: ¿hay envíos con entrega pendiente en alguna de estas franjas, en esa fecha o después?

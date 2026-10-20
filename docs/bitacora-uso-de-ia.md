@@ -315,6 +315,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Usar la vigente para todos los envíos hasta guardar la versión: cambiaría las reglas de envíos que ya están en la calle al publicar una versión nueva. Pedirle a Cristian que el adaptador lo escriba él: es código de Envíos (CU-17, CU-18 y CU-10). |
 | **Verificación** | Diez pruebas nuevas: seis del adaptador con un Administración falso (la versión 1 se conserva aunque rija la 2, la vigente para envíos sin versión, la versión inexistente falla, el motivo de otra versión no se acepta, la hoja lleva la versión y el catálogo, y una sola consulta por versión), dos de la política de devolución y dos de la versión en el alta. Se ajustaron las pruebas de la hoja de ruta, de la sincronización y del alta. 470 pruebas (122 unitarias, 56 de arquitectura y 292 de integración), todas pasan. |
 
+## **3.20 CU-55 · Confirmar la rendición (nivel mínimo)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 20/10/2026 |
+| **Archivos** | Ejecución: `Rendicion.cs` (`Confirmar`, `DebeVolver`, `Resolver`), `IEjecucionModuleApi`, `RendicionPendiente` (`DebeVolver`) y `EjecucionModuleApi`. Envíos: `EnvioReintegradoADeposito` (nuevo), `IEnviosModuleApi` (`ReintegrarADepositoAsync`, `RegistrarFaltantesAsync`), `EnviosModuleApi`, `IEnvioRepository` y `EnvioRepository`. Planificación: `FinalizarRutaAsync`. Depósito: `ConfirmarRendicionHandler` y las páginas `ConfirmarRendicion/Index` y `Detalle` (nuevos), `DepositoModule` y el `.csproj`. Seguimiento: `InvalidarSeguimiento` (el evento nuevo). Backoffice: enlace en el menú. Pruebas: `RendicionTests` y `ConfirmarRendicionTests` (nuevos). CU-55 en `casos-de-uso.md` (v1.3) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-55 sobre la rendición que dejó CU-54 (Lucas Ottonello), respetando el contrato que él propuso: Ejecución sigue siendo la dueña de la rendición y Depósito coordina por contratos. |
+| **Cómo se trabajó** | La IA leyó CU-54, CU-55, la tabla de transiciones y el diseño de Lucas, y propuso el diseño. El responsable eligió: coordinar desde Depósito, que los faltantes generen incidencia sin bloquear el cierre y que los sobrantes bloqueen. Se pidió expresamente que la IA escribiera el código y las pruebas. Corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | La regla de cada línea en `Rendicion.Confirmar`: entregado en calle, devuelto al depósito, o faltante (recibida en falso y sin estado final; el extravío lo decide el despachador). T8 sólo para envíos no intentados que volvieron enteros, con `EnvioReintegradoADeposito` por Outbox. Una incidencia de tipo extravío por envío con faltantes. `Ruta.Finalizar`, que ya liberaba la reserva. Todo en una transacción con el bloqueo de planificación del operador. Ante un error, la página vuelve con un GET nuevo, para no mostrar entidades que quedaron cambiadas en memoria después del rollback. |
+| **Modificado** | La IA normalizaba lo escaneado a mayúsculas, como en CU-30, y la prueba de punta a punta lo detectó: los códigos de las pruebas tienen minúsculas. Se pasó a comparar sin distinguir mayúsculas. También mostraba los primeros 8 caracteres del Id de la ruta, que en un UUID v7 son la marca de tiempo y se repiten entre rutas creadas juntas: se pasó a los últimos 8. |
+| **Descartado** | Ubicar CU-55 en Ejecución: el actor es el operario de depósito, y el plan lo asigna al área de Depósito. Bloquear el cierre ante faltantes: un bulto perdido dejaría la ruta abierta para siempre. Marcar Extraviado desde la rendición: lo decide el despachador (CU-21). Guardar los sobrantes: queda fuera del nivel mínimo. |
+| **Verificación** | Tres pruebas unitarias de `Rendicion.Confirmar` y cinco de integración desde la página: confirmación completa (T8, Outbox, incidencia, líneas, ruta finalizada y reserva liberada), sobrante que impide confirmar sin cambiar nada, listado y detalle, 404 para otro operador y 403 para otro perfil. 551 pruebas (154 unitarias, 56 de arquitectura y 341 de integración), todas pasan. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -334,3 +349,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.13 | 16/10/2026 | Entrada de la revisión de la mensajería y sus trazas. | Ezequiel Marcenal |
 | 0.14 | 19/10/2026 | Entrada de la caché distribuida con su métrica de aciertos. | Ezequiel Marcenal |
 | 0.15 | 19/10/2026 | Entrada de las reglas de entrega pedidas a Administración y la versión de reglas del envío. | Ezequiel Marcenal |
+| 0.16 | 20/10/2026 | Entrada de CU-55, confirmar la rendición. | Ezequiel Marcenal |

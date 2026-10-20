@@ -596,6 +596,14 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujos alternativos** | **A1 · Faltan bultos declarados (paso 4).** El sistema los marca como faltantes y crea una incidencia (CU-22); el despachador decide si declara el extravío (CU-21).<br><br>**A2 · Llegan bultos no declarados (paso 4).** El sistema los registra como sobrantes y pide revisar. |
 | **Requerimientos especiales** | 1. Los envíos con intento fallido ya fueron reprogramados o enviados a devolución por el sistema (CU-18); la rendición sólo registra su regreso físico al depósito. |
 
+**Implementación en nivel mínimo (20/10/2026, Ezequiel Marcenal):**
+* La pantalla está en el Backoffice, en el módulo Depósito (`/backoffice/rendiciones`), sólo para el perfil Operario de depósito. Depósito coordina y cada módulo cambia lo suyo por su contrato: Ejecución cierra la rendición (`IEjecucionModuleApi.ConfirmarRendicionAsync`), Envíos aplica T8 y registra los faltantes, y Planificación finaliza la ruta, que libera al repartidor y al vehículo. Todo en una sola transacción, con el bloqueo de planificación del operador.
+* Se comparan sólo los bultos que tenían que volver: no intentados, de un intento fallido y de una carga parcial. Los entregados en la calle quedan *Entregado en calle*; los que nunca se cargaron no se comparan. El código escaneado se compara sin espacios y sin distinguir mayúsculas.
+* T8 se aplica a un envío no intentado sólo si volvieron todos sus bultos, y publica `EnvioReintegradoADeposito` por Outbox (el seguimiento público invalida su caché con ese evento).
+* **A1:** un faltante no bloquea el cierre. La línea queda con *recibida* en falso y sin estado final, y se abre una incidencia de tipo extravío por envío con los códigos que faltan. El envío no cambia de estado: el extravío lo declara el despachador (CU-21).
+* **A2:** un sobrante (un código que no tenía que volver en esta rendición, o que no existe) impide confirmar hasta que el operario lo saque de la lista. No se guarda.
+* Fuera del nivel mínimo: registrar los sobrantes, el responsable de la confirmación y la conciliación de una carga parcial con una transición del envío.
+
 ## **2.6 Seguimiento y notificaciones**
 
 ### **CU-60 · Consultar el seguimiento público de un envío**
@@ -824,3 +832,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 1.1 | 19/10/2026 | CU-60: decisiones de implementación (origen de los datos, token, límite de tasa, ventana estimada). | Cristian Reyes |
 | 1.2 | 19/10/2026 | CU-06: el máximo de paradas de Planificación sale de las reglas operativas; motivos validados por la versión del envío. | Cristian Reyes |
 | 1.1 | 19/10/2026 | CU-18, A2: con los intentos agotados, la devolución automática depende de la política de devolución de la versión de reglas del envío. | Ezequiel Marcenal |
+| 1.3 | 20/10/2026 | CU-55: implementación en nivel mínimo (coordinación desde Depósito, T8 con todos los bultos, faltantes con incidencia, sobrantes que impiden confirmar). | Ezequiel Marcenal |
