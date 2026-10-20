@@ -330,6 +330,21 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Descartado** | Ubicar CU-55 en Ejecución: el actor es el operario de depósito, y el plan lo asigna al área de Depósito. Bloquear el cierre ante faltantes: un bulto perdido dejaría la ruta abierta para siempre. Marcar Extraviado desde la rendición: lo decide el despachador (CU-21). Guardar los sobrantes: queda fuera del nivel mínimo. |
 | **Verificación** | Tres pruebas unitarias de `Rendicion.Confirmar` y cinco de integración desde la página: confirmación completa (T8, Outbox, incidencia, líneas, ruta finalizada y reserva liberada), sobrante que impide confirmar sin cambiar nada, listado y detalle, 404 para otro operador y 403 para otro perfil. 551 pruebas (154 unitarias, 56 de arquitectura y 341 de integración), todas pasan. |
 
+## **3.21 PWA del repartidor: registrar la entrega y el intento fallido sin conexión (CU-17 y CU-18)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 20/10/2026 |
+| **Archivos** | `hoja-ruta.js` (`registrarEntrega`, `registrarIntentoFallido` y `estadosEnvios`), `evidencia.js` (nuevo), `EntregaService.cs` y `Entrega.razor` (nuevos), `HojaDeRuta.razor` y `Program.cs` de la PWA; `repartidor-hoja-ruta.test.mjs`. También `CacheDistribuidaTests` (prueba de Valkey inalcanzable). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Completar la parte de la PWA de CU-17 y CU-18, que faltaba para el hito del 22/10 («registrando entregas sin conectividad y sincronizando»), sobre la cola cifrada y la sincronización que dejó Lucas Ottonello con CU-51 y CU-54. |
+| **Cómo se trabajó** | El responsable decidió hacerlo en el equipo de Ezequiel en lugar de esperar a Lucas. Se pidió expresamente que la IA escribiera el código y las pruebas. La IA revisó primero el merge de Lucas (anulación de despacho, mejoras de navegación y sesión, y el listado de CU-55 con chofer y vehículo) y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | La entrega y el intento van a la misma cola cifrada de la carga y la rendición, sin borrador, con un registro por envío; un rechazo del servidor queda para despacho. Las reglas (firma siempre, foto, nombre y documento, motivos y evidencia) se validan con las de la versión del envío que trae la hoja; el servidor vuelve a validar. Un envío que la hoja muestra asignado se acepta si este dispositivo confirmó la carga de todos sus bultos, porque sin conexión la hoja no se actualiza. La firma se dibuja en un canvas sobre fondo blanco; la foto se achica y pasa a JPEG hasta entrar en 1 MB; la posición sale del GPS, que funciona sin red. La sincronización reutiliza la de la carga, que reintenta al volver la conexión. La prueba de Valkey inalcanzable pasó a medir la segunda lectura, porque la primera incluye el intento de conexión y con la máquina cargada superaba el límite. |
+| **Modificado** | — |
+| **Descartado** | Un servicio de sincronización propio: duplicaría la cola y los reintentos de Lucas. Permitir volver a registrar un envío rechazado: el rechazo es definitivo (ADR-0004) y lo revisa despacho. |
+| **Verificación** | Cinco pruebas JavaScript nuevas (entrega en la cola y sincronizada, reglas y posición exigidas y un solo registro por envío, motivo del catálogo con evidencia, envío cargado sin conexión, y la rendición que toma lo entregado); 40 pruebas JavaScript, todas pasan. 582 pruebas .NET (154 unitarias, 56 de arquitectura y 372 de integración), todas pasan. Falta probarlo en un teléfono con la cámara, el GPS y el modo avión. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -350,3 +365,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.14 | 19/10/2026 | Entrada de la caché distribuida con su métrica de aciertos. | Ezequiel Marcenal |
 | 0.15 | 19/10/2026 | Entrada de las reglas de entrega pedidas a Administración y la versión de reglas del envío. | Ezequiel Marcenal |
 | 0.16 | 20/10/2026 | Entrada de CU-55, confirmar la rendición. | Ezequiel Marcenal |
+| 0.17 | 20/10/2026 | Entrada de la PWA de CU-17 y CU-18. | Ezequiel Marcenal |

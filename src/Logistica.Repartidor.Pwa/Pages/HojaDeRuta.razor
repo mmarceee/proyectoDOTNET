@@ -2,6 +2,7 @@
 @using Logistica.Repartidor.Pwa.Services
 @implements IDisposable
 @inject HojaDeRutaService Hoja
+@inject EntregaService Entregas
 
 <PageTitle>Mi ruta</PageTitle>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
@@ -47,6 +48,15 @@
                             @if (!string.IsNullOrWhiteSpace(envio.Direccion.Referencia)) { <p class="mb-1">Referencia: @envio.Direccion.Referencia</p> }
                             @if (envio.Franja is { } franja) { <p class="mb-1">Franja: @franja.Desde.ToString("HH:mm")–@franja.Hasta.ToString("HH:mm")</p> }
                             <p class="mb-1">Bultos (@envio.Bultos.Count): @string.Join(", ", envio.Bultos.Select(b => b.Codigo))</p>
+                            @{ var local = estados.FirstOrDefault(e => e.EnvioId == envio.Id); }
+                            @if (local is not null)
+                            {
+                                <p class="mb-0"><span class="badge @(local.Estado switch { "Aplicada" => "text-bg-success", "Rechazada" => "text-bg-danger", _ => "text-bg-warning" })">@TextoLocal(local)</span></p>
+                            }
+                            else if (!anterior && ruta.Rendicion?.Iniciada is null && (envio.Estado is "EnTransito" or "AsignadoARuta"))
+                            {
+                                <a class="btn btn-sm btn-primary mt-1" href="@($"entrega?rutaId={ruta.RutaId}&envioId={envio.Id}")">Registrar entrega o intento</a>
+                            }
                         </section>
                     }
                 </div>
@@ -69,7 +79,22 @@
             await Hoja.SeleccionarAsync(RutaId);
         }
     }
-    private void ActualizarVista() => _ = InvokeAsync(StateHasChanged);
+    // Lo registrado en este dispositivo (CU-17 y CU-18), aunque todavía no se haya sincronizado.
+    private IReadOnlyList<EstadoEnvioLocal> estados = [];
+    private void ActualizarVista() => _ = InvokeAsync(async () =>
+    {
+        if (Hoja.Copia is { } copia && !Hoja.Cargando) estados = await Entregas.EstadosAsync(copia.Hoja.RutaId);
+        StateHasChanged();
+    });
+    private static string TextoLocal(EstadoEnvioLocal local) => (local.Tipo, local.Estado) switch
+    {
+        ("RegistrarEntrega", "Aplicada") => "Entrega confirmada",
+        ("RegistrarEntrega", "Rechazada") => "Entrega rechazada: avisá a despacho",
+        ("RegistrarEntrega", _) => "Entrega pendiente de sincronizar",
+        (_, "Aplicada") => "Intento fallido confirmado",
+        (_, "Rechazada") => "Intento fallido rechazado: avisá a despacho",
+        _ => "Intento fallido pendiente de sincronizar",
+    };
     private static string Horario(TimeOnly? desde, TimeOnly? hasta) => desde is null || hasta is null ? "" : $"· {desde:HH:mm}–{hasta:HH:mm}";
     private static string Cantidad(int cantidad, string singular, string plural) => $"{cantidad} {(cantidad == 1 ? singular : plural)}";
     private static string Estado(string estado) => estado switch {

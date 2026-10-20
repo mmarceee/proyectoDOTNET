@@ -606,3 +606,88 @@ export async function confirmarRendicion(ruta, revision) {
             dependencias:base.dependencias, observaciones:actual.observaciones } };
     return escribirBorrador({ ...actual, revision:revision+1, operacionId:op.operacionId, resultado:'Pendiente' }, revision, s, op);
 }
+
+// CU-17 y CU-18: la entrega y el intento fallido van a la misma cola cifrada, sin borrador; la hora y la posición son
+// las del dispositivo (ADR-0004). Un registro por envío: si ya hay uno pendiente, aplicado o rechazado, no se agrega
+// otro (un rechazo del servidor es definitivo y lo revisa despacho). Las reglas salen de la hoja: las de la versión del
+// envío. El servidor vuelve a validar todo al sincronizar.
+const TIPOS_EN_CALLE = ['RegistrarEntrega','RegistrarIntentoFallido'];
+const MAX_ARCHIVO = 1024 * 1024;
+async function operacionesDeRuta(s, ruta) {
+    const lista = [];
+    for (const fila of await listaOperaciones(s, true)) {
+        const op = await descifrar(fila, 'operacion', fila.meta.id, s);
+        if (op.rutaId === ruta) lista.push({ op, estado:fila.estado, motivo:fila.motivo ?? null });
+    }
+    return lista;
+}
+export async function estadosEnvios(ruta) {
+    const s = await sesionLocal();
+    if (!s) return [];
+    return (await operacionesDeRuta(s, ruta)).filter(r => TIPOS_EN_CALLE.includes(r.op.tipo))
+        .map(r => ({ envioId:r.op.envioId, tipo:r.op.tipo, estado:r.estado, motivo:r.motivo }));
+}
+async function envioParaRegistrar(ruta, envioId) {
+    const s = await activo(), copia = await cargar();
+    if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta) throw new Error('Abrí la hoja de esta ruta antes de registrar.');
+    await exigirJornadaAbierta(ruta, copia);
+    const envio = copia.hoja.paradas.flatMap(p => p.envios).find(e => e.id === envioId);
+    if (!envio) throw new Error('El envío no está en esta ruta.');
+    const operaciones = await operacionesDeRuta(s, ruta);
+    if (operaciones.some(r => TIPOS_EN_CALLE.includes(r.op.tipo) && r.op.envioId === envioId))
+        throw new Error('Este envío ya está registrado en este dispositivo.');
+    // Sin conexión la hoja no se actualiza: un envío AsignadoARuta salió si una carga de este dispositivo leyó todos
+    // sus bultos.
+    const cargado = operaciones.some(r => r.op.tipo === 'ConfirmarCarga' && r.estado !== 'Rechazada'
+        && envio.bultos.every(b => r.op.carga.lecturas.some(l => l.codigoBulto === b.codigo)));
+    if (envio.estado !== 'EnTransito' && !(envio.estado === 'AsignadoARuta' && cargado))
+        throw new Error('Este envío no salió en el vehículo: sólo se registran envíos en tránsito.');
+    return { s, envio };
+}
+function archivo(a, nombre) {
+    if (!a) return null;
+    if (!['image/png','image/jpeg'].includes(a.tipoContenido) || !text(a.contenidoBase64)
+        || Math.floor(a.contenidoBase64.length * 3 / 4) > MAX_ARCHIVO)
+        throw new Error(`${nombre} debe ser una imagen PNG o JPEG de hasta 1 MB.`);
+    return { tipoContenido:a.tipoContenido, contenidoBase64:a.contenidoBase64 };
+}
+function coordenada(valor, maximo) { return typeof valor === 'number' && Number.isFinite(valor) && Math.abs(valor) <= maximo; }
+async function encolar(s, ruta, envioId, posicion, tipo, datos) {
+    if (!coordenada(posicion?.latitud, 90) || !coordenada(posicion?.longitud, 180))
+        throw new Error('No pudimos obtener tu ubicación. Activá la ubicación del dispositivo e intentá de nuevo.');
+    const dispositivo = await instalacion(), redondear = v => Math.round(v * 1e6) / 1e6;
+    const op = { ...dispositivo, operacionId:uuidv7(), tipo, rutaId:ruta, envioId, ocurridoEn:new Date().toISOString(),
+        latitud:redondear(posicion.latitud), longitud:redondear(posicion.longitud), correlacionId:traceparent(), ...datos };
+    const registro = await cifrar('operacion', op.operacionId, op, s), db = await open();
+    try {
+        const tx = db.transaction(['espacios','operaciones'],'readwrite'), done = completed(tx);
+        comprobarToken(tx.objectStore('espacios'), s, () => tx.objectStore('operaciones')
+            .add({ ...registro, estado:'Pendiente', secuencia:op.secuencia }, op.operacionId), tx);
+        try { await done; } catch { throw new Error('No se pudo guardar: cambió la sesión o no hay espacio en el dispositivo.'); }
+    } finally { db.close(); }
+    return { envioId, tipo, estado:'Pendiente', motivo:null };
+}
+export async function registrarEntrega(ruta, envioId, datos) {
+    const { s, envio } = await envioParaRegistrar(ruta, envioId), reglas = envio.reglasEntrega;
+    const firma = archivo(datos?.firma, 'La firma');
+    if (!firma) throw new Error('La firma de quien recibe es obligatoria.');
+    const foto = archivo(datos?.foto, 'La foto');
+    if (reglas.exigeFoto && !foto) throw new Error('Este envío exige una foto de la entrega.');
+    const nombre = datos?.nombreReceptor?.trim() || null, documento = datos?.documentoReceptor?.trim() || null;
+    if (reglas.exigeNombreYDocumento && (!nombre || !documento))
+        throw new Error('Este envío exige el nombre y el documento de quien recibe.');
+    if ((nombre?.length ?? 0) > 200 || (documento?.length ?? 0) > 50) throw new Error('El nombre o el documento son demasiado largos.');
+    return encolar(s, ruta, envioId, datos, 'RegistrarEntrega',
+        { entrega:{ firma, foto, nombreReceptor:nombre, documentoReceptor:documento } });
+}
+export async function registrarIntentoFallido(ruta, envioId, datos) {
+    const { s, envio } = await envioParaRegistrar(ruta, envioId);
+    const motivo = envio.reglasEntrega.motivosNoEntrega.find(m => m.id === datos?.motivoId);
+    if (!motivo) throw new Error('Elegí el motivo de la lista.');
+    const foto = archivo(datos?.foto, 'La foto');
+    if (motivo.exigeEvidencia && !foto) throw new Error(`El motivo «${motivo.nombreParaMostrar}» exige una foto como evidencia.`);
+    const observaciones = datos?.observaciones?.trim() || null;
+    if ((observaciones?.length ?? 0) > 1000) throw new Error('Las observaciones no pueden superar los 1000 caracteres.');
+    return encolar(s, ruta, envioId, datos, 'RegistrarIntentoFallido',
+        { intentoFallido:{ motivoId:motivo.id, foto, observaciones } });
+}
