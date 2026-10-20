@@ -2,8 +2,8 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 9 de octubre de 2026 |
-| **Autor** | Ezequiel Marcenal |
+| **Fecha** | 20 de octubre de 2026 (creada el 09/10/2026) |
+| **Autores** | Ezequiel Marcenal y Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
 
@@ -22,6 +22,7 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | Herramienta | Quién la usa | Para qué |
 | :---- | :---- | :---- |
 | Claude Code (modelo Claude Opus 5.5), en la aplicación de escritorio | Ezequiel Marcenal | Revisión de código, explicación de conceptos, planificación de tareas y, cuando se pide expresamente, escritura de código, pruebas y documentación |
+| Codex, aplicación de escritorio | Lucas Ottonello | Explicación y revisión de arquitectura; análisis de casos de uso; escritura y corrección de código, documentación, migraciones y pruebas; verificación en navegador y apoyo para integrar ramas. No se reconstruye el modelo concreto de cada sesión porque no está verificado. |
 
 *(Cada integrante agrega las herramientas que usa.)*
 
@@ -329,6 +330,7 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Modificado** | La IA normalizaba lo escaneado a mayúsculas, como en CU-30, y la prueba de punta a punta lo detectó: los códigos de las pruebas tienen minúsculas. Se pasó a comparar sin distinguir mayúsculas. También mostraba los primeros 8 caracteres del Id de la ruta, que en un UUID v7 son la marca de tiempo y se repiten entre rutas creadas juntas: se pasó a los últimos 8. |
 | **Descartado** | Ubicar CU-55 en Ejecución: el actor es el operario de depósito, y el plan lo asigna al área de Depósito. Bloquear el cierre ante faltantes: un bulto perdido dejaría la ruta abierta para siempre. Marcar Extraviado desde la rendición: lo decide el despachador (CU-21). Guardar los sobrantes: queda fuera del nivel mínimo. |
 | **Verificación** | Tres pruebas unitarias de `Rendicion.Confirmar` y cinco de integración desde la página: confirmación completa (T8, Outbox, incidencia, líneas, ruta finalizada y reserva liberada), sobrante que impide confirmar sin cambiar nada, listado y detalle, 404 para otro operador y 403 para otro perfil. 551 pruebas (154 unitarias, 56 de arquitectura y 341 de integración), todas pasan. |
+| **Aporte posterior de Lucas con Codex · 20/10/2026** | Se revisó la diferencia entre bultos que deben volver y los declarados como devueltos. En el listado de pendientes se sustituyó el GUID visible por el nombre del chofer y la matrícula, conservando fecha y cantidad de bultos que deben volver; los enlaces siguen identificando la ruta por su ID. La consulta usa los contratos de Planificación y Administración, incluidos recursos históricos inactivos y sin quitar el aislamiento. Se ajustó la prueba del listado y pasaron las cinco pruebas dirigidas de CU-55. Este aporte no atribuye a Lucas la implementación del cierre, T8 e incidencias, realizada por Ezequiel. |
 
 ## **3.21 PWA del repartidor: registrar la entrega y el intento fallido sin conexión (CU-17 y CU-18)**
 
@@ -344,6 +346,192 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Modificado** | — |
 | **Descartado** | Un servicio de sincronización propio: duplicaría la cola y los reintentos de Lucas. Permitir volver a registrar un envío rechazado: el rechazo es definitivo (ADR-0004) y lo revisa despacho. |
 | **Verificación** | Cinco pruebas JavaScript nuevas (entrega en la cola y sincronizada, reglas y posición exigidas y un solo registro por envío, motivo del catálogo con evidencia, envío cargado sin conexión, y la rendición que toma lo entregado); 40 pruebas JavaScript, todas pasan. 582 pruebas .NET (154 unitarias, 56 de arquitectura y 372 de integración), todas pasan. Falta probarlo en un teléfono con la cámara, el GPS y el modo avión. |
+
+## **Nota sobre las entradas retrospectivas de Lucas**
+
+Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de Codex, a partir de los chats disponibles del proyecto, los commits de Lucas y la documentación del repositorio. Las fechas corresponden al trabajo original o a sus ampliaciones. Los resultados de pruebas son los registrados durante esas tareas; **no se volvió a ejecutar la suite al completar esta bitácora**. Lucas debe revisar la redacción para confirmar que representa su experiencia; no se supone que escribió manualmente todo el código ni que aceptó sin cambios todas las propuestas iniciales. No se incluyen conversaciones de otros proyectos ni se garantiza recuperar sesiones no disponibles.
+
+## **3.22 Arquitectura: revisión documental y preparación del monitoreo**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | Septiembre–octubre de 2026; revisión de Identity el 13/10 |
+| **Referencias** | `docs/analisis-diseno/ADR-0001-estilo-arquitectonico.md`, ADR-0002, diagramas y guía de implementación. Chats «Revisar diagrama .NET en Drawio», «Revisar organización por módulos», «Explicar arquitectura final y hexág», «Explicar el flujo de la aplicación», «Explicar arquitectura de monitoreo» y «Revisar cambios de Identity y migrac». |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Entender y revisar monolito modular, capas, Features, puertos y adaptadores, contratos, host único, multitenancy y mensajería; preparar explicaciones para el monitoreo. |
+| **Cómo se trabajó** | La IA leyó documentación y código, explicó el recorrido de las solicitudes y comparó diagramas y ADR. Señaló contradicciones y actualizó el estado del Markdown del ADR-0001 siguiendo la aprobación de Lucas. La autoría original de los ADR y de la infraestructura de otros integrantes no se atribuye a la IA de Lucas. |
+| **Aceptado sin modificaciones** | Se utilizó la explicación del flujo pantalla → caso de uso → dominio → repositorio y de la comunicación por Contracts como apoyo para comprender y revisar las implementaciones. No se afirma una aceptación íntegra de todo el texto generado. |
+| **Modificado** | Se corrigió el estado documental del ADR-0001 para reflejar la aprobación existente. Las revisiones distinguieron arquitectura prevista de funcionalidad efectivamente implementada y señalaron diferencias entre Markdown, documentos y diagramas. |
+| **Descartado o no aplicado** | No se integró la rama de Identity durante la revisión del 13/10, por pedido de Lucas. Se señalaron para coordinación la amplitud de la excepción de Identity y la autorización transitoria; no se registraron como correcciones ya realizadas. |
+| **Verificación** | Contraste manual entre documentación, referencias de proyectos, código e historial. La revisión de Identity de esa sesión no pudo certificar las pruebas por problemas del entorno; no equivale a una aprobación automática del cambio. |
+
+## **3.23 CU-13 · Consulta de envíos en Backoffice**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 05–06/10/2026; integración posterior con el aislamiento compartido |
+| **Archivos y referencias** | `ConsultarEnviosQuery`, handler, DTO y reader de listado; `ConsultarEnvios/Index.cshtml` y PageModel; configuración e índices de Envíos. Chat «Consultar requisitos del CU-13»; commits `7c191f5`, `e60e23f` y `c408638`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Construir y comprender listado, paginación y filtros por estado, fechas, texto y comercio, manteniendo el alcance del operador y comercio del contexto. |
+| **Cómo se trabajó** | Se trabajó por pasos: la IA explicó y proporcionó fragmentos para incorporar, revisó lo escrito y realizó correcciones directas cuando Lucas las pidió. También comprobó el flujo alta por API → listado. No se reconstruye quién tecleó cada línea. |
+| **Aceptado sin modificaciones** | Consulta y paginación en PostgreSQL, filtros antes del conteo y de obtener la página, e índices compuestos por operador/fecha y operador/estado como diseño de la consulta. |
+| **Modificado** | La búsqueda de texto pasó a enviarse con Enter. Se corrigió Siguiente para conservar el texto y se agregó `ComercioId` opcional a la consulta. Los filtros manuales de aislamiento se retiraron al incorporar el mecanismo compartido, trabajo registrado por Ezequiel en 3.2. |
+| **Descartado o diferido** | La propuesta inicial de implementar el aislamiento global desde CU-13 se dejó a sus responsables transversales. La integración del selector y nombres comerciales dependía del contrato de Administración; no se declaró terminado el alcance completo por haber completado el listado inicial. |
+| **Verificación** | Se comprobó en la aplicación búsqueda por número, texto inexistente, paginación de 25 resultados sin perder la búsqueda y aparición de un envío creado por API. Se revisó la migración para que sólo agregara los dos índices; el módulo compiló sin errores. |
+
+## **3.24 CU-14 · Detalle del envío e integración con recepción**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 08–09/10/2026; ajustes posteriores de presentación |
+| **Archivos y referencias** | Slice `ConsultarDetalleEnvio` de Envíos, readers de detalle/evidencia, integración con `RecibirBulto`, pruebas de detalle y recepción; `docs/analisis-diseno/cu-14/revision-arquitectura.md`. Chat «Planificar detalle de envío CU-14»; commits `5e0e63e`, `b4b213a` y `35f036d`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Mostrar datos, bultos, tarifa y antecedentes del envío; consultar evidencias y navegar a recepción conservando el contexto del listado. |
+| **Cómo se trabajó** | Primero se analizó el alcance sin implementar. Luego la IA escribió y modificó código, pruebas, datos de demostración y documentación bajo las decisiones de Lucas, y revisó la arquitectura del resultado. |
+| **Aceptado sin modificaciones** | Separación entre consulta, DTOs, readers y presentación, e intercambio con Depósito mediante su contrato. El registro físico sigue siendo una acción explícita, no un efecto de consultar el detalle. |
+| **Modificado** | La revisión detectó coordinación en el PageModel y reglas en Razor: se trasladaron a Application. Se agregaron handlers de evidencia y precarga, y se conservaron filtros al ir y volver de recepción. Sólo se precarga el código del bulto; las medidas se ingresan durante la recepción. Se corrigió el error de validación al abrir recepción sin código y después se reorganizó el layout del detalle. |
+| **Descartado** | Mantener la decisión de recepción como una comparación de estado en la vista, consultar directamente al reader desde el endpoint de evidencia o completar automáticamente las medidas físicas desde las declaradas. |
+| **Verificación** | La corrección arquitectónica terminó con 24 pruebas de integración y 54 de arquitectura correctas, incluido detalle → recepción → registro → detalle → listado con filtros. Los permisos provisionales que existían en esa fecha se integraron posteriormente con Identity; no se presenta aquella revisión como verificación de todos los permisos futuros. |
+
+## **3.25 CU-40 · Planificación de rutas, paradas y restricciones**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | Desde el 09/10/2026; agrupación de paradas el 12/10 y reintentos el 15/10 |
+| **Archivos y referencias** | Dominio de Rutas, slices de armado/consulta/validación, repositorios y migraciones de Planificación, contratos con Envíos/Administración/Depósito, páginas y JavaScript; `docs/analisis-diseno/cu-40`. Chat «Analizar el CU-40»; commits `1799495`, `9da8fce`, `f741ef3` y `1c6877c`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Armar una ruta con repartidor, vehículo y envíos validando capacidad, franjas, paradas, disponibilidad y RF-15: impedir que un envío pertenezca simultáneamente a dos rutas activas. |
+| **Cómo se trabajó** | Lucas definió las reglas mediante ejemplos y preguntas antes de implementar. La IA escribió dominio, handlers, persistencia, migraciones, interfaz, pruebas y documentación, y los fue corrigiendo con las observaciones de Lucas y de sus compañeros. |
+| **Aceptado sin modificaciones** | Evaluación compartida antes de confirmar, evidencia de validación, control de revisión y operación transaccional. Uso de medidas de recepción cuando existen, con respaldo en las declaradas cuando falta el dato. |
+| **Modificado** | El modelo inicial confundía envío y parada. A pedido de Lucas se pasó a Ruta → Parada → envíos: la misma dirección, aun con apartamentos diferentes, puede ser una visita si las franjas son compatibles. Las capacidades siguen contando todos los bultos. Se agregó prohibición de crear rutas hacia el pasado y validación de `ReintentoDesde` al armar y despachar, admitiendo el límite exacto en la zona del operador. El máximo de paradas pasó a leerse del contrato conectado por Cristian a CU-06. |
+| **Corrección del Outbox** | La IA implementó inicialmente `OutboxMessage` con `IOperadorOwned` y una prueba que exigía el filtro Tenant. Contradecía ADR-0002 §2.4: el publicador sin inquilino no vería los mensajes. Tras la observación de Ezequiel y Cristian se retiró ese enfoque y se adaptó Planificación al Outbox compartido sin marcador implementado por Ezequiel (3.7). Fue un error de la implementación asistida, no una regla válida de CU-40. |
+| **Modificado en la interfaz** | Datos de ruta fijos con Modificar/Confirmar/Cancelar; selección de envíos en modal, filtros automáticos y limpieza, actualización parcial sin cerrar el modal y botones de validación/confirmación dependientes de la selección vigente. Se corrigieron búsquedas, errores de binding al cambiar fecha y la presentación de historial, repartidor y vehículo. |
+| **Descartado** | Contar cada envío como una parada; distinguir apartamentos como visitas separadas por sí solos; confiar sólo en la prevalidación del navegador; conservar el filtro Tenant en Outbox o saltearlo con `IgnoreQueryFilters`. |
+| **Verificación** | Pruebas de reglas, persistencia, aislamiento, concurrencia, rollback y migraciones de agrupación. Para el plazo de reintento se registraron 81 pruebas de integración de Planificación, 61 unitarias y 54 de arquitectura correctas; la integración posterior con main pasó 286 pruebas. Son ejecuciones históricas, no un conteo de pruebas exclusivas de CU-40. |
+
+## **3.26 CU-41 · Quitar un envío de una ruta**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 12/10/2026 y ajustes posteriores de historial |
+| **Archivos y referencias** | Slice `QuitarEnvioDeRuta`, dominio, repositorio y auditoría de retiros, presentación de detalle y pruebas `QuitarEnvioDeRutaTests`. Commits `2297467`, `da90523` y `f741ef3`; chat «Analizar el CU-40». |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Quitar un envío antes del despacho, devolverlo a EnDeposito mediante T4 y conservar evidencia de quién lo retiró. |
+| **Cómo se trabajó** | La IA implementó el command, handler, coordinación por contratos, transacción y pruebas. También explicó a Lucas cómo el request transporta datos y el handler ejecuta la operación. |
+| **Aceptado sin modificaciones** | Revalidar estado y revisión dentro de la operación, coordinar el retiro con Envíos mediante su API y revertir todos los efectos si falla el guardado. |
+| **Modificado** | Se agregó historial explícito de retiros al detectar Lucas que no aparecían. Tras agrupar envíos por visita, quitar uno conserva la parada mientras tenga otros; retirar el último elimina la parada y, si no quedan envíos, libera las reservas correspondientes. Fechas del historial en dd/MM/aaaa y hora local UTC−3 sin mostrar esa etiqueta. Se adaptó al Outbox por módulo. |
+| **Descartado** | Borrar la visita completa al quitar uno de sus envíos, permitir retirar después del despacho o eliminar la ruta como parte de este caso de uso. |
+| **Verificación** | Pruebas de retiro, aislamiento, revisión, carrera con despacho y rollback; revisión de historial y migraciones. La integración con Outbox y agrupación se verificó con la regresión de Planificación. |
+
+## **3.27 CU-43 · Despacho, aviso al repartidor y resolución de rutas anteriores**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 14–16/10/2026; ampliación el 20/10/2026 |
+| **Archivos y referencias** | Slices `DespacharRuta` y `AnularDespacho`, evidencia de despacho/anulación, Outbox y transporte/publicador/consumidor, aviso interno e Inbox, API/Worker/PWA; `docs/analisis-diseno/cu-43`. Chat «Planificar CU-43 despachar ruta» y ampliación en «Analizar el CU-40»; commits `e317def`, `bd95dec` y `fc6b037`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cerrar la planificación, ponerla a disposición del repartidor y entregar un aviso durable. Resolver además rutas de días anteriores despachadas pero nunca iniciadas. |
+| **Cómo se trabajó** | Se acordó el comportamiento antes del código. La IA implementó el despacho, la mensajería y el aviso, escribió pruebas y documentación, y verificó API/Worker en Docker. La revisión y correcciones posteriores de trazas y consumo realizadas por Ezequiel están registradas en 3.17. |
+| **Aceptado sin modificaciones** | Guardar estado, evidencia y `RutaDespachada.v1` en la misma transacción; publicar con confirmación del broker y procesar de forma idempotente. Despachar conserva los envíos AsignadoARuta: EnTransito corresponde a CU-51. |
+| **Modificado** | Se exigió usuario repartidor vinculado y habilitado y se integró Identity. El 20/10 se agregó anulación controlada sólo de un despacho anterior sin actividad: motivo, revisión y confirmación de coordinación con el repartidor; vuelve a Planificada, conserva envíos y auditoría. Compite con la carga bajo el mismo bloqueo por operador. Una operación offline anterior que llegue después queda como conflicto, sin reactivar la ruta. |
+| **Descartado o limitado** | No se simula carga ni rendición para cerrar una planificación atrasada. No se elimina la ruta ni se permite anular si hay escaneos, operaciones aplicadas o rendición. El evento `DespachoAnulado.v1` no tiene consumidor implementado y no acredita una notificación push. La ausencia de operaciones locales pendientes requiere coordinación humana: el servidor no conoce una cola desconectada. |
+| **Verificación** | PostgreSQL/RabbitMQ reales: publicación pendiente al iniciar Worker, persistencia, reentrega, fallos, reintentos, autorización y aislamiento; demo en Docker. La ampliación agregó 17 pruebas dirigidas correctas. La regresión completa de esa ampliación tuvo una prueba de tiempo de Valkey fallida bajo carga, que pasó aisladamente junto a las otras siete de caché; no se declara toda esa ejecución simultáneamente verde. |
+
+## **3.28 ADR-0005 · Modo de renderizado de Blazor**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 12/10/2026 |
+| **Archivo y referencia** | `docs/analisis-diseno/ADR-0005-modo-de-renderizado-de-blazor.md`; chat «Redactar ADR sobre modo de render Bl»; commit de renombrado `19e644b`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Justificar WebAssembly frente a Server y Auto según la letra: escalado, estado, latencia y recursos del servidor. |
+| **Cómo se trabajó** | La IA explicó los modelos de ejecución, revisó la configuración real y redactó el Markdown tras acordar el contenido con Lucas. |
+| **Aceptado sin modificaciones** | Estructura de contexto, decisión, alternativas, consecuencias y verificaciones como fundamento de la elección existente. No implicó migrar las aplicaciones a otro modo de renderizado. |
+| **Modificado** | Se aclaró que el seguimiento es público sin login pero requiere el token del enlace. Se corrigieron verificaciones propuestas que inicialmente sonaban como compromisos acordados y se distinguieron obligaciones de recomendaciones. Se renombró de ADR-0004 a ADR-0005 para evitar la colisión con el ADR de sincronización de main. |
+| **Descartado o diferido** | Dar por verificadas tarjetas de Trello que no pudieron consultarse o aprobar el ADR por el solo hecho de redactarlo. Se dejó el formato de entrega final para más adelante. |
+| **Verificación** | Contraste con letra, ADR-0001 y proyectos WebAssembly/host. El archivo continúa como Propuesto, pendiente de revisión del equipo. |
+
+## **3.29 CU-50 · Descarga de hoja de ruta y consulta sin conexión**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 17/10/2026; ampliación Mis rutas y correcciones el 19–20/10 |
+| **Archivos y referencias** | Consulta de hoja en Ejecución, contratos de módulos y HTTP, `HojaDeRutaService`, páginas de PWA, `wwwroot/js/hoja-ruta.js`, service worker y pruebas; `docs/analisis-diseno/cu-50`; commit `17cf3d9`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Descargar una hoja consistente y propia, conservarla cifrada en el dispositivo y permitir consultarla sin conexión. |
+| **Cómo se trabajó** | La IA escribió implementación, almacenamiento, pruebas C#/JavaScript y documentación siguiendo las decisiones acordadas; comprobó el flujo publicado con el servidor detenido y luego restablecido. |
+| **Aceptado sin modificaciones** | Identidad del espacio por usuario/operador/repartidor, IndexedDB y AES-GCM con clave no exportable, guardado atómico y conservación de la copia anterior ante fallos. La descarga no cambia estados del negocio. |
+| **Modificado** | Se ampliaron las tarjetas de Mis rutas y la selección de rutas anteriores abiertas, conservando por separado hojas y operaciones. Se ajustaron bloqueo por cambio/cierre de cuenta y respuestas tardías. El arranque detenido en 98 % se investigó como desalineación/caché de archivos WASM; se recompiló y agregó no-store de recursos sólo en Development. |
+| **Descartado** | Usar GUID como nombre de ruta, sobrescribir la copia anterior ante una descarga incompleta, guardar documentos personales en localStorage o borrar IndexedDB para solucionar una actualización de la PWA. |
+| **Verificación** | La entrega inicial registró 397 pruebas .NET y 12 JavaScript correctas; luego 25 dirigidas de hoja/unidad de trabajo. Demo publicada: descargar, detener API, abandonar/reabrir la hoja, consultar datos, restaurar API y comprobar el bloqueo al cerrar sesión. El uso sin red exige la PWA publicada; el service worker de desarrollo no cachea la aplicación completa. |
+
+## **3.30 CU-51 · Carga del vehículo y cola de sincronización de la PWA**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 19/10/2026; coordinación con la anulación el 20/10 |
+| **Archivos y referencias** | Pantalla/servicio de carga y lector, almacenamiento y cola en `hoja-ruta.js`, `ConfirmarCarga` en Ejecución, APIs de Planificación/Envíos y pruebas; `docs/analisis-diseno/cu-51`; commit `aeddc2d`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Escanear carga por cámara o entrada manual, persistir avance sin red y sincronizar una confirmación sin duplicar transiciones. |
+| **Cómo se trabajó** | La IA implementó código, migración de almacenamiento local, pruebas y documentación. El endpoint base de sincronización CU-52 y sus políticas previas pertenecen al trabajo de Ezequiel (3.14); Lucas amplió ese recorrido para carga y la cola cliente. |
+| **Aceptado sin modificaciones** | Borradores cifrados por espacio, operación confirmada inmutable e idempotencia por OperacionId. Sólo envíos cargados completos pasan a EnTransito; confirmar faltantes requiere reconocimiento explícito. |
+| **Modificado** | La revisión eliminó contratos paralelos de carga y trasladó la coordinación a las APIs de Application de los módulos. Se corrigió una habilitación demasiado amplia: las rutas anteriores se consultan o rinden, pero no admiten nuevas cargas. Una carga guardada en su día puede sincronizarse después, comparando la fecha efectiva de la operación en la zona del operador, no la fecha de llegada. |
+| **Descartado** | Aumentar el avance por lecturas repetidas, mostrar una confirmación local como ya aplicada en el servidor, perder el payload de un conflicto o iniciar una carga hoy sobre una ruta atrasada sin revisión de despacho. |
+| **Verificación** | Tras corregir contratos: 428 pruebas .NET y 23 JavaScript correctas, incluida decodificación real de imagen CODE-128. El ajuste de fecha pasó 77 de integración de Ejecución, 56 de arquitectura y 35 JavaScript. Cobertura de cortes, reenvíos, doble confirmación, concurrencia entre pestañas, migración local y preservación de operaciones. |
+
+## **3.31 CU-54 · Declaración de rendición del repartidor**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 19–20/10/2026 |
+| **Archivos y referencias** | `Rendicion` y líneas en Ejecución, preparación/registro/consulta, repositorio y migración, contratos para CU-55, `Rendicion.razor`, `RendicionService`, cola cifrada y pruebas; `docs/analisis-diseno/cu-54`; commits `f32f123`, `f28cbe6` y `7ededf4`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Declarar qué bultos vuelven al depósito, incluso sin conexión, conservar las observaciones y preparar el control posterior de CU-55. |
+| **Cómo se trabajó** | Se acordó y documentó el diseño antes del código. La IA implementó dominio, persistencia, coordinación y pantalla sobre la sincronización existente, escribió pruebas y realizó una demostración offline/online. |
+| **Aceptado sin modificaciones** | Diferenciar declaración del repartidor de recepción física del depósito, conservar ambas por línea y mantener la operación confirmada inmutable. Una rendición registrada impide nuevas operaciones de recorrido sobre esa ruta. |
+| **Modificado** | Se distinguieron bultos no cargados, carga parcial, entregas e intentos de esta ruta frente a los históricos y operaciones todavía pendientes. Se conservaron las dependencias y el orden de lotes al sincronizar. Al integrar main se corrigió una prueba que aún dependía de reglas provisorias eliminadas, para usar el catálogo real por su contrato. El botón pasó a Finalizar ruta, rojo y a la derecha; el texto no adelanta el cierre administrativo. |
+| **Descartado** | Editar la declaración una vez confirmada, marcar automáticamente como extraviado lo que no vuelve, liberar reservas o finalizar la ruta al declarar. Esos efectos corresponden al control de depósito en CU-55. No se incluyó una rendición de dinero. |
+| **Verificación** | 49 pruebas dirigidas finales y 31 JavaScript correctas; demo con API detenida, recarga del borrador y operación pendiente, y sincronización al restablecerla. En la regresión completa una prueba de latencia de Valkey falló y pasó aislada; se registró esa limitación. La adaptación posterior de pruebas al contrato de reglas pasó la regresión de esa integración. |
+
+## **3.32 Acceso a las aplicaciones e integración con Identity**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello, sobre Identity de Administración implementado por Cristian |
+| **Fecha** | 14–20/10/2026 |
+| **Archivos y referencias** | Ingreso/salida de las aplicaciones, middleware de acceso y políticas, `IngresoModel`, `FormularioIngresoVencidoFilter`, consulta de sesión del Portal y pruebas de Identity. Chats «Planificar CU-43 despachar ruta», «Evaluar PWA del repartidor» y «Analizar el CU-40». |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Conectar las pantallas y planificación a la sesión real, impedir que un comercio acceda al Backoffice y dar a Portal y Repartidor sus accesos correspondientes. |
+| **Cómo se trabajó** | La IA revisó la compatibilidad con roles/claims y escribió integración, correcciones, pantallas y pruebas. La selección de operador y renovación del claim provienen de la coordinación con los compañeros; no se atribuye a Lucas toda la implementación de CU-03. |
+| **Aceptado sin modificaciones** | Autorización del lado servidor por perfil, lectura del responsable desde la sesión y diferenciación de ingreso del comercio, repartidor y personal. |
+| **Modificado** | Se corrigieron redirecciones al login incorrecto y acceso del comercio al personal; se agregaron cierres de sesión y consulta de cuenta para el Portal. Ante el HTTP 400 reportado al ingresar se cubrió el caso de formulario antifalsificación vencido: redirección a un GET nuevo con mensaje, manteniendo el rechazo del POST inválido. La contraseña incorrecta normal conserva su mensaje de credenciales inválidas. |
+| **Descartado** | Desactivar antiforgery para evitar el 400, aceptar el POST inválido, permitir por estar autenticado sin comprobar el perfil o extender el bypass de desarrollo a usuarios autenticados sin el rol requerido. |
+| **Verificación** | Pruebas de login, permisos, logout, selección y aislamiento durante las integraciones. La corrección del formulario pasó 18 pruebas dirigidas y la consulta de sesión del Portal cuatro. El diagnóstico no demuestra retrospectivamente la causa exacta de la captura original sin sus logs; verifica los escenarios reproducidos. |
+
+## **3.33 Presentación común, revisiones de integración y diagnóstico del entorno**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | Octubre de 2026; revisión retrospectiva el 20/10 |
+| **Archivos y referencias** | Layouts, navegación y estilos de Backoffice, Portal y PWA; pruebas y documentación de los componentes anteriores. Chat «Agregar menú hamburguesa adaptable» y revisiones de main en los chats de los casos de uso. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Mejorar navegación y legibilidad, revisar la compatibilidad al incorporar trabajo paralelo y diagnosticar fallos de compilación, arranque y CI. |
+| **Cómo se trabajó** | Lucas indicó los cambios visuales mediante capturas y ejemplos; la IA editó Razor/CSS/JavaScript y verificó compilaciones o flujos dirigidos. Revisó diferencias con main y ayudó a resolver conflictos. Las modificaciones funcionales específicas y sus pruebas se registran en cada entrada anterior. |
+| **Aceptado sin modificaciones** | Se incorporaron las ubicaciones y textos concretos pedidos por Lucas: datos de sesión junto a navegación/cierre, nombres y matrículas en lugar de IDs visibles, fechas legibles y acciones por ruta. No se reconstruye una aceptación sin cambios de todos los layouts intermedios. |
+| **Modificado** | Cabeceras, footers y disposición de botones se iteraron con las observaciones de Lucas. En el chat del menú adaptable se incorporó hamburguesa por debajo de 1400 px en las tres aplicaciones y pantallas de cuenta. Se corrigieron conflictos de paquetes conservando referencias necesarias y versiones compatibles con main. |
+| **Descartado o no acreditado** | No se atribuyen a Lucas la caché de Ezequiel ni CU-04/05/06/60 de Cristian por haberlos revisado o integrado. La auditoría previa de CU-17/18 distinguió backend de pantallas móviles que entonces faltaban. Posteriormente Ezequiel incorporó esas pantallas a main; su implementación y verificaciones se registran en 3.21. Tampoco se dio por aprobada la propuesta ADR-0006 ni por demostradas en Aspire las métricas sólo por encontrar su instrumentación. |
+| **Verificación** | Revisiones de diffs, compilaciones y pruebas dirigidas según cada cambio. En la tarea del menú compilaron los tres proyectos; la compilación completa quedó bloqueada por archivos de la API en ejecución. Los problemas de entorno no se registran como pruebas aprobadas ni las revisiones documentales como implementación de casos ajenos. |
 
 # **4\. Historial de versiones**
 
@@ -366,3 +554,4 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | 0.15 | 19/10/2026 | Entrada de las reglas de entrega pedidas a Administración y la versión de reglas del envío. | Ezequiel Marcenal |
 | 0.16 | 20/10/2026 | Entrada de CU-55, confirmar la rendición. | Ezequiel Marcenal |
 | 0.17 | 20/10/2026 | Entrada de la PWA de CU-17 y CU-18. | Ezequiel Marcenal |
+| 0.18 | 20/10/2026 | Registro retrospectivo del uso de Codex por Lucas: arquitectura, CU-13/14/40/41/43/50/51/54, ADR-0005, acceso y presentación; aporte posterior al listado de CU-55. Reconstruido con chats, Git y documentación, para revisión del responsable. | Lucas Ottonello |
