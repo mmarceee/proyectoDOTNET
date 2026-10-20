@@ -37,6 +37,14 @@ internal sealed class PlanificacionModuleApi(IRutaRepository rutas) : IPlanifica
         await rutas.GuardarAsync(ct);
     }
 
+    public async Task FinalizarRutaAsync(Guid rutaId, CancellationToken ct)
+    {
+        var ruta = await rutas.ObtenerAsync(rutaId, ct)
+            ?? throw new Logistica.SharedKernel.DomainException("La ruta no está disponible.");
+        ruta.Finalizar();
+        await rutas.GuardarAsync(ct);
+    }
+
     public async Task<bool> EnvioEnRutaDelRepartidorAsync(Guid rutaId, Guid repartidorId, Guid envioId, CancellationToken ct)
     {
         // El filtro "Tenant" deja afuera las rutas de otros operadores: para quien pregunta, no existen.

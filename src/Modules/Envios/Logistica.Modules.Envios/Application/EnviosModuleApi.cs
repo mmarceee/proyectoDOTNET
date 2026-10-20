@@ -3,6 +3,7 @@ using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Contracts.Results;
 using Logistica.Modules.Envios.Domain.Devoluciones;
 using Logistica.Modules.Envios.Domain.Envios;
+using Logistica.Modules.Envios.Domain.Incidencias;
 using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Envios.Application;
@@ -228,6 +229,54 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
         // T2. Si el envío ya no está Admitido (por ejemplo, lo cancelaron), Transicionar lo rechaza.
         envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, reloj.GetUtcNow());
+
+        await envios.GuardarCambiosAsync(ct);
+    }
+
+    // CU-55 (T8). Si un envío ya no está EnTransito (lo entregaron o lo declararon extraviado mientras tanto),
+    // Transicionar lo rechaza y no se reintegra ninguno: la rendición entera se confirma o no.
+    public async Task ReintegrarADepositoAsync(IReadOnlyCollection<Guid> envioIds, Guid? responsableId, CancellationToken ct)
+    {
+        if (envioIds.Count == 0)
+        {
+            return;
+        }
+
+        var lista = await envios.ObtenerParaPlanificacionAsync(envioIds, ct);
+        if (lista.Count != envioIds.Distinct().Count())
+        {
+            throw new DomainException("Un envío de la rendición ya no existe.");
+        }
+
+        var ahora = reloj.GetUtcNow();
+        foreach (var envio in lista)
+        {
+            envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora,
+                detalle: "Volvió en la rendición sin haberse intentado.");
+            eventos.Registrar(EnvioReintegradoADeposito.Tipo,
+                new EnvioReintegradoADeposito(envio.Id, envio.Numero, ahora, responsableId), ahora);
+        }
+
+        await envios.GuardarCambiosAsync(ct);
+    }
+
+    // CU-55, A1: una incidencia por envío, con los códigos de los bultos que no volvieron. El envío no cambia de estado:
+    // el extravío lo declara el despachador (CU-21).
+    public async Task RegistrarFaltantesAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct)
+    {
+        if (bultoIds.Count == 0)
+        {
+            return;
+        }
+
+        var ahora = reloj.GetUtcNow();
+        foreach (var envio in await envios.ObtenerPorBultosAsync(bultoIds, ct))
+        {
+            var codigos = envio.Bultos.Where(b => bultoIds.Contains(b.Id)).Select(b => b.Codigo).Order();
+            envios.Agregar(Incidencia.Crear(envio, TipoIncidencia.Extravio,
+                $"Faltante en la rendición. Bultos que no volvieron: {string.Join(", ", codigos)}. Revisar si se declara el extravío (CU-21).",
+                ahora));
+        }
 
         await envios.GuardarCambiosAsync(ct);
     }

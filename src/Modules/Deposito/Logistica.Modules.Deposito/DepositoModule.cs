@@ -26,6 +26,9 @@ public static class DepositoModule
         services.AddScoped<RecibirBultoHandler>();
         services.AddScoped<ConsultarBultoParaRecepcionHandler>();
 
+        // CU-55: confirmar la rendición.
+        services.AddScoped<Application.Features.ConfirmarRendicion.ConfirmarRendicionHandler>();
+
         return services;
     }
 

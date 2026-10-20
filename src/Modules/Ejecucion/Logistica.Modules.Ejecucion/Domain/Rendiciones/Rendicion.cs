@@ -29,6 +29,18 @@ internal sealed class Rendicion : Entity, IOperadorOwned
         foreach (var linea in lineas) rendicion._lineas.Add(LineaRendicion.Crear(rendicion, linea));
         return rendicion;
     }
+
+    // CU-55: el operario de depósito confirmó qué bultos volvieron y la rendición se cierra. Cada línea queda resuelta
+    // (LineaRendicion.Resolver). Un bulto escaneado que no tenía que volver es un sobrante (A2): se rechaza antes de
+    // cambiar nada, para que el operario lo revise.
+    public void Confirmar(IReadOnlySet<Guid> recibidos, DateTimeOffset ahora)
+    {
+        if (FinalizadaEn is not null) throw new DomainException("La rendición ya se confirmó.");
+        if (recibidos.Except(_lineas.Where(l => l.DebeVolver).Select(l => l.BultoId)).Any())
+            throw new DomainException("Hay bultos escaneados que no tenían que volver en esta rendición.");
+        foreach (var linea in _lineas) linea.Resolver(recibidos.Contains(linea.BultoId));
+        FinalizadaEn = ahora.ToUniversalTime();
+    }
     internal static string? Limpiar(string? texto) => string.IsNullOrWhiteSpace(texto) ? null : texto.Trim();
 }
 
@@ -58,5 +70,23 @@ internal sealed class LineaRendicion : Entity, IOperadorOwned
         return new() { OperadorId = rendicion.OperadorId, RendicionId = rendicion.Id, EnvioId = linea.EnvioId,
             BultoId = linea.BultoId, Situacion = linea.Situacion, Declarada = linea.Declarada,
             Observacion = Rendicion.Limpiar(linea.Observacion) };
+    }
+
+    // Los bultos que tenían que volver al depósito: los no intentados, los de un intento fallido y las lecturas de una
+    // carga parcial. Son los únicos que el operario compara con lo escaneado.
+    internal bool DebeVolver => Situacion is "NoIntentado" or "IntentoFallido" or "CargaParcial";
+
+    // CU-55. Lo entregado en la calle y lo ya extraviado quedan así. Un bulto que tenía que volver y llegó queda
+    // DevueltoADeposito; si no llegó, Recibida es false y no tiene estado final: es un faltante, y el extravío lo
+    // declara el despachador (CU-21), nunca la rendición sola. Los no cargados y los resueltos no se comparan.
+    internal void Resolver(bool recibida)
+    {
+        if (Situacion == "EntregadoEnCalle") EstadoFinal = EstadoLineaRendicion.EntregadoEnCalle;
+        else if (Situacion == "Extraviado") EstadoFinal = EstadoLineaRendicion.Extraviado;
+        else if (DebeVolver)
+        {
+            Recibida = recibida;
+            EstadoFinal = recibida ? EstadoLineaRendicion.DevueltoADeposito : null;
+        }
     }
 }

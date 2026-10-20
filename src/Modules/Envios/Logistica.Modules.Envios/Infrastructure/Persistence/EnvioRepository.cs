@@ -48,6 +48,18 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         db.Devoluciones.Add(devolucion);
     }
 
+    public void Agregar(Domain.Incidencias.Incidencia incidencia)
+    {
+        db.Incidencias.Add(incidencia);
+    }
+
+    public async Task<IReadOnlyList<Envio>> ObtenerPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Envios.Include(e => e.Bultos).Where(e => e.Bultos.Any(b => bultoIds.Contains(b.Id)))
+            .OrderBy(e => e.Numero).ToListAsync(ct);
+    }
+
     public Task GuardarCambiosAsync(CancellationToken ct)
     {
         return db.SaveChangesAsync(ct);
