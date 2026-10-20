@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Logistica.Http.Contracts.Cuenta;
 using Logistica.Http.Contracts.Envios;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -61,6 +62,27 @@ public class SeleccionarOperadorTests(PostgresApiFactory factory) : IClassFixtur
 
         Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
         Assert.Equal("/portal/ingresar", respuesta.Headers.Location!.ToString());
+    }
+
+    [Fact]
+    public async Task La_sesion_del_portal_muestra_el_usuario_autenticado_y_no_se_guarda_en_cache()
+    {
+        using var client = Cliente();
+        using var anonima = await client.GetAsync("/api/portal/sesion");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonima.StatusCode);
+
+        await Sesion.IngresarAsync(client, "comercio@tiendademo.uy");
+        await Sesion.ElegirOperadorAsync(client, DatosIniciales.OperadorDemoId);
+        using var respuesta = await client.GetAsync("/api/portal/sesion");
+        respuesta.EnsureSuccessStatusCode();
+        Assert.True(respuesta.Headers.CacheControl?.NoStore);
+        Assert.Equal("comercio@tiendademo.uy",
+            (await respuesta.Content.ReadFromJsonAsync<SesionPortalResponse>())!.NombreUsuario);
+
+        using var personal = Cliente();
+        await Sesion.IngresarAsync(personal, "repartidor@operador-demo.uy");
+        using var ajena = await personal.GetAsync("/api/portal/sesion");
+        Assert.Equal(HttpStatusCode.Forbidden, ajena.StatusCode);
     }
 
     // Lee directo de la base, sin pasar por el filtro, para comprobar con qué operador quedó guardado.

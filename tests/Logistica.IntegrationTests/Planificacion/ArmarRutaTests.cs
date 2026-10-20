@@ -534,6 +534,8 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         public void Agregar(ValidacionRuta validacion) => original.Agregar(validacion);
         public Task<IReadOnlyList<RetiroEnvioRuta>> RetirosAsync(Guid id, int pagina, CancellationToken ct) => original.RetirosAsync(id, pagina, ct);
         public void Agregar(RetiroEnvioRuta retiro) => original.Agregar(retiro);
+        public Task<IReadOnlyList<AnulacionDespacho>> AnulacionesAsync(Guid id, int pagina, CancellationToken ct) => original.AnulacionesAsync(id, pagina, ct);
+        public void Agregar(AnulacionDespacho anulacion) => original.Agregar(anulacion);
         public Task GuardarAsync(CancellationToken ct) => throw new InvalidOperationException("Fallo inyectado después de guardar Envíos.");
     }
 }

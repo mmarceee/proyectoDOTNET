@@ -1,0 +1,9 @@
+.seleccion-pendiente {
+    color: var(--bs-secondary-color, #6c757d);
+    font-style: italic;
+}
+
+.form-select option {
+    color: var(--bs-body-color, #212529);
+    font-style: normal;
+}

@@ -5,7 +5,11 @@
 }
 .navbar-brand {
     color: #fff;
-    white-space: normal;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: calc(100% - 5rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .navbar-collapse {
     align-items: center;
@@ -48,7 +52,7 @@
     --bs-btn-focus-shadow-rgb: 220, 53, 69;
     white-space: nowrap;
 }
-@media (max-width: 767.98px) {
+@media (max-width: 1399.98px) {
     .navbar-collapse { padding-top: .75rem; }
     .btn-logout { margin: .75rem 0 .25rem; }
 }

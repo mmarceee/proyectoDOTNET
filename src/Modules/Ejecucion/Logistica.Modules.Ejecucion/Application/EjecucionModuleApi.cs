@@ -7,6 +7,8 @@ namespace Logistica.Modules.Ejecucion.Application;
 
 internal sealed class EjecucionModuleApi(IRendicionRepository rendiciones, TimeProvider reloj) : IEjecucionModuleApi
 {
+    public Task<bool> TieneActividadRegistradaAsync(Guid rutaId, CancellationToken ct)
+        => rendiciones.TieneActividadRegistradaAsync(rutaId, ct);
     public async Task<RendicionPendiente?> ConsultarRendicionAsync(Guid rutaId, CancellationToken ct)
     {
         var r = await rendiciones.ObtenerAsync(rutaId, ct);

@@ -55,5 +55,9 @@ internal sealed class RutaRepository(PlanificacionDbContext db) : IRutaRepositor
             .Skip((pagina - 1) * 20).Take(20).ToListAsync(ct);
     public void Agregar(RetiroEnvioRuta retiro) => db.Retiros.Add(retiro);
     public void Agregar(ValidacionRuta validacion) => db.Validaciones.Add(validacion);
+    public async Task<IReadOnlyList<AnulacionDespacho>> AnulacionesAsync(Guid rutaId, int pagina, CancellationToken ct)
+        => await db.AnulacionesDespacho.AsNoTracking().Where(a => a.RutaId == rutaId)
+            .OrderByDescending(a => a.RevisionRuta).Skip((pagina - 1) * 20).Take(20).ToListAsync(ct);
+    public void Agregar(AnulacionDespacho anulacion) => db.AnulacionesDespacho.Add(anulacion);
     public Task GuardarAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }

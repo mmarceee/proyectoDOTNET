@@ -10,6 +10,7 @@ namespace Logistica.Modules.Administracion.Presentation.Features.IniciarSesion;
 internal sealed class IngresarModel(IServicioSesion sesion)
     : IngresoModel(sesion, TipoAccesoSesion.Personal, "/backoffice") { }
 
+[TypeFilter(typeof(FormularioIngresoVencidoFilter))]
 internal abstract class IngresoModel(IServicioSesion sesion, TipoAccesoSesion acceso, string inicio) : PageModel
 {
     [BindProperty]
@@ -24,8 +25,10 @@ internal abstract class IngresoModel(IServicioSesion sesion, TipoAccesoSesion ac
 
     public string? Error { get; private set; }
 
-    public void OnGet()
+    public void OnGet(bool formularioVencido = false)
     {
+        if (formularioVencido)
+            Error = "El formulario de ingreso venció o la sesión cambió en otra pestaña. Lo actualizamos; ingresá tus datos nuevamente.";
     }
 
     public async Task<IActionResult> OnPostAsync()

@@ -1,5 +1,7 @@
 # CU-51 · Carga del vehículo
 
+Actualización del 20/10/2026: una ruta anterior que nunca inició se resuelve desde despacho mediante la [anulación controlada de CU-43](../cu-43/anulacion-despacho-sin-iniciar.md). Primero se sincroniza cualquier carga local pendiente. Una carga antigua que llegue después de anular no reactiva la ruta y queda como conflicto con su contenido conservado.
+
 Implementación local del 19/10/2026, sobre el [diseño acordado](diseno-cu-51.md).
 
 ## Flujo disponible

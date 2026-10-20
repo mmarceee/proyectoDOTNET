@@ -147,6 +147,7 @@ public static class AdministracionModule
 
         // CU-07: la marca del operador de la sesión, para los layouts.
         Presentation.Features.GestionarIdentidadVisual.MarcaDelOperadorEndpoint.Map(endpoints);
+        Presentation.Features.IniciarSesion.SesionPortalEndpoint.Map(endpoints);
         return endpoints;
     }
 

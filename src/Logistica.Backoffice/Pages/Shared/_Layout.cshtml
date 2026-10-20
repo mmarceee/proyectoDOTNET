@@ -11,7 +11,7 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-xxl navbar-light bg-white border-bottom box-shadow mb-3" aria-label="Navegación principal">
             <div class="container">
                 <a class="navbar-brand d-flex align-items-center gap-2" href="/backoffice">
                     @if (User.Identity?.IsAuthenticated == true)
@@ -20,11 +20,11 @@
                     }
                     Backoffice
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation" aria-controls="main-navigation"
                         aria-expanded="false" aria-label="Mostrar navegación">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                <div id="main-navigation" class="navbar-collapse collapse justify-content-between">
                     @if (User.Identity?.IsAuthenticated == true && !User.IsInRole("UsuarioComercio")
                         && (User.IsInRole("Administrador") || User.IsInRole("Despachador") || User.IsInRole("OperarioDeposito")))
                     {
@@ -75,7 +75,7 @@
                     }
                     @if (User.Identity?.IsAuthenticated == true)
                     {
-                        <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="cuenta-usuario d-flex flex-wrap align-items-center gap-2">
                             <span class="navbar-text">@User.Identity.Name</span>
                             <form method="post" action="/cuenta/salir" asp-antiforgery="true" class="m-0">
                                 <button type="submit" class="btn btn-outline-secondary btn-sm btn-logout">Cerrar sesión</button>

@@ -40,6 +40,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
     public EvaluacionRutaResponse? Evaluacion { get; private set; }
     public IReadOnlyList<ValidacionRutaResponse> Historial { get; private set; } = [];
     public IReadOnlyList<RetiroEnvioRutaResponse> Retiros { get; private set; } = [];
+    public IReadOnlyList<AnulacionDespachoResponse> Anulaciones { get; private set; } = [];
     public bool Desarrollo => acceso.Desarrollo;
     public bool Editable => Ruta is null || Ruta.Estado == "Planificada";
     public bool CambioDatos => Ruta is not null && (Ruta.Fecha != Fecha || Ruta.RepartidorId != RepartidorId || Ruta.VehiculoId != VehiculoId);
@@ -225,6 +226,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
             Ruta = await lectorRutas.DetalleAsync(id, ct);
             Historial = await lectorRutas.ValidacionesAsync(id, 1, ct);
             Retiros = await lectorRutas.RetirosAsync(id, 1, ct);
+            Anulaciones = await lectorRutas.AnulacionesAsync(id, 1, ct);
             NumerosEnvio = await lectorRutas.NumerosEnvioAsync(Ruta.Paradas.SelectMany(p => p.Envios).Select(e => e.EnvioId)
                 .Concat(Historial.SelectMany(v => v.Bultos).Select(b => b.EnvioId)).Distinct().ToArray(), ct);
             // Una nueva confirmación debe usar la revisión recién mostrada, sin reenviar automáticamente.

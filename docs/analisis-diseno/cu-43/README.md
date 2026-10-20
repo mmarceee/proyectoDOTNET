@@ -1,5 +1,7 @@
 # CU-43 · Despachar una ruta
 
+Ampliación del 20/10/2026: [anular el despacho de una ruta anterior sin iniciar](anulacion-despacho-sin-iniciar.md). Permite volver a Planificada, con motivo, auditoría y comprobación de ausencia de actividad, para replanificar sin una carga o rendición ficticia. La carga tardía de la autorización anterior no se aplica.
+
 Actualización: 16/10/2026. Incluye el despacho desde Backoffice y el aviso interno persistente en la aplicación del repartidor. No incluye la descarga de la hoja de ruta ni almacenamiento offline (CU-50), push o correo.
 
 ## Comportamiento

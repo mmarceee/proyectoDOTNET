@@ -748,6 +748,8 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 
 * modificarPlanificacion(fecha: DateOnly, repartidorId: Guid, vehiculoId: Guid): void — sólo en estado Planificada (ampliación de CU-40 acordada el 09/10/2026). La aplicación coordina la revalidación completa de los envíos, los recursos activos y su disponibilidad, y el cambio atómico de reservas; si falla, se conservan los datos anteriores. Puede reagrupar visitas según las franjas de la nueva fecha; conserva los envíos y no repite sus transiciones de asignación.
 
+* anularDespacho(hoy: DateOnly): void — Despachada de un día anterior vuelve a Planificada y aumenta su revisión. La aplicación exige ausencia de actividad en Ejecución, envíos AsignadoARuta y confirmación de coordinación con el repartidor. AnulacionDespacho conserva el despacho original, motivo, responsable, fecha y revisiones. Mantiene envíos y reservas para la fecha original, sin bloqueo de días posteriores. No finaliza ni borra la ruta. [Ampliación CU-43 del 20/10/2026](cu-43/anulacion-despacho-sin-iniciar.md).
+
 * quitarEnvio(envioId: Guid): void — sólo si la ruta no fue despachada; se quita el envío y se elimina la parada únicamente si ya no contiene otros envíos (T4, T19).
 
 * En el cambio programado de franjas de CU-04, un envío AsignadoARuta afectado sale de su ruta Planificada por T19 y queda Reprogramado con la nueva franja, conservando el día de entrega. Si sólo lo determinaba la ruta, ese día se guarda como fechaEntregaProgramada al reprogramar. Se quita el miembro y se elimina la parada sólo si ya no contiene otros envíos, sin borrar la evidencia histórica; si la ruta queda vacía, libera sus recursos. Se muestran los envíos afectados antes de confirmar y se dejan disponibles para reasignación manual mediante T13 (acordado al definir CU-40 el 09/10/2026).
@@ -757,6 +759,12 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 * moverParada(paradaId: Guid, nuevoOrden: int): void — ajuste manual del despachador (CU-42)
 
 * despachar(): void — cierra la planificación. Antes de invocarlo, la aplicación comprueba mediante el contrato de Administración que el repartidor tenga usuario vinculado del mismo operador, con cuenta activada, activa y perfil Repartidor para la PWA, tanto al prevalidar como al confirmar (CU-43, acuerdo del 16/10/2026). Ante un vínculo ausente o una cuenta no habilitada se conserva Planificada y no se registra evidencia ni evento de despacho. Administración realiza la comprobación de cuenta y rol mediante ServicioUsuarios; el agregado no accede a Identity ni a entidades de Administración.
+
+**AnulacionDespacho**
+
+Entidad histórica de Planificación, inmutable después de confirmar (ampliación CU-43, 20/10/2026). Ruta 1 → 0..* AnulacionDespacho. No elimina ni reemplaza ValidacionRuta.
+
+**Atributos:** id, operadorId, rutaId, fechaRuta, despachadaEn (instante del despacho original), revisionAnterior, revisionRuta, motivo (hasta 1000 caracteres), responsableId y ocurridoEn (UTC). La aplicación registra esta evidencia en la misma transacción que Despachada → Planificada y DespachoAnulado.v1. El historial está aislado por operador y vinculado a Ruta mediante clave compuesta; se conserva al replanificar, quitar envíos o volver a despachar.
 
 **Parada**
 

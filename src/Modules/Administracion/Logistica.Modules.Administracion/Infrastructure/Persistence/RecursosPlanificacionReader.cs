@@ -45,4 +45,14 @@ internal sealed class RecursosPlanificacionReader(AdministracionDbContext db, IC
         var franjas = await db.Franjas.AsNoTracking().ToListAsync(ct);
         return new(repartidores, vehiculos, zonas, franjas);
     }
+    public async Task<NombresRecursosPlanificacion> ConsultarNombresAsync(IReadOnlyCollection<Guid> repartidorIds,
+        IReadOnlyCollection<Guid> vehiculoIds, CancellationToken ct)
+    {
+        // El filtro Tenant se conserva. No filtrar Activo: una ruta anterior mantiene sus asignaciones.
+        var repartidores = await db.Repartidores.AsNoTracking().Where(r => repartidorIds.Contains(r.Id))
+            .ToDictionaryAsync(r => r.Id, r => r.Nombre, ct);
+        var vehiculos = await db.Vehiculos.AsNoTracking().Where(v => vehiculoIds.Contains(v.Id))
+            .ToDictionaryAsync(v => v.Id, v => v.Matricula, ct);
+        return new(repartidores, vehiculos);
+    }
 }

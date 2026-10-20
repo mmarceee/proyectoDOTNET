@@ -7,6 +7,9 @@ public interface IAdministracionModuleApi
     Task BloquearPlanificacionAsync(CancellationToken ct);
     Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct);
     Task<RecursosPlanificacion> ConsultarRecursosPlanificacionAsync(DateOnly fecha, CancellationToken ct);
+    // Identificación de los recursos ya asignados, incluidos los desactivados, del operador actual.
+    Task<NombresRecursosPlanificacion> ConsultarNombresRecursosAsync(IReadOnlyCollection<Guid> repartidorIds,
+        IReadOnlyCollection<Guid> vehiculoIds, CancellationToken ct);
     Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct);
     Task<IReadOnlyList<FranjaPlanificacion>> ResolverFranjasAsync(IReadOnlyCollection<Guid> ids, DateOnly fecha, CancellationToken ct);
 

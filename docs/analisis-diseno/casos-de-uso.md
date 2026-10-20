@@ -497,10 +497,12 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 
 ### **CU-43 · Despachar una ruta**
 
+**Ampliación del 20/10/2026:** Despacho puede anular el despacho de una ruta anterior sin iniciar, sin carga/rendición/operaciones aplicadas y con sus envíos AsignadoARuta. Exige revisión actual, motivo y confirmación de coordinación con el repartidor para descartar carga física o pendiente de sincronizar. Vuelve a Planificada conservando envíos y evidencia; registra el despacho original en el historial de anulaciones. Una carga antigua que llegue después queda como conflicto sin reactivar la ruta. Luego se replanifica por CU-40 o se retiran envíos por CU-41. Véase [flujo y concurrencia](cu-43/anulacion-despacho-sin-iniciar.md).
+
 | Campo | Contenido |
 | :---- | :---- |
 | **Caso de uso** | CU-43 · Despachar una ruta |
-| **Descripción** | El despachador cierra la planificación de una ruta y la pone a disposición del repartidor, que puede descargarla en la PWA (RF 17). Una ruta despachada ya no se modifica. |
+| **Descripción** | El despachador cierra la planificación de una ruta y la pone a disposición del repartidor, que puede descargarla en la PWA (RF 17). Una ruta despachada ya no se modifica, salvo la anulación controlada de un despacho anterior sin iniciar descrita en la ampliación del 20/10/2026. |
 | **Pre-Condición** | 1. El usuario tiene perfil *Despachador*.<br>2. La ruta está *Planificada* y tiene al menos una parada ordenada.<br>3. El repartidor asignado tiene un usuario vinculado del mismo operador, con cuenta activada, activa y perfil Repartidor para acceder a la PWA; se comprueba al prevalidar y otra vez al confirmar el despacho. |
 | **Post-Condición** | **Éxito:** la ruta queda *Despachada*, con la fecha y hora. Se publica `RutaDespachada` por Outbox para avisar al repartidor.<br>**Fracaso:** la ruta sigue *Planificada*. |
 | **Actores** | **Principal:** despachador, desde el Backoffice.<br>**Secundario:** Worker (aviso al repartidor). |

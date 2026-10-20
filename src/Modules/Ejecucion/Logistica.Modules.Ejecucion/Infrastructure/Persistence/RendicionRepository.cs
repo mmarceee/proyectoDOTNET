@@ -28,6 +28,13 @@ internal sealed class RendicionRepository(EjecucionDbContext db) : IRendicionRep
         return new(bultos.ToHashSet(), ops.Where(o => o.Resultado == ResultadoOperacion.Aplicada && o.Tipo == "RegistrarIntentoFallido"
                 && o.EnvioId != null).Select(o => o.EnvioId!.Value).ToHashSet(), ops);
     }
+    public async Task<bool> TieneActividadRegistradaAsync(Guid rutaId, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Rendiciones.AnyAsync(r => r.RutaId == rutaId, ct)
+            || await db.EscaneosCarga.AnyAsync(e => e.RutaId == rutaId, ct)
+            || await db.Operaciones.AnyAsync(o => o.RutaId == rutaId && o.Resultado == ResultadoOperacion.Aplicada, ct);
+    }
     public void Agregar(Rendicion rendicion) => db.Rendiciones.Add(rendicion);
     public Task GuardarAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }

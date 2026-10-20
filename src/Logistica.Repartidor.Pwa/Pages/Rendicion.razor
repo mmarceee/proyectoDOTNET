@@ -4,9 +4,9 @@
 @inject RendicionService Rendiciones
 @inject HojaDeRutaService Hoja
 
-<PageTitle>Rendir ruta</PageTitle>
+<PageTitle>Finalizar ruta</PageTitle>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1>Rendir ruta</h1>
+    <h1>Finalizar ruta</h1>
     <NavLink href="" class="btn btn-outline-secondary">Mis rutas</NavLink>
 </div>
 <p>Declará los bultos que devolvés al depósito. El operario verificará lo recibido antes de cerrar la ruta.</p>
@@ -42,9 +42,9 @@ else if (Rendiciones.Borrador is { } borrador)
                         @if (bulto.RequiereDeclaracion && borrador.OperacionId is null)
                         {
                             <label class="form-label" for="@("devuelve-" + bulto.BultoId)">¿Devolvés este bulto?</label>
-                            <select id="@("devuelve-" + bulto.BultoId)" class="form-select mb-2" value="@(bulto.Devuelve?.ToString().ToLowerInvariant() ?? "")"
+                            <select id="@("devuelve-" + bulto.BultoId)" class="form-select mb-2 @(bulto.Devuelve is null ? "seleccion-pendiente" : "")" value="@(bulto.Devuelve?.ToString().ToLowerInvariant() ?? "")"
                                     disabled="@Rendiciones.Ocupado" @onchange="e => Elegir(bulto, e)">
-                                <option value="">Elegí una opción</option><option value="true">Sí, lo devuelvo</option><option value="false">No vuelve al depósito</option>
+                                <option value="" disabled hidden>Elegí una opción</option><option value="true">Sí, lo devuelvo</option><option value="false">No vuelve al depósito</option>
                             </select>
                             @if (bulto.Devuelve == false)
                             {

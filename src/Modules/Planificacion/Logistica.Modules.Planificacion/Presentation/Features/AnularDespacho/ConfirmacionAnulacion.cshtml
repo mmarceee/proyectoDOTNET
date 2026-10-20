@@ -1,0 +1,28 @@
+@model Logistica.Modules.Planificacion.Presentation.Features.ArmarRuta.DetalleModel
+@if (Model.PuedeAnularDespacho)
+{
+    <section class="card border-warning mb-4" aria-labelledby="titulo-anular-despacho">
+        <div class="card-body p-4">
+            <h2 id="titulo-anular-despacho" class="h5">Resolver despacho de un día anterior</h2>
+            <p>Si el recorrido no comenzó, podés anular el despacho para volver a planificar. Se conserva el historial y los envíos siguen asignados a esta ruta.</p>
+            <p>Primero coordiná con el repartidor: no debe haber bultos cargados ni una carga pendiente de sincronizar. Si la hay, debe sincronizarla antes de continuar. El sistema vuelve a comprobar la actividad al confirmar.</p>
+            <details>
+                <summary>Anular despacho sin iniciar</summary>
+                <form method="post" asp-page-handler="AnularDespacho" class="mt-3">
+                    <input type="hidden" asp-for="RevisionEsperada" />
+                    <input type="hidden" asp-for="Fecha" />
+                    <div class="mb-3">
+                        <label asp-for="MotivoAnulacion" class="form-label">Motivo de la anulación</label>
+                        <textarea asp-for="MotivoAnulacion" class="form-control" required maxlength="1000" rows="3"></textarea>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input asp-for="ConfirmoSinCargaPendiente" class="form-check-input" required />
+                        <label asp-for="ConfirmoSinCargaPendiente" class="form-check-label">Confirmé con el repartidor que no hay carga física ni carga pendiente de sincronizar.</label>
+                    </div>
+                    <p class="text-muted">Una carga de este despacho que llegue después quedará rechazada para revisión. La anulación no borra operaciones del dispositivo.</p>
+                    <button type="submit" class="btn btn-warning">Confirmar anulación del despacho</button>
+                </form>
+            </details>
+        </div>
+    </section>
+}

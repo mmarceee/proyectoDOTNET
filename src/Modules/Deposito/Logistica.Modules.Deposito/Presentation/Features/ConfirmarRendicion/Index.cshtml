@@ -27,17 +27,20 @@ else
             <thead>
                 <tr>
                     <th scope="col">Iniciada</th>
-                    <th scope="col">Ruta</th>
+                    <th scope="col">Chofer</th>
+                    <th scope="col">Vehículo</th>
                     <th scope="col">Bultos que vuelven</th>
                     <th scope="col"></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var rendicion in Model.Rendiciones)
+                @foreach (var fila in Model.Rendiciones)
                 {
+                    var rendicion = fila.Rendicion;
                     <tr>
                         <td>@rendicion.IniciadaEn.ToString("dd/MM/yyyy HH:mm") UTC</td>
-                        <td><code>@(rendicion.RutaId.ToString()[^8..])</code></td>
+                        <td>@fila.Chofer</td>
+                        <td class="text-nowrap">@fila.Vehiculo</td>
                         <td>@rendicion.Lineas.Count(l => l.DebeVolver)</td>
                         <td><a href="/backoffice/rendiciones/@rendicion.RutaId" class="btn btn-sm btn-primary">Revisar</a></td>
                     </tr>

@@ -1,6 +1,5 @@
 using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Deposito.Application.Features.ConfirmarRendicion;
-using Logistica.Modules.Ejecucion.Contracts.Results;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -10,7 +9,7 @@ namespace Logistica.Modules.Deposito.Presentation.Features.ConfirmarRendicion;
 [Authorize(Policy = Politicas.OperarioDeposito)]
 internal sealed class IndexModel(ConfirmarRendicionHandler handler) : PageModel
 {
-    public IReadOnlyList<RendicionPendiente> Rendiciones { get; private set; } = [];
+    public IReadOnlyList<RendicionEnListado> Rendiciones { get; private set; } = [];
     public string? Mensaje { get; private set; }
 
     public async Task OnGetAsync(CancellationToken ct)

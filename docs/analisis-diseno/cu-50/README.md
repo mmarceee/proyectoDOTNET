@@ -1,5 +1,9 @@
 # CU-50 · Descargar la hoja de ruta
 
+Actualización del 20/10/2026: «Pendiente de resolución por despacho» tiene una acción en Backoffice: [anular el despacho anterior sin iniciar, CU-43](../cu-43/anulacion-despacho-sin-iniciar.md). Al actualizar, la ruta deja de ofrecerse al repartidor mientras vuelva a Planificada; una copia anterior no autoriza operaciones en el servidor.
+
+Arranque en desarrollo (20/10/2026): la API responde no-store para los recursos de las aplicaciones WASM en Development, para evitar reutilizar arranques de compilaciones anteriores. Las pruebas verifican que los archivos propios que referencia dotnet.js existen bajo la ruta de cada aplicación. Si una pestaña previa quedó en 98 % con 404, reiniciar la API y recargar con Disable cache activado en Network; no borrar IndexedDB ni el almacenamiento del sitio porque puede contener operaciones sin sincronizar. Este ajuste no cambia el service worker publicado ni la política de producción.
+
 Actualización: 17/10/2026. Implementado sobre el [diseño acordado](diseno-cu-50.md).
 
 ## Comportamiento

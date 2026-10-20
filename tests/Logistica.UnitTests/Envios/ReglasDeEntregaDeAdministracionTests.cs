@@ -125,6 +125,8 @@ public class ReglasDeEntregaDeAdministracionTests
         public Task BloquearPlanificacionAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<RecursosPlanificacion> ConsultarRecursosPlanificacionAsync(DateOnly fecha, CancellationToken ct) => throw new NotSupportedException();
+        public Task<NombresRecursosPlanificacion> ConsultarNombresRecursosAsync(IReadOnlyCollection<Guid> repartidorIds,
+            IReadOnlyCollection<Guid> vehiculoIds, CancellationToken ct) => throw new NotSupportedException();
         public Task<ReglasPlanificacion> ObtenerReglasPlanificacionAsync(DateTimeOffset ahora, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<FranjaPlanificacion>> ResolverFranjasAsync(IReadOnlyCollection<Guid> ids, DateOnly fecha, CancellationToken ct) => throw new NotSupportedException();
         public Task<TarifaBulto?> CalcularTarifaAsync(Guid zonaId, Modalidad modalidad, decimal pesoKg, decimal volumenM3, CancellationToken ct) => throw new NotSupportedException();
