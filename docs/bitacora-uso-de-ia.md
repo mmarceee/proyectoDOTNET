@@ -332,11 +332,26 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | **Verificación** | Tres pruebas unitarias de `Rendicion.Confirmar` y cinco de integración desde la página: confirmación completa (T8, Outbox, incidencia, líneas, ruta finalizada y reserva liberada), sobrante que impide confirmar sin cambiar nada, listado y detalle, 404 para otro operador y 403 para otro perfil. 551 pruebas (154 unitarias, 56 de arquitectura y 341 de integración), todas pasan. |
 | **Aporte posterior de Lucas con Codex · 20/10/2026** | Se revisó la diferencia entre bultos que deben volver y los declarados como devueltos. En el listado de pendientes se sustituyó el GUID visible por el nombre del chofer y la matrícula, conservando fecha y cantidad de bultos que deben volver; los enlaces siguen identificando la ruta por su ID. La consulta usa los contratos de Planificación y Administración, incluidos recursos históricos inactivos y sin quitar el aislamiento. Se ajustó la prueba del listado y pasaron las cinco pruebas dirigidas de CU-55. Este aporte no atribuye a Lucas la implementación del cierre, T8 e incidencias, realizada por Ezequiel. |
 
+## **3.21 PWA del repartidor: registrar la entrega y el intento fallido sin conexión (CU-17 y CU-18)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 20/10/2026 |
+| **Archivos** | `hoja-ruta.js` (`registrarEntrega`, `registrarIntentoFallido` y `estadosEnvios`), `evidencia.js` (nuevo), `EntregaService.cs` y `Entrega.razor` (nuevos), `HojaDeRuta.razor` y `Program.cs` de la PWA; `repartidor-hoja-ruta.test.mjs`. También `CacheDistribuidaTests` (prueba de Valkey inalcanzable). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Completar la parte de la PWA de CU-17 y CU-18, que faltaba para el hito del 22/10 («registrando entregas sin conectividad y sincronizando»), sobre la cola cifrada y la sincronización que dejó Lucas Ottonello con CU-51 y CU-54. |
+| **Cómo se trabajó** | El responsable decidió hacerlo en el equipo de Ezequiel en lugar de esperar a Lucas. Se pidió expresamente que la IA escribiera el código y las pruebas. La IA revisó primero el merge de Lucas (anulación de despacho, mejoras de navegación y sesión, y el listado de CU-55 con chofer y vehículo) y corrió las pruebas en Docker. |
+| **Aceptado sin modificaciones** | La entrega y el intento van a la misma cola cifrada de la carga y la rendición, sin borrador, con un registro por envío; un rechazo del servidor queda para despacho. Las reglas (firma siempre, foto, nombre y documento, motivos y evidencia) se validan con las de la versión del envío que trae la hoja; el servidor vuelve a validar. Un envío que la hoja muestra asignado se acepta si este dispositivo confirmó la carga de todos sus bultos, porque sin conexión la hoja no se actualiza. La firma se dibuja en un canvas sobre fondo blanco; la foto se achica y pasa a JPEG hasta entrar en 1 MB; la posición sale del GPS, que funciona sin red. La sincronización reutiliza la de la carga, que reintenta al volver la conexión. La prueba de Valkey inalcanzable pasó a medir la segunda lectura, porque la primera incluye el intento de conexión y con la máquina cargada superaba el límite. |
+| **Modificado** | — |
+| **Descartado** | Un servicio de sincronización propio: duplicaría la cola y los reintentos de Lucas. Permitir volver a registrar un envío rechazado: el rechazo es definitivo (ADR-0004) y lo revisa despacho. |
+| **Verificación** | Cinco pruebas JavaScript nuevas (entrega en la cola y sincronizada, reglas y posición exigidas y un solo registro por envío, motivo del catálogo con evidencia, envío cargado sin conexión, y la rendición que toma lo entregado); 40 pruebas JavaScript, todas pasan. 582 pruebas .NET (154 unitarias, 56 de arquitectura y 372 de integración), todas pasan. Falta probarlo en un teléfono con la cámara, el GPS y el modo avión. |
+
 ## **Nota sobre las entradas retrospectivas de Lucas**
 
-Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de Codex, a partir de los chats disponibles del proyecto, los commits de Lucas y la documentación del repositorio. Las fechas corresponden al trabajo original o a sus ampliaciones. Los resultados de pruebas son los registrados durante esas tareas; **no se volvió a ejecutar la suite al completar esta bitácora**. Lucas debe revisar la redacción para confirmar que representa su experiencia; no se supone que escribió manualmente todo el código ni que aceptó sin cambios todas las propuestas iniciales. No se incluyen conversaciones de otros proyectos ni se garantiza recuperar sesiones no disponibles.
+Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de Codex, a partir de los chats disponibles del proyecto, los commits de Lucas y la documentación del repositorio. Las fechas corresponden al trabajo original o a sus ampliaciones. Los resultados de pruebas son los registrados durante esas tareas; **no se volvió a ejecutar la suite al completar esta bitácora**. Lucas debe revisar la redacción para confirmar que representa su experiencia; no se supone que escribió manualmente todo el código ni que aceptó sin cambios todas las propuestas iniciales. No se incluyen conversaciones de otros proyectos ni se garantiza recuperar sesiones no disponibles.
 
-## **3.21 Arquitectura: revisión documental y preparación del monitoreo**
+## **3.22 Arquitectura: revisión documental y preparación del monitoreo**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -351,7 +366,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado o no aplicado** | No se integró la rama de Identity durante la revisión del 13/10, por pedido de Lucas. Se señalaron para coordinación la amplitud de la excepción de Identity y la autorización transitoria; no se registraron como correcciones ya realizadas. |
 | **Verificación** | Contraste manual entre documentación, referencias de proyectos, código e historial. La revisión de Identity de esa sesión no pudo certificar las pruebas por problemas del entorno; no equivale a una aprobación automática del cambio. |
 
-## **3.22 CU-13 · Consulta de envíos en Backoffice**
+## **3.23 CU-13 · Consulta de envíos en Backoffice**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -366,7 +381,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado o diferido** | La propuesta inicial de implementar el aislamiento global desde CU-13 se dejó a sus responsables transversales. La integración del selector y nombres comerciales dependía del contrato de Administración; no se declaró terminado el alcance completo por haber completado el listado inicial. |
 | **Verificación** | Se comprobó en la aplicación búsqueda por número, texto inexistente, paginación de 25 resultados sin perder la búsqueda y aparición de un envío creado por API. Se revisó la migración para que sólo agregara los dos índices; el módulo compiló sin errores. |
 
-## **3.23 CU-14 · Detalle del envío e integración con recepción**
+## **3.24 CU-14 · Detalle del envío e integración con recepción**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -381,7 +396,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Mantener la decisión de recepción como una comparación de estado en la vista, consultar directamente al reader desde el endpoint de evidencia o completar automáticamente las medidas físicas desde las declaradas. |
 | **Verificación** | La corrección arquitectónica terminó con 24 pruebas de integración y 54 de arquitectura correctas, incluido detalle → recepción → registro → detalle → listado con filtros. Los permisos provisionales que existían en esa fecha se integraron posteriormente con Identity; no se presenta aquella revisión como verificación de todos los permisos futuros. |
 
-## **3.24 CU-40 · Planificación de rutas, paradas y restricciones**
+## **3.25 CU-40 · Planificación de rutas, paradas y restricciones**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -398,7 +413,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Contar cada envío como una parada; distinguir apartamentos como visitas separadas por sí solos; confiar sólo en la prevalidación del navegador; conservar el filtro Tenant en Outbox o saltearlo con `IgnoreQueryFilters`. |
 | **Verificación** | Pruebas de reglas, persistencia, aislamiento, concurrencia, rollback y migraciones de agrupación. Para el plazo de reintento se registraron 81 pruebas de integración de Planificación, 61 unitarias y 54 de arquitectura correctas; la integración posterior con main pasó 286 pruebas. Son ejecuciones históricas, no un conteo de pruebas exclusivas de CU-40. |
 
-## **3.25 CU-41 · Quitar un envío de una ruta**
+## **3.26 CU-41 · Quitar un envío de una ruta**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -413,7 +428,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Borrar la visita completa al quitar uno de sus envíos, permitir retirar después del despacho o eliminar la ruta como parte de este caso de uso. |
 | **Verificación** | Pruebas de retiro, aislamiento, revisión, carrera con despacho y rollback; revisión de historial y migraciones. La integración con Outbox y agrupación se verificó con la regresión de Planificación. |
 
-## **3.26 CU-43 · Despacho, aviso al repartidor y resolución de rutas anteriores**
+## **3.27 CU-43 · Despacho, aviso al repartidor y resolución de rutas anteriores**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -428,7 +443,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado o limitado** | No se simula carga ni rendición para cerrar una planificación atrasada. No se elimina la ruta ni se permite anular si hay escaneos, operaciones aplicadas o rendición. El evento `DespachoAnulado.v1` no tiene consumidor implementado y no acredita una notificación push. La ausencia de operaciones locales pendientes requiere coordinación humana: el servidor no conoce una cola desconectada. |
 | **Verificación** | PostgreSQL/RabbitMQ reales: publicación pendiente al iniciar Worker, persistencia, reentrega, fallos, reintentos, autorización y aislamiento; demo en Docker. La ampliación agregó 17 pruebas dirigidas correctas. La regresión completa de esa ampliación tuvo una prueba de tiempo de Valkey fallida bajo carga, que pasó aisladamente junto a las otras siete de caché; no se declara toda esa ejecución simultáneamente verde. |
 
-## **3.27 ADR-0005 · Modo de renderizado de Blazor**
+## **3.28 ADR-0005 · Modo de renderizado de Blazor**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -443,7 +458,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado o diferido** | Dar por verificadas tarjetas de Trello que no pudieron consultarse o aprobar el ADR por el solo hecho de redactarlo. Se dejó el formato de entrega final para más adelante. |
 | **Verificación** | Contraste con letra, ADR-0001 y proyectos WebAssembly/host. El archivo continúa como Propuesto, pendiente de revisión del equipo. |
 
-## **3.28 CU-50 · Descarga de hoja de ruta y consulta sin conexión**
+## **3.29 CU-50 · Descarga de hoja de ruta y consulta sin conexión**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -458,7 +473,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Usar GUID como nombre de ruta, sobrescribir la copia anterior ante una descarga incompleta, guardar documentos personales en localStorage o borrar IndexedDB para solucionar una actualización de la PWA. |
 | **Verificación** | La entrega inicial registró 397 pruebas .NET y 12 JavaScript correctas; luego 25 dirigidas de hoja/unidad de trabajo. Demo publicada: descargar, detener API, abandonar/reabrir la hoja, consultar datos, restaurar API y comprobar el bloqueo al cerrar sesión. El uso sin red exige la PWA publicada; el service worker de desarrollo no cachea la aplicación completa. |
 
-## **3.29 CU-51 · Carga del vehículo y cola de sincronización de la PWA**
+## **3.30 CU-51 · Carga del vehículo y cola de sincronización de la PWA**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -473,7 +488,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Aumentar el avance por lecturas repetidas, mostrar una confirmación local como ya aplicada en el servidor, perder el payload de un conflicto o iniciar una carga hoy sobre una ruta atrasada sin revisión de despacho. |
 | **Verificación** | Tras corregir contratos: 428 pruebas .NET y 23 JavaScript correctas, incluida decodificación real de imagen CODE-128. El ajuste de fecha pasó 77 de integración de Ejecución, 56 de arquitectura y 35 JavaScript. Cobertura de cortes, reenvíos, doble confirmación, concurrencia entre pestañas, migración local y preservación de operaciones. |
 
-## **3.30 CU-54 · Declaración de rendición del repartidor**
+## **3.31 CU-54 · Declaración de rendición del repartidor**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -488,7 +503,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Editar la declaración una vez confirmada, marcar automáticamente como extraviado lo que no vuelve, liberar reservas o finalizar la ruta al declarar. Esos efectos corresponden al control de depósito en CU-55. No se incluyó una rendición de dinero. |
 | **Verificación** | 49 pruebas dirigidas finales y 31 JavaScript correctas; demo con API detenida, recarga del borrador y operación pendiente, y sincronización al restablecerla. En la regresión completa una prueba de latencia de Valkey falló y pasó aislada; se registró esa limitación. La adaptación posterior de pruebas al contrato de reglas pasó la regresión de esa integración. |
 
-## **3.31 Acceso a las aplicaciones e integración con Identity**
+## **3.32 Acceso a las aplicaciones e integración con Identity**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -503,7 +518,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Desactivar antiforgery para evitar el 400, aceptar el POST inválido, permitir por estar autenticado sin comprobar el perfil o extender el bypass de desarrollo a usuarios autenticados sin el rol requerido. |
 | **Verificación** | Pruebas de login, permisos, logout, selección y aislamiento durante las integraciones. La corrección del formulario pasó 18 pruebas dirigidas y la consulta de sesión del Portal cuatro. El diagnóstico no demuestra retrospectivamente la causa exacta de la captura original sin sus logs; verifica los escenarios reproducidos. |
 
-## **3.32 Presentación común, revisiones de integración y diagnóstico del entorno**
+## **3.33 Presentación común, revisiones de integración y diagnóstico del entorno**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -515,7 +530,7 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Cómo se trabajó** | Lucas indicó los cambios visuales mediante capturas y ejemplos; la IA editó Razor/CSS/JavaScript y verificó compilaciones o flujos dirigidos. Revisó diferencias con main y ayudó a resolver conflictos. Las modificaciones funcionales específicas y sus pruebas se registran en cada entrada anterior. |
 | **Aceptado sin modificaciones** | Se incorporaron las ubicaciones y textos concretos pedidos por Lucas: datos de sesión junto a navegación/cierre, nombres y matrículas en lugar de IDs visibles, fechas legibles y acciones por ruta. No se reconstruye una aceptación sin cambios de todos los layouts intermedios. |
 | **Modificado** | Cabeceras, footers y disposición de botones se iteraron con las observaciones de Lucas. En el chat del menú adaptable se incorporó hamburguesa por debajo de 1400 px en las tres aplicaciones y pantallas de cuenta. Se corrigieron conflictos de paquetes conservando referencias necesarias y versiones compatibles con main. |
-| **Descartado o no acreditado** | No se atribuyen a Lucas la caché de Ezequiel ni CU-04/05/06/60 de Cristian por haberlos revisado o integrado. La auditoría de CU-17/18 distinguió backend de pantallas móviles aún faltantes. Tampoco se dio por aprobada la propuesta ADR-0006 ni por demostradas en Aspire las métricas sólo por encontrar su instrumentación. |
+| **Descartado o no acreditado** | No se atribuyen a Lucas la caché de Ezequiel ni CU-04/05/06/60 de Cristian por haberlos revisado o integrado. La auditoría previa de CU-17/18 distinguió backend de pantallas móviles que entonces faltaban. Posteriormente Ezequiel incorporó esas pantallas a main; su implementación y verificaciones se registran en 3.21. Tampoco se dio por aprobada la propuesta ADR-0006 ni por demostradas en Aspire las métricas sólo por encontrar su instrumentación. |
 | **Verificación** | Revisiones de diffs, compilaciones y pruebas dirigidas según cada cambio. En la tarea del menú compilaron los tres proyectos; la compilación completa quedó bloqueada por archivos de la API en ejecución. Los problemas de entorno no se registran como pruebas aprobadas ni las revisiones documentales como implementación de casos ajenos. |
 
 # **4\. Historial de versiones**
@@ -538,4 +553,5 @@ Las entradas 3.21 a 3.32 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.14 | 19/10/2026 | Entrada de la caché distribuida con su métrica de aciertos. | Ezequiel Marcenal |
 | 0.15 | 19/10/2026 | Entrada de las reglas de entrega pedidas a Administración y la versión de reglas del envío. | Ezequiel Marcenal |
 | 0.16 | 20/10/2026 | Entrada de CU-55, confirmar la rendición. | Ezequiel Marcenal |
-| 0.17 | 20/10/2026 | Registro retrospectivo del uso de Codex por Lucas: arquitectura, CU-13/14/40/41/43/50/51/54, ADR-0005, acceso y presentación; aporte posterior al listado de CU-55. Reconstruido con chats, Git y documentación, para revisión del responsable. | Lucas Ottonello |
+| 0.17 | 20/10/2026 | Entrada de la PWA de CU-17 y CU-18. | Ezequiel Marcenal |
+| 0.18 | 20/10/2026 | Registro retrospectivo del uso de Codex por Lucas: arquitectura, CU-13/14/40/41/43/50/51/54, ADR-0005, acceso y presentación; aporte posterior al listado de CU-55. Reconstruido con chats, Git y documentación, para revisión del responsable. | Lucas Ottonello |
