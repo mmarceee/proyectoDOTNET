@@ -24,5 +24,6 @@ secreto "ConnectionStrings:Postgres" "Host=localhost;Port=${POSTGRES_PORT};Datab
 secreto "ConnectionStrings:Valkey" "localhost:${VALKEY_PORT}"
 secreto "ConnectionStrings:RabbitMQ" "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@localhost:${RABBITMQ_PORT}/"
 secreto "ConnectionStrings:Smtp" "smtp://localhost:${MAILPIT_SMTP_PORT:-1025}"
+secreto "Seguimiento:Avisos:ClaveCifrado" "${AVISOS_CLAVE_CIFRADO:-}"
 
 echo "Secretos cargados para Logistica.Api y Logistica.Worker (UserSecretsId: logistica-local)."

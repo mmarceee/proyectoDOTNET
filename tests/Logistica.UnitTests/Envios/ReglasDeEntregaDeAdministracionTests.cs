@@ -122,6 +122,7 @@ public class ReglasDeEntregaDeAdministracionTests
         }
 
         // El resto del contrato no lo usa el adaptador.
+        public Task<Guid?> ObtenerRelacionComercialActualAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task BloquearPlanificacionAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<RecursosPlanificacion> ConsultarRecursosPlanificacionAsync(DateOnly fecha, CancellationToken ct) => throw new NotSupportedException();

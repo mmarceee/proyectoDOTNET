@@ -94,6 +94,45 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.ToTable("avisos_ruta", "seguimiento");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Avisos.SuscripcionAviso", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RelacionComercialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SecretoFirma")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.PrimitiveCollection<int[]>("TiposEvento")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
+
+                    b.Property<string>("UrlDestino")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RelacionComercialId");
+
+                    b.HasIndex("OperadorId", "ComercioId", "Activa");
+
+                    b.ToTable("suscripciones_aviso", "seguimiento");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Seguimiento.Infrastructure.Persistence.MensajeRecibido", b =>
                 {
                     b.Property<Guid>("MessageId")

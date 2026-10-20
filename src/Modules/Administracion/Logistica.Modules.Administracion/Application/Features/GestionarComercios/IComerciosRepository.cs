@@ -17,6 +17,7 @@ internal interface IComerciosRepository
 {
     Task<IReadOnlyList<ComercioVista>> ListarAsync(string? buscar, EstadoRelacion? estado, CancellationToken ct);
     Task<ComercioVista?> ObtenerAsync(Guid comercioId, CancellationToken ct);
+    Task<Guid?> ObtenerRelacionIdAsync(Guid comercioId, CancellationToken ct);
     // Excepción acotada de CU-01 A1: búsqueda exacta del documento global, sin datos de otras relaciones.
     Task<Comercio?> BuscarDocumentoAsync(string documento, CancellationToken ct);
     Task<RelacionComercial?> BloquearRelacionAsync(Guid comercioId, CancellationToken ct);

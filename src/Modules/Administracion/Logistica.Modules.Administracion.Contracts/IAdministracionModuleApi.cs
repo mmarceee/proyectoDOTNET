@@ -4,6 +4,9 @@ namespace Logistica.Modules.Administracion.Contracts;
 
 public interface IAdministracionModuleApi
 {
+    // CU-63: vínculo del comercio autenticado con el operador seleccionado. Sin ambos, devuelve null.
+    Task<Guid?> ObtenerRelacionComercialActualAsync(CancellationToken ct);
+
     Task BloquearPlanificacionAsync(CancellationToken ct);
     Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct);
     Task<RecursosPlanificacion> ConsultarRecursosPlanificacionAsync(DateOnly fecha, CancellationToken ct);
