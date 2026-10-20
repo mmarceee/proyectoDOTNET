@@ -1,0 +1,174 @@
+@page "/entrega"
+@using Logistica.Http.Contracts.Repartidor
+@using Logistica.Repartidor.Pwa.Services
+@implements IDisposable
+@inject HojaDeRutaService Hoja
+@inject EntregaService Entregas
+
+@* CU-17 y CU-18: el repartidor registra la entrega o el intento fallido. Funciona sin conexión: queda guardado cifrado
+   en el dispositivo y se sincroniza cuando vuelve la conexión. *@
+<PageTitle>Registrar envío</PageTitle>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Registrar envío</h1>
+    <a class="btn btn-outline-secondary" href="@($"hoja-de-ruta?rutaId={RutaId}")">Volver a la ruta</a>
+</div>
+
+@if (envio is null)
+{
+    <p role="status">@(Hoja.Cargando ? "Abriendo la hoja guardada…" : "El envío no está en la hoja guardada de esta ruta. Volvé a la ruta y actualizala.")</p>
+}
+else
+{
+    var reglas = envio.ReglasEntrega;
+    <section class="card mb-3">
+        <div class="card-body">
+            <h2 class="h5">Envío @envio.Numero</h2>
+            <p class="mb-1"><strong>@envio.DestinatarioNombre</strong> · @envio.DestinatarioTelefono</p>
+            <p class="mb-1">@envio.Direccion.Calle @envio.Direccion.Numero, @envio.Direccion.Localidad</p>
+            <p class="mb-0">Bultos: @string.Join(", ", envio.Bultos.Select(b => b.Codigo))</p>
+        </div>
+    </section>
+
+    @if (estado is not null)
+    {
+        <div class="alert @(estado.Estado switch { "Aplicada" => "alert-success", "Rechazada" => "alert-danger", _ => "alert-warning" })" role="status">
+            @(estado.Tipo == "RegistrarEntrega" ? "Entrega" : "Intento fallido")
+            @(estado.Estado switch
+            {
+                "Aplicada" => "confirmado por el servidor.",
+                "Rechazada" => $"rechazado por el servidor ({estado.Motivo}). Avisá a despacho.",
+                _ => "guardado en este dispositivo, pendiente de sincronizar.",
+            })
+        </div>
+    }
+    else
+    {
+        <div class="btn-group mb-3 w-100" role="group" aria-label="Resultado de la visita">
+            <button type="button" class="btn @(entregado ? "btn-primary" : "btn-outline-primary")" @onclick="() => Elegir(true)">Entregado</button>
+            <button type="button" class="btn @(!entregado ? "btn-primary" : "btn-outline-primary")" @onclick="() => Elegir(false)">No se pudo entregar</button>
+        </div>
+
+        @if (entregado)
+        {
+            <label class="form-label" for="firma">Firma de quien recibe</label>
+            <canvas id="firma" @ref="firma" class="border rounded w-100 d-block mb-2" style="height: 200px; background: #fff"></canvas>
+            <button type="button" class="btn btn-sm btn-outline-secondary mb-3" @onclick="LimpiarFirma">Borrar firma</button>
+
+            <div class="mb-3">
+                <label class="form-label" for="foto-entrega">Foto @(reglas.ExigeFoto ? "(obligatoria)" : "(opcional)")</label>
+                <input id="foto-entrega" type="file" accept="image/*" capture="environment" class="form-control" @ref="foto" />
+            </div>
+            <div class="row g-2 mb-3">
+                <div class="col-sm">
+                    <label class="form-label" for="nombre">Nombre de quien recibe @(reglas.ExigeNombreYDocumento ? "(obligatorio)" : "(opcional)")</label>
+                    <input id="nombre" class="form-control" maxlength="200" @bind="nombre" />
+                </div>
+                <div class="col-sm">
+                    <label class="form-label" for="documento">Documento @(reglas.ExigeNombreYDocumento ? "(obligatorio)" : "(opcional)")</label>
+                    <input id="documento" class="form-control" maxlength="50" @bind="documento" />
+                </div>
+            </div>
+            <button class="btn btn-primary" disabled="@ocupado" @onclick="RegistrarEntrega">Confirmar entrega</button>
+        }
+        else
+        {
+            <div class="mb-3">
+                <label class="form-label" for="motivo">Motivo</label>
+                <select id="motivo" class="form-select" @bind="motivoId">
+                    <option value="">Elegí el motivo</option>
+                    @foreach (var motivo in reglas.MotivosNoEntrega)
+                    {
+                        <option value="@motivo.Id">@motivo.NombreParaMostrar@(motivo.ExigeEvidencia ? " (con foto)" : "")</option>
+                    }
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="foto-intento">Foto @(MotivoElegido?.ExigeEvidencia == true ? "(obligatoria)" : "(opcional)")</label>
+                <input id="foto-intento" type="file" accept="image/*" capture="environment" class="form-control" @ref="foto" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="observaciones">Observaciones (opcional)</label>
+                <textarea id="observaciones" class="form-control" rows="2" maxlength="1000" @bind="observaciones"></textarea>
+            </div>
+            <button class="btn btn-primary" disabled="@(ocupado || MotivoElegido is null)" @onclick="RegistrarIntento">Registrar intento</button>
+        }
+    }
+
+    @if (ocupado) { <p class="mt-3" role="status">Guardando…</p> }
+    @if (error is not null) { <div class="alert alert-danger mt-3" role="alert">@error</div> }
+}
+
+@code {
+    [SupplyParameterFromQuery] public Guid RutaId { get; set; }
+    [SupplyParameterFromQuery] public Guid EnvioId { get; set; }
+
+    private EnvioHojaResponse? envio;
+    private EstadoEnvioLocal? estado;
+    private bool entregado = true, ocupado, abierta, firmaIniciada;
+    private string? nombre, documento, observaciones, error;
+    private Guid? motivoId;
+    private ElementReference firma, foto;
+
+    private MotivoHojaResponse? MotivoElegido => envio?.ReglasEntrega.MotivosNoEntrega.FirstOrDefault(m => m.Id == motivoId);
+
+    protected override void OnInitialized() => Hoja.Cambio += HojaCambio;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!abierta)
+        {
+            abierta = true;
+            await Hoja.SeleccionarAsync(RutaId);
+            return;
+        }
+
+        // El recuadro existe recién después de dibujar el formulario de entrega.
+        if (entregado && envio is not null && estado is null && !firmaIniciada)
+        {
+            firmaIniciada = true;
+            await Entregas.IniciarFirmaAsync(firma);
+        }
+    }
+
+    private void HojaCambio() => _ = InvokeAsync(async () =>
+    {
+        envio = Hoja.Copia is { } copia && copia.Hoja.RutaId == RutaId
+            ? copia.Hoja.Paradas.SelectMany(p => p.Envios).FirstOrDefault(e => e.Id == EnvioId)
+            : null;
+        if (envio is not null && !Hoja.Cargando) await ActualizarEstadoAsync();
+        StateHasChanged();
+    });
+
+    private async Task ActualizarEstadoAsync()
+    {
+        estado = (await Entregas.EstadosAsync(RutaId)).FirstOrDefault(e => e.EnvioId == EnvioId);
+    }
+
+    private void Elegir(bool esEntrega)
+    {
+        entregado = esEntrega;
+        firmaIniciada = false;
+        error = null;
+    }
+
+    private Task LimpiarFirma() => Entregas.LimpiarFirmaAsync(firma);
+
+    private Task RegistrarEntrega() => RegistrarAsync(() =>
+        Entregas.RegistrarEntregaAsync(RutaId, EnvioId, firma, foto, nombre, documento));
+
+    private Task RegistrarIntento() => RegistrarAsync(() =>
+        Entregas.RegistrarIntentoAsync(RutaId, EnvioId, motivoId!.Value, foto, observaciones));
+
+    private async Task RegistrarAsync(Func<Task<string?>> registrar)
+    {
+        ocupado = true; error = null;
+        try
+        {
+            error = await registrar();
+            await ActualizarEstadoAsync();
+        }
+        finally { ocupado = false; }
+    }
+
+    public void Dispose() => Hoja.Cambio -= HojaCambio;
+}

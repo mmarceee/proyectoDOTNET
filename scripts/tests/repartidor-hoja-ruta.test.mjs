@@ -544,3 +544,86 @@ test('CU-52 cerrar sesión mientras llega el ack no descarta la operación del p
         assert.deepEqual((await store.pendientesCarga())[0],op);
     } finally { globalThis.fetch=fetchAnterior; }
 });
+
+// CU-17 y CU-18: la entrega y el intento fallido se guardan cifrados en la misma cola, sin conexión.
+const FIRMA = { tipoContenido:'image/png', contenidoBase64:'iVBORw0KGgo=' };
+const AQUI = { latitud:-34.9011, longitud:-56.1645 };
+async function prepararEnCalle(ajustar = () => {}) {
+    const token = await store.activar(sesion()), h = hoja();
+    h.estadoRuta = 'EnCurso'; h.paradas[0].envios[0].estado = 'EnTransito'; ajustar(h);
+    await store.guardar(h, token);
+    return { ruta:h.rutaId, envio:h.paradas[0].envios[0].id };
+}
+test('CU-17 sin conexión la entrega queda en la cola con firma, hora y posición, y después se sincroniza', async () => {
+    const { ruta, envio } = await prepararEnCalle();
+    assert.equal((await store.registrarEntrega(ruta, envio, { firma:FIRMA, nombreReceptor:' Ana ', ...AQUI })).estado, 'Pendiente');
+    const [op] = await store.pendientesCarga();
+    assert.equal(op.tipo, 'RegistrarEntrega'); assert.equal(op.envioId, envio); assert.equal(op.rutaId, ruta);
+    assert.deepEqual(op.entrega, { firma:FIRMA, foto:null, nombreReceptor:'Ana', documentoReceptor:null });
+    assert.equal(op.ocurridoEn, '2026-10-17T15:00:00.000Z');
+    assert.deepEqual([op.latitud, op.longitud], [AQUI.latitud, AQUI.longitud]);
+    assert.deepEqual(await store.estadosEnvios(ruta), [{ envioId:envio, tipo:'RegistrarEntrega', estado:'Pendiente', motivo:null }]);
+    const fetchAnterior = globalThis.fetch;
+    try {
+        globalThis.fetch = async () => { throw new TypeError('sin red'); };
+        await assert.rejects(store.sincronizarCargas(), /pendiente de sincronizar/);
+        assert.deepEqual(await store.pendientesCarga(), [op]);
+        globalThis.fetch = async (_, request) => {
+            assert.deepEqual(JSON.parse(request.body).operaciones, [op]);
+            return { ok:true, json:async () => ({ resultados:[{ operacionId:op.operacionId, resultado:'Aplicada' }] }) };
+        };
+        await store.sincronizarCargas();
+        assert.deepEqual(await store.pendientesCarga(), []);
+        assert.equal((await store.estadosEnvios(ruta))[0].estado, 'Aplicada');
+    } finally { globalThis.fetch = fetchAnterior; }
+});
+test('CU-17 exige la firma, lo que piden las reglas del envío y una posición, y no registra dos veces', async () => {
+    const { ruta, envio } = await prepararEnCalle(h => Object.assign(h.paradas[0].envios[0].reglasEntrega,
+        { exigeFoto:true, exigeNombreYDocumento:true }));
+    const completa = { firma:FIRMA, foto:{ tipoContenido:'image/jpeg', contenidoBase64:'/9j/4AAQ' },
+        nombreReceptor:'Ana', documentoReceptor:'1234567-8', ...AQUI };
+    await assert.rejects(store.registrarEntrega(ruta, envio, { ...completa, firma:null }), /firma/);
+    await assert.rejects(store.registrarEntrega(ruta, envio, { ...completa, foto:null }), /foto/);
+    await assert.rejects(store.registrarEntrega(ruta, envio, { ...completa, documentoReceptor:' ' }), /documento/);
+    await assert.rejects(store.registrarEntrega(ruta, envio,
+        { ...completa, firma:{ tipoContenido:'image/gif', contenidoBase64:'R0lG' } }), /PNG o JPEG/);
+    await assert.rejects(store.registrarEntrega(ruta, envio, { ...completa, latitud:null }), /ubicación/);
+    assert.deepEqual(await store.pendientesCarga(), []);
+    await store.registrarEntrega(ruta, envio, completa);
+    await assert.rejects(store.registrarEntrega(ruta, envio, completa), /ya está registrado/);
+    await assert.rejects(store.registrarIntentoFallido(ruta, envio, { motivoId:id(16), ...AQUI }), /ya está registrado/);
+    assert.equal((await store.pendientesCarga()).length, 1);
+});
+test('CU-18 el motivo sale del catálogo del envío y uno que exige evidencia pide la foto', async () => {
+    const { ruta, envio } = await prepararEnCalle(h => h.paradas[0].envios[0].reglasEntrega.motivosNoEntrega.push(
+        { id:id(17), codigo:'SIN_ACCESO', nombreParaMostrar:'Sin acceso', reprogramable:true, exigeEvidencia:true }));
+    await assert.rejects(store.registrarIntentoFallido(ruta, envio, { motivoId:id(99), ...AQUI }), /motivo/);
+    await assert.rejects(store.registrarIntentoFallido(ruta, envio, { motivoId:id(17), ...AQUI }), /exige una foto/);
+    await store.registrarIntentoFallido(ruta, envio, { motivoId:id(16), observaciones:' Nadie atendió ', ...AQUI });
+    const [op] = await store.pendientesCarga();
+    assert.equal(op.tipo, 'RegistrarIntentoFallido');
+    assert.deepEqual(op.intentoFallido, { motivoId:id(16), foto:null, observaciones:'Nadie atendió' });
+    assert.deepEqual(await store.estadosEnvios(ruta),
+        [{ envioId:envio, tipo:'RegistrarIntentoFallido', estado:'Pendiente', motivo:null }]);
+});
+test('CU-17 sin conexión acepta un envío que la hoja muestra asignado si este dispositivo confirmó su carga', async () => {
+    const token = await store.activar(sesion()), h = hoja();
+    await store.guardar(h, token);
+    const ruta = h.rutaId, envio = h.paradas[0].envios[0].id;
+    await assert.rejects(store.registrarEntrega(ruta, envio, { firma:FIRMA, ...AQUI }), /no salió en el vehículo/);
+    let c = await store.abrirCarga(ruta); c = await store.escanearCarga(ruta, c.revision, 'ENV-001-1');
+    await store.confirmarCarga(ruta, c.revision, false);
+    await store.registrarEntrega(ruta, envio, { firma:FIRMA, ...AQUI });
+    // La carga va primero en la secuencia: el servidor la aplica antes que la entrega.
+    assert.deepEqual((await store.pendientesCarga()).map(o => o.tipo), ['ConfirmarCarga', 'RegistrarEntrega']);
+});
+test('CU-54 la rendición toma como entregado en la calle lo registrado en este dispositivo', async () => {
+    const token = await store.activar(sesion()), h = hoja54('NoIntentado');
+    await store.guardar(h, token);
+    const local = await store.registrarEntrega(h.rutaId, h.paradas[0].envios[0].id, { firma:FIRMA, ...AQUI });
+    assert.equal(local.estado, 'Pendiente');
+    const rendicion = await store.abrirRendicion(h.rutaId);
+    assert.equal(rendicion.bultos[0].situacion, 'EntregadoEnCalle');
+    assert.equal(rendicion.bultos[0].requiereDeclaracion, false);
+    assert.equal(rendicion.dependencias.length, 1);
+});
