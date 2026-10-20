@@ -12,6 +12,11 @@ using Logistica.Modules.Seguimiento.Application.Features.ConsultarSeguimiento;
 using Logistica.Modules.Seguimiento.Application.Features.ConsultarAvisos;
 using Logistica.Modules.Seguimiento.Infrastructure.Messaging;
 using Logistica.Modules.Seguimiento.Infrastructure.Persistence;
+using Logistica.Modules.Seguimiento.Domain.Avisos;
+using Logistica.Modules.Seguimiento.Application.Features.ConfigurarSuscripcionesAviso;
+using Logistica.Modules.Seguimiento.Infrastructure.Security;
+using Logistica.Modules.Seguimiento.Infrastructure.Http;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Logistica.Modules.Seguimiento;
 
@@ -22,6 +27,24 @@ public static class SeguimientoModule
     {
         services.AddModuleDbContext<SeguimientoDbContext>(configuration.GetConnectionString("Postgres"), SeguimientoDbContext.Schema);
         services.AddScoped<IAvisosRepository, AvisosRepository>();
+        services.AddScoped<ISuscripcionesAvisoRepository, SuscripcionesAvisoRepository>();
+        services.AddScoped<ISuscripcionesAvisoReader, SuscripcionesAvisoReader>();
+        services.AddScoped<ConsultarSuscripcionesAvisoHandler>();
+        services.AddScoped<DesactivarSuscripcionAvisoHandler>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<EnviarPruebaAvisoHandler>();
+        services.AddHttpClient<IEmisorAvisos, EmisorAvisosHttp>(http => http.Timeout = TimeSpan.FromSeconds(10))
+            .ConfigurePrimaryHttpMessageHandler(ConectorAvisosHttp.CrearHandler);
+        services.AddAntiforgery(options => options.HeaderName = "RequestVerificationToken");
+        // Se valida al cifrar/descifrar, para que los otros casos de Seguimiento funcionen sin esta clave.
+        services.AddSingleton<ISecretosAviso>(_ => new SecretosAviso(configuration["Seguimiento:Avisos:ClaveCifrado"]));
+        services.AddScoped<RegenerarSecretoAvisoHandler>();
+        // El Worker usa el mismo módulo pero no necesita Administración para entregar avisos.
+        services.AddScoped(sp => new CrearSuscripcionAvisoHandler(
+            sp.GetRequiredService<ISuscripcionesAvisoRepository>(),
+            sp.GetRequiredService<Administracion.Contracts.IAdministracionModuleApi>(),
+            sp.GetRequiredService<ISecretosAviso>(), sp.GetRequiredService<SharedKernel.ICurrentTenant>(),
+            sp.GetRequiredService<SharedKernel.IUnidadDeTrabajo>()));
         services.AddScoped<ConsultarAvisosHandler>();
         services.AddKeyedScoped<IConsumidorIntegracion, NotificarRutaDespachada>(NotificarRutaDespachada.Cola);
         services.AddSingleton(new SuscripcionIntegracion(NotificarRutaDespachada.Cola, RutaDespachada.Tipo));
@@ -51,6 +74,7 @@ public static class SeguimientoModule
     public static IEndpointRouteBuilder MapSeguimientoEndpoints(this IEndpointRouteBuilder endpoints)
     {
         Presentation.Features.ConsultarAvisos.ConsultarAvisosEndpoint.Map(endpoints);
+        Presentation.Features.ConfigurarSuscripcionesAviso.ConfigurarSuscripcionesAvisoEndpoints.Map(endpoints);
         Presentation.Features.ConsultarSeguimiento.ConsultarSeguimientoEndpoint.Map(endpoints);
         return endpoints;
     }

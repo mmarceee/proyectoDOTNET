@@ -5,14 +5,21 @@ using Logistica.Modules.Administracion.Application.Features.ConfigurarReglas;
 using Logistica.Modules.Administracion.Application.Features.ConfigurarTarifario;
 using Logistica.Modules.Administracion.Application.Features.GestionarIdentidadVisual;
 using Logistica.Modules.Administracion.Application.Features.GestionarUsuarios;
+using Logistica.Modules.Administracion.Application.Features.GestionarComercios;
 using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Administracion.Application;
 
 internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lector, IServicioUsuarios usuarios,
-    ICurrentTenant tenant, TarifarioVigente tarifario, ReglasVigentes reglas, ConsultarIdentidadVisualHandler identidad)
+    ICurrentTenant tenant, TarifarioVigente tarifario, ReglasVigentes reglas, ConsultarIdentidadVisualHandler identidad,
+    IComerciosRepository comercios)
     : IAdministracionModuleApi
 {
+    public Task<Guid?> ObtenerRelacionComercialActualAsync(CancellationToken ct) =>
+        tenant.OperadorId is not null && tenant.ComercioId is Guid comercioId
+            ? comercios.ObtenerRelacionIdAsync(comercioId, ct)
+            : Task.FromResult<Guid?>(null);
+
     // CU-07 para CU-60: la misma consulta que usan los estilos de cada operador, sin el logo.
     public async Task<MarcaOperador?> MarcaDelOperadorAsync(CancellationToken ct) =>
         await identidad.HandleAsync(ct) is { } marca

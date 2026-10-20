@@ -33,6 +33,13 @@ internal sealed class ComerciosRepository(AdministracionDbContext db, ICurrentTe
         return await Consulta.SingleOrDefaultAsync(c => c.Id == id, ct);
     }
 
+    public async Task<Guid?> ObtenerRelacionIdAsync(Guid comercioId, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.RelacionesComerciales.AsNoTracking().Where(r => r.ComercioId == comercioId)
+            .Select(r => (Guid?)r.Id).SingleOrDefaultAsync(ct);
+    }
+
     public async Task<Comercio?> BuscarDocumentoAsync(string documento, CancellationToken ct)
     {
         await db.ParticiparEnTransaccionAsync(ct);

@@ -17,6 +17,11 @@ Laboratorio .NET 2026 · Equipo 1. La documentación de análisis y diseño est�
    ```
    La aplicación queda en http://localhost:8080 (ver [Rutas](#rutas)).
 
+Para configurar suscripciones de avisos (CU-63), completar también `AVISOS_CLAVE_CIFRADO` en `.env` con
+una clave exclusiva de exactamente 32 bytes en Base64 (`openssl rand -base64 32`). API y Worker comparten
+el valor; debe conservarse entre reinicios y despliegues para poder descifrar los secretos guardados.
+El [avance de CU-63](docs/analisis-diseno/cu-63/README.md) detalla la configuración y el alcance implementado.
+
 ### Desarrollo desde Visual 
 
 Para depurar la Api o el Worker, levantar sólo los servicios de soporte y ejecutar la aplicación desde Visual Studio o con `dotnet run`:
