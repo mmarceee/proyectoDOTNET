@@ -7,6 +7,11 @@ namespace Logistica.Modules.Planificacion.Application;
 // Implementación del contrato de Planificación. Es internal: los otros módulos sólo ven la interfaz.
 internal sealed class PlanificacionModuleApi(IRutaRepository rutas) : IPlanificacionModuleApi
 {
+    public async Task<RutaParaPosicion?> ConsultarParaPosicionAsync(Guid rutaId, Guid repartidorId, CancellationToken ct)
+    {
+        var r = await rutas.ObtenerAsync(rutaId, ct);
+        return r is null || r.RepartidorId != repartidorId ? null : new(r.VehiculoId, r.Estado.ToString(), r.DespachadaEn);
+    }
     public async Task<IReadOnlyList<RutaDelRepartidor>> ListarDelRepartidorAsync(Guid repartidorId, int pagina, CancellationToken ct)
     {
         if (pagina is < 1 or > 10000) throw new Logistica.SharedKernel.DomainException("La página no es válida.");

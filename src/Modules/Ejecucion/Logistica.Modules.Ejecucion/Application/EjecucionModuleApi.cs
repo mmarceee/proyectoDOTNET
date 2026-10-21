@@ -5,8 +5,17 @@ using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Ejecucion.Application;
 
-internal sealed class EjecucionModuleApi(IRendicionRepository rendiciones, TimeProvider reloj) : IEjecucionModuleApi
+internal sealed class EjecucionModuleApi(IRendicionRepository rendiciones, TimeProvider reloj,
+    Domain.Posiciones.IPosicionRepository posiciones,
+    Microsoft.Extensions.Options.IOptions<Features.ReportarPosicion.RetencionPosiciones> retencion) : IEjecucionModuleApi
 {
+    public async Task<IReadOnlyList<PosicionVehiculoResult>> ConsultarUltimasPosicionesAsync(IReadOnlyCollection<Guid> vehiculos, CancellationToken ct)
+    {
+        if (vehiculos.Count > 500 || vehiculos.Contains(Guid.Empty)) throw new DomainException("La consulta admite hasta 500 vehículos válidos.");
+        if (vehiculos.Count == 0) return [];
+        return (await posiciones.UltimasAsync(vehiculos, reloj.GetUtcNow().AddDays(-retencion.Value.Dias), ct))
+            .Select(Mapping.PosicionMapper.Mapear).ToArray();
+    }
     public Task<bool> TieneActividadRegistradaAsync(Guid rutaId, CancellationToken ct)
         => rendiciones.TieneActividadRegistradaAsync(rutaId, ct);
     public async Task<RendicionPendiente?> ConsultarRendicionAsync(Guid rutaId, CancellationToken ct)

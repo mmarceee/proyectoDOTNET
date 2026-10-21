@@ -2,7 +2,7 @@ namespace Logistica.Http.Contracts.Repartidor;
 
 // Cuerpo de POST /api/repartidor/sincronizacion (CU-52; ADR-0004, sección 2.1): las operaciones que el repartidor
 // registró sin conexión, en el orden en que ocurrieron (Secuencia), hasta 20 por lote.
-public sealed record SincronizacionRequest(IReadOnlyList<OperacionDispositivoRequest> Operaciones);
+public sealed record SincronizacionRequest(IReadOnlyList<OperacionDispositivoRequest> Operaciones, int? Pendientes = null);
 
 // Una operación de la PWA. OperacionId lo genera el dispositivo al confirmarla y la hace idempotente. La hora y la
 // posición son las del dispositivo. Según el Tipo, viaja Entrega o IntentoFallido.

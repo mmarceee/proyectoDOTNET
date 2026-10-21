@@ -570,6 +570,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujos alternativos** | **A1 · Sin conexión (paso 2).** La PWA guarda las posiciones y las envía al sincronizar (CU-52).<br><br>**A2 · Sin permiso de ubicación (paso 1).** La PWA avisa al repartidor que el seguimiento está desactivado. |
 | **Requerimientos especiales** | 1. **Limitación de la PWA:** a diferencia de una aplicación nativa, una PWA no puede reportar la posición con la pantalla apagada. El requisito de seguimiento en segundo plano es de la aplicación MAUI (sección 6.11), que el equipo reemplaza por una PWA según la exención para equipos de 3.<br>2. Política de retención de posiciones, por su volumen (modelo de dominio). |
 
+**Implementación de CU-53 (21/10/2026):** captura periódica en la PWA visible, cola cifrada y sincronización CU-52; persistencia y evento en memoria posterior al commit en Ejecución. El seguimiento termina al confirmar la rendición, incluso sin red. Retención configurable de 30 días. CU-66 queda a cargo de Cristian, con contratos de consulta y notificación documentados. Las pruebas con PostgreSQL real y la prueba en teléfono están pendientes. Véase [alcance y verificación](cu-53/README.md) y [continuidad para CU-66](cu-53/integracion-cu-66.md).
+
 ### **CU-54 · Iniciar la rendición**
 
 | Campo | Contenido |

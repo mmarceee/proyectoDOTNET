@@ -42,6 +42,81 @@ function hoja54(situacion = 'NoIntentado') {
     return h;
 }
 
+test('CU-53 conserva posiciones cifradas sin red, limita pestañas a 30 segundos y no conserva recibos GPS', async t => {
+    const token = await store.activar(sesion()), h = hoja54(); await store.guardar(h,token);
+    const p = () => ({ latitud:-34.9011234,longitud:-56.1645678,capturadaEn:Date.now() });
+    assert.equal((await store.rutaParaSeguimiento()).rutaId,h.rutaId);
+    const resultados = await Promise.all([store.guardarPosicion(h.rutaId,token,p()),store.guardarPosicion(h.rutaId,token,p())]);
+    assert.equal(resultados.filter(Boolean).length,1);
+    assert.equal(await store.guardarPosicion(h.rutaId,token,p()),false);
+    t.mock.timers.setTime(Date.now()+30000);
+    assert.equal(await store.guardarPosicion(h.rutaId,token,p()),true);
+    const pendientes = await store.pendientesCarga();
+    assert.equal(pendientes.length,2); assert.equal(pendientes[0].tipo,'ReportarPosicion');
+    assert.equal(pendientes[0].latitud,-34.901123); assert.equal(pendientes[0].longitud,-56.164568);
+    const filas = await registros('operaciones');
+    assert.ok(filas.every(r => !JSON.stringify(r).includes('latitud')));
+    const anterior = globalThis.fetch;
+    try {
+        globalThis.fetch = async (_,r) => {
+            const body = JSON.parse(r.body); assert.equal(body.pendientes,2);
+            return {ok:true,json:async () => ({resultados:body.operaciones.map(op => ({operacionId:op.operacionId,resultado:'Aplicada'}))})};
+        };
+        await store.sincronizarCargas();
+        assert.equal((await store.pendientesCarga()).length,0);
+        assert.equal((await registros('recibos')).length,0);
+    } finally { globalThis.fetch = anterior; }
+});
+
+test('CU-53 inicia con carga local completa y se detiene al confirmar rendición sin conexión', async () => {
+    const token = await store.activar(sesion()), h = hoja54('NoCargado'); h.estadoRuta='Despachada';
+    await store.guardar(h,token); assert.equal(await store.rutaParaSeguimiento(),null);
+    let b = await store.abrirCarga(h.rutaId);
+    b = await store.escanearCarga(h.rutaId,b.revision,'ENV-001-1'); await store.confirmarCarga(h.rutaId,b.revision,false);
+    assert.equal((await store.rutaParaSeguimiento()).rutaId,h.rutaId);
+    const capturaPendiente = {latitud:-34,longitud:-56,capturadaEn:Date.now()};
+    let r = await store.abrirRendicion(h.rutaId);
+    r = await store.declararBulto(h.rutaId,r.revision,id(15),true,null);
+    await store.confirmarRendicion(h.rutaId,r.revision);
+    assert.equal(await store.rutaParaSeguimiento(),null);
+    assert.equal(await store.guardarPosicion(h.rutaId,token,capturaPendiente),false);
+});
+
+test('CU-53 descarta una lectura tardía tras cambiar sesión y rechaza coordenadas o lecturas antiguas', async () => {
+    const token = await store.activar(sesion()), h = hoja54(); await store.guardar(h,token);
+    await assert.rejects(store.guardarPosicion(h.rutaId,token,{latitud:91,longitud:0,capturadaEn:Date.now()}),/reciente/);
+    await assert.rejects(store.guardarPosicion(h.rutaId,token,{latitud:0,longitud:0,capturadaEn:Date.now()-60000}),/reciente/);
+    await store.activar(sesion(20));
+    assert.equal(await store.guardarPosicion(h.rutaId,token,{latitud:0,longitud:0,capturadaEn:Date.now()}),false);
+    assert.equal(await store.rutaParaSeguimiento(),null);
+    await store.activar(sesion()); assert.equal((await store.pendientesCarga()).length,0);
+});
+
+test('CU-53 no reactiva una ruta cerrada al seleccionar otra hoja', async () => {
+    const token = await store.activar(sesion()), h = hoja54(); await store.guardar(h,token);
+    await store.sinRuta(token);
+    const otra = hoja(); otra.rutaId=id(30); await store.guardar(otra,token);
+    assert.equal(await store.rutaParaSeguimiento(),null);
+});
+
+test('ADR-0004 dos disparadores comparten un único envío pendiente dentro de la pestaña', async () => {
+    const token=await store.activar(sesion()),h=hoja54();await store.guardar(h,token);
+    await store.guardarPosicion(h.rutaId,token,{latitud:0,longitud:0,capturadaEn:Date.now()});
+    let continuar,comenzo,envios=0;
+    const espera=new Promise(resolve => {continuar=resolve;}),inicio=new Promise(resolve => {comenzo=resolve;});
+    const anterior=globalThis.fetch;
+    try {
+        globalThis.fetch=async (_,request) => {
+            envios++;comenzo();await espera;
+            return {ok:true,json:async () => ({resultados:JSON.parse(request.body).operaciones
+                .map(op => ({operacionId:op.operacionId,resultado:'Aplicada'}))})};
+        };
+        const primera=store.sincronizarCargas(),segunda=store.sincronizarCargas();
+        await inicio;assert.equal(envios,1);continuar();await Promise.all([primera,segunda]);
+        assert.equal(envios,1);assert.equal((await store.pendientesCarga()).length,0);
+    } finally {continuar();globalThis.fetch=anterior;}
+});
+
 test('Mis rutas conserva hojas y cargas separadas al alternar rutas, incluso de días anteriores', async t => {
     let token = await store.activar(sesion());
     const primera = hoja();

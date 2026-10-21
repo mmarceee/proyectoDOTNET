@@ -4,6 +4,8 @@ namespace Logistica.Modules.Administracion.Contracts;
 
 public interface IAdministracionModuleApi
 {
+    // ADR-0002 §2.4: catálogo técnico de mantenimiento, sin endpoint HTTP. Operador no tiene filtro Tenant.
+    Task<IReadOnlyList<Guid>> ConsultarOperadoresActivosAsync(CancellationToken ct);
     // CU-63: vínculo del comercio autenticado con el operador seleccionado. Sin ambos, devuelve null.
     Task<Guid?> ObtenerRelacionComercialActualAsync(CancellationToken ct);
 

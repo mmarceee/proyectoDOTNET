@@ -164,6 +164,48 @@ namespace Logistica.Modules.Ejecucion.Infrastructure.Persistence.Migrations
                     b.ToTable("operaciones_dispositivo", "ejecucion");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Ejecucion.Domain.Posiciones.PosicionVehiculo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CapturadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Latitud")
+                        .HasPrecision(10, 6)
+                        .HasColumnType("numeric(10,6)");
+
+                    b.Property<decimal>("Longitud")
+                        .HasPrecision(10, 6)
+                        .HasColumnType("numeric(10,6)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RecibidaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RutaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VehiculoId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CapturadaEn");
+
+                    b.HasIndex("OperadorId", "VehiculoId", "CapturadaEn", "Id");
+
+                    b.ToTable("posiciones_vehiculo", "ejecucion", t =>
+                        {
+                            t.HasCheckConstraint("ck_posicion_latitud", "\"Latitud\" BETWEEN -90 AND 90");
+
+                            t.HasCheckConstraint("ck_posicion_longitud", "\"Longitud\" BETWEEN -180 AND 180");
+                        });
+                });
+
             modelBuilder.Entity("Logistica.Modules.Ejecucion.Domain.Rendiciones.LineaRendicion", b =>
                 {
                     b.Property<Guid>("Id")

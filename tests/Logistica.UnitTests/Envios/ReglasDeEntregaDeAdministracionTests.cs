@@ -107,6 +107,7 @@ public class ReglasDeEntregaDeAdministracionTests
     private sealed class AdministracionFalsa(ReglasOperativas? vigente, params ReglasOperativas[] versiones)
         : IAdministracionModuleApi
     {
+        public Task<IReadOnlyList<Guid>> ConsultarOperadoresActivosAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([]);
         public int Pedidos { get; private set; }
 
         public Task<ReglasOperativas?> ReglasDeEntregaAsync(Guid versionReglasId, CancellationToken ct)
