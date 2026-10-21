@@ -62,7 +62,10 @@ public static class RabbitMqTransport
             comercio = Guid.TryParse(valor, out var guid) && guid != Guid.Empty ? guid
                 : throw new InvalidDataException("Comercio inválido en el sobre.");
         return new(id, propiedades.Type, operador, comercio, DateTimeOffset.FromUnixTimeSeconds(propiedades.Timestamp.UnixTime),
-            Cabecera(propiedades, "traceparent"), Encoding.UTF8.GetString(cuerpo.Span));
+            Cabecera(propiedades, "traceparent"), Encoding.UTF8.GetString(cuerpo.Span))
+        {
+            Intento = int.TryParse(Cabecera(propiedades, "intento"), out var intento) && intento > 0 ? intento : 0,
+        };
     }
 
     internal static string? Cabecera(IReadOnlyBasicProperties p, string nombre)

@@ -11,6 +11,8 @@ internal sealed class SeguimientoDbContext(DbContextOptions<SeguimientoDbContext
     public const string Schema = "seguimiento";
     public DbSet<AvisoRuta> Avisos => Set<AvisoRuta>();
     public DbSet<SuscripcionAviso> SuscripcionesAviso => Set<SuscripcionAviso>();
+    public DbSet<EntregaAviso> EntregasAviso => Set<EntregaAviso>();
+    public DbSet<EnvioSeguido> EnviosSeguidos => Set<EnvioSeguido>();
     public DbSet<MensajeRecibido> Inbox => Set<MensajeRecibido>();
 }
 

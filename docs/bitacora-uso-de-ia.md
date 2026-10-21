@@ -568,6 +568,34 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Verificación** | En las ejecuciones de este chat pasaron 51 pruebas JavaScript, 232 unitarias .NET y 56 de arquitectura. La API y la PWA compilan y EF Core generó la migración. Las 14 pruebas de integración de CU-53 compilan; se intentó ejecutarlas, incluso fuera del sandbox, pero todas quedaron con error al inicializar el fixture de Testcontainers por la indisponibilidad de Docker, antes de comprobar su comportamiento con PostgreSQL. Quedan prueba en teléfono y aplicación de migración al entorno de desarrollo. Al actualizar esta entrada sólo se revisó la documentación; no se volvieron a ejecutar las pruebas funcionales. |
 | **Referencias** | [CU-53](analisis-diseno/cu-53/README.md), [integración para Cristian](analisis-diseno/cu-53/integracion-cu-66.md), [auditoría ADR](analisis-diseno/cu-53/revision-arquitectura.md), CU-52/53/54, ADR-0001/0002/0004 y especificación W3C de geolocalización. |
 
+## **3.36 Entrega de los avisos a los comercios (CU-64)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 21/10/2026 |
+| **Archivos** | Envíos: `EnvioAdmitido` y `CrearEnvioHandler`. Seguimiento: `EntregaAviso`, `IntentoAviso`, `EnvioSeguido`, `EstadoEntregaAviso`, `ClasificadorAvisos`, `SuscripcionAviso.Recibe`, `PrepararAvisosHandler`, `EntregarAvisoHandler`, los consumidores `PrepararAvisos` y `EntregarAviso`, `AvisoPendiente`, repositorios, configuración EF y migración `EntregasAviso`. BuildingBlocks: `MensajeIntegracion.Intento`. Pruebas `EntregaAvisoTests` y `EntregarAvisosTests`; ajuste de dos consultas de `ArmarRutaTests`. Documentos: README de CU-64, modelo de dominio y guía de integración de CU-63. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-64 sobre las piezas que dejó Lucas Ottonello con CU-63 (firma, cifrado del secreto y emisor HTTP), para el hito del 29/10. |
+| **Cómo se trabajó** | La IA revisó primero el merge de CU-63 y leyó la guía de integración de Lucas. Propuso cuatro decisiones (origen del comercio, clasificación de los hechos, entrega en dos etapas y entidad con intentos); el responsable las aceptó con la condición de no contradecir los ADR y pidió que la IA escribiera el código. |
+| **Aceptado sin modificaciones** | Clasificación en un único tipo por hecho, con `CambioDeEstado` como "todos". Entrega en dos etapas: preparar (inbox, entregas y outbox en una transacción) y entregar (un mensaje por entrega, que se reintenta solo). `EntregaAviso` con su colección de intentos, para el historial de CU-65. |
+| **Modificado** | La IA había propuesto llevar el `ComercioId` en el contenido de los eventos de Envíos; al verificarlo contra el ADR-0003 (sección 2.2: el inquilino nunca sale del contenido del evento) se reemplazó por `EnvioAdmitido`, publicado desde la sesión del comercio, y la copia `EnvioSeguido` en Seguimiento. También había propuesto confirmar el mensaje al agotar los reintentos; para cumplir la sección 2.6 el último fallo deja la entrega en la cola de fallidos y manda el mensaje a `logistica.fallidos`. Para saber cuándo es el último intento se expuso la cabecera `intento` en `MensajeIntegracion`. |
+| **Descartado** | Una excepción para destinos internos en desarrollo: la guía de CU-63 la descarta expresamente. Leer el comercio del contenido de los eventos o cambiar `AgregarAlOutbox` para recibirlo del llamador: contradicen los ADR-0002 y 0003. |
+| **Verificación** | 16 pruebas unitarias y 6 de integración nuevas, incluida una de extremo a extremo (Portal, outbox, RabbitMQ, Worker y receptor en memoria que verifica la firma por su cuenta). La primera corrida completa mostró que `ArmarRutaTests` contaba todas las filas del outbox del envío; se restringió la consulta al evento de asignación. Corrida final en Docker: 695 pruebas .NET (233 unitarias, 56 de arquitectura y 406 de integración), todas pasan; cobertura de líneas del 94,7 %. No se probó con `docker compose` ni con un receptor HTTPS público, que todavía no existe. |
+
+## **3.37 Revisión de main e integración con CU-53**
+
+| Campo | Registro |
+| :---- | :---- |
+| **Fecha y responsable** | 21/10/2026 · Lucas Ottonello |
+| **Herramienta y solicitud** | Codex, en este chat. Lucas pidió verificar el último commit de main contra los ADR y resolver el conflicto con su rama. |
+| **Origen revisado** | Tras git fetch, origin/main apunta a `04fab20ff1910a145136c1f59ea7ef61f40f5285`, merge de PR #48 con CU-64. Se revisaron los cambios respecto del primer padre y su integración local en lukovski. |
+| **Conflicto resuelto** | Únicamente la bitácora: ambas ramas agregaron sección 3.35 y versión 0.20. Se conservaron completos los aportes de Lucas y Ezequiel; CU-53 mantiene 3.35/0.20/0.21 y CU-64 pasa a 3.36/0.22. No se reemplazó una entrada por la otra ni se alteraron sus resultados históricos de pruebas. |
+| **Revisión contra ADR** | Se comprobaron los límites de Domain/Application/Infrastructure y Contracts de ADR-0001, los marcadores/filtros y el origen del tenant de ADR-0002, y la persistencia conjunta, Inbox, Outbox y reintentos de ADR-0003. No se encontraron violaciones de dependencias en CU-64. Se señaló el desvío formal de dos índices únicos que no incluyen OperadorId conforme a la convención escrita de ADR-0002 §2.1; los GUID padre son globales y no se demostró una fuga entre operadores. No se cambió el esquema dentro de esta resolución documental. |
+| **Límites del alcance** | Los envíos anteriores a EnvioAdmitido, los eventos de transiciones todavía no publicados y el receptor HTTPS público continúan como pendientes documentados de CU-64. Integrar main no resuelve los pendientes de CU-52 identificados en la auditoría de CU-53. No se modificaron los ADR para justificar el código. |
+| **Verificación local** | Sobre la integración pasan 248 pruebas unitarias .NET y 56 de arquitectura. Se intentaron las seis de EntregarAvisosTests, también fuera del sandbox: todas fallaron al inicializar los fixtures de PostgreSQL y RabbitMQ con DockerUnavailableException, antes de comprobar el comportamiento funcional. El TRX local queda en TestResults/cu64-main-review, ignorado por Git. No se atribuye a esta revisión la corrida histórica de 695 pruebas declarada por el autor de CU-64. |
+| **Referencia** | [Revisión del commit de main](analisis-diseno/cu-64/revision-arquitectura.md). |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -593,3 +621,5 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.19 | 21/10/2026 | Entrada de CU-63 basada en este chat: análisis previo, implementación asistida, revisión del origen de los requisitos, ajustes de interfaz pedidos por Lucas, envío de prueba y contrato de continuidad para Ezequiel en CU-64. | Lucas Ottonello |
 | 0.20 | 21/10/2026 | CU-53: acuerdos, captura y sincronización de posiciones, retención y contratos para CU-66; verificación local y bloqueo de pruebas con Docker documentados. | Lucas Ottonello |
 | 0.21 | 21/10/2026 | Se amplía CU-53 con la explicación de clases solicitada por Lucas, el resultado de la revisión contra los ADR, las correcciones, los pendientes de CU-52 y la distinción entre pruebas aprobadas e integración bloqueada al inicializar Docker. | Lucas Ottonello |
+| 0.22 | 21/10/2026 | Entrada de CU-64, entregar los avisos a los comercios; numeración ajustada al integrar main para conservar también las entradas de CU-53. | Ezequiel Marcenal |
+| 0.23 | 21/10/2026 | Revisión de main 04fab20 contra los ADR e integración con lukovski; resolución del conflicto conservando CU-53/CU-64, observaciones y verificación local. | Lucas Ottonello |

@@ -16,5 +16,8 @@ internal sealed class SuscripcionesAvisoRepository(SeguimientoDbContext db) : IS
     public async Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(CancellationToken ct) =>
         await db.SuscripcionesAviso.AsNoTracking().OrderBy(s => s.Id).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<SuscripcionAviso>> ListarActivasAsync(Guid comercioId, CancellationToken ct) =>
+        await db.SuscripcionesAviso.Where(s => s.ComercioId == comercioId && s.Activa).OrderBy(s => s.Id).ToListAsync(ct);
+
     public async Task GuardarAsync(CancellationToken ct) => await db.SaveChangesAsync(ct);
 }

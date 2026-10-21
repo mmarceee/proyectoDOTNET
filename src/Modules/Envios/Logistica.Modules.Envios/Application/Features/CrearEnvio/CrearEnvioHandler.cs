@@ -1,3 +1,4 @@
+using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.SharedKernel;
 using Logistica.Modules.Administracion.Contracts;
@@ -7,7 +8,8 @@ namespace Logistica.Modules.Envios.Application.Features.CrearEnvio;
 // CU-10, versión mínima del 8/10: un envío del Portal, sin zona, franja ni tarifa.
 // Coordina los pasos; las reglas del envío están en Envio.Crear.
 internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant tenant, TimeProvider reloj,
-    IRelacionComercialActiva relacion, IUnidadDeTrabajo unidad, IAdministracionModuleApi administracion)
+    IRelacionComercialActiva relacion, IUnidadDeTrabajo unidad, IAdministracionModuleApi administracion,
+    IIntegrationEventPublisher eventos)
 {
     // Hasta el 15/10 la tarifa es cero. Después la calcula Administración para cada bulto (CU-10, paso 7).
     private const decimal TarifaProvisoria = 0m;
@@ -46,6 +48,8 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
         {
             await relacion.ExigirAsync(comercioId, ct);
             envios.Agregar(envio);
+            // T1 también llega a Seguimiento: es el único evento con el comercio en el sobre (CU-64).
+            eventos.Registrar(EnvioAdmitido.Tipo, new EnvioAdmitido(envio.Id, envio.Numero, envio.CreadoEn), envio.CreadoEn);
             await envios.GuardarCambiosAsync(ct);
         }, ct);
 
