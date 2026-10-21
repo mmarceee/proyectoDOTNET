@@ -533,6 +533,21 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado o no acreditado** | No se atribuyen a Lucas la caché de Ezequiel ni CU-04/05/06/60 de Cristian por haberlos revisado o integrado. La auditoría previa de CU-17/18 distinguió backend de pantallas móviles que entonces faltaban. Posteriormente Ezequiel incorporó esas pantallas a main; su implementación y verificaciones se registran en 3.21. Tampoco se dio por aprobada la propuesta ADR-0006 ni por demostradas en Aspire las métricas sólo por encontrar su instrumentación. |
 | **Verificación** | Revisiones de diffs, compilaciones y pruebas dirigidas según cada cambio. En la tarea del menú compilaron los tres proyectos; la compilación completa quedó bloqueada por archivos de la API en ejecución. Los problemas de entorno no se registran como pruebas aprobadas ni las revisiones documentales como implementación de casos ajenos. |
 
+## **3.34 Entrega de los avisos a los comercios (CU-64)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 21/10/2026 |
+| **Archivos** | Envíos: `EnvioAdmitido` y `CrearEnvioHandler`. Seguimiento: `EntregaAviso`, `IntentoAviso`, `EnvioSeguido`, `EstadoEntregaAviso`, `ClasificadorAvisos`, `SuscripcionAviso.Recibe`, `PrepararAvisosHandler`, `EntregarAvisoHandler`, los consumidores `PrepararAvisos` y `EntregarAviso`, `AvisoPendiente`, repositorios, configuración EF y migración `EntregasAviso`. BuildingBlocks: `MensajeIntegracion.Intento`. Pruebas `EntregaAvisoTests` y `EntregarAvisosTests`; ajuste de dos consultas de `ArmarRutaTests`. Documentos: README de CU-64, modelo de dominio y guía de integración de CU-63. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-64 sobre las piezas que dejó Lucas Ottonello con CU-63 (firma, cifrado del secreto y emisor HTTP), para el hito del 29/10. |
+| **Cómo se trabajó** | La IA revisó primero el merge de CU-63 y leyó la guía de integración de Lucas. Propuso cuatro decisiones (origen del comercio, clasificación de los hechos, entrega en dos etapas y entidad con intentos); el responsable las aceptó con la condición de no contradecir los ADR y pidió que la IA escribiera el código. |
+| **Aceptado sin modificaciones** | Clasificación en un único tipo por hecho, con `CambioDeEstado` como "todos". Entrega en dos etapas: preparar (inbox, entregas y outbox en una transacción) y entregar (un mensaje por entrega, que se reintenta solo). `EntregaAviso` con su colección de intentos, para el historial de CU-65. |
+| **Modificado** | La IA había propuesto llevar el `ComercioId` en el contenido de los eventos de Envíos; al verificarlo contra el ADR-0003 (sección 2.2: el inquilino nunca sale del contenido del evento) se reemplazó por `EnvioAdmitido`, publicado desde la sesión del comercio, y la copia `EnvioSeguido` en Seguimiento. También había propuesto confirmar el mensaje al agotar los reintentos; para cumplir la sección 2.6 el último fallo deja la entrega en la cola de fallidos y manda el mensaje a `logistica.fallidos`. Para saber cuándo es el último intento se expuso la cabecera `intento` en `MensajeIntegracion`. |
+| **Descartado** | Una excepción para destinos internos en desarrollo: la guía de CU-63 la descarta expresamente. Leer el comercio del contenido de los eventos o cambiar `AgregarAlOutbox` para recibirlo del llamador: contradicen los ADR-0002 y 0003. |
+| **Verificación** | 16 pruebas unitarias y 6 de integración nuevas, incluida una de extremo a extremo (Portal, outbox, RabbitMQ, Worker y receptor en memoria que verifica la firma por su cuenta). La primera corrida completa mostró que `ArmarRutaTests` contaba todas las filas del outbox del envío; se restringió la consulta al evento de asignación. Corrida final en Docker: 695 pruebas .NET (233 unitarias, 56 de arquitectura y 406 de integración), todas pasan; cobertura de líneas del 94,7 %. No se probó con `docker compose` ni con un receptor HTTPS público, que todavía no existe. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -555,3 +570,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.16 | 20/10/2026 | Entrada de CU-55, confirmar la rendición. | Ezequiel Marcenal |
 | 0.17 | 20/10/2026 | Entrada de la PWA de CU-17 y CU-18. | Ezequiel Marcenal |
 | 0.18 | 20/10/2026 | Registro retrospectivo del uso de Codex por Lucas: arquitectura, CU-13/14/40/41/43/50/51/54, ADR-0005, acceso y presentación; aporte posterior al listado de CU-55. Reconstruido con chats, Git y documentación, para revisión del responsable. | Lucas Ottonello |
+| 0.19 | 21/10/2026 | Entrada de CU-64, entregar los avisos a los comercios. | Ezequiel Marcenal |

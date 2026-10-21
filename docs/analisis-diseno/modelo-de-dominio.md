@@ -6,7 +6,7 @@ Este documento reúne el modelo de dominio completo como un único modelo, agrup
 
 Convención de multitenancy (ADR-0002 v2.1): toda clase lleva un campo operadorId que la ata a su operador (inquilino), salvo Operador y Comercio, que son globales. RelacionComercial lleva operadorId y comercioId y se filtra por ambos (ADR-0002, sección 2.6). Usuario lleva operadorId o comercioId, pero no tiene filtro de inquilino (ver la nota de Usuario).
 
-Segundo nivel de aislamiento: además de operadorId, llevan comercioId las clases que consulta el Portal o la API del comercio: RelacionComercial, ClaveApi, Envio, Bulto, EventoEnvio, IntentoEntrega, Incidencia, Devolucion, SuscripcionAviso, EntregaAviso, Liquidacion y LineaLiquidacion. Estos campos no se repiten en cada clase, salvo donde ayudan a entenderla.
+Segundo nivel de aislamiento: además de operadorId, llevan comercioId las clases que consulta el Portal o la API del comercio: RelacionComercial, ClaveApi, Envio, Bulto, EventoEnvio, IntentoEntrega, Incidencia, Devolucion, SuscripcionAviso, EntregaAviso, IntentoAviso, EnvioSeguido, Liquidacion y LineaLiquidacion. Estos campos no se repiten en cada clase, salvo donde ayudan a entenderla.
 
 Las relaciones hacia un enum no se listan como filas de relación: el enum es el tipo de un atributo, no una entidad relacionada.
 
@@ -1037,29 +1037,69 @@ EntregadoEnCalle, DevueltoADeposito, Extraviado
 
 * regenerarSecreto(): void — invalida el secreto anterior (CU-63, A3)
 
+* recibe(tipo: TipoEventoAviso): bool — CambioDeEstado abarca todos los hechos; EntregaFallida y Devolucion, sólo el suyo (CU-64)
+
 **EntregaAviso**
 
-*historial de intentos de aviso a un comercio, con reintentos y cola de fallidos*
+*raíz de agregado — un aviso de un hecho del envío para una suscripción, con sus intentos, reintentos y cola de fallidos (CU-64)*
+
+**Atributos**
+
+* id: Guid (el identificador del aviso que recibe el comercio; se conserva en los reintentos)
+
+* suscripcionAvisoId: Guid
+
+* eventoId: Guid (MessageId del evento de integración de Envíos que originó el aviso; con la suscripción, identifica la entrega)
+
+* envioId: Guid
+
+* numeroEnvio: string
+
+* estadoEnvio: string (estado del envío que informa el aviso)
+
+* tipo: TipoEventoAviso (un único tipo por hecho, ver ClasificadorAvisos en el README de CU-64)
+
+* fechaEvento: DateTimeOffset
+
+* estado: EstadoEntregaAviso
+
+* intentos: IntentoAviso\[\]
+
+**Métodos**
+
+* registrarIntento(enviadoEn, exitoso, codigoRespuesta, error, ultimo): void
+
+* reintentar(): void — vuelve a Pendiente una entrega en la cola de fallidos (CU-65 o CU-09)
+
+**IntentoAviso**
+
+*un intento HTTP de una EntregaAviso (CU-64); el historial de CU-65 muestra cada uno*
 
 **Atributos**
 
 * id: Guid
 
-* suscripcionAvisoId: Guid
+* entregaAvisoId: Guid
 
-* eventoEnvioId: Guid
-
-* intento: int
-
-* estado: EstadoEntregaAviso
-
-* codigoRespuesta: int (opcional)
+* numero: int
 
 * enviadoEn: DateTimeOffset
 
-**Métodos**
+* exitoso: bool
 
-* reintentar(): void
+* codigoRespuesta: int (opcional; no hay código si no hubo conexión o venció la espera)
+
+* error: string (opcional)
+
+**EnvioSeguido**
+
+*copia mínima de un Envio en Seguimiento, creada con el evento EnvioAdmitido (CU-64). Dice a qué comercio avisar en los eventos que publican el operador o el repartidor, cuyo sobre no trae comercio (ADR-0003, sección 2.2)*
+
+**Atributos**
+
+* id: Guid (el mismo del Envio)
+
+* numero: string
 
 ## **Enumerados**
 
@@ -1086,6 +1126,8 @@ CambioDeEstado, EntregaFallida, Devolucion
 **EstadoEntregaAviso**  *«enum»*
 
 Pendiente, Exitosa, Fallida, EnColaDeFallidos
+
+*Pendiente: sin intentos (o reencolada). Fallida: el último intento falló y quedan reintentos. EnColaDeFallidos: se agotaron los reintentos (CU-64)*
 
 ## **Coordinación entre agregados (Envio, Devolucion, Incidencia, Notificacion, EntregaAviso)**
 
@@ -1242,7 +1284,9 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | EntregaAviso | 0..\* | asociación | 1 | SuscripcionAviso |
 | Notificacion | 0..\* | asociación | 1 | Envio |
 | SuscripcionAviso | 0..\* | asociación | 1 | RelacionComercial |
-| EntregaAviso | 0..\* | asociación | 1 | EventoEnvio |
+| EntregaAviso | 0..\* | asociación | 1 | EnvioSeguido |
+| EntregaAviso | 1 | composición | 0..\* | IntentoAviso |
+| EnvioSeguido | 0..1 | asociación | 1 | Envio |
 | Liquidacion | 1 | composición | 1..\* | LineaLiquidacion |
 | RecepcionDeposito | 0..\* | asociación | 1 | Bulto |
 | Liquidacion | 0..\* | asociación | 1 | RelacionComercial |

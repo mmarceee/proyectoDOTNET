@@ -142,7 +142,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         Assert.Single(respuestas, r => r.StatusCode == HttpStatusCode.Created);
         Assert.Single(respuestas, r => r.StatusCode == HttpStatusCode.Conflict);
         Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM planificacion."EnviosParada" WHERE "EnvioId"=@id""", envio.Id));
-        Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text""", envio.Id));
+        Assert.Equal(1L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text AND "Tipo"='EnvioAsignadoARuta.v1'""", envio.Id));
     }
 
     [Fact]
@@ -501,7 +501,8 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     {
         Assert.Equal("EnDeposito", await ScalarAsync<string>("""SELECT "Estado" FROM envios."Envios" WHERE "Id"=@id""", id));
         Assert.Equal(0L, await ScalarAsync<long>("""SELECT count(*) FROM planificacion."EnviosParada" WHERE "EnvioId"=@id""", id));
-        Assert.Equal(0L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text""", id));
+        // El alta del envío (EnvioAdmitido) también está en el outbox: se cuenta sólo la asignación.
+        Assert.Equal(0L, await ScalarAsync<long>("""SELECT count(*) FROM envios.outbox_messages WHERE "Contenido"::jsonb->>'EnvioId'=@id::text AND "Tipo"='EnvioAsignadoARuta.v1'""", id));
     }
     private async Task<T> ScalarAsync<T>(string sql, Guid id)
     {

@@ -164,6 +164,8 @@ public sealed class ConfigurarSuscripcionesAvisoTests(PostgresApiFactory factory
         public void Agregar(SuscripcionAviso s) => real.Agregar(s);
         public Task<SuscripcionAviso?> ObtenerAsync(Guid id, CancellationToken ct) => real.ObtenerAsync(id, ct);
         public Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(CancellationToken ct) => real.ListarAsync(ct);
+        public Task<IReadOnlyList<SuscripcionAviso>> ListarActivasAsync(Guid comercioId, CancellationToken ct) =>
+            real.ListarActivasAsync(comercioId, ct);
         public async Task GuardarAsync(CancellationToken ct)
         {
             await real.GuardarAsync(ct);

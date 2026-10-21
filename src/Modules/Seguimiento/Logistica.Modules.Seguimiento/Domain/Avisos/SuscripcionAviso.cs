@@ -48,6 +48,10 @@ internal sealed class SuscripcionAviso : Entity, IOperadorOwned, IComercioOwned
 
     public void Desactivar() => Activa = false;
 
+    // CU-64: CambioDeEstado abarca todos los hechos del envío; EntregaFallida y Devolucion, sólo los suyos.
+    public bool Recibe(TipoEventoAviso tipo) =>
+        Activa && (_tiposEvento.Contains(TipoEventoAviso.CambioDeEstado) || _tiposEvento.Contains(tipo));
+
     public void RegenerarSecreto(string secretoFirmaCifrado)
     {
         ValidarSecreto(secretoFirmaCifrado);

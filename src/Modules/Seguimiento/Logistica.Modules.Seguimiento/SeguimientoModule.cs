@@ -16,6 +16,8 @@ using Logistica.Modules.Seguimiento.Domain.Avisos;
 using Logistica.Modules.Seguimiento.Application.Features.ConfigurarSuscripcionesAviso;
 using Logistica.Modules.Seguimiento.Infrastructure.Security;
 using Logistica.Modules.Seguimiento.Infrastructure.Http;
+using Logistica.Modules.Seguimiento.Application.Features.EntregarAvisos;
+using Logistica.Modules.Seguimiento.Contracts.Events;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Logistica.Modules.Seguimiento;
@@ -46,6 +48,21 @@ public static class SeguimientoModule
             sp.GetRequiredService<ISecretosAviso>(), sp.GetRequiredService<SharedKernel.ICurrentTenant>(),
             sp.GetRequiredService<SharedKernel.IUnidadDeTrabajo>()));
         services.AddScoped<ConsultarAvisosHandler>();
+
+        // CU-64: una cola por evento de Envíos prepara las entregas; otra envía cada entrega y la reintenta sola.
+        services.AddScoped<IEnviosSeguidosRepository, EnviosSeguidosRepository>();
+        services.AddScoped<IEntregasAvisoRepository, EntregasAvisoRepository>();
+        services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
+        services.AddScoped<PrepararAvisosHandler>();
+        services.AddScoped<EntregarAvisoHandler>();
+        foreach (var tipo in PrepararAvisos.Tipos)
+        {
+            services.AddKeyedScoped<IConsumidorIntegracion, PrepararAvisos>(PrepararAvisos.Cola(tipo));
+            services.AddSingleton(new SuscripcionIntegracion(PrepararAvisos.Cola(tipo), tipo));
+        }
+        services.AddKeyedScoped<IConsumidorIntegracion, EntregarAviso>(EntregarAviso.Cola);
+        services.AddSingleton(new SuscripcionIntegracion(EntregarAviso.Cola, AvisoPendiente.Tipo));
+
         services.AddKeyedScoped<IConsumidorIntegracion, NotificarRutaDespachada>(NotificarRutaDespachada.Cola);
         services.AddSingleton(new SuscripcionIntegracion(NotificarRutaDespachada.Cola, RutaDespachada.Tipo));
 
