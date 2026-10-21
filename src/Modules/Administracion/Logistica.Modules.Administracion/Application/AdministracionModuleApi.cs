@@ -15,6 +15,8 @@ internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lecto
     IComerciosRepository comercios, Domain.Operadores.IOperadorRepository operadores)
     : IAdministracionModuleApi
 {
+    public async Task<string> ObtenerZonaHorariaActualAsync(CancellationToken ct) =>
+        (await lector.ObtenerContextoPlanificacionAsync(ct)).ZonaHoraria;
     public Task<IReadOnlyList<Guid>> ConsultarOperadoresActivosAsync(CancellationToken ct) => operadores.ConsultarActivosAsync(ct);
     public Task<Guid?> ObtenerRelacionComercialActualAsync(CancellationToken ct) =>
         tenant.OperadorId is not null && tenant.ComercioId is Guid comercioId

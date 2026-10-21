@@ -1,0 +1,137 @@
+@page "/integraciones/avisos/historial"
+@page "/integraciones/avisos/historial/{EntregaId:guid}"
+@implements IDisposable
+
+<PageTitle>Historial de avisos · Integraciones</PageTitle>
+<p class="text-muted small mb-1">Integraciones · Avisos automáticos</p>
+<h1>@(EntregaId is null ? "Historial de avisos" : "Detalle del aviso")</h1>
+<nav class="nav nav-tabs mb-4" aria-label="Avisos automáticos">
+    <a class="nav-link" href="integraciones/avisos">Suscripciones</a>
+    <a class="nav-link active" aria-current="page" href="@UrlLista">Historial</a>
+</nav>
+
+@if (_error is not null) { <div class="alert alert-danger" role="alert">@_error</div> }
+@if (_mensaje is not null) { <div class="alert alert-success" role="status">@_mensaje</div> }
+@if (_elegirOperador) { <p><a href="/cuenta/operador?ReturnUrl=%2Fportal%2Fintegraciones%2Favisos%2Fhistorial">Elegir operador</a></p> }
+
+@if (_porConfirmar.Count > 0)
+{
+    <section class="alert alert-warning" aria-labelledby="confirmar-reenvio">
+        <h2 id="confirmar-reenvio" class="h5">Solicitar reenvío de @_porConfirmar.Count aviso(s)</h2>
+        <p>Se procesarán en segundo plano y conservarán su identificador y los intentos anteriores.
+            Si algún aviso ya no admite reenvío, no se solicitará ninguno del lote.</p>
+        <button type="button" class="btn btn-warning me-2" disabled="@_ocupado" @onclick="ReenviarAsync">@(_ocupado ? "Solicitando…" : "Confirmar reenvío")</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@_ocupado" @onclick="Cancelar">Cancelar</button>
+    </section>
+}
+
+@if (EntregaId is null)
+{
+    <EditForm Model="this" OnSubmit="FiltrarAsync" class="mb-4">
+        <fieldset disabled="@_ocupado">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="filtro-estado" class="form-label">Estado del aviso</label>
+                    <InputSelect id="filtro-estado" class="form-select" @bind-Value="_estado">
+                        <option value="">Todos</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Exitosa">Exitosa</option>
+                        <option value="Fallida">Fallida</option>
+                        <option value="EnColaDeFallidos">En cola de fallidos</option>
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label for="filtro-desde" class="form-label">Fecha del evento desde</label>
+                    <InputDate id="filtro-desde" class="form-control" @bind-Value="_desde" />
+                </div>
+                <div class="col-md-3">
+                    <label for="filtro-hasta" class="form-label">Hasta</label>
+                    <InputDate id="filtro-hasta" class="form-control" @bind-Value="_hasta" />
+                </div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary">Filtrar</button></div>
+            </div>
+            <button type="button" class="btn btn-link ps-0 mt-2" @onclick="LimpiarAsync">Limpiar filtros</button>
+        </fieldset>
+    </EditForm>
+    <p class="small text-muted">Fechas y horas del operador seleccionado. Sólo se reenvían manualmente los avisos en cola de fallidos con suscripción activa; los intentos fallidos anteriores los gestiona automáticamente el sistema.</p>
+}
+
+@if (_cargando) { <p role="status">Cargando historial…</p> }
+else if (_detalle is not null)
+{
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a class="btn btn-outline-secondary" href="@UrlLista">Volver al historial</a>
+        <button type="button" class="btn btn-outline-secondary" disabled="@_ocupado" @onclick="CargarAsync">Actualizar</button>
+        @if (_detalle.Entrega.PuedeReenviar)
+        {
+            <button type="button" class="btn btn-primary" disabled="@AccionesBloqueadas" @onclick="() => Confirmar([_detalle.Entrega.Id])">Reenviar</button>
+        }
+    </div>
+    <dl class="row">
+        <dt class="col-sm-3">Número de envío</dt><dd class="col-sm-9">@_detalle.Entrega.NumeroEnvio</dd>
+        <dt class="col-sm-3">Estado del envío</dt><dd class="col-sm-9">@_detalle.Entrega.EstadoEnvio</dd>
+        <dt class="col-sm-3">Tipo de evento</dt><dd class="col-sm-9">@NombreTipo(_detalle.Entrega.Tipo)</dd>
+        <dt class="col-sm-3">Fecha del evento</dt><dd class="col-sm-9">@Fecha(_detalle.Entrega.FechaEvento)</dd>
+        <dt class="col-sm-3">Estado del aviso</dt><dd class="col-sm-9">@NombreEstado(_detalle.Entrega.Estado)</dd>
+        <dt class="col-sm-3">Sistema receptor</dt><dd class="col-sm-9 text-break">@_detalle.UrlDestino</dd>
+        <dt class="col-sm-3">Identificador del aviso</dt><dd class="col-sm-9 text-break">@_detalle.Entrega.Id</dd>
+    </dl>
+    @if (!_detalle.Entrega.SuscripcionActiva)
+    {
+        <p class="alert alert-warning">La suscripción está inactiva. No se puede solicitar un reenvío.</p>
+    }
+    <h2 class="h5">Intentos de entrega</h2>
+    @if (_detalle.Intentos.Count == 0) { <p>El aviso todavía no tiene intentos registrados.</p> }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <caption>Intentos registrados, en orden de ejecución. Fechas y horas del operador.</caption>
+                <thead><tr><th scope="col">Intento</th><th scope="col">Fecha</th><th scope="col">Resultado</th><th scope="col">Respuesta HTTP</th><th scope="col">Error</th></tr></thead>
+                <tbody>@foreach (var intento in _detalle.Intentos)
+                {
+                    <tr @key="intento.Numero"><td>@intento.Numero</td><td class="text-nowrap">@Fecha(intento.Fecha)</td><td>@(intento.Exitoso ? "Exitoso" : "Fallido")</td><td>@(intento.CodigoRespuesta?.ToString() ?? "Sin respuesta")</td><td class="text-break">@(intento.Error ?? "—")</td></tr>
+                }</tbody>
+            </table>
+        </div>
+    }
+}
+else if (_historial is not null)
+{
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <button type="button" class="btn btn-outline-secondary" disabled="@_ocupado" @onclick="CargarAsync">Actualizar</button>
+        <button type="button" class="btn btn-primary" disabled="@(AccionesBloqueadas || _seleccionados.Count == 0)" @onclick="() => Confirmar(_seleccionados)">Reenviar seleccionados (@_seleccionados.Count)</button>
+        <span>@_historial.TotalRegistros aviso(s)</span>
+    </div>
+    @if (_historial.Entregas.Count == 0) { <p>No hay avisos para los filtros seleccionados.</p> }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <caption>Historial de avisos del comercio con el operador seleccionado</caption>
+                <thead><tr>
+                    <th scope="col"><input type="checkbox" class="form-check-input" aria-label="Seleccionar avisos reenviables de esta página" checked="@TodosSeleccionados" disabled="@(AccionesBloqueadas || !_historial.Entregas.Any(e => e.PuedeReenviar))" @onchange="SeleccionarTodos" /></th>
+                    <th scope="col">Fecha del evento</th><th scope="col">Envío</th><th scope="col">Evento</th><th scope="col">Estado del aviso</th><th scope="col">Intentos</th><th scope="col">Acciones</th>
+                </tr></thead>
+                <tbody>@foreach (var entrega in _historial.Entregas)
+                {
+                    <tr @key="entrega.Id">
+                        <td><input type="checkbox" class="form-check-input" aria-label="@($"Seleccionar aviso de {entrega.NumeroEnvio}")" checked="@_seleccionados.Contains(entrega.Id)" disabled="@(AccionesBloqueadas || !entrega.PuedeReenviar)" @onchange="e => Seleccionar(entrega.Id, e.Value is true)" /></td>
+                        <td class="text-nowrap">@Fecha(entrega.FechaEvento)</td><td>@entrega.NumeroEnvio</td><td>@NombreTipo(entrega.Tipo)</td>
+                        <td>@NombreEstado(entrega.Estado)@if (!entrega.SuscripcionActiva) { <span class="d-block small text-muted">Suscripción inactiva</span> }</td>
+                        <td>@entrega.CantidadIntentos</td>
+                        <td><div class="d-flex gap-2 flex-wrap">
+                            <a class="btn btn-outline-secondary btn-sm" href="@UrlDetalle(entrega.Id)">Ver detalle</a>
+                            @if (entrega.PuedeReenviar) { <button type="button" class="btn btn-outline-primary btn-sm" disabled="@AccionesBloqueadas" @onclick="() => Confirmar([entrega.Id])">Reenviar</button> }
+                        </div></td>
+                    </tr>
+                }</tbody>
+            </table>
+        </div>
+    }
+    <nav class="d-flex align-items-center gap-3" aria-label="Paginación del historial">
+        <button type="button" class="btn btn-outline-secondary" disabled="@(_ocupado || _historial.Pagina <= 1)" @onclick="() => Paginar(_historial.Pagina - 1)">Anterior</button>
+        <span>Página @_historial.Pagina de @Math.Max(1, (int)Math.Ceiling(_historial.TotalRegistros / (double)_historial.TamanoPagina))</span>
+        <button type="button" class="btn btn-outline-secondary" disabled="@(_ocupado || (long)_historial.Pagina * _historial.TamanoPagina >= _historial.TotalRegistros)" @onclick="() => Paginar(_historial.Pagina + 1)">Siguiente</button>
+    </nav>
+}

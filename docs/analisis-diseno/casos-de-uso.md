@@ -691,9 +691,9 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Pre-Condición** | 1. El usuario está autenticado con el perfil *Usuario de comercio* y seleccionó el operador (CU-03). |
 | **Post-Condición** | **Éxito:** el aviso reenviado se vuelve a entregar (CU-64) con el mismo identificador.<br>**Fracaso:** el aviso sigue fallido. |
 | **Actores** | **Principal:** usuario del comercio, desde el Portal del comercio. |
-| **Flujo de evento principal** | 1. El usuario elige **Historial de avisos**.<br>2. El sistema lista las entregas con fecha, tipo de evento, número de envío, estado y cantidad de intentos, filtrables por estado y fecha.<br>3. El usuario abre una entrega y ve cada intento con su código de respuesta.<br>4. El usuario elige **Reenviar** sobre una entrega fallida.<br>5. El sistema la vuelve a encolar. |
-| **Flujos alternativos** | **A1 · Reenvío masivo (paso 4).** El usuario selecciona varias entregas fallidas y las reenvía juntas.<br><br>**A2 · Suscripción desactivada (paso 4).** El sistema informa que la suscripción está inactiva. |
-| **Requerimientos especiales** | 1. El comercio ve sólo sus avisos con el operador seleccionado. |
+| **Flujo de evento principal** | 1. El usuario elige **Historial de avisos**.<br>2. El sistema lista las entregas con fecha, tipo de evento, número de envío, estado y cantidad de intentos, filtrables por estado y fecha.<br>3. El usuario abre una entrega y ve cada intento con su código de respuesta.<br>4. El usuario elige **Reenviar** sobre una entrega en cola de fallidos y confirma.<br>5. El sistema la deja *Pendiente* y la vuelve a encolar en la misma transacción, conservando su identificador e intentos anteriores. CU-64 procesa la entrega en segundo plano. |
+| **Flujos alternativos** | **A1 · Reenvío masivo (paso 4).** El usuario selecciona varias entregas en cola de fallidos y las reenvía juntas. Si alguna no admite reenvío, el lote completo se rechaza.<br><br>**A2 · Suscripción desactivada (paso 4).** El sistema informa que la suscripción está inactiva y no encola el reenvío. |
+| **Requerimientos especiales** | 1. El comercio ve sólo sus avisos con el operador seleccionado.<br>2. Los avisos *Fallida* siguen bajo los reintentos automáticos de CU-64; sólo *EnColaDeFallidos* permite reenvío manual, con suscripción activa.<br>3. Las fechas se filtran y muestran en la zona horaria del operador. |
 
 ### **CU-66 · Ver el tablero de operación en vivo**
 
