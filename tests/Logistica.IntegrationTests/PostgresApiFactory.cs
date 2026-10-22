@@ -17,6 +17,9 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
         // Se aplican antes de que Program.cs lea la configuración, así la API usa este contenedor
         // y crea las tablas al iniciar, igual que en docker compose.
         builder.UseSetting("ConnectionStrings:Postgres", ConnectionString);
+        // El enrutamiento de miles de assets se comprueba en AplicacionesWebAssemblyTests con el catálogo real.
+        // Repetirlo en cada API efímera de negocio retiene demasiada memoria durante la suite con cobertura.
+        builder.UseSetting("StaticAssets:ManifestPath", Path.Combine(AppContext.BaseDirectory, "staticassets.vacio.json"));
         builder.UseSetting("Database:MigrateOnStartup", "true");
         // Los casos de mensajería habilitan su propio broker aislado; nunca usar el de user-secrets.
         builder.UseSetting("ConnectionStrings:RabbitMQ", "");
@@ -32,8 +35,17 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
         return _postgres.StartAsync();
     }
 
-    Task IAsyncLifetime.DisposeAsync()
+    async Task IAsyncLifetime.DisposeAsync()
     {
-        return _postgres.DisposeAsync().AsTask();
+        // Detener primero los hosts y sus servicios de fondo, incluidos los creados con WithWebHostBuilder.
+        // La base debe seguir disponible hasta que las aplicaciones hayan terminado de cerrarse.
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            await _postgres.DisposeAsync();
+        }
     }
 }

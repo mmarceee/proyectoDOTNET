@@ -169,12 +169,15 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 
-app.MapStaticAssets();
+// Por defecto se usa el catálogo generado para las aplicaciones web. Los hosts de pruebas de negocio pueden
+// proporcionar un catálogo mínimo; las pruebas de archivos WebAssembly verifican el catálogo real.
+var manifiestoEstaticos = app.Configuration["StaticAssets:ManifestPath"];
+app.MapStaticAssets(manifiestoEstaticos);
 
 app.MapHealthChecks("/health");
 
 app.MapRazorPages()
-    .WithStaticAssets();
+    .WithStaticAssets(manifiestoEstaticos);
 
 app.MapAdministracionEndpoints()
     .MapEnviosEndpoints()
