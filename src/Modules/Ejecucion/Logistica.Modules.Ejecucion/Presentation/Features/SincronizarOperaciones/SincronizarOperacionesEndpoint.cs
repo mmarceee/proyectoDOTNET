@@ -14,6 +14,9 @@ namespace Logistica.Modules.Ejecucion.Presentation.Features.SincronizarOperacion
 // rechace: el rechazo es parte de la política, no un error del pedido.
 internal static class SincronizarOperacionesEndpoint
 {
+    private static readonly System.Diagnostics.Metrics.Meter Medidor = new(EjecucionModule.FuenteDeTrazas);
+    private static readonly System.Diagnostics.Metrics.Histogram<int> Pendientes =
+        Medidor.CreateHistogram<int>("logistica.sincronizacion.pendientes", "operaciones", "Pendientes informadas por el dispositivo antes de sincronizar");
     // ADR-0004, sección 2.8: hasta 20 operaciones por lote.
     public const int MaximoOperaciones = 20;
 
@@ -32,7 +35,7 @@ internal static class SincronizarOperacionesEndpoint
             return TypedResults.Forbid();
         }
 
-        if (request.Operaciones.Count is 0 or > MaximoOperaciones)
+        if (request.Operaciones.Count is 0 or > MaximoOperaciones || request.Pendientes is < 0)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
@@ -41,6 +44,7 @@ internal static class SincronizarOperacionesEndpoint
         }
 
         var usuarioId = Guid.TryParse(usuario.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : (Guid?)null;
+        if (request.Pendientes is int pendientes) Pendientes.Record(pendientes);
 
         return TypedResults.Ok(await handler.HandleAsync(
             new SincronizarOperacionesCommand(repartidorId, usuarioId, request.Operaciones), ct));

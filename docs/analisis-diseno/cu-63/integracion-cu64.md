@@ -46,7 +46,7 @@ Para CU-64 se debe mantener el mismo identificador al reintentar una entrega. El
 duplicados por ese identificador; el emisor no garantiza el orden. Hay que definir la clasificación de los
 eventos reales, incluyendo la superposición entre cambio de estado, entrega fallida y devolución, de modo
 que una misma suscripción no reciba dos mensajes por el mismo hecho sólo por coincidir en varios tipos.
-Esta clasificación pertenece a CU-64 y todavía no está implementada.
+Esta clasificación pertenece a CU-64; está implementada y documentada en el [README de CU-64](../cu-64/README.md).
 
 ## Firma HMAC-SHA256
 

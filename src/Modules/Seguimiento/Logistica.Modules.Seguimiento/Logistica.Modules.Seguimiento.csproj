@@ -10,6 +10,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- CU-62: correo al destinatario por SMTP, sólo en Infrastructure. -->
+    <PackageReference Include="MailKit" />
+    <!-- Reemplaza la versión vulnerable que trae MimeKit (ver Directory.Packages.props). -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Logistica.UnitTests" />
     <InternalsVisibleTo Include="Logistica.IntegrationTests" />
   </ItemGroup>

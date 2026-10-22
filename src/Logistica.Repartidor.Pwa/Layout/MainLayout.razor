@@ -1,10 +1,16 @@
 @inherits LayoutComponentBase
 @inject Logistica.Repartidor.Pwa.Services.CargaService Cargas
+@inject Logistica.Repartidor.Pwa.Services.SeguimientoPosicionService Seguimiento
+@implements IDisposable
 <div class="page">
     <header>
         <NavMenu />
     </header>
     <main class="container content">
+        @if (Seguimiento.Estado is not null)
+        {
+            <div class="alert alert-info py-2" role="status">@Seguimiento.Estado</div>
+        }
         @Body
     </main>
     <footer class="app-footer border-top text-muted">
@@ -14,6 +20,13 @@
 @code {
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender) await Cargas.SincronizarAsync();
+        if (firstRender)
+        {
+            Seguimiento.Cambio += ActualizarSeguimiento;
+            await Seguimiento.InicializarAsync();
+            await Cargas.SincronizarAsync();
+        }
     }
+    private void ActualizarSeguimiento() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Seguimiento.Cambio -= ActualizarSeguimiento;
 }

@@ -12,9 +12,12 @@ namespace Logistica.Modules.Administracion.Application;
 
 internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lector, IServicioUsuarios usuarios,
     ICurrentTenant tenant, TarifarioVigente tarifario, ReglasVigentes reglas, ConsultarIdentidadVisualHandler identidad,
-    IComerciosRepository comercios)
+    IComerciosRepository comercios, Domain.Operadores.IOperadorRepository operadores)
     : IAdministracionModuleApi
 {
+    public async Task<string> ObtenerZonaHorariaActualAsync(CancellationToken ct) =>
+        (await lector.ObtenerContextoPlanificacionAsync(ct)).ZonaHoraria;
+    public Task<IReadOnlyList<Guid>> ConsultarOperadoresActivosAsync(CancellationToken ct) => operadores.ConsultarActivosAsync(ct);
     public Task<Guid?> ObtenerRelacionComercialActualAsync(CancellationToken ct) =>
         tenant.OperadorId is not null && tenant.ComercioId is Guid comercioId
             ? comercios.ObtenerRelacionIdAsync(comercioId, ct)

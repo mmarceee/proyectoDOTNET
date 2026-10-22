@@ -2,7 +2,7 @@
   "name": "logistica-pruebas-pwa",
   "private": true,
   "scripts": {
-    "test": "node --test repartidor-hoja-ruta.test.mjs repartidor-service-worker.test.cjs repartidor-camara.test.cjs",
+    "test": "node --test repartidor-hoja-ruta.test.mjs repartidor-posicion.test.mjs repartidor-service-worker.test.cjs repartidor-camara.test.cjs",
     "vendor": "node vendor-zxing.mjs"
   },
   "devDependencies": {

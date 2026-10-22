@@ -94,6 +94,126 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.ToTable("avisos_ruta", "seguimiento");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Avisos.EntregaAviso", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("EstadoEnvio")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("EventoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("FechaEvento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NumeroEnvio")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SuscripcionAvisoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId", "SuscripcionAvisoId")
+                        .IsUnique();
+
+                    b.HasIndex("OperadorId", "ComercioId", "Estado", "FechaEvento");
+
+                    b.ToTable("entregas_aviso", "seguimiento");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Avisos.EnvioSeguido", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EmailDestinatario")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("NombreDestinatario")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Numero")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("envios_seguidos", "seguimiento");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Avisos.IntentoAviso", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CodigoRespuesta")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EntregaAvisoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("EnviadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("Exitoso")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntregaAvisoId", "Numero")
+                        .IsUnique();
+
+                    b.ToTable("intentos_aviso", "seguimiento");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Avisos.SuscripcionAviso", b =>
                 {
                     b.Property<Guid>("Id")
@@ -133,6 +253,112 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.ToTable("suscripciones_aviso", "seguimiento");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Notificaciones.IdentidadOperador", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ActualizadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ColorPrimario")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ColorSecundario")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("EmailContacto")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TelefonoContacto")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId")
+                        .IsUnique();
+
+                    b.ToTable("identidades_operador", "seguimiento");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Notificaciones.Notificacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Canal")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Destino")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTimeOffset?>("EnviadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("EstadoEnvio")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("EventoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Intentos")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("UltimoError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId")
+                        .IsUnique();
+
+                    b.HasIndex("OperadorId", "EnvioId");
+
+                    b.ToTable("notificaciones", "seguimiento");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Seguimiento.Infrastructure.Persistence.MensajeRecibido", b =>
                 {
                     b.Property<Guid>("MessageId")
@@ -148,6 +374,20 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.HasKey("MessageId", "Consumidor");
 
                     b.ToTable("inbox_messages", "seguimiento");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Avisos.IntentoAviso", b =>
+                {
+                    b.HasOne("Logistica.Modules.Seguimiento.Domain.Avisos.EntregaAviso", null)
+                        .WithMany("Intentos")
+                        .HasForeignKey("EntregaAvisoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Avisos.EntregaAviso", b =>
+                {
+                    b.Navigation("Intentos");
                 });
 #pragma warning restore 612, 618
         }

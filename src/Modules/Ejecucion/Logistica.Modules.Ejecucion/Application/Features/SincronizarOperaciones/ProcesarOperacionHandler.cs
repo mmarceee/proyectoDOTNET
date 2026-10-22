@@ -7,6 +7,8 @@ using Logistica.Modules.Planificacion.Contracts;
 using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Ejecucion.Domain.Rendiciones;
 using Logistica.SharedKernel;
+using Logistica.Modules.Ejecucion.Application.Abstractions;
+using Logistica.Modules.Ejecucion.Contracts.Events;
 
 namespace Logistica.Modules.Ejecucion.Application.Features.SincronizarOperaciones;
 
@@ -22,7 +24,9 @@ internal sealed class ProcesarOperacionHandler(
     Features.ConfirmarCarga.ConfirmarCargaHandler cargas,
     Features.IniciarRendicion.IniciarRendicionHandler rendir,
     IRendicionRepository rendiciones,
-    IAdministracionModuleApi administracion)
+    IAdministracionModuleApi administracion,
+    Features.ReportarPosicion.ReportarPosicionHandler posiciones,
+    IIntegrationEventPublisher eventos)
 {
     public const string TipoEntrega = "RegistrarEntrega";
     public const string TipoIntentoFallido = "RegistrarIntentoFallido";
@@ -37,24 +41,33 @@ internal sealed class ProcesarOperacionHandler(
         {
             // El cierre de jornada y sus operaciones anteriores no pueden adelantarse mutuamente.
             await administracion.BloquearPlanificacionAsync(ct);
+            // ADR-0004 §2.2: un reenvío devuelve el resultado y no genera otro aviso de conflicto.
+            if (await operaciones.ObtenerAsync(command.Operacion.OperacionId, ct) is { } existente)
+            {
+                resultado = existente.RepartidorId != command.RepartidorId
+                    ? new(command.Operacion.OperacionId, Resultados.Conflicto, "RutaNoAsignada")
+                    : existente.Resultado == ResultadoOperacion.Aplicada
+                        ? new(command.Operacion.OperacionId, Resultados.YaAplicada)
+                        : new(command.Operacion.OperacionId, Nombre(existente.Resultado), existente.Motivo, existente.Detalle);
+                return;
+            }
             resultado = await ProcesarAsync(command, ct);
+            if (resultado.Resultado is Resultados.Conflicto or Resultados.Invalida)
+            {
+                var op = command.Operacion;
+                eventos.Registrar(ConflictoSincronizacionRegistrado.Tipo,
+                    new ConflictoSincronizacionRegistrado(op.OperacionId, op.RutaId, op.EnvioId,
+                        command.RepartidorId, resultado.Resultado, resultado.Motivo), reloj.GetUtcNow());
+                await operaciones.GuardarCambiosAsync(ct);
+            }
         }, ct);
+        await posiciones.PublicarConfirmadaAsync();
         return resultado!;
     }
 
     private async Task<ResultadoOperacionResponse> ProcesarAsync(ProcesarOperacionCommand command, CancellationToken ct)
     {
         var op = command.Operacion;
-
-        // Sección 2.2: si ya se recibió, se responde lo mismo que la primera vez, sin volver a procesarla.
-        if (await operaciones.ObtenerAsync(op.OperacionId, ct) is { } existente)
-        {
-            if (existente.RepartidorId != command.RepartidorId)
-                return new(op.OperacionId, Resultados.Conflicto, "RutaNoAsignada");
-            return existente.Resultado == ResultadoOperacion.Aplicada
-                ? new(op.OperacionId, Resultados.YaAplicada)
-                : new(op.OperacionId, Nombre(existente.Resultado), existente.Motivo, existente.Detalle);
-        }
 
         var datos = Datos(command);
 
@@ -64,6 +77,7 @@ internal sealed class ProcesarOperacionHandler(
         }
 
         if (op.Tipo == "IniciarRendicion") return await rendir.HandleAsync(command, datos, ct);
+        if (op.Tipo == "ReportarPosicion") return await posiciones.HandleAsync(command, datos, ct);
         if (op.Tipo is "ConfirmarCarga" or TipoEntrega or TipoIntentoFallido
             && await rendiciones.ObtenerAsync(op.RutaId, ct) is { } rendicion)
             return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto,

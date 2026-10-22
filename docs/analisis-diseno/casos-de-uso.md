@@ -502,7 +502,7 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | Campo | Contenido |
 | :---- | :---- |
 | **Caso de uso** | CU-43 · Despachar una ruta |
-| **Descripción** | El despachador cierra la planificación de una ruta y la pone a disposición del repartidor, que puede descargarla en la PWA (RF 17). Una ruta despachada ya no se modifica, salvo la anulación controlada de un despacho anterior sin iniciar descrita en la ampliación del 20/10/2026. |
+| **Descripción** | El despachador cierra la planificación de una ruta y la pone a disposición del repartidor, que puede descargarla en la PWA (RF 17). Para editar una ruta despachada que no inició, debe anular el despacho con motivo y comprobación de ausencia de carga y actividad, volver a Planificada y validar nuevamente al despachar. La ampliación del 20/10/2026 se extendió el 22/10/2026 a rutas actuales y futuras. |
 | **Pre-Condición** | 1. El usuario tiene perfil *Despachador*.<br>2. La ruta está *Planificada* y tiene al menos una parada ordenada.<br>3. El repartidor asignado tiene un usuario vinculado del mismo operador, con cuenta activada, activa y perfil Repartidor para acceder a la PWA; se comprueba al prevalidar y otra vez al confirmar el despacho. |
 | **Post-Condición** | **Éxito:** la ruta queda *Despachada*, con la fecha y hora. Se publica `RutaDespachada` por Outbox para avisar al repartidor.<br>**Fracaso:** la ruta sigue *Planificada*. |
 | **Actores** | **Principal:** despachador, desde el Backoffice.<br>**Secundario:** Worker (aviso al repartidor). |
@@ -569,6 +569,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujo de evento principal** | 1. Con la ruta en curso, la PWA obtiene la posición cada 30 segundos.<br>2. La PWA la envía al servidor.<br>3. El sistema guarda la posición y publica `PosicionReportada` en memoria.<br>4. El tablero muestra la nueva posición en tiempo real. |
 | **Flujos alternativos** | **A1 · Sin conexión (paso 2).** La PWA guarda las posiciones y las envía al sincronizar (CU-52).<br><br>**A2 · Sin permiso de ubicación (paso 1).** La PWA avisa al repartidor que el seguimiento está desactivado. |
 | **Requerimientos especiales** | 1. **Limitación de la PWA:** a diferencia de una aplicación nativa, una PWA no puede reportar la posición con la pantalla apagada. El requisito de seguimiento en segundo plano es de la aplicación MAUI (sección 6.11), que el equipo reemplaza por una PWA según la exención para equipos de 3.<br>2. Política de retención de posiciones, por su volumen (modelo de dominio). |
+
+**Implementación de CU-53 (21/10/2026):** captura periódica en la PWA visible, cola cifrada y sincronización CU-52; persistencia y evento en memoria posterior al commit en Ejecución. El seguimiento termina al confirmar la rendición, incluso sin red. Retención configurable de 30 días. CU-66 queda a cargo de Cristian, con contratos de consulta y notificación documentados. Las pruebas con PostgreSQL real y la prueba en teléfono están pendientes. Véase [alcance y verificación](cu-53/README.md) y [continuidad para CU-66](cu-53/integracion-cu-66.md).
 
 ### **CU-54 · Iniciar la rendición**
 
@@ -689,9 +691,9 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Pre-Condición** | 1. El usuario está autenticado con el perfil *Usuario de comercio* y seleccionó el operador (CU-03). |
 | **Post-Condición** | **Éxito:** el aviso reenviado se vuelve a entregar (CU-64) con el mismo identificador.<br>**Fracaso:** el aviso sigue fallido. |
 | **Actores** | **Principal:** usuario del comercio, desde el Portal del comercio. |
-| **Flujo de evento principal** | 1. El usuario elige **Historial de avisos**.<br>2. El sistema lista las entregas con fecha, tipo de evento, número de envío, estado y cantidad de intentos, filtrables por estado y fecha.<br>3. El usuario abre una entrega y ve cada intento con su código de respuesta.<br>4. El usuario elige **Reenviar** sobre una entrega fallida.<br>5. El sistema la vuelve a encolar. |
-| **Flujos alternativos** | **A1 · Reenvío masivo (paso 4).** El usuario selecciona varias entregas fallidas y las reenvía juntas.<br><br>**A2 · Suscripción desactivada (paso 4).** El sistema informa que la suscripción está inactiva. |
-| **Requerimientos especiales** | 1. El comercio ve sólo sus avisos con el operador seleccionado. |
+| **Flujo de evento principal** | 1. El usuario elige **Historial de avisos**.<br>2. El sistema lista las entregas con fecha, tipo de evento, número de envío, estado y cantidad de intentos, filtrables por estado y fecha.<br>3. El usuario abre una entrega y ve cada intento con su código de respuesta.<br>4. El usuario elige **Reenviar** sobre una entrega en cola de fallidos y confirma.<br>5. El sistema la deja *Pendiente* y la vuelve a encolar en la misma transacción, conservando su identificador e intentos anteriores. CU-64 procesa la entrega en segundo plano. |
+| **Flujos alternativos** | **A1 · Reenvío masivo (paso 4).** El usuario selecciona varias entregas en cola de fallidos y las reenvía juntas. Si alguna no admite reenvío, el lote completo se rechaza.<br><br>**A2 · Suscripción desactivada (paso 4).** El sistema informa que la suscripción está inactiva y no encola el reenvío. |
+| **Requerimientos especiales** | 1. El comercio ve sólo sus avisos con el operador seleccionado.<br>2. Los avisos *Fallida* siguen bajo los reintentos automáticos de CU-64; sólo *EnColaDeFallidos* permite reenvío manual, con suscripción activa.<br>3. Las fechas se filtran y muestran en la zona horaria del operador. |
 
 ### **CU-66 · Ver el tablero de operación en vivo**
 

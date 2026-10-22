@@ -18,7 +18,7 @@ internal sealed class DetalleModel(ArmarRutaHandler service, ConsultarRutasHandl
     [BindProperty] public Guid EnvioAQuitar { get; set; }
     [BindProperty] public string? MotivoAnulacion { get; set; }
     [BindProperty] public bool ConfirmoSinCargaPendiente { get; set; }
-    public bool PuedeAnularDespacho => Ruta?.Estado == "Despachada" && Ruta.Fecha < Hoy;
+    public bool PuedeAnularDespacho => Ruta?.Estado == "Despachada";
     public bool ConfirmacionDespacho { get; private set; }
     public EvaluacionRutaResponse? EvaluacionDespacho { get; private set; }
 
@@ -29,7 +29,7 @@ internal sealed class DetalleModel(ArmarRutaHandler service, ConsultarRutasHandl
         {
             if (!ModelState.IsValid) { await CargarFrescoAsync(ct); return Page(); }
             await anular.HandleAsync(new(id, RevisionEsperada, MotivoAnulacion ?? "", ConfirmoSinCargaPendiente), ct);
-            MensajeConfirmacion = "Despacho anulado. La ruta volvió a Planificada y sus envíos siguen asignados. Modificá la fecha o quitá los envíos antes de volver a despachar.";
+            MensajeConfirmacion = "Despacho anulado. La ruta volvió a Planificada y sus envíos siguen asignados. Podés editarla; antes de volver a despachar se validarán nuevamente todos los requisitos.";
             return Redirect($"/backoffice/rutas/{id}#resultado-ruta");
         }
         catch (RutaNoEncontradaException) { return NotFound(); }

@@ -6,7 +6,7 @@ Este documento reúne el modelo de dominio completo como un único modelo, agrup
 
 Convención de multitenancy (ADR-0002 v2.1): toda clase lleva un campo operadorId que la ata a su operador (inquilino), salvo Operador y Comercio, que son globales. RelacionComercial lleva operadorId y comercioId y se filtra por ambos (ADR-0002, sección 2.6). Usuario lleva operadorId o comercioId, pero no tiene filtro de inquilino (ver la nota de Usuario).
 
-Segundo nivel de aislamiento: además de operadorId, llevan comercioId las clases que consulta el Portal o la API del comercio: RelacionComercial, ClaveApi, Envio, Bulto, EventoEnvio, IntentoEntrega, Incidencia, Devolucion, SuscripcionAviso, EntregaAviso, Liquidacion y LineaLiquidacion. Estos campos no se repiten en cada clase, salvo donde ayudan a entenderla.
+Segundo nivel de aislamiento: además de operadorId, llevan comercioId las clases que consulta el Portal o la API del comercio: RelacionComercial, ClaveApi, Envio, Bulto, EventoEnvio, IntentoEntrega, Incidencia, Devolucion, Notificacion, SuscripcionAviso, EntregaAviso, IntentoAviso, EnvioSeguido, Liquidacion y LineaLiquidacion. Estos campos no se repiten en cada clase, salvo donde ayudan a entenderla.
 
 Las relaciones hacia un enum no se listan como filas de relación: el enum es el tipo de un atributo, no una entidad relacionada.
 
@@ -748,7 +748,7 @@ Pendiente, EnTransitoADeposito, RecibidaEnDeposito, Cerrada
 
 * modificarPlanificacion(fecha: DateOnly, repartidorId: Guid, vehiculoId: Guid): void — sólo en estado Planificada (ampliación de CU-40 acordada el 09/10/2026). La aplicación coordina la revalidación completa de los envíos, los recursos activos y su disponibilidad, y el cambio atómico de reservas; si falla, se conservan los datos anteriores. Puede reagrupar visitas según las franjas de la nueva fecha; conserva los envíos y no repite sus transiciones de asignación.
 
-* anularDespacho(hoy: DateOnly): void — Despachada de un día anterior vuelve a Planificada y aumenta su revisión. La aplicación exige ausencia de actividad en Ejecución, envíos AsignadoARuta y confirmación de coordinación con el repartidor. AnulacionDespacho conserva el despacho original, motivo, responsable, fecha y revisiones. Mantiene envíos y reservas para la fecha original, sin bloqueo de días posteriores. No finaliza ni borra la ruta. [Ampliación CU-43 del 20/10/2026](cu-43/anulacion-despacho-sin-iniciar.md).
+* anularDespacho(): void — Despachada sin iniciar vuelve a Planificada y aumenta su revisión, independientemente de la fecha de la ruta. La aplicación exige ausencia de actividad en Ejecución, envíos AsignadoARuta, motivo y confirmación de coordinación con el repartidor. AnulacionDespacho conserva el despacho original, motivo, responsable, fecha y revisiones. Mantiene envíos y reservas para la fecha original, sin bloqueo de días posteriores. No finaliza ni borra la ruta. La edición y el nuevo despacho mantienen sus validaciones completas. [Ampliación CU-43 del 20/10/2026 y 22/10/2026](cu-43/anulacion-despacho-sin-iniciar.md).
 
 * quitarEnvio(envioId: Guid): void — sólo si la ruta no fue despachada; se quita el envío y se elimina la parada únicamente si ya no contiene otros envíos (T4, T19).
 
@@ -1005,13 +1005,47 @@ EntregadoEnCalle, DevueltoADeposito, Extraviado
 
 * tipo: TipoNotificacion
 
-* destino: string (copiado de Envio.destinatario al crear la notificación — no es una relación, es una foto del dato en ese momento)
+* eventoId: Guid (MessageId del evento de Envíos que la originó; único: el mismo evento no manda dos correos — CU-62)
+
+* estadoEnvio: string (estado del envío que informa)
+
+* destino: string (opcional; copiado de EnvioSeguido.emailDestinatario al crear la notificación — no es una relación, es una foto del dato en ese momento)
 
 * estado: EstadoNotificacion
 
 * creadaEn: DateTimeOffset
 
 * enviadaEn: DateTimeOffset (opcional)
+
+* intentos: int
+
+* ultimoError: string (opcional)
+
+**Métodos**
+
+* registrarEnvio(enviadaEn): void
+
+* registrarFallo(error, ultimo): void — el último fallo, agotados los reintentos, la deja Fallida (CU-62, A3)
+
+**IdentidadOperador**
+
+*copia en Seguimiento de la identidad visual del operador (CU-07), para los correos al destinatario (CU-62). La actualiza el evento IdentidadVisualActualizada; el Worker no consulta Administración. Un operador sin copia usa una marca neutra*
+
+**Atributos**
+
+* id: Guid (el mismo del Operador)
+
+* nombre: string
+
+* colorPrimario: string
+
+* colorSecundario: string
+
+* emailContacto: string (opcional)
+
+* telefonoContacto: string (opcional)
+
+* actualizadaEn: DateTimeOffset (fecha del evento; uno anterior que llega tarde no la pisa)
 
 **SuscripcionAviso**
 
@@ -1037,29 +1071,73 @@ EntregadoEnCalle, DevueltoADeposito, Extraviado
 
 * regenerarSecreto(): void — invalida el secreto anterior (CU-63, A3)
 
+* recibe(tipo: TipoEventoAviso): bool — CambioDeEstado abarca todos los hechos; EntregaFallida y Devolucion, sólo el suyo (CU-64)
+
 **EntregaAviso**
 
-*historial de intentos de aviso a un comercio, con reintentos y cola de fallidos*
+*raíz de agregado — un aviso de un hecho del envío para una suscripción, con sus intentos, reintentos y cola de fallidos (CU-64)*
+
+**Atributos**
+
+* id: Guid (el identificador del aviso que recibe el comercio; se conserva en los reintentos)
+
+* suscripcionAvisoId: Guid
+
+* eventoId: Guid (MessageId del evento de integración de Envíos que originó el aviso; con la suscripción, identifica la entrega)
+
+* envioId: Guid
+
+* numeroEnvio: string
+
+* estadoEnvio: string (estado del envío que informa el aviso)
+
+* tipo: TipoEventoAviso (un único tipo por hecho, ver ClasificadorAvisos en el README de CU-64)
+
+* fechaEvento: DateTimeOffset
+
+* estado: EstadoEntregaAviso
+
+* intentos: IntentoAviso\[\]
+
+**Métodos**
+
+* registrarIntento(enviadoEn, exitoso, codigoRespuesta, error, ultimo): void
+
+* reintentar(): void — vuelve a Pendiente una entrega en la cola de fallidos (CU-65 o CU-09)
+
+**IntentoAviso**
+
+*un intento HTTP de una EntregaAviso (CU-64); el historial de CU-65 muestra cada uno*
 
 **Atributos**
 
 * id: Guid
 
-* suscripcionAvisoId: Guid
+* entregaAvisoId: Guid
 
-* eventoEnvioId: Guid
-
-* intento: int
-
-* estado: EstadoEntregaAviso
-
-* codigoRespuesta: int (opcional)
+* numero: int
 
 * enviadoEn: DateTimeOffset
 
-**Métodos**
+* exitoso: bool
 
-* reintentar(): void
+* codigoRespuesta: int (opcional; no hay código si no hubo conexión o venció la espera)
+
+* error: string (opcional)
+
+**EnvioSeguido**
+
+*copia mínima de un Envio en Seguimiento, creada con el evento EnvioAdmitido (CU-64 y CU-62). Dice a qué comercio avisar en los eventos que publican el operador o el repartidor, cuyo sobre no trae comercio (ADR-0003, sección 2.2), y a quién notificar, porque el Worker no consulta Envíos*
+
+**Atributos**
+
+* id: Guid (el mismo del Envio)
+
+* numero: string
+
+* nombreDestinatario: string (opcional)
+
+* emailDestinatario: string (opcional; sin correo, las notificaciones quedan NoEnviable — CU-62, A2)
 
 ## **Enumerados**
 
@@ -1077,7 +1155,7 @@ CambioDeEstado, VentanaEstimada, SolicitudDeReprogramacion
 
 Pendiente, Enviada, Fallida, NoEnviable
 
-*NoEnviable: el destinatario no tiene correo; se registra sin reintentos (CU-62, A2)*
+*NoEnviable: el destinatario no tiene un correo válido; se registra sin reintentos (CU-62, A2). Pendiente incluye la espera entre reintentos; Fallida, los reintentos agotados (CU-09 la puede reintentar)*
 
 **TipoEventoAviso**  *«enum»*
 
@@ -1086,6 +1164,8 @@ CambioDeEstado, EntregaFallida, Devolucion
 **EstadoEntregaAviso**  *«enum»*
 
 Pendiente, Exitosa, Fallida, EnColaDeFallidos
+
+*Pendiente: sin intentos (o reencolada). Fallida: el último intento falló y quedan reintentos. EnColaDeFallidos: se agotaron los reintentos (CU-64)*
 
 ## **Coordinación entre agregados (Envio, Devolucion, Incidencia, Notificacion, EntregaAviso)**
 
@@ -1240,9 +1320,12 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | Rendicion | 1 | asociación | 1 | Ruta |
 | LineaRendicion | 0..\* | asociación | 1 | Bulto |
 | EntregaAviso | 0..\* | asociación | 1 | SuscripcionAviso |
-| Notificacion | 0..\* | asociación | 1 | Envio |
+| Notificacion | 0..\* | asociación | 1 | EnvioSeguido |
+| IdentidadOperador | 0..1 | asociación | 1 | Operador |
 | SuscripcionAviso | 0..\* | asociación | 1 | RelacionComercial |
-| EntregaAviso | 0..\* | asociación | 1 | EventoEnvio |
+| EntregaAviso | 0..\* | asociación | 1 | EnvioSeguido |
+| EntregaAviso | 1 | composición | 0..\* | IntentoAviso |
+| EnvioSeguido | 0..1 | asociación | 1 | Envio |
 | Liquidacion | 1 | composición | 1..\* | LineaLiquidacion |
 | RecepcionDeposito | 0..\* | asociación | 1 | Bulto |
 | Liquidacion | 0..\* | asociación | 1 | RelacionComercial |

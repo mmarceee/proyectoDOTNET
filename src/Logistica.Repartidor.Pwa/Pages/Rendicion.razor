@@ -9,7 +9,14 @@
     <h1>Finalizar ruta</h1>
     <NavLink href="" class="btn btn-outline-secondary">Mis rutas</NavLink>
 </div>
-<p>Declará los bultos que devolvés al depósito. El operario verificará lo recibido antes de cerrar la ruta.</p>
+@if (Rendiciones.Borrador is { } declaracion && !declaracion.Bultos.Any(b => b.RequiereDeclaracion))
+{
+    <p>No tenés bultos para devolver. Depósito sólo debe confirmar el cierre administrativo de la ruta.</p>
+}
+else
+{
+    <p>Declará los bultos que devolvés al depósito. El operario verificará lo recibido antes de cerrar la ruta.</p>
+}
 @if (Rendiciones.Mensaje is not null) { <div class="alert alert-info" role="status">@Rendiciones.Mensaje</div> }
 @if (Hoja.SinConexion && !Hoja.RequiereIngreso) { <div class="alert alert-warning">Sin conexión. La declaración y su confirmación se guardan cifradas en este dispositivo.</div> }
 @if (Hoja.RequiereIngreso) { <a class="btn btn-primary" href="/repartidor/ingresar">Iniciar sesión</a> }
@@ -23,7 +30,9 @@ else if (Rendiciones.Borrador is { } borrador)
     }
     else if (borrador.Resultado == "Aplicada")
     {
-        <div class="alert alert-success">Tu declaración está confirmada. Esperando recepción del depósito. Tu recorrido en esta ruta terminó.</div>
+        <div class="alert alert-success">Tu recorrido en esta ruta terminó. @(borrador.Bultos.Any(b => b.RequiereDeclaracion)
+            ? "Tu declaración está confirmada. Depósito verificará los bultos que debían volver antes de cerrar la ruta."
+            : "No hay bultos para devolver. Sólo queda la confirmación administrativa de depósito.")</div>
     }
     else if (borrador.Resultado == "Rechazada")
     {
@@ -66,7 +75,8 @@ else if (Rendiciones.Borrador is { } borrador)
     <section class="card mb-3"><div class="card-body">
         <h2 class="h5">Resumen de la declaración</h2>
         <p>@borrador.Bultos.Count(b => b.RequiereDeclaracion && b.Devuelve == true) bultos declarados para devolver · @borrador.Bultos.Count(b => b.RequiereDeclaracion && b.Devuelve == false) que no vuelven</p>
-        @if (!borrador.Bultos.Any(b => b.RequiereDeclaracion)) { <p>No hay bultos pendientes de regreso. Podés iniciar la rendición sin devoluciones.</p> }
+        @if (!borrador.Bultos.Any(b => b.RequiereDeclaracion) && borrador.OperacionId is null)
+        { <p>No hay bultos pendientes de regreso. Podés confirmar la declaración sin devoluciones.</p> }
         @if (borrador.OperacionId is null)
         {
             <label for="observaciones-rendicion" class="form-label">Observaciones generales (opcional)</label>

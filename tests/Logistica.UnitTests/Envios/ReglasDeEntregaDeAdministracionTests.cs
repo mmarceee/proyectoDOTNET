@@ -107,6 +107,7 @@ public class ReglasDeEntregaDeAdministracionTests
     private sealed class AdministracionFalsa(ReglasOperativas? vigente, params ReglasOperativas[] versiones)
         : IAdministracionModuleApi
     {
+        public Task<IReadOnlyList<Guid>> ConsultarOperadoresActivosAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([]);
         public int Pedidos { get; private set; }
 
         public Task<ReglasOperativas?> ReglasDeEntregaAsync(Guid versionReglasId, CancellationToken ct)
@@ -122,6 +123,7 @@ public class ReglasDeEntregaDeAdministracionTests
         }
 
         // El resto del contrato no lo usa el adaptador.
+        public Task<string> ObtenerZonaHorariaActualAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<Guid?> ObtenerRelacionComercialActualAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task BloquearPlanificacionAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<ContextoPlanificacion> ObtenerContextoPlanificacionAsync(CancellationToken ct) => throw new NotSupportedException();

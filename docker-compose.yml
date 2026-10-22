@@ -16,6 +16,9 @@ x-app-environment: &app-environment
   Seguimiento__ClaveToken: ${SEGUIMIENTO_CLAVE_TOKEN:-}
   # CU-63: clave de cifrado de los secretos de firma, común a API y Worker.
   Seguimiento__Avisos__ClaveCifrado: ${AVISOS_CLAVE_CIFRADO:-}
+  # CU-62: dirección pública del sitio, para los enlaces de los correos, y remitente de los correos.
+  Aplicacion__UrlPublica: ${URL_PUBLICA:-http://localhost:${API_PORT:-8080}}
+  Seguimiento__Correo__Remitente: ${CORREO_REMITENTE:-avisos@logistica.local}
 
 services:
   postgres:

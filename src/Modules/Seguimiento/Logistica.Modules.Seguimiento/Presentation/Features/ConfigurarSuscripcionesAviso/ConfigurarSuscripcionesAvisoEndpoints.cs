@@ -18,23 +18,7 @@ internal static class ConfigurarSuscripcionesAvisoEndpoints
 
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        var grupo = endpoints.MapGroup(Ruta).WithTags("Avisos")
-            .RequireAuthorization(Politicas.Comercio)
-            .RequireAuthorization(p => p.RequireAuthenticatedUser().RequireClaim(ClaimsDeSesion.ComercioId));
-        grupo.AddEndpointFilter(async (contexto, siguiente) =>
-        {
-            var http = contexto.HttpContext;
-            http.Response.Headers.CacheControl = "no-store";
-            if (HttpMethods.IsPost(http.Request.Method))
-            {
-                try { await http.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(http); }
-                catch (AntiforgeryValidationException)
-                {
-                    return Results.Problem(statusCode: 400, title: "La solicitud no tiene un token válido.");
-                }
-            }
-            return await siguiente(contexto);
-        });
+        var grupo = AccesoAvisos.CrearGrupo(endpoints, Ruta);
 
         grupo.MapGet("/antifalsificacion", (HttpContext http, IAntiforgery antiforgery) =>
             TypedResults.Ok(new TokenAntifalsificacionResponse(antiforgery.GetAndStoreTokens(http).RequestToken!)));

@@ -19,6 +19,10 @@
 </div>
 
 <p class="small text-muted mb-4">Esta configuración está dirigida a la persona que administra la integración de tu sistema.</p>
+<nav class="nav nav-tabs mb-4" aria-label="Avisos automáticos">
+    <a class="nav-link active" aria-current="page" href="integraciones/avisos">Suscripciones</a>
+    <a class="nav-link" href="integraciones/avisos/historial">Historial</a>
+</nav>
 
 @if (_error is not null)
 {
@@ -55,21 +59,13 @@
     <section class="card border-warning mb-4" aria-labelledby="titulo-secreto">
         <div class="card-body">
             <h2 id="titulo-secreto" class="h5">Guardá la clave de firma</h2>
-            <p>Se muestra una sola vez. Copialo y guardalo en la configuración segura de tu sistema.
-                Esta clave permite a tu sistema comprobar el origen de los avisos. Si la perdés, tendrás que generar una nueva.</p>
+            <p>Esta clave permite que tu sistema reconozca los avisos enviados por la plataforma.
+                Copiala y entregásela a la persona que administra tu sistema para que complete la conexión.
+                Se muestra una sola vez. Si la perdés, tendrás que generar una nueva.</p>
             <label for="secreto-firma" class="form-label">Clave de firma</label>
             <input id="secreto-firma" class="form-control font-monospace mb-3" readonly autocomplete="off"
                    spellcheck="false" value="@_secreto.SecretoFirma" aria-describedby="ayuda-secreto" />
             <p id="ayuda-secreto" class="small text-muted">Seleccioná el valor para copiarlo. Al cerrar este aviso no podrás volver a consultarlo.</p>
-            <details class="mb-3">
-                <summary>Cómo verificar la firma</summary>
-                <ol class="mt-2">
-                    <li>Decodificá esta clave de Base64.</li>
-                    <li>Tomá la fecha de <code>X-Aviso-Fecha</code>, agregá un punto y el cuerpo JSON exacto recibido.</li>
-                    <li>Calculá HMAC-SHA256 con esa clave y compará el hexadecimal con <code>X-Aviso-Firma</code>, después de <code>v1=</code>.</li>
-                    <li>Rechazá fechas con más de 5 minutos de diferencia respecto de tu reloj y usá el identificador del mensaje para detectar duplicados.</li>
-                </ol>
-            </details>
             <button type="button" class="btn btn-primary" @onclick="CerrarSecreto">Ya guardé la clave</button>
         </div>
     </section>
