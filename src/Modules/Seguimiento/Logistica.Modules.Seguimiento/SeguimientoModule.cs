@@ -17,6 +17,11 @@ using Logistica.Modules.Seguimiento.Application.Features.ConfigurarSuscripciones
 using Logistica.Modules.Seguimiento.Infrastructure.Security;
 using Logistica.Modules.Seguimiento.Infrastructure.Http;
 using Logistica.Modules.Seguimiento.Application.Features.EntregarAvisos;
+using Logistica.Modules.Seguimiento.Application.Features.NotificarDestinatario;
+using Logistica.Modules.Seguimiento.Application.HechosEnvio;
+using Logistica.Modules.Seguimiento.Domain.Notificaciones;
+using Logistica.Modules.Seguimiento.Infrastructure.Correo;
+using Logistica.Modules.Administracion.Contracts.Events;
 using Logistica.Modules.Seguimiento.Contracts.Events;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -51,6 +56,7 @@ public static class SeguimientoModule
 
         // CU-64: una cola por evento de Envíos prepara las entregas; otra envía cada entrega y la reintenta sola.
         services.AddScoped<IEnviosSeguidosRepository, EnviosSeguidosRepository>();
+        services.AddScoped<EnviosSeguidos>();
         services.AddScoped<IEntregasAvisoRepository, EntregasAvisoRepository>();
         services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
         services.AddScoped<PrepararAvisosHandler>();
@@ -62,6 +68,24 @@ public static class SeguimientoModule
         }
         services.AddKeyedScoped<IConsumidorIntegracion, EntregarAviso>(EntregarAviso.Cola);
         services.AddSingleton(new SuscripcionIntegracion(EntregarAviso.Cola, AvisoPendiente.Tipo));
+
+        // CU-62: correo al destinatario con la marca del operador. La dirección pública, el servidor SMTP y la clave
+        // del token se validan al usarlos, así la API y el Worker arrancan aunque falten.
+        services.AddScoped<INotificacionesRepository, NotificacionesRepository>();
+        services.AddScoped<IIdentidadesOperadorRepository, IdentidadesOperadorRepository>();
+        services.AddSingleton(_ => new DireccionPublica(configuration["Aplicacion:UrlPublica"]));
+        services.AddSingleton(_ => new ServidorSmtp(configuration.GetConnectionString("Smtp"),
+            configuration["Seguimiento:Correo:Remitente"]));
+        services.AddScoped<IEmisorCorreo, EmisorCorreoSmtp>();
+        services.AddScoped<NotificarDestinatarioHandler>();
+        services.AddScoped<ActualizarIdentidadOperadorHandler>();
+        foreach (var tipo in NotificarDestinatario.Tipos)
+        {
+            services.AddKeyedScoped<IConsumidorIntegracion, NotificarDestinatario>(NotificarDestinatario.Cola(tipo));
+            services.AddSingleton(new SuscripcionIntegracion(NotificarDestinatario.Cola(tipo), tipo));
+        }
+        services.AddKeyedScoped<IConsumidorIntegracion, ActualizarIdentidadOperador>(ActualizarIdentidadOperador.Cola);
+        services.AddSingleton(new SuscripcionIntegracion(ActualizarIdentidadOperador.Cola, IdentidadVisualActualizada.Tipo));
 
         services.AddKeyedScoped<IConsumidorIntegracion, NotificarRutaDespachada>(NotificarRutaDespachada.Cola);
         services.AddSingleton(new SuscripcionIntegracion(NotificarRutaDespachada.Cola, RutaDespachada.Tipo));

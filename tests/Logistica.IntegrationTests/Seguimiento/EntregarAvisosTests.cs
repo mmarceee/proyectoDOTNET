@@ -14,6 +14,7 @@ using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Seguimiento;
 using Logistica.Modules.Seguimiento.Application.Abstractions;
 using Logistica.Modules.Seguimiento.Application.Features.EntregarAvisos;
+using Logistica.Modules.Seguimiento.Application.HechosEnvio;
 using Logistica.Modules.Seguimiento.Contracts.Events;
 using Logistica.Modules.Seguimiento.Domain.Avisos;
 using Logistica.Modules.Seguimiento.Infrastructure.Http;

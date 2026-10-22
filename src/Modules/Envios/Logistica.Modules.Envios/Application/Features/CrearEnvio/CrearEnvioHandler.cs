@@ -49,7 +49,8 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             await relacion.ExigirAsync(comercioId, ct);
             envios.Agregar(envio);
             // T1 también llega a Seguimiento: es el único evento con el comercio en el sobre (CU-64).
-            eventos.Registrar(EnvioAdmitido.Tipo, new EnvioAdmitido(envio.Id, envio.Numero, envio.CreadoEn), envio.CreadoEn);
+            eventos.Registrar(EnvioAdmitido.Tipo, new EnvioAdmitido(envio.Id, envio.Numero, envio.CreadoEn,
+                envio.Destinatario.Nombre, envio.Destinatario.Email), envio.CreadoEn);
             await envios.GuardarCambiosAsync(ct);
         }, ct);
 

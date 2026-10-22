@@ -25,5 +25,9 @@ secreto "ConnectionStrings:Valkey" "localhost:${VALKEY_PORT}"
 secreto "ConnectionStrings:RabbitMQ" "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@localhost:${RABBITMQ_PORT}/"
 secreto "ConnectionStrings:Smtp" "smtp://localhost:${MAILPIT_SMTP_PORT:-1025}"
 secreto "Seguimiento:Avisos:ClaveCifrado" "${AVISOS_CLAVE_CIFRADO:-}"
+# CU-60 y CU-62: el Worker también firma los enlaces de seguimiento que van en los correos.
+secreto "Seguimiento:ClaveToken" "${SEGUIMIENTO_CLAVE_TOKEN:-}"
+secreto "Aplicacion:UrlPublica" "${URL_PUBLICA:-http://localhost:${API_PORT:-8080}}"
+secreto "Seguimiento:Correo:Remitente" "${CORREO_REMITENTE:-avisos@logistica.local}"
 
 echo "Secretos cargados para Logistica.Api y Logistica.Worker (UserSecretsId: logistica-local)."

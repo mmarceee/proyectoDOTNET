@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 21 de octubre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 22 de octubre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal y Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -567,6 +567,21 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Una excepción para destinos internos en desarrollo: la guía de CU-63 la descarta expresamente. Leer el comercio del contenido de los eventos o cambiar `AgregarAlOutbox` para recibirlo del llamador: contradicen los ADR-0002 y 0003. |
 | **Verificación** | 16 pruebas unitarias y 6 de integración nuevas, incluida una de extremo a extremo (Portal, outbox, RabbitMQ, Worker y receptor en memoria que verifica la firma por su cuenta). La primera corrida completa mostró que `ArmarRutaTests` contaba todas las filas del outbox del envío; se restringió la consulta al evento de asignación. Corrida final en Docker: 695 pruebas .NET (233 unitarias, 56 de arquitectura y 406 de integración), todas pasan; cobertura de líneas del 94,7 %. No se probó con `docker compose` ni con un receptor HTTPS público, que todavía no existe. |
 
+## **3.36 Notificar al destinatario por correo (CU-62)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 22/10/2026 |
+| **Archivos** | Envíos: destinatario opcional en `EnvioAdmitido`. Administración: `IdentidadVisualActualizada`, su `IIntegrationEventPublisher` y la publicación en `ActualizarIdentidadVisualHandler` (CU-07). Seguimiento: `Notificacion`, `IdentidadOperador`, datos del destinatario en `EnvioSeguido`, `NotificarDestinatarioHandler`, `TextosNotificacion`, `ActualizarIdentidadOperadorHandler`, `IEmisorCorreo`, `EmisorCorreoSmtp` y `PlantillaCorreo` (MailKit), los consumidores `NotificarDestinatario` y `ActualizarIdentidadOperador`, migración `NotificacionesDestinatario`; `HechoEnvio`, `EnviosSeguidos` y `LectorHechosEnvio` pasan a compartirse con CU-64. Paquetes: MailKit 4.18.1 y `System.Security.Cryptography.Pkcs` 10.0.13. Configuración: Compose, `.env.example` y `configurar-secretos.sh`. Pruebas `NotificacionTests` y `NotificarDestinatarioTests`. Documentos: README de CU-62, README de CU-64 y modelo de dominio. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-62 para el hito del 29/10, con Mailpit en desarrollo. |
+| **Cómo se trabajó** | La IA relevó qué faltaba (no había envío de correo, y el Worker no tenía el correo del destinatario, la marca del operador ni una dirección pública) y propuso seis decisiones. El responsable las aceptó con la condición de no contradecir los ADR y pidió que la IA escribiera el código. |
+| **Aceptado sin modificaciones** | Destinatario como campos opcionales de `EnvioAdmitido` (ADR-0003, sección 2.3). Marca por un evento de CU-07 y copia en Seguimiento, con marca neutra mientras el operador no guarde la suya. Cinco eventos relevantes, una notificación por evento, reintentos de la mensajería y cola de fallidos como en CU-64. `Aplicacion:UrlPublica` para el enlace y MailKit para SMTP. |
+| **Modificado** | La compilación falló porque MimeKit trae `System.Security.Cryptography.Pkcs` 10.0.0, con avisos de seguridad, y las advertencias son errores: se fijó la 10.0.13. Un correo mal escrito también queda *NoEnviable*, porque reintentar no lo arregla. `configurar-secretos.sh` no cargaba `Seguimiento:ClaveToken`, que el Worker necesita para firmar los enlaces: se agregó. |
+| **Descartado** | Consultar Envíos o Administración desde el Worker: se comunica sólo por la cola. `System.Net.Mail.SmtpClient`, que Microsoft no recomienda para código nuevo. El logo en el correo, que el seguimiento público tampoco muestra. |
+| **Verificación** | 15 pruebas unitarias y 6 de integración nuevas, incluida una de extremo a extremo con **Mailpit** en Testcontainers (envío creado en el Portal, outbox, RabbitMQ, Worker y correo recibido con el enlace). Corrida completa en Docker: 716 pruebas .NET (248 unitarias, 56 de arquitectura y 412 de integración); fallaron por tiempo de espera dos ajenas al cambio (`UnidadDeTrabajoTests`, al abrir la conexión a PostgreSQL, y `SeleccionarOperadorTests`, en un request HTTP), que pasaron al repetirlas solas. No se probó con `docker compose` ni contra Brevo. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -591,3 +606,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.18 | 20/10/2026 | Registro retrospectivo del uso de Codex por Lucas: arquitectura, CU-13/14/40/41/43/50/51/54, ADR-0005, acceso y presentación; aporte posterior al listado de CU-55. Reconstruido con chats, Git y documentación, para revisión del responsable. | Lucas Ottonello |
 | 0.19 | 21/10/2026 | Entrada de CU-63 basada en este chat: análisis previo, implementación asistida, revisión del origen de los requisitos, ajustes de interfaz pedidos por Lucas, envío de prueba y contrato de continuidad para Ezequiel en CU-64. | Lucas Ottonello |
 | 0.20 | 21/10/2026 | Entrada de CU-64, entregar los avisos a los comercios. | Ezequiel Marcenal |
+| 0.21 | 22/10/2026 | Entrada de CU-62, notificar al destinatario por correo. | Ezequiel Marcenal |

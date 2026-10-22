@@ -65,7 +65,7 @@ Eventos de Envíos que generan avisos y estado que informan:
 
 La recepción en depósito (T2), las devoluciones iniciadas por el operador o el comercio (T12, T14), la devolución
 confirmada (T15) y el extravío (T16) todavía no publican eventos de integración. Cuando Envíos los publique, alcanza
-con agregarlos a `PrepararAvisos.Tipos` y a su traducción.
+con agregarlos a `PrepararAvisos.Tipos` y a su traducción en `LectorHechosEnvio`, que comparte con CU-62.
 
 ### 3. Entrega en dos etapas
 
@@ -132,3 +132,4 @@ Las tres entidades llevan `OperadorId` y `ComercioId` y tienen el filtro de inqu
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 1.0 | 21/10/2026 | Versión inicial: diseño e implementación de CU-64. | Ezequiel Marcenal |
+| 1.1 | 22/10/2026 | El hecho del envío y su lector pasan a compartirse con CU-62 (`HechoEnvio`, `EnviosSeguidos`, `LectorHechosEnvio`). | Ezequiel Marcenal |

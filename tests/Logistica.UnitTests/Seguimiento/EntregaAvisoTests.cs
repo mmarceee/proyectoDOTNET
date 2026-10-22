@@ -117,7 +117,7 @@ public class EntregaAvisoTests
     {
         var envio = Guid.NewGuid();
         var mensaje = Mensaje(tipo, new { EnvioId = envio, Numero = "ENV-9" });
-        var hecho = PrepararAvisos.Leer(mensaje);
+        var hecho = LectorHechosEnvio.Leer(mensaje);
 
         Assert.Equal((mensaje.Id, envio, estado, fallido, alta), (hecho.EventoId, hecho.EnvioId, hecho.EstadoEnvio,
             hecho.IntentoFallido, hecho.EsAlta));
@@ -128,15 +128,15 @@ public class EntregaAvisoTests
     [Fact]
     public void El_intento_fallido_lleva_el_estado_final_y_un_evento_incompleto_es_invalido()
     {
-        var hecho = PrepararAvisos.Leer(Mensaje(IntentoFallidoRegistrado.Tipo,
+        var hecho = LectorHechosEnvio.Leer(Mensaje(IntentoFallidoRegistrado.Tipo,
             new { EnvioId = Guid.NewGuid(), Numero = "ENV-9", EstadoFinal = "EnDevolucion" }));
         Assert.Equal("EnDevolucion", hecho.EstadoEnvio);
         Assert.True(hecho.IntentoFallido);
 
-        Assert.Throws<InvalidDataException>(() => PrepararAvisos.Leer(Mensaje(IntentoFallidoRegistrado.Tipo,
+        Assert.Throws<InvalidDataException>(() => LectorHechosEnvio.Leer(Mensaje(IntentoFallidoRegistrado.Tipo,
             new { EnvioId = Guid.NewGuid() })));
-        Assert.Throws<InvalidDataException>(() => PrepararAvisos.Leer(Mensaje(EnvioEntregado.Tipo, new { Numero = "ENV-9" })));
-        Assert.Throws<InvalidDataException>(() => PrepararAvisos.Leer(Mensaje("OtroEvento.v1", new { EnvioId = Guid.NewGuid() })));
+        Assert.Throws<InvalidDataException>(() => LectorHechosEnvio.Leer(Mensaje(EnvioEntregado.Tipo, new { Numero = "ENV-9" })));
+        Assert.Throws<InvalidDataException>(() => LectorHechosEnvio.Leer(Mensaje("OtroEvento.v1", new { EnvioId = Guid.NewGuid() })));
     }
 
     private static MensajeIntegracion Mensaje(string tipo, object contenido) =>
