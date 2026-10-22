@@ -42,11 +42,11 @@ internal sealed class PlanificacionModuleApi(IRutaRepository rutas) : IPlanifica
         await rutas.GuardarAsync(ct);
     }
 
-    public async Task FinalizarRutaAsync(Guid rutaId, CancellationToken ct)
+    public async Task FinalizarRutaAsync(Guid rutaId, IReadOnlyCollection<Guid> entregados, CancellationToken ct)
     {
         var ruta = await rutas.ObtenerAsync(rutaId, ct)
             ?? throw new Logistica.SharedKernel.DomainException("La ruta no está disponible.");
-        ruta.Finalizar();
+        ruta.Finalizar(entregados.ToHashSet());
         await rutas.GuardarAsync(ct);
     }
 

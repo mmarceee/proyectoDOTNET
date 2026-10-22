@@ -74,17 +74,20 @@ internal sealed class Ruta : Entity, IOperadorOwned
         if (Estado != EstadoRuta.Despachada) throw new DomainException("La ruta debe estar despachada.");
         Estado = EstadoRuta.EnCurso; Actualizar();
     }
-    public void AnularDespacho(DateOnly hoy)
+    public void AnularDespacho()
     {
-        if (Estado != EstadoRuta.Despachada || Fecha >= hoy)
-            throw new DomainException("Sólo se puede anular el despacho de una ruta anterior que no se inició.");
+        if (Estado != EstadoRuta.Despachada)
+            throw new DomainException("Sólo se puede anular el despacho de una ruta que no se inició.");
         Estado = EstadoRuta.Planificada;
         DespachadaEn = null;
         Actualizar();
     }
-    public void Finalizar()
+    public void Finalizar(IReadOnlySet<Guid>? entregados = null)
     {
         if (Estado is not (EstadoRuta.EnCurso or EstadoRuta.Despachada)) throw new DomainException("La ruta no está en ejecución.");
+        entregados ??= new HashSet<Guid>();
+        if (entregados.Except(EnvioIds).Any()) throw new DomainException("Hay entregas que no pertenecen a la ruta.");
+        foreach (var parada in _paradas) parada.Cerrar(entregados);
         Estado = EstadoRuta.Finalizada; Actualizar();
     }
     public void RegistrarCarga(bool tieneEnviosCargados)

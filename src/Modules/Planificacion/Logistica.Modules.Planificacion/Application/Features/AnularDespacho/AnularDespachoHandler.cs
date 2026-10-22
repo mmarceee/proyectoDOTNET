@@ -4,7 +4,6 @@ using Logistica.Modules.Ejecucion.Contracts;
 using Logistica.Modules.Envios.Contracts;
 using Logistica.Modules.Planificacion.Application.Abstractions;
 using Logistica.Modules.Planificacion.Application.Exceptions;
-using Logistica.Modules.Planificacion.Application.Services;
 using Logistica.Modules.Planificacion.Contracts.Events;
 using Logistica.Modules.Planificacion.Domain.Rutas;
 using Logistica.SharedKernel;
@@ -14,7 +13,7 @@ namespace Logistica.Modules.Planificacion.Application.Features.AnularDespacho;
 
 internal sealed class AnularDespachoHandler(IRutaRepository rutas, IAdministracionModuleApi administracion,
     IEjecucionModuleApi ejecucion, IEnviosModuleApi envios, IConfirmacionPlanificacion confirmacion,
-    CalendarioPlanificacion calendario, IResponsablePlanificacion responsable, IIntegrationEventPublisher eventos,
+    IResponsablePlanificacion responsable, IIntegrationEventPublisher eventos,
     TimeProvider reloj)
 {
     public async Task<RutaResponse> HandleAsync(AnularDespachoCommand command, CancellationToken ct)
@@ -33,9 +32,6 @@ internal sealed class AnularDespachoHandler(IRutaRepository rutas, IAdministraci
                 throw new ConflictoRutaException("RutaModificada", "Otra operación modificó la ruta. Recargá antes de anular.", revision: ruta.Revision);
             if (ruta.Estado != EstadoRuta.Despachada || ruta.DespachadaEn is null)
                 throw new ConflictoRutaException("RutaIniciada", "La ruta debe seguir Despachada y sin iniciar.");
-            var hoy = await calendario.HoyAsync(ct);
-            if (ruta.Fecha >= hoy)
-                throw new DomainException("Esta acción sólo resuelve rutas de días anteriores.");
             if (await ejecucion.TieneActividadRegistradaAsync(ruta.Id, ct))
                 throw new ConflictoRutaException("RutaConActividad", "Hay carga, rendición u operaciones aplicadas. No se puede anular el despacho.");
             var ids = ruta.EnvioIds.ToArray();
@@ -45,7 +41,7 @@ internal sealed class AnularDespachoHandler(IRutaRepository rutas, IAdministraci
             var despacho = ruta.DespachadaEn.Value;
             var anterior = ruta.Revision;
             var ahora = reloj.GetUtcNow();
-            ruta.AnularDespacho(hoy);
+            ruta.AnularDespacho();
             rutas.Agregar(AnulacionDespacho.Registrar(ruta, despacho, anterior, command.Motivo.Trim(), responsable.Id, ahora));
             eventos.Registrar(DespachoAnulado.Tipo,
                 new DespachoAnulado(ruta.Id, ruta.RepartidorId, ruta.Fecha, ruta.Revision, responsable.Id), ahora);

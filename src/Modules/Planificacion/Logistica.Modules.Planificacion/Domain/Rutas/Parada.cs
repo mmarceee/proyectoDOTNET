@@ -24,4 +24,10 @@ internal sealed class Parada : Entity, IOperadorOwned
     internal void Agregar(EnvioParada envio) { envio.MoverA(this); _envios.Add(envio); }
     internal void Quitar(Guid envioId) => _envios.RemoveAll(e => e.EnvioId == envioId);
     internal void CambiarOrden(int orden) => Orden = orden;
+    internal void Cerrar(IReadOnlySet<Guid> entregados)
+    {
+        foreach (var envio in _envios) envio.Cerrar(entregados.Contains(envio.EnvioId));
+        Estado = _envios.All(e => e.Estado == EstadoParada.Completada)
+            ? EstadoParada.Completada : EstadoParada.Fallida;
+    }
 }

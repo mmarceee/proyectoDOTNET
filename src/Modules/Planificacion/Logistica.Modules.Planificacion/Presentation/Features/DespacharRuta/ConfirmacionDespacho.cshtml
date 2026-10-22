@@ -10,7 +10,7 @@
                 @if (Model.ConfirmacionDespacho && Model.EvaluacionDespacho is { } carga)
                 {
                     <p>Restricciones verificadas: @carga.Paradas paradas · @carga.PesoKg kg · @carga.VolumenM3.ToString("0.######") m³.</p>
-                    <p>Al confirmar, la ruta queda disponible para el repartidor y ya no se podrá modificar.</p>
+                    <p>Al confirmar, la ruta queda disponible para el repartidor. Para editarla después, tendrás que anular el despacho con un motivo y comprobar que no haya carga ni actividad registrada.</p>
                     <button asp-page-handler="Despachar" class="btn btn-success">Confirmar despacho</button>
                     <a href="/backoffice/rutas/@Model.Id" class="btn btn-outline-secondary">Cancelar</a>
                 }

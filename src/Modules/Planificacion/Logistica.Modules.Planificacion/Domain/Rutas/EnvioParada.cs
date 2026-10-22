@@ -13,4 +13,5 @@ internal sealed class EnvioParada : Entity, IOperadorOwned
     internal EnvioParada(Parada parada, Guid envioId)
     { OperadorId = parada.OperadorId; RutaId = parada.RutaId; ParadaId = parada.Id; EnvioId = envioId; Estado = EstadoParada.Pendiente; }
     internal void MoverA(Parada parada) => ParadaId = parada.Id;
+    internal void Cerrar(bool entregado) => Estado = entregado ? EstadoParada.Completada : EstadoParada.Fallida;
 }

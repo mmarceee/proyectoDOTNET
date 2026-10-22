@@ -32,7 +32,7 @@
             <div class="row g-3 align-items-end">
                 <div class="col-md-4">
                     <label for="filtro-estado" class="form-label">Estado del aviso</label>
-                    <InputSelect id="filtro-estado" class="form-select" @bind-Value="_estado">
+                    <InputSelect id="filtro-estado" class="form-select" @bind-Value="_estado" @bind-Value:after="FiltrarAsync">
                         <option value="">Todos</option>
                         <option value="Pendiente">Pendiente</option>
                         <option value="Exitosa">Exitosa</option>
@@ -42,15 +42,22 @@
                 </div>
                 <div class="col-md-3">
                     <label for="filtro-desde" class="form-label">Fecha del evento desde</label>
-                    <InputDate id="filtro-desde" class="form-control" @bind-Value="_desde" />
+                    <InputDate id="filtro-desde" class="form-control" @bind-Value="_desde" @bind-Value:after="FiltrarAsync" />
                 </div>
                 <div class="col-md-3">
                     <label for="filtro-hasta" class="form-label">Hasta</label>
-                    <InputDate id="filtro-hasta" class="form-control" @bind-Value="_hasta" />
+                    <InputDate id="filtro-hasta" class="form-control" @bind-Value="_hasta" @bind-Value:after="FiltrarAsync" />
                 </div>
-                <div class="col-md-2"><button type="submit" class="btn btn-primary">Filtrar</button></div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-2 w-100" @onclick="LimpiarAsync">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                            <path d="M3 10a9 9 0 1 1 2.6 8.4" />
+                            <path d="M3 4v6h6" />
+                        </svg>
+                        Limpiar filtros
+                    </button>
+                </div>
             </div>
-            <button type="button" class="btn btn-link ps-0 mt-2" @onclick="LimpiarAsync">Limpiar filtros</button>
         </fieldset>
     </EditForm>
     <p class="small text-muted">Fechas y horas del operador seleccionado. Sólo se reenvían manualmente los avisos en cola de fallidos con suscripción activa; los intentos fallidos anteriores los gestiona automáticamente el sistema.</p>
@@ -61,7 +68,6 @@ else if (_detalle is not null)
 {
     <div class="d-flex flex-wrap gap-2 mb-3">
         <a class="btn btn-outline-secondary" href="@UrlLista">Volver al historial</a>
-        <button type="button" class="btn btn-outline-secondary" disabled="@_ocupado" @onclick="CargarAsync">Actualizar</button>
         @if (_detalle.Entrega.PuedeReenviar)
         {
             <button type="button" class="btn btn-primary" disabled="@AccionesBloqueadas" @onclick="() => Confirmar([_detalle.Entrega.Id])">Reenviar</button>
@@ -99,7 +105,6 @@ else if (_detalle is not null)
 else if (_historial is not null)
 {
     <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
-        <button type="button" class="btn btn-outline-secondary" disabled="@_ocupado" @onclick="CargarAsync">Actualizar</button>
         <button type="button" class="btn btn-primary" disabled="@(AccionesBloqueadas || _seleccionados.Count == 0)" @onclick="() => Confirmar(_seleccionados)">Reenviar seleccionados (@_seleccionados.Count)</button>
         <span>@_historial.TotalRegistros aviso(s)</span>
     </div>
