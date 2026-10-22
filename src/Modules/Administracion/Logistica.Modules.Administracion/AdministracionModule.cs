@@ -38,6 +38,7 @@ public static class AdministracionModule
         services.AddScoped<Domain.Operadores.IOperadorRepository, OperadorRepository>();
         services.AddScoped<Application.Features.GestionarIdentidadVisual.ConsultarIdentidadVisualHandler>();
         services.AddScoped<Application.Features.GestionarIdentidadVisual.ActualizarIdentidadVisualHandler>();
+        services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 
         // CU-04: zonas y franjas horarias.
         services.AddScoped<Domain.Planificacion.IZonaRepository, ZonaRepository>();

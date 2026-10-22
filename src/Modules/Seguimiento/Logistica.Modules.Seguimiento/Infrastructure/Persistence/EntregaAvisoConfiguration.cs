@@ -41,5 +41,7 @@ internal sealed class EnvioSeguidoConfiguration : IEntityTypeConfiguration<Envio
         b.ToTable("envios_seguidos");
         b.HasKey(e => e.Id);
         b.Property(e => e.Numero).HasMaxLength(50);
+        b.Property(e => e.NombreDestinatario).HasMaxLength(EnvioSeguido.LargoNombre);
+        b.Property(e => e.EmailDestinatario).HasMaxLength(EnvioSeguido.LargoEmail);
     }
 }

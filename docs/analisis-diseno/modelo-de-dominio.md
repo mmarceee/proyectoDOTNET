@@ -6,7 +6,7 @@ Este documento reúne el modelo de dominio completo como un único modelo, agrup
 
 Convención de multitenancy (ADR-0002 v2.1): toda clase lleva un campo operadorId que la ata a su operador (inquilino), salvo Operador y Comercio, que son globales. RelacionComercial lleva operadorId y comercioId y se filtra por ambos (ADR-0002, sección 2.6). Usuario lleva operadorId o comercioId, pero no tiene filtro de inquilino (ver la nota de Usuario).
 
-Segundo nivel de aislamiento: además de operadorId, llevan comercioId las clases que consulta el Portal o la API del comercio: RelacionComercial, ClaveApi, Envio, Bulto, EventoEnvio, IntentoEntrega, Incidencia, Devolucion, SuscripcionAviso, EntregaAviso, IntentoAviso, EnvioSeguido, Liquidacion y LineaLiquidacion. Estos campos no se repiten en cada clase, salvo donde ayudan a entenderla.
+Segundo nivel de aislamiento: además de operadorId, llevan comercioId las clases que consulta el Portal o la API del comercio: RelacionComercial, ClaveApi, Envio, Bulto, EventoEnvio, IntentoEntrega, Incidencia, Devolucion, Notificacion, SuscripcionAviso, EntregaAviso, IntentoAviso, EnvioSeguido, Liquidacion y LineaLiquidacion. Estos campos no se repiten en cada clase, salvo donde ayudan a entenderla.
 
 Las relaciones hacia un enum no se listan como filas de relación: el enum es el tipo de un atributo, no una entidad relacionada.
 
@@ -1005,13 +1005,47 @@ EntregadoEnCalle, DevueltoADeposito, Extraviado
 
 * tipo: TipoNotificacion
 
-* destino: string (copiado de Envio.destinatario al crear la notificación — no es una relación, es una foto del dato en ese momento)
+* eventoId: Guid (MessageId del evento de Envíos que la originó; único: el mismo evento no manda dos correos — CU-62)
+
+* estadoEnvio: string (estado del envío que informa)
+
+* destino: string (opcional; copiado de EnvioSeguido.emailDestinatario al crear la notificación — no es una relación, es una foto del dato en ese momento)
 
 * estado: EstadoNotificacion
 
 * creadaEn: DateTimeOffset
 
 * enviadaEn: DateTimeOffset (opcional)
+
+* intentos: int
+
+* ultimoError: string (opcional)
+
+**Métodos**
+
+* registrarEnvio(enviadaEn): void
+
+* registrarFallo(error, ultimo): void — el último fallo, agotados los reintentos, la deja Fallida (CU-62, A3)
+
+**IdentidadOperador**
+
+*copia en Seguimiento de la identidad visual del operador (CU-07), para los correos al destinatario (CU-62). La actualiza el evento IdentidadVisualActualizada; el Worker no consulta Administración. Un operador sin copia usa una marca neutra*
+
+**Atributos**
+
+* id: Guid (el mismo del Operador)
+
+* nombre: string
+
+* colorPrimario: string
+
+* colorSecundario: string
+
+* emailContacto: string (opcional)
+
+* telefonoContacto: string (opcional)
+
+* actualizadaEn: DateTimeOffset (fecha del evento; uno anterior que llega tarde no la pisa)
 
 **SuscripcionAviso**
 
@@ -1093,13 +1127,17 @@ EntregadoEnCalle, DevueltoADeposito, Extraviado
 
 **EnvioSeguido**
 
-*copia mínima de un Envio en Seguimiento, creada con el evento EnvioAdmitido (CU-64). Dice a qué comercio avisar en los eventos que publican el operador o el repartidor, cuyo sobre no trae comercio (ADR-0003, sección 2.2)*
+*copia mínima de un Envio en Seguimiento, creada con el evento EnvioAdmitido (CU-64 y CU-62). Dice a qué comercio avisar en los eventos que publican el operador o el repartidor, cuyo sobre no trae comercio (ADR-0003, sección 2.2), y a quién notificar, porque el Worker no consulta Envíos*
 
 **Atributos**
 
 * id: Guid (el mismo del Envio)
 
 * numero: string
+
+* nombreDestinatario: string (opcional)
+
+* emailDestinatario: string (opcional; sin correo, las notificaciones quedan NoEnviable — CU-62, A2)
 
 ## **Enumerados**
 
@@ -1117,7 +1155,7 @@ CambioDeEstado, VentanaEstimada, SolicitudDeReprogramacion
 
 Pendiente, Enviada, Fallida, NoEnviable
 
-*NoEnviable: el destinatario no tiene correo; se registra sin reintentos (CU-62, A2)*
+*NoEnviable: el destinatario no tiene un correo válido; se registra sin reintentos (CU-62, A2). Pendiente incluye la espera entre reintentos; Fallida, los reintentos agotados (CU-09 la puede reintentar)*
 
 **TipoEventoAviso**  *«enum»*
 
@@ -1282,7 +1320,8 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | Rendicion | 1 | asociación | 1 | Ruta |
 | LineaRendicion | 0..\* | asociación | 1 | Bulto |
 | EntregaAviso | 0..\* | asociación | 1 | SuscripcionAviso |
-| Notificacion | 0..\* | asociación | 1 | Envio |
+| Notificacion | 0..\* | asociación | 1 | EnvioSeguido |
+| IdentidadOperador | 0..1 | asociación | 1 | Operador |
 | SuscripcionAviso | 0..\* | asociación | 1 | RelacionComercial |
 | EntregaAviso | 0..\* | asociación | 1 | EnvioSeguido |
 | EntregaAviso | 1 | composición | 0..\* | IntentoAviso |

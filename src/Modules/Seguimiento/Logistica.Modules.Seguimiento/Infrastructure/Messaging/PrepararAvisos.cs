@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Seguimiento.Application.Features.EntregarAvisos;
@@ -21,7 +20,7 @@ internal sealed class PrepararAvisos(SeguimientoDbContext db, PrepararAvisosHand
 
     public async Task ProcesarAsync(MensajeIntegracion mensaje, CancellationToken ct)
     {
-        var hecho = Leer(mensaje);
+        var hecho = LectorHechosEnvio.Leer(mensaje);
         var consumidor = Cola(mensaje.Tipo);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (!await db.Inbox.AnyAsync(m => m.MessageId == mensaje.Id && m.Consumidor == consumidor, ct))
@@ -31,37 +30,5 @@ internal sealed class PrepararAvisos(SeguimientoDbContext db, PrepararAvisosHand
             await db.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct);
-    }
-
-    // El contenido aporta sólo datos del hecho; el inquilino viene del sobre. La fecha del evento es la del sobre.
-    internal static HechoEnvio Leer(MensajeIntegracion mensaje)
-    {
-        using var json = JsonDocument.Parse(mensaje.Contenido);
-        var raiz = json.RootElement;
-        if (!raiz.TryGetProperty("EnvioId", out var id) || !id.TryGetGuid(out var envioId) || envioId == Guid.Empty)
-            throw new InvalidDataException("El evento no tiene el Id del envío.");
-        var numero = raiz.TryGetProperty("Numero", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
-
-        HechoEnvio Hecho(string estado, bool intentoFallido = false, bool esAlta = false) =>
-            new(mensaje.Id, envioId, numero, estado, intentoFallido, mensaje.OcurridoEn, esAlta);
-
-        return mensaje.Tipo switch
-        {
-            EnvioAdmitido.Tipo => Hecho("Admitido", esAlta: true),
-            EnvioAsignadoARuta.Tipo => Hecho("AsignadoARuta"),
-            EnvioDesasignadoDeRuta.Tipo => Hecho("EnDeposito"),
-            EnvioEnTransito.Tipo => Hecho("EnTransito"),
-            EnvioEntregado.Tipo => Hecho("Entregado"),
-            // T7 y, en la misma operación, T9 o T10: el aviso lleva el estado en que quedó el envío.
-            IntentoFallidoRegistrado.Tipo => Hecho(
-                raiz.TryGetProperty("EstadoFinal", out var final) && final.ValueKind == JsonValueKind.String
-                    && final.GetString() is { Length: > 0 } estado
-                    ? estado : throw new InvalidDataException("El intento fallido no tiene el estado final."),
-                intentoFallido: true),
-            EnvioReprogramado.Tipo => Hecho("Reprogramado"),
-            EnvioCancelado.Tipo => Hecho("Cancelado"),
-            EnvioReintegradoADeposito.Tipo => Hecho("EnDeposito"),
-            _ => throw new InvalidDataException("Tipo de evento sin aviso al comercio."),
-        };
     }
 }
