@@ -108,6 +108,41 @@ public class SeguimientoPublicoTests(PostgresApiFactory factory) : IClassFixture
         Assert.Equal(HttpStatusCode.NotFound, (await este.GetAsync($"/backoffice/seguimiento/{envio.Numero}")).StatusCode);
     }
 
+    // Sólo Administrador y Despachador mandan enlaces: el operario de depósito no ve el menú ni entra escribiendo la
+    // dirección de la página del listado o de la del enlace (403).
+    [Fact]
+    public async Task El_operario_de_deposito_no_ve_ni_entra_al_seguimiento()
+    {
+        var envio = await EnvioAsync(DatosIniciales.OperadorDemoId);
+        using var despacho = Cliente();
+        await Sesion.IngresarAsync(despacho, "despacho@operador-demo.uy");
+        using var deposito = Cliente();
+        await Sesion.IngresarAsync(deposito, "deposito@operador-demo.uy");
+
+        Assert.Contains("href=\"/backoffice/seguimiento\"", await despacho.GetStringAsync("/backoffice"));
+        Assert.Equal(HttpStatusCode.OK, (await despacho.GetAsync("/backoffice/seguimiento")).StatusCode);
+        Assert.DoesNotContain("href=\"/backoffice/seguimiento\"", await deposito.GetStringAsync("/backoffice"));
+        Assert.Equal(HttpStatusCode.Forbidden, (await deposito.GetAsync("/backoffice/seguimiento")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await deposito.GetAsync($"/backoffice/seguimiento/{envio.Numero}")).StatusCode);
+    }
+
+    // El listado del Backoffice muestra los envíos del operador de la sesión y nunca los de otro (ADR-0002).
+    [Fact]
+    public async Task El_listado_muestra_solo_los_envios_del_operador()
+    {
+        var deDemo = await EnvioAsync(DatosIniciales.OperadorDemoId);
+        var deEste = await EnvioAsync(DatosIniciales.OperadorEsteId);
+        using var admin = Cliente();
+        await Sesion.IngresarAsync(admin, "admin@operador-demo.uy");
+
+        var propio = await admin.GetStringAsync($"/backoffice/seguimiento?Texto={deDemo.Numero}");
+        var ajeno = await admin.GetStringAsync($"/backoffice/seguimiento?Texto={deEste.Numero}");
+
+        Assert.Contains($"/backoffice/seguimiento/{deDemo.Numero}", propio);
+        Assert.DoesNotContain($"/backoffice/seguimiento/{deEste.Numero}", ajeno);
+        Assert.Contains("No hay envíos para mostrar.", ajeno);
+    }
+
     private string Token(Guid operadorId, Guid envioId) =>
         factory.Services.GetRequiredService<TokenSeguimiento>().Generar(operadorId, envioId);
 

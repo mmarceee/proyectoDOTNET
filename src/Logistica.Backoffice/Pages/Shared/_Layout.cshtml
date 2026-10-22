@@ -35,6 +35,13 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" href="/backoffice/envios">Envíos</a>
                         </li>
+                        @* CU-60: los mismos perfiles que la página; el operario de depósito no lo ve (y si entra a mano, 403). *@
+                        @if (User.IsInRole("Administrador") || User.IsInRole("Despachador"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/backoffice/seguimiento">Seguimiento</a>
+                            </li>
+                        }
                         @if (User.IsInRole("OperarioDeposito"))
                         {
                             <li class="nav-item">
