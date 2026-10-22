@@ -9,6 +9,7 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -23,13 +24,28 @@ jobs:
       - name: Build
         run: dotnet build Logistica.slnx --no-restore --configuration Release
 
+      - name: Release build servers
+        run: dotnet build-server shutdown
+
       # Cobertura de las capas de dominio y aplicación (opcional 7.2): ver coverage.runsettings.
       - name: Test
         id: test
+        timeout-minutes: 20
         run: >
           dotnet test Logistica.slnx --no-build --configuration Release
           --settings coverage.runsettings --collect "XPlat Code Coverage"
+          --logger trx
+          --blame-hang --blame-hang-timeout 3m --blame-hang-dump-type none
           --results-directory TestResults
+
+      # TRX y secuencia de ejecución aunque falle una prueba o se detecte un bloqueo.
+      - name: Upload test results
+        if: ${{ always() && steps.test.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-pruebas
+          path: TestResults
+          if-no-files-found: warn
 
       # Une los resultados de los tres proyectos de prueba en un solo reporte.
       - name: Coverage report

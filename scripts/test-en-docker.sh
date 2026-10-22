@@ -14,6 +14,7 @@ repo="$(pwd -W 2>/dev/null || pwd)"
 MSYS_NO_PATHCONV=1 docker run --rm \
   -v "${repo}:/repo:ro" \
   -v "${repo}/coverage:/salida" \
+  -v "${repo}/TestResults:/resultados" \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --add-host host.docker.internal:host-gateway \
   -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
@@ -23,12 +24,17 @@ MSYS_NO_PATHCONV=1 docker run --rm \
   cd /repo
   tar --exclude=./.vs --exclude=./.git --exclude=./coverage --exclude=./TestResults --exclude="*/bin" --exclude="*/obj" -cf - . | tar -xf - -C /w
   cd /w
+  resultados=$(mktemp -d /resultados/docker-XXXXXXXX)
   dotnet restore Logistica.slnx
   dotnet build Logistica.slnx --no-restore -c Release
+  dotnet build-server shutdown
   dotnet test Logistica.slnx --no-build -c Release \
-    --settings coverage.runsettings --collect "XPlat Code Coverage" --results-directory TestResults
+    --settings coverage.runsettings --collect "XPlat Code Coverage" \
+    --logger trx \
+    --blame-hang --blame-hang-timeout 3m --blame-hang-dump-type none \
+    --results-directory "$resultados"
   dotnet tool restore
-  dotnet reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:/salida \
+  dotnet reportgenerator -reports:"$resultados/**/coverage.cobertura.xml" -targetdir:/salida \
     -reporttypes:"Html;TextSummary" -title:"Logística · dominio y aplicación"
   head -n 20 /salida/Summary.txt
 '
