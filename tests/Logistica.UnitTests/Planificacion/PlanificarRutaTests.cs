@@ -5,6 +5,35 @@ namespace Logistica.UnitTests.Planificacion;
 
 public class PlanificarRutaTests
 {
+    [Theory]
+    [InlineData(0, "Fallida")]
+    [InlineData(1, "Fallida")]
+    [InlineData(2, "Completada")]
+    public void Finalizar_resuelve_todos_los_envios_y_la_parada_segun_las_entregas(int cantidad, string esperado)
+    {
+        var envios = new[] { EnEdificio(), EnEdificio() };
+        var ruta = Ruta.Crear(Guid.NewGuid(), Fecha, Guid.NewGuid(), Guid.NewGuid(), envios, DateTimeOffset.UtcNow);
+        ruta.Despachar(DateTimeOffset.UtcNow);
+        var entregados = envios.Take(cantidad).Select(e => e.Id).ToHashSet();
+        ruta.Finalizar(entregados);
+        Assert.Equal(EstadoRuta.Finalizada, ruta.Estado);
+        Assert.False(ruta.ReservaActiva);
+        var parada = Assert.Single(ruta.Paradas);
+        Assert.Equal(esperado, parada.Estado.ToString());
+        Assert.All(parada.Envios, e => Assert.Equal(entregados.Contains(e.EnvioId)
+            ? EstadoParada.Completada : EstadoParada.Fallida, e.Estado));
+    }
+
+    [Fact]
+    public void Finalizar_rechaza_entregas_ajenas_sin_modificar_la_ruta()
+    {
+        var ruta = Nueva();
+        ruta.Despachar(DateTimeOffset.UtcNow);
+        Assert.Throws<DomainException>(() => ruta.Finalizar(new HashSet<Guid> { Guid.NewGuid() }));
+        Assert.Equal(EstadoRuta.Despachada, ruta.Estado);
+        Assert.All(ruta.Paradas.SelectMany(p => p.Envios), e => Assert.Equal(EstadoParada.Pendiente, e.Estado));
+    }
+
     private static readonly DateOnly Fecha = new(2035, 1, 1);
     private static VehiculoRuta Vehiculo(decimal peso = 100, decimal volumen = 1) => new(Guid.NewGuid(), peso, volumen, 100, 80, 60);
     private static EnvioRuta Envio(decimal peso = 2, decimal largo = 30, decimal ancho = 20, decimal alto = 10)

@@ -18,7 +18,12 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
 
     // Un código por línea: el lector escribe el código y presiona Enter.
     [BindProperty]
-    public string Escaneados { get; set; } = "";
+    public string? Escaneados { get; set; } = "";
+
+    [BindProperty]
+    public bool ConfirmarFaltantes { get; set; }
+
+    public bool RequiereConfirmacion { get; private set; }
 
     public ComparacionRendicion Comparacion { get; private set; } = null!;
 
@@ -47,6 +52,17 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
     {
         try
         {
+            var comparacion = await handler.CompararAsync(RutaId, Codigos(), ct);
+            if (comparacion is null) return NotFound();
+            if (comparacion.Rendicion.FinalizadaEn is null && comparacion.Sobrantes.Count == 0 &&
+                comparacion.Faltantes > 0 && !ConfirmarFaltantes)
+            {
+                Comparacion = comparacion;
+                Comparada = true;
+                RequiereConfirmacion = true;
+                return Page();
+            }
+
             if (await handler.ConfirmarAsync(RutaId, Codigos(), ct) is not { } confirmada)
             {
                 return NotFound();
@@ -65,7 +81,7 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
         }
     }
 
-    private string[] Codigos() => Escaneados.Split(['\n', '\r', ',', ';', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+    private string[] Codigos() => (Escaneados ?? "").Split(['\n', '\r', ',', ';', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
 
     private async Task<IActionResult> MostrarAsync(CancellationToken ct)
     {

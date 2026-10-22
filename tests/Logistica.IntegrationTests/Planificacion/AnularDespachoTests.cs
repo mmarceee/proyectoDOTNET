@@ -5,6 +5,8 @@ using Logistica.Http.Contracts.Planificacion;
 using Logistica.Http.Contracts.Repartidor;
 using Logistica.IntegrationTests.Identidad;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
+using Logistica.Modules.Administracion.Infrastructure.Identity;
+using Logistica.Modules.Administracion.Domain.Operadores;
 using Logistica.Modules.Ejecucion.Domain.Operaciones;
 using Logistica.Modules.Ejecucion.Infrastructure.Persistence;
 using Logistica.Modules.Envios.Domain.Envios;
@@ -16,6 +18,7 @@ using Logistica.Modules.Planificacion.Infrastructure.Persistence;
 using Logistica.SharedKernel;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -122,14 +125,91 @@ public sealed class AnularDespachoTests(PostgresApiFactory factory) : IClassFixt
     [InlineData("EnCurso", -10, 409)]
     [InlineData("Finalizada", -11, 409)]
     [InlineData("Planificada", -12, 409)]
-    [InlineData("Despachada", 0, 400)]
-    [InlineData("Despachada", 1, 400)]
-    public async Task Rechaza_estados_y_fechas_fuera_del_alcance(string estado, int fecha, int codigo)
+    public async Task Rechaza_estados_que_no_admiten_reapertura(string estado, int fecha, int codigo)
     {
         var d = await PrepararAsync(Enum.Parse<EstadoRuta>(estado), fecha); using var client = Cliente();
         Assert.Equal(codigo, (int)(await AnularAsync(client, d)).StatusCode);
         using var scope = Scope();
         Assert.False(await scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>().AnulacionesDespacho.AnyAsync(a => a.RutaId == d.Ruta));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task Permite_volver_a_editar_un_despacho_de_hoy_o_futuro_con_motivo_y_sin_actividad(int desplazamiento)
+    {
+        var d = await PrepararAsync(desplazamiento: desplazamiento, recursosPropios: true);
+        using var client = Cliente();
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/backoffice/rutas/{d.Ruta}"));
+        Assert.Contains("Volver a editar la ruta", html);
+        Assert.Contains("Motivo de la anulación", html);
+        client.DefaultRequestHeaders.Add("RequestVerificationToken",
+            Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+        Assert.Equal(HttpStatusCode.BadRequest, (await AnularAsync(client, d, motivo: " ")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await AnularAsync(client, d, confirma: false)).StatusCode);
+        var respuesta = await AnularAsync(client, d, motivo: "Corregir la planificación antes de salir.");
+        respuesta.EnsureSuccessStatusCode();
+        var ruta = (await respuesta.Content.ReadFromJsonAsync<RutaResponse>())!;
+        Assert.Equal("Planificada", ruta.Estado);
+        Assert.Equal(d.Revision + 1, ruta.Revision);
+        Assert.Null(ruta.DespachadaEn);
+        using var scope = Scope();
+        var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+        var auditoria = await plan.AnulacionesDespacho.SingleAsync(a => a.RutaId == d.Ruta);
+        Assert.Equal("Corregir la planificación antes de salir.", auditoria.Motivo);
+        Assert.Equal(d.Despacho, auditoria.DespachadaEn);
+        // Sigue reservada ese día, pero deja de bloquear los días siguientes al volver a Planificada.
+        var repositorio = scope.ServiceProvider.GetRequiredService<IRutaRepository>();
+        Assert.Equal(2, (await repositorio.RecursosOcupadosAsync(d.Fecha, d.Repartidor, d.Vehiculo, null, default)).Count);
+        Assert.Empty(await repositorio.RecursosOcupadosAsync(d.Fecha.AddDays(1), d.Repartidor, d.Vehiculo, null, default));
+    }
+
+    [Fact]
+    public async Task La_ruta_reabierta_se_edita_con_las_mismas_restricciones_y_se_despacha_con_una_revision_nueva()
+    {
+        var d = await PrepararAsync(desplazamiento: 30, recursosPropios: true);
+        using var client = Cliente();
+        var cambio = new ModificarRutaRequest(d.Revision, d.Fecha.AddDays(1), d.Repartidor, d.Vehiculo);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync($"/api/planificacion/rutas/{d.Ruta}/planificacion", cambio)).StatusCode);
+        var reabierta = (await (await AnularAsync(client, d)).Content.ReadFromJsonAsync<RutaResponse>())!;
+        Guid vehiculoChico;
+        using (var scope = Scope())
+        {
+            var vehiculo = Logistica.Modules.Administracion.Domain.Planificacion.Vehiculo.Crear(
+                DatosIniciales.OperadorDemoId, Guid.NewGuid().ToString("N"), "Prueba", 0.5m, 1, 100, 100, 100);
+            vehiculoChico = vehiculo.Id;
+            var admin = scope.ServiceProvider.GetRequiredService<AdministracionDbContext>();
+            var usuarios = scope.ServiceProvider.GetRequiredService<UserManager<Usuario>>();
+            var usuario = Usuario.CrearPersonal(DatosIniciales.OperadorDemoId, "Repartidor de reapertura", $"reapertura-{Guid.NewGuid():N}@prueba.uy");
+            Assert.True((await usuarios.CreateAsync(usuario, UsuariosIniciales.ContrasenaDemo)).Succeeded);
+            Assert.True((await usuarios.AddToRoleAsync(usuario, "Repartidor")).Succeeded);
+            var repartidor = await admin.Repartidores.SingleAsync(r => r.Id == d.Repartidor);
+            admin.Entry(repartidor).Property(r => r.UsuarioId).CurrentValue = usuario.Id;
+            admin.Vehiculos.Add(vehiculo);
+            await admin.SaveChangesAsync();
+        }
+        var invalida = await client.PutAsJsonAsync($"/api/planificacion/rutas/{d.Ruta}/planificacion",
+            new ModificarRutaRequest(reabierta.Revision, d.Fecha.AddDays(1), d.Repartidor, vehiculoChico));
+        Assert.Equal(HttpStatusCode.BadRequest, invalida.StatusCode);
+        Assert.Contains("CapacidadPesoExcedida", await invalida.Content.ReadAsStringAsync());
+        var modificacion = await client.PutAsJsonAsync($"/api/planificacion/rutas/{d.Ruta}/planificacion",
+            cambio with { RevisionEsperada = reabierta.Revision });
+        modificacion.EnsureSuccessStatusCode();
+        var editada = (await modificacion.Content.ReadFromJsonAsync<RutaResponse>())!;
+        Assert.Equal("Planificada", editada.Estado);
+        Assert.Equal(d.Fecha.AddDays(1), editada.Fecha);
+        var despacho = await client.PostAsJsonAsync($"/api/planificacion/rutas/{d.Ruta}/despacho", new DespacharRutaRequest(editada.Revision));
+        despacho.EnsureSuccessStatusCode();
+        var despachada = (await despacho.Content.ReadFromJsonAsync<RutaResponse>())!;
+        Assert.Equal("Despachada", despachada.Estado);
+        Assert.True(despachada.Revision > d.Revision);
+        using var verificacion = Scope();
+        var db = verificacion.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+        Assert.Single(await db.AnulacionesDespacho.Where(a => a.RutaId == d.Ruta).ToListAsync());
+        Assert.True(await db.Validaciones.AnyAsync(v => v.RutaId == d.Ruta && v.Operacion == OperacionValidacionRuta.Modificacion));
+        Assert.True(await db.Validaciones.AnyAsync(v => v.RutaId == d.Ruta && v.Operacion == OperacionValidacionRuta.Despacho));
+        Assert.Empty(await verificacion.ServiceProvider.GetRequiredService<IRutaRepository>().RecursosOcupadosAsync(
+            d.Fecha, d.Repartidor, d.Vehiculo, null, default));
     }
 
     [Fact]

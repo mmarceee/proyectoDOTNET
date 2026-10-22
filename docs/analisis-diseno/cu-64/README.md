@@ -108,8 +108,12 @@ Las tres entidades llevan `OperadorId` y `ComercioId` y tienen el filtro de inqu
 
 - Historial: `entregas_aviso` con su índice (`OperadorId`, `ComercioId`, `Estado`, `FechaEvento`) e `intentos_aviso`.
 - Reenviar: en una unidad de trabajo, registrar `AvisoPendiente` en el outbox de Seguimiento con el `EntregaId`
-  (`IIntegrationEventPublisher` del módulo). No hace falta llamar a `Reintentar`: lo hace la entrega.
+  (`IIntegrationEventPublisher` del módulo). CU-65 llama a `Reintentar` en esa misma transacción para dejar la entrega
+  en *Pendiente* desde la solicitud e impedir que dos solicitudes manuales la encolen simultáneamente. El consumidor
+  admite ese estado y mantiene su recuperación de *EnColaDeFallidos* para CU-09.
 - A2 (suscripción desactivada): verificar `SuscripcionAviso.Activa` antes de encolar.
+
+El historial, los endpoints y las garantías del reenvío están documentados en [CU-65](../cu-65/README.md).
 
 ## Pendiente
 

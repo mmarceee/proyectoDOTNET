@@ -2,6 +2,7 @@ using Logistica.Http.Contracts.Planificacion;
 using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Administracion.Contracts.Results;
 using Logistica.Modules.Envios.Contracts;
+using Logistica.Modules.Ejecucion.Contracts;
 using Logistica.Modules.Planificacion.Domain.Rutas;
 using Logistica.Modules.Planificacion.Application.Exceptions;
 using Logistica.SharedKernel;
@@ -9,7 +10,8 @@ using static Logistica.Modules.Planificacion.Application.Mapping.RutaResponseMap
 
 namespace Logistica.Modules.Planificacion.Application.Features.ConsultarRutas;
 
-internal sealed class ConsultarRutasHandler(IRutaRepository rutas, IEnviosModuleApi envios, IAdministracionModuleApi administracion)
+internal sealed class ConsultarRutasHandler(IRutaRepository rutas, IEnviosModuleApi envios, IAdministracionModuleApi administracion,
+    IEjecucionModuleApi ejecucion)
 {
     public Task<NombresRecursosPlanificacion> RecursosAsignadosAsync(IReadOnlyList<RutaResponse> lista, CancellationToken ct)
         => administracion.ConsultarNombresRecursosAsync(lista.Select(r => r.RepartidorId).Where(id => id != Guid.Empty).Distinct().ToArray(),
@@ -30,7 +32,23 @@ internal sealed class ConsultarRutasHandler(IRutaRepository rutas, IEnviosModule
         }
         return (await rutas.ListarAsync(fecha, filtro, ct)).Select(r => Mapear(r)).ToList();
     }
-    public async Task<RutaResponse> DetalleAsync(Guid id, CancellationToken ct) => Mapear(await ExigirRutaAsync(id, ct));
+    public async Task<RutaResponse> DetalleAsync(Guid id, CancellationToken ct)
+    {
+        var ruta = Mapear(await ExigirRutaAsync(id, ct));
+        if (ruta.Estado != nameof(EstadoRuta.Finalizada)) return ruta;
+        var rendicion = await ejecucion.ConsultarRendicionAsync(id, ct);
+        if (rendicion?.FinalizadaEn is not { } cierre) return ruta;
+
+        // Reconstruye también cierres anteriores a esta corrección desde su evidencia histórica,
+        // sin usar el estado actual del envío (podría estar ya en otra ruta) ni escribir durante una consulta.
+        var entregados = rendicion.Lineas.GroupBy(l => l.EnvioId)
+            .Where(g => g.All(l => l.EstadoFinal == "EntregadoEnCalle")).Select(g => g.Key).ToHashSet();
+        return ruta with { FinalizadaEn = cierre, Paradas = ruta.Paradas.Select(p => p with
+        {
+            Estado = p.Envios.All(e => entregados.Contains(e.EnvioId)) ? "Completada" : "Fallida",
+            Envios = p.Envios.Select(e => e with { Estado = entregados.Contains(e.EnvioId) ? "Completada" : "Fallida" }).ToArray(),
+        }).ToArray() };
+    }
     public async Task<IReadOnlyList<ValidacionRutaResponse>> ValidacionesAsync(Guid id, int pagina, CancellationToken ct)
     {
         await ExigirRutaAsync(id, ct);

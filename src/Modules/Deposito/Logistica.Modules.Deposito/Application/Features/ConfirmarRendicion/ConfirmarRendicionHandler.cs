@@ -104,7 +104,10 @@ internal sealed class ConfirmarRendicionHandler(
             var faltantes = cerrada.Lineas.Where(l => l.Recibida == false).Select(l => l.BultoId).ToArray();
             await envios.RegistrarFaltantesAsync(faltantes, ct);
 
-            await planificacion.FinalizarRutaAsync(rutaId, ct);
+            var entregados = cerrada.Lineas.GroupBy(l => l.EnvioId)
+                .Where(g => g.All(l => l.EstadoFinal == "EntregadoEnCalle"))
+                .Select(g => g.Key).ToArray();
+            await planificacion.FinalizarRutaAsync(rutaId, entregados, ct);
 
             resultado = new RendicionConfirmada(recibidos.Length, reintegrados.Length, faltantes.Length);
         }, ct);

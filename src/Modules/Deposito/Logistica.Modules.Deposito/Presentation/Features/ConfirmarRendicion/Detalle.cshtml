@@ -80,7 +80,20 @@
     }
 }
 
-@if (!confirmada)
+@if (!confirmada && Model.RequiereConfirmacion)
+{
+    <section class="alert alert-warning" role="alert" aria-labelledby="confirmar-faltantes">
+        <h2 id="confirmar-faltantes" class="h5">Confirmar rendición con faltantes</h2>
+        <p>Faltan <strong>@Model.Comparacion.Faltantes bultos</strong>. Se registrarán como faltantes y se abrirán
+            incidencias por los envíos afectados. La ruta quedará finalizada. ¿Querés confirmar igualmente?</p>
+        <form method="post">
+            <input type="hidden" asp-for="Escaneados" />
+            <button type="submit" asp-page-handler="Confirmar" name="ConfirmarFaltantes" value="true" class="btn btn-warning">Confirmar con faltantes</button>
+            <button type="submit" asp-page-handler="Comparar" class="btn btn-outline-secondary">Volver y revisar bultos</button>
+        </form>
+    </section>
+}
+else if (!confirmada)
 {
     <form method="post" class="mt-3">
         <div class="mb-3">

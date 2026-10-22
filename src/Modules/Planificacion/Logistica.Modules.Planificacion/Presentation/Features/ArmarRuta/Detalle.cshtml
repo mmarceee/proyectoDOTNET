@@ -64,7 +64,14 @@ else { <div asp-validation-summary="All" class="text-danger mb-3" role="alert"><
 <section class="card mt-5 mb-4" aria-labelledby="historial-validaciones">
 <div class="card-body p-4">
 <h2 id="historial-validaciones" class="h5">Historial de la ruta</h2>
-<p class="text-muted mb-4">Consultá los envíos quitados y las validaciones registradas al confirmar cambios en la ruta.</p>
+<p class="text-muted mb-4">Consultá el cierre, los envíos quitados y las validaciones registradas al confirmar cambios en la ruta.</p>
+@if (Model.Ruta?.FinalizadaEn is { } cierre)
+{
+    <div class="border rounded p-3 mb-3" data-finalizacion-ruta>
+        <strong>Ruta finalizada · rendición confirmada en depósito</strong> · @cierre.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm")
+        <p class="mt-2 mb-0">Las paradas completadas corresponden a envíos entregados. Una parada fallida indica que quedó al menos un envío sin entregar; el cierre no convierte las devoluciones ni los faltantes en entregas.</p>
+    </div>
+}
 @if (Model.Anulaciones.Count > 0)
 {
     <h3 class="h6">Despachos anulados</h3>
