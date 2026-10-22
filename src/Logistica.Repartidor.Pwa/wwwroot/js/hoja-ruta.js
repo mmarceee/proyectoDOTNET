@@ -150,7 +150,7 @@ export async function guardar(hoja, token) {
         clave, encoder.encode(JSON.stringify(hoja)));
     const db = await open();
     try {
-        const tx = db.transaction(['espacios', 'hojas'], 'readwrite'), done = completed(tx);
+        const tx = db.transaction(['espacios', 'hojas', 'instalacion'], 'readwrite'), done = completed(tx);
         const r = tx.objectStore('espacios').get('activo');
         r.onsuccess = () => {
             if (!r.result || r.result.token !== token || key(r.result) !== key(hoja)) { tx.abort(); return; }
@@ -160,6 +160,7 @@ export async function guardar(hoja, token) {
                     hojas.put(anterior.result, `${key(sesion)}:ruta:${anterior.result.meta.rutaId}`);
                 hojas.put({ meta, iv, contenido, descargadaEn: new Date().toISOString() }, key(sesion));
                 hojas.delete(`${key(sesion)}:ruta:${hoja.rutaId}`);
+                tx.objectStore('instalacion').delete(`gps-cerrada:${key(sesion)}:${hoja.rutaId}`);
                 tx.objectStore('espacios').put({ ...r.result, rutaSeleccionada:hoja.rutaId, sinRuta:false }, 'activo');
             };
         };
@@ -170,11 +171,13 @@ export async function guardar(hoja, token) {
 export async function sinRuta(token) {
     const db = await open();
     try {
-        const tx = db.transaction('espacios', 'readwrite'), done = completed(tx);
+        const tx = db.transaction(['espacios','instalacion'], 'readwrite'), done = completed(tx);
         const store = tx.objectStore('espacios'), r = store.get('activo');
         r.onsuccess = () => {
             if (!r.result || r.result.token !== token) { tx.abort(); return; }
             store.put({ ...r.result, sinRuta: true }, 'activo');
+            if (r.result.rutaSeleccionada) tx.objectStore('instalacion')
+                .put(true,`gps-cerrada:${key(r.result)}:${r.result.rutaSeleccionada}`);
         };
         await done;
     } finally { db.close(); }
@@ -451,8 +454,9 @@ async function enviarPendientes() {
         await done;
     } finally { db.close(); }
     if ((await activo()).token !== s.token) throw new Error('La sesión cambió. La carga sigue pendiente.');
+    const pendientes = (await listaOperaciones(s,true)).filter(r => r.estado !== 'Aplicada' && r.estado !== 'Rechazada').length;
     const response = await fetch('/api/repartidor/sincronizacion', { method:'POST', credentials:'same-origin',
-        headers:{'Content-Type':'application/json'}, body:JSON.stringify({ operaciones }), signal:AbortSignal.timeout(15000) });
+        headers:{'Content-Type':'application/json'}, body:JSON.stringify({ operaciones, pendientes }), signal:AbortSignal.timeout(15000) });
     if (response.status === 401 || response.status === 403) {
         await bloquear(); throw new Error('Iniciá sesión de nuevo. Las cargas pendientes se conservan cifradas.');
     }
@@ -468,7 +472,16 @@ async function enviarPendientes() {
     }
     return { mensaje:aplicadas ? 'Operaciones confirmadas por el servidor.' : 'Revisá las operaciones rechazadas.', aplicadas };
 }
+let sincronizacionEnCurso = null;
 export async function sincronizarCargas() {
+    // ADR-0004 §2.8: compartir la misma promesa entre temporizador GPS, pantallas y evento online.
+    if (sincronizacionEnCurso) return sincronizacionEnCurso;
+    const tarea = ejecutarSincronizacion();
+    sincronizacionEnCurso = tarea;
+    try { return await tarea; }
+    finally { if (sincronizacionEnCurso === tarea) sincronizacionEnCurso = null; }
+}
+async function ejecutarSincronizacion() {
     try {
         const enviar = async () => {
             let aplicadas = 0, mensaje = null;
@@ -512,7 +525,7 @@ async function exigirJornadaAbierta(ruta, copia = null) {
 }
 async function aceptarSinBorrador(op, respuesta, s) {
     const aplicada = ['Aplicada','YaAplicada'].includes(respuesta.resultado);
-    const recibo = aplicada ? await cifrar('operacion',op.operacionId,op,s) : null, db = await open();
+    const recibo = aplicada && op.tipo !== 'ReportarPosicion' ? await cifrar('operacion',op.operacionId,op,s) : null, db = await open();
     try {
         const tx = db.transaction(['espacios','operaciones','recibos'],'readwrite'), done = completed(tx);
         comprobarToken(tx.objectStore('espacios'),s,() => {
@@ -520,7 +533,7 @@ async function aceptarSinBorrador(op, respuesta, s) {
             r.onsuccess = () => {
                 if (!r.result) { tx.abort(); return; }
                 if (aplicada) {
-                    tx.objectStore('recibos').put({ ...recibo, estado:'Aplicada', secuencia:op.secuencia },op.operacionId);
+                    if (recibo) tx.objectStore('recibos').put({ ...recibo, estado:'Aplicada', secuencia:op.secuencia },op.operacionId);
                     store.delete(op.operacionId);
                 } else store.put({ ...r.result, estado:'Rechazada', motivo:respuesta.motivo },op.operacionId);
             };
@@ -690,4 +703,56 @@ export async function registrarIntentoFallido(ruta, envioId, datos) {
     if ((observaciones?.length ?? 0) > 1000) throw new Error('Las observaciones no pueden superar los 1000 caracteres.');
     return encolar(s, ruta, envioId, datos, 'RegistrarIntentoFallido',
         { intentoFallido:{ motivoId:motivo.id, foto, observaciones } });
+}
+
+// CU-53: la ruta operativa es independiente de la pantalla abierta. Una rendición confirmada detiene el GPS.
+export async function rutaParaSeguimiento() {
+    const s = await sesionLocal();
+    if (!s) return null;
+    const candidatas = [];
+    for (const copia of await rutasGuardadas()) {
+        const h = copia.hoja, rendicion = await borradorRendicion(h.rutaId);
+        if (copia.sinRuta || h.rendicion?.iniciada || rendicion?.operacionId
+            || await read('instalacion',`gps-cerrada:${key(s)}:${h.rutaId}`)) continue;
+        const carga = await borradorCarga(h.rutaId);
+        const completa = carga?.operacionId && carga.resultado !== 'Rechazada'
+            && h.paradas.flatMap(p => p.envios).some(e => e.bultos.every(b => carga.lecturas.some(l => l.codigoBulto === b.codigo)));
+        if (h.estadoRuta === 'EnCurso' || completa) candidatas.push(h.rutaId);
+    }
+    if ((await sesionLocal())?.token !== s.token) return null;
+    if (candidatas.length > 1) throw new Error('Hay más de una ruta en curso. Actualizá tus rutas para habilitar el seguimiento.');
+    return candidatas.length ? { rutaId:candidatas[0], token:s.token } : null;
+}
+
+export async function guardarPosicion(rutaId, token, posicion) {
+    const s = await activo(), actual = await rutaParaSeguimiento();
+    if (s.token !== token || actual?.rutaId !== rutaId || actual.token !== token) return false;
+    if (!coordenada(posicion?.latitud,90) || !coordenada(posicion?.longitud,180)
+        || !Number.isFinite(posicion.capturadaEn) || Math.abs(Date.now()-posicion.capturadaEn) > 15000)
+        throw new Error('La ubicación no es reciente. Se reintentará automáticamente.');
+    const dispositivo = await instalacion(), redondear = v => Math.round(v*1e6)/1e6;
+    const op = { ...dispositivo, operacionId:uuidv7(), tipo:'ReportarPosicion', rutaId, envioId:null,
+        ocurridoEn:new Date(posicion.capturadaEn).toISOString(), latitud:redondear(posicion.latitud),
+        longitud:redondear(posicion.longitud), correlacionId:traceparent() };
+    const registro = await cifrar('operacion',op.operacionId,op,s), db = await open();
+    let guardada = false;
+    try {
+        // Serializa pestañas y rendición, incluso sin Web Locks. La ubicación completa queda cifrada.
+        const tx = db.transaction(['espacios','operaciones','borradores','instalacion'],'readwrite'), done = completed(tx);
+        comprobarToken(tx.objectStore('espacios'),s,() => {
+            const r = tx.objectStore('borradores').get(draftKey(s,rutaId,'rendicion'));
+            r.onsuccess = () => {
+                if (r.result?.bloqueaRuta) return;
+                const id = `gps:${key(s)}:${rutaId}`, ultima = tx.objectStore('instalacion').get(id);
+                ultima.onsuccess = () => {
+                    if (ultima.result && Date.now()-ultima.result < 30000) return;
+                    tx.objectStore('instalacion').put(Date.now(),id);
+                    tx.objectStore('operaciones').add({ ...registro, estado:'Pendiente', secuencia:op.secuencia },op.operacionId);
+                    guardada = true;
+                };
+            };
+        },tx);
+        await done;
+    } finally { db.close(); }
+    return guardada;
 }

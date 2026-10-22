@@ -57,8 +57,8 @@ else if (envios.Length == 0) { <div class="alert alert-success">No quedan envío
         <div class="d-flex flex-wrap gap-2 mb-3">
             <button class="btn btn-outline-primary" @onclick="IniciarCamara" disabled="@(camaraActiva || Cargas.Ocupado)">Escanear con cámara</button>
             @if (camaraActiva) { <button class="btn btn-outline-secondary" @onclick="DetenerCamara">Detener cámara</button> }
-            <button class="btn btn-outline-secondary" @onclick="Cargas.AbrirAsync" disabled="@Cargas.Ocupado">Recuperar avance guardado</button>
         </div>
+        <p class="small text-muted">Tu avance se guarda automáticamente en este dispositivo.</p>
         @foreach (var envio in envios)
         {
             <section class="card mb-2"><div class="card-body">

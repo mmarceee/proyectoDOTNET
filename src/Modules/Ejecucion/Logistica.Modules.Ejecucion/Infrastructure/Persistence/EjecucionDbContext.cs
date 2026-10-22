@@ -9,6 +9,7 @@ internal sealed class EjecucionDbContext(DbContextOptions<EjecucionDbContext> op
     : ModuleDbContext(options, Schema, unidadDeTrabajo, tenant)
 {
     public const string Schema = "ejecucion";
+    public DbSet<Domain.Posiciones.PosicionVehiculo> Posiciones => Set<Domain.Posiciones.PosicionVehiculo>();
 
     public DbSet<OperacionDispositivo> Operaciones => Set<OperacionDispositivo>();
     public DbSet<Domain.Cargas.EscaneoCarga> EscaneosCarga => Set<Domain.Cargas.EscaneoCarga>();

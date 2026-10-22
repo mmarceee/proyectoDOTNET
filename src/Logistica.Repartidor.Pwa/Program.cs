@@ -12,5 +12,6 @@ builder.Services.AddScoped<Logistica.Repartidor.Pwa.Services.CargaService>();
 builder.Services.AddScoped<Logistica.Repartidor.Pwa.Services.RendicionService>();
 builder.Services.AddScoped<Logistica.Repartidor.Pwa.Services.MisRutasService>();
 builder.Services.AddScoped<Logistica.Repartidor.Pwa.Services.EntregaService>();
+builder.Services.AddScoped<Logistica.Repartidor.Pwa.Services.SeguimientoPosicionService>();
 
 await builder.Build().RunAsync();

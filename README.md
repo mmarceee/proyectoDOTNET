@@ -51,6 +51,19 @@ bash scripts/test-en-docker.sh
 
 El script también genera el reporte de cobertura de las capas de dominio y aplicación en `coverage/index.html` (configuración en `coverage.runsettings`). En el CI, el resumen aparece en la página de cada ejecución y el reporte completo se descarga como el artefacto `reporte-cobertura`.
 
+Las clases de integración se ejecutan de a una para limitar los contenedores y hosts de API
+simultáneos. Con `coverage.runsettings`, cada proceso de pruebas tiene un límite de heap administrado de 4 GiB para
+que el recolector libere memoria antes de agotar el runner; no es un límite de memoria de la aplicación desplegada.
+El límite usa [`DOTNET_GCHeapHardLimit`](https://learn.microsoft.com/dotnet/core/runtime-config/garbage-collector#heap-hard-limit)
+en el entorno del testhost configurado por VSTest.
+`PostgresApiFactory` usa un catálogo estático vacío para no reconstruir miles de endpoints Blazor en cada host de
+negocio. `AplicacionesWebAssemblyTests` mantiene el catálogo generado real y verifica el arranque, runtime y service
+worker de las aplicaciones. Sin `StaticAssets:ManifestPath`, la API sigue usando su catálogo generado habitual.
+Se cierran los servidores de compilación antes de las pruebas. CI conserva los resultados TRX y los diagnósticos de bloqueos en el artefacto `resultados-pruebas`, incluso
+si una prueba falla. Tres minutos sin actividad de pruebas abortan el proceso y registran la secuencia; el paso completo
+tiene un límite de veinte minutos. El script de Docker usa los mismos diagnósticos y guarda cada ejecución por separado
+en `TestResults/docker-*`.
+
 ## Rutas
 
 | Ruta | Contenido |

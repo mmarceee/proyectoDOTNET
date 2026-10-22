@@ -7,6 +7,13 @@
   y activando el colector "XPlat Code Coverage" (los comandos están en esos dos archivos).
 -->
 <RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <!-- 4 GiB de heap administrado por testhost. Fuerza recolección antes de agotar el runner con los hosts
+           de API y el colector de cobertura. Sólo afecta las pruebas; no configura la API ni el Worker desplegados. -->
+      <DOTNET_GCHeapHardLimit>0x100000000</DOTNET_GCHeapHardLimit>
+    </EnvironmentVariables>
+  </RunConfiguration>
   <DataCollectionRunSettings>
     <DataCollectors>
       <DataCollector friendlyName="XPlat code coverage">

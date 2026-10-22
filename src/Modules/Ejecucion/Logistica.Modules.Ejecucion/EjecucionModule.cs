@@ -22,6 +22,13 @@ public static class EjecucionModule
     {
         services.AddModuleDbContext<EjecucionDbContext>(configuration.GetConnectionString("Postgres"), EjecucionDbContext.Schema);
         services.AddScoped<IOperacionRepository, OperacionRepository>();
+        services.AddScoped<Application.Abstractions.IIntegrationEventPublisher, IntegrationEventPublisher>();
+        services.AddScoped<Domain.Posiciones.IPosicionRepository, PosicionRepository>();
+        services.AddScoped<Application.Features.ReportarPosicion.ReportarPosicionHandler>();
+        services.AddOptions<Application.Features.ReportarPosicion.RetencionPosiciones>()
+            .Bind(configuration.GetSection("Ejecucion:Posiciones:Retencion"))
+            .Validate(o => o.Dias is >= 1 and <= 3650, "La retención debe ser de 1 a 3650 días.").ValidateOnStart();
+        services.AddHostedService<DepurarPosiciones>();
         services.AddScoped<Domain.Rendiciones.IRendicionRepository, RendicionRepository>();
         services.AddScoped<Contracts.IEjecucionModuleApi, Application.EjecucionModuleApi>();
         services.AddScoped<Application.Features.IniciarRendicion.PrepararRendicion>();

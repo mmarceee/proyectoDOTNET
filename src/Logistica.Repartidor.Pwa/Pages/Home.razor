@@ -36,13 +36,13 @@ else
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <h2 class="h4 mb-0">Ruta del @ruta.FechaRuta.ToString("dd/MM/yyyy")</h2>
                     <span class="badge @(cerrada ? "text-bg-secondary" : pendiente ? "text-bg-warning" : esperaDeposito ? "text-bg-info" : "text-bg-primary")">
-                        @(cerrada ? "Finalizada" : pendiente ? "Pendiente de sincronizar" : esperaDeposito ? "Pendiente de depósito" : futura ? "Próxima ruta" : sinIniciarAtrasada ? "Pendiente de resolución por despacho" : ruta.Estado == "EnCurso" ? "En curso" : ruta.Estado == "Despachada" ? "Pendiente de carga" : "Copia anterior")
+                        @(cerrada ? "Finalizada" : pendiente ? "Pendiente de sincronizar" : esperaDeposito ? "Pendiente de cierre" : futura ? "Próxima ruta" : sinIniciarAtrasada ? "Pendiente de resolución por despacho" : ruta.Estado == "EnCurso" ? "En curso" : ruta.Estado == "Despachada" ? "Pendiente de carga" : "Copia anterior")
                     </span>
                 </div>
                 <p class="text-muted mb-2">Vehículo @(ruta.Matricula ?? "sin información") · @ruta.Envios @(ruta.Envios == 1 ? "envío" : "envíos") · @ruta.Paradas @(ruta.Paradas == 1 ? "parada" : "paradas")</p>
                 @if (cerrada) { <p>Depósito completó el cierre de esta ruta.</p> }
                 else if (pendiente) { <p>Tu declaración está guardada en este dispositivo. Falta enviarla al servidor.</p> }
-                else if (esperaDeposito) { <p>Tu declaración está confirmada. Esperando recepción del depósito. Tu recorrido en esta ruta terminó.</p> }
+                else if (esperaDeposito) { <p>Tu recorrido en esta ruta terminó. Tu declaración está confirmada; depósito debe completar el cierre de la ruta.</p> }
                 else if (futura) { <p>Podrás comenzar cuando llegue la fecha de esta ruta.</p> }
                 else if (sinIniciarAtrasada) { <p>Esta ruta es de un día anterior y no tiene una carga confirmada. Si guardaste una carga sin conexión, sincronizala primero. Si el recorrido no comenzó, coordiná con despacho para que anule el despacho y vuelva a planificar.</p> }
                 else if (anterior && carga == "Pendiente") { <p>Hay una carga guardada pendiente de sincronizar. Podés enviarla, pero no registrar una carga nueva para esta fecha.</p> }

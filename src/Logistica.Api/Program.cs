@@ -44,6 +44,7 @@ builder.Services.AddOpenTelemetry()
     .WithMetrics(metricas =>
     {
         metricas.AddMeter(MetricasCache.Medidor);
+        metricas.AddMeter(EjecucionModule.FuenteDeTrazas);
 
         if (exportarOtlp)
         {
@@ -76,11 +77,14 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<TenantProvisorio>();
 builder.Services.AddScoped<InquilinoMensaje>();
+builder.Services.AddScoped<InquilinoTrabajo>();
 builder.Services.AddScoped<TenantDeSesion>();
 builder.Services.AddScoped<ICurrentTenant>(sp =>
 {
     var mensaje = sp.GetRequiredService<InquilinoMensaje>();
-    return mensaje.Activo ? mensaje : sp.GetRequiredService<TenantDeSesion>();
+    if (mensaje.Activo) return mensaje;
+    var trabajo = sp.GetRequiredService<InquilinoTrabajo>();
+    return trabajo.OperadorId is not null ? trabajo : sp.GetRequiredService<TenantDeSesion>();
 });
 builder.Services.AddAuthorization();
 
@@ -165,12 +169,15 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 
-app.MapStaticAssets();
+// Por defecto se usa el catálogo generado para las aplicaciones web. Los hosts de pruebas de negocio pueden
+// proporcionar un catálogo mínimo; las pruebas de archivos WebAssembly verifican el catálogo real.
+var manifiestoEstaticos = app.Configuration["StaticAssets:ManifestPath"];
+app.MapStaticAssets(manifiestoEstaticos);
 
 app.MapHealthChecks("/health");
 
 app.MapRazorPages()
-    .WithStaticAssets();
+    .WithStaticAssets(manifiestoEstaticos);
 
 app.MapAdministracionEndpoints()
     .MapEnviosEndpoints()

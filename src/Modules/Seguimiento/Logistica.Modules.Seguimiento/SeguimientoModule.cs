@@ -22,6 +22,7 @@ using Logistica.Modules.Seguimiento.Application.HechosEnvio;
 using Logistica.Modules.Seguimiento.Domain.Notificaciones;
 using Logistica.Modules.Seguimiento.Infrastructure.Correo;
 using Logistica.Modules.Administracion.Contracts.Events;
+using Logistica.Modules.Seguimiento.Application.Features.HistorialAvisos;
 using Logistica.Modules.Seguimiento.Contracts.Events;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -38,6 +39,13 @@ public static class SeguimientoModule
         services.AddScoped<ISuscripcionesAvisoReader, SuscripcionesAvisoReader>();
         services.AddScoped<ConsultarSuscripcionesAvisoHandler>();
         services.AddScoped<DesactivarSuscripcionAvisoHandler>();
+        services.AddScoped<IHistorialAvisosReader, HistorialAvisosReader>();
+        services.AddScoped<IReenviosAvisoRepository, ReenviosAvisoRepository>();
+        services.AddScoped<ReenviarAvisosHandler>();
+        services.AddScoped(sp => new ConsultarHistorialAvisosHandler(
+            sp.GetRequiredService<IHistorialAvisosReader>(),
+            sp.GetRequiredService<Administracion.Contracts.IAdministracionModuleApi>(),
+            sp.GetRequiredService<SharedKernel.ICurrentTenant>()));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<EnviarPruebaAvisoHandler>();
         services.AddHttpClient<IEmisorAvisos, EmisorAvisosHttp>(http => http.Timeout = TimeSpan.FromSeconds(10))
@@ -116,6 +124,7 @@ public static class SeguimientoModule
     {
         Presentation.Features.ConsultarAvisos.ConsultarAvisosEndpoint.Map(endpoints);
         Presentation.Features.ConfigurarSuscripcionesAviso.ConfigurarSuscripcionesAvisoEndpoints.Map(endpoints);
+        Presentation.Features.HistorialAvisos.HistorialAvisosEndpoints.Map(endpoints);
         Presentation.Features.ConsultarSeguimiento.ConsultarSeguimientoEndpoint.Map(endpoints);
         return endpoints;
     }
