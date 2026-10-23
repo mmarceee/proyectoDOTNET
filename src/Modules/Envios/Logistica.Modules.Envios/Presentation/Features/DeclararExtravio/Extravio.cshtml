@@ -1,0 +1,39 @@
+@page "/backoffice/envios/{numero}/extravio"
+@model Logistica.Modules.Envios.Presentation.Features.DeclararExtravio.ExtravioModel
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = $"Declarar extravío · {Model.Numero}";
+}
+
+<div class="backoffice-page-header mb-4">
+    <div>
+        <h1 class="mb-2">Declarar extravío del envío @Model.Numero</h1>
+        <span class="badge @EstadoEnvioBadge.Clase(Model.Estado)">@EstadoEnvioTexto.Mostrar(Model.Estado)</span>
+    </div>
+    <a href="/backoffice/envios/@Uri.EscapeDataString(Model.Numero)" class="btn btn-outline-secondary">Volver al envío</a>
+</div>
+
+<div class="alert alert-warning" role="alert">
+    El envío quedará <strong>Extraviado</strong>. Es un estado final: no se puede deshacer.
+</div>
+
+<form method="post" class="card">
+    <div class="card-body p-4">
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+        <div class="mb-3">
+            <label asp-for="Motivo" class="form-label">Motivo</label>
+            <textarea asp-for="Motivo" class="form-control" rows="3" maxlength="500"></textarea>
+            <span asp-validation-for="Motivo" class="text-danger"></span>
+        </div>
+
+        <div class="form-check mb-3">
+            <input asp-for="Confirmo" class="form-check-input" />
+            <label asp-for="Confirmo" class="form-check-label">Entiendo que esta acción no se puede deshacer.</label>
+            <span asp-validation-for="Confirmo" class="text-danger d-block"></span>
+        </div>
+
+        <button type="submit" class="btn btn-danger">Declarar extraviado</button>
+    </div>
+</form>
