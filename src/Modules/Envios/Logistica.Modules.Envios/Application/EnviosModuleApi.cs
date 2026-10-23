@@ -1,6 +1,7 @@
 using Logistica.Modules.Envios.Contracts;
 using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Contracts.Results;
+using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
 using Logistica.Modules.Envios.Domain.Devoluciones;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Domain.Incidencias;
@@ -10,7 +11,7 @@ namespace Logistica.Modules.Envios.Application;
 
 // Implementación del contrato de Envíos. Es internal: los otros módulos sólo ven la interfaz.
 internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj, IReglasDeEntrega reglasDeEntrega,
-    IIntegrationEventPublisher eventos) : IEnviosModuleApi
+    IIntegrationEventPublisher eventos, ConsultarEnviosHandler listado) : IEnviosModuleApi
 {
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
@@ -156,6 +157,17 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
     public Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct)
     {
         return envios.IdPorNumeroAsync(numero.Trim().ToUpperInvariant(), ct);
+    }
+
+    // CU-60: reusa el listado del Backoffice (CU-13), con sus validaciones y el filtro "Tenant", y devuelve sólo lo que
+    // la página de seguimiento muestra.
+    public async Task<PaginaEnviosParaSeguimiento> ListarParaSeguimientoAsync(string? texto, int pagina, CancellationToken ct)
+    {
+        var resultado = await listado.HandleAsync(new ConsultarEnviosQuery(Pagina: pagina, Texto: texto), ct);
+        var filas = resultado.Envios
+            .Select(e => new EnvioParaSeguimiento(e.Numero, e.Estado, e.DestinatarioNombre, e.Localidad, e.CreadoEn))
+            .ToArray();
+        return new PaginaEnviosParaSeguimiento(filas, resultado.Pagina, resultado.TotalPaginas);
     }
 
     public Task<IReadOnlyList<Guid>> EnviosSinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct)

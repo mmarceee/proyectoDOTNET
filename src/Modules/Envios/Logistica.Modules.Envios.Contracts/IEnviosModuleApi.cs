@@ -43,6 +43,10 @@ public interface IEnviosModuleApi
     // el Backoffice. null si no existe o es de otro operador.
     Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct);
 
+    // CU-60: los envíos del operador, del más nuevo al más viejo, para elegir desde el Backoffice cuál enlace de
+    // seguimiento mandar. texto busca por número o destinatario, igual que el listado de envíos (CU-13).
+    Task<PaginaEnviosParaSeguimiento> ListarParaSeguimientoAsync(string? texto, int pagina, CancellationToken ct);
+
     // CU-55 (T8): los envíos que salieron y no llegaron a intentarse vuelven al depósito, y cada uno publica
     // EnvioReintegradoADeposito por Outbox. Si alguno ya no está EnTransito, lanza una DomainException.
     Task ReintegrarADepositoAsync(IReadOnlyCollection<Guid> envioIds, Guid? responsableId, CancellationToken ct);

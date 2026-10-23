@@ -1,0 +1,70 @@
+@page "/backoffice/seguimiento"
+@model Logistica.Modules.Seguimiento.Presentation.Features.ConsultarSeguimiento.IndexModel
+@using Logistica.Modules.Seguimiento.Application.Features.ConsultarSeguimiento
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Seguimiento";
+}
+
+<h1 class="h3 mb-2">Seguimiento</h1>
+<p class="text-muted">Elegí un envío para ver su enlace de seguimiento y mandárselo al destinatario.</p>
+
+<form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-3">
+    <div>
+        <label for="Texto" class="form-label">Número o destinatario</label>
+        <input id="Texto" name="Texto" value="@Model.Texto" type="search" class="form-control"
+               placeholder="Escribí y presioná Enter" />
+    </div>
+    <a href="/backoffice/seguimiento" class="btn btn-outline-secondary">Limpiar</a>
+</form>
+
+@if (Model.Resultado.Envios.Count == 0)
+{
+    <p>No hay envíos para mostrar.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Número</th>
+                    <th scope="col">Destinatario</th>
+                    <th scope="col">Localidad</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Fecha de alta</th>
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var envio in Model.Resultado.Envios)
+                {
+                    <tr>
+                        <td>@envio.Numero</td>
+                        <td>@envio.Destinatario</td>
+                        <td>@envio.Localidad</td>
+                        <td>@TextosSeguimiento.Estado(envio.Estado)</td>
+                        <td>@envio.CreadoEn.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            <a class="btn btn-outline-primary btn-sm text-nowrap"
+                               href="/backoffice/seguimiento/@Uri.EscapeDataString(envio.Numero)"
+                               aria-label="Ver el enlace de seguimiento del envío @envio.Numero">Ver enlace</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <nav aria-label="Paginación" class="d-flex align-items-center gap-3">
+        @if (Model.Resultado.Pagina > 1)
+        {
+            <a class="btn btn-outline-primary" href="@Model.UrlPagina(Model.Resultado.Pagina - 1)">Anterior</a>
+        }
+        <span>Página @Model.Resultado.Pagina de @Model.Resultado.TotalPaginas</span>
+        @if (Model.Resultado.Pagina < Model.Resultado.TotalPaginas)
+        {
+            <a class="btn btn-outline-primary" href="@Model.UrlPagina(Model.Resultado.Pagina + 1)">Siguiente</a>
+        }
+    </nav>
+}
