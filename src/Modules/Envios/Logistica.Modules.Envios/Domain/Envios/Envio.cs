@@ -223,6 +223,21 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         DefinirPlanificacion(ZonaId, franjaId, fecha);
     }
 
+    // CU-21 (T16): el administrador o el despachador declara perdido un envío que estaba en el depósito, en tránsito o
+    // en devolución. Extraviado es terminal. La Incidencia de tipo Extravío es otro agregado: la crea quien llama,
+    // en la misma transacción.
+    public void DeclararExtravio(string motivo, Guid? responsableId, DateTimeOffset ahora)
+    {
+        // A1: el motivo es obligatorio (guarda de T16).
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            throw new DomainException("Para declarar un extravío hay que indicar el motivo.");
+        }
+
+        // A2: si el estado no lo permite (por ejemplo, Entregado), Transicionar lanza TransicionInvalidaException.
+        Transicionar(EstadoEnvio.Extraviado, OrigenEvento.Backoffice, responsableId, ahora, detalle: motivo.Trim());
+    }
+
     // Verifica la transición antes de tocar el envío, para no dejar un intento agregado sin su cambio de estado.
     private void ExigirTransicion(EstadoEnvio nuevo)
     {

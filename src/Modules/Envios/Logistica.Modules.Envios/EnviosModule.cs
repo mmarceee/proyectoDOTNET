@@ -17,6 +17,7 @@ using Logistica.Modules.Envios.Application.Features.CancelarEnvio;
 using Logistica.Modules.Envios.Presentation.Features.CancelarEnvio;
 using Logistica.Modules.Envios.Application.Features.ReprogramarEnvio;
 using Logistica.Modules.Envios.Presentation.Features.ReprogramarEnvio;
+using Logistica.Modules.Envios.Application.Features.DeclararExtravio;
 
 namespace Logistica.Modules.Envios;
 
@@ -39,6 +40,7 @@ public static class EnviosModule
         services.AddScoped<CrearEnvioHandler>();
         services.AddScoped<CancelarEnvioHandler>();
         services.AddScoped<ReprogramarEnvioHandler>();
+        services.AddScoped<DeclararExtravioHandler>();
 
         // Las reglas de entrega y el catálogo de motivos de la versión del envío, pedidos a Administración (CU-06).
         services.AddScoped<IReglasDeEntrega, Infrastructure.ReglasDeEntregaDeAdministracion>();
