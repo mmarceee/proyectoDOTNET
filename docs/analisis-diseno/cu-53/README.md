@@ -52,7 +52,33 @@ Verificación local del 21/10/2026:
 
 La aprobación de las pruebas estructurales no certifica cumplimiento completo del ADR-0004: véase [auditoría de arquitectura y documentación](revision-arquitectura.md) para los pendientes detectados en la sincronización compartida.
 
-Comandos desde la raíz:
+## Prueba manual del reporte de posición
+
+CU-53 registra una posición cada **30 segundos**, no cada 30 minutos. No genera un informe periódico para descargar. El indicador de la PWA informa el estado; los puntos se comprueban en la sincronización y en la persistencia. El mapa corresponde a CU-66.
+
+1. Ingresar a `/repartidor/` con el repartidor asignado a una ruta. Descargar su hoja y confirmar la carga de al menos un envío completo para que la ruta esté EnCurso. No confirmar todavía la declaración de rendición.
+2. Permitir ubicación en el navegador y mantener la PWA abierta y visible. En desarrollo puede usarse localhost en la computadora; al entrar desde un teléfono se necesita un origen HTTPS seguro. La ubicación simulada del navegador sirve para comprobar el circuito sin desplazarse; mantener las mismas coordenadas no impide registrar capturas con horas distintas.
+3. Abrir las herramientas del navegador (F12), pestaña Red/Network, filtrar por `sincronizacion` y observar durante 60–90 segundos. Abrir las solicitudes `POST /api/repartidor/sincronizacion`: en el cuerpo, buscar operaciones con `tipo: "ReportarPosicion"`, `rutaId`, `latitud`, `longitud` y `ocurridoEn`. Los lotes pueden incluir otras operaciones; no existe un POST separado para GPS.
+4. En la respuesta, relacionar cada `operacionId` con su `resultado`: debe ser `Aplicada` o, si es un reenvío, `YaAplicada`. Un HTTP 200 por sí solo no acredita aceptación: revisar `motivo` y `detalle` si el resultado es `Conflicto` o `Invalida`. La captura inicial y los disparadores de reconexión/visibilidad, la espera del GPS y los reintentos hacen que el envío no sea un reloj exacto de 30 segundos.
+5. Para comprobar lo que llegó al servidor, ejecutar esta consulta de sólo lectura en PostgreSQL, reemplazando ambos IDs por los del operador y la ruta probados. Ejecutarla otra vez después de 30–60 segundos: deben aparecer nuevas filas y horas de captura, aunque el vehículo esté quieto.
+
+```sql
+SELECT "Id", "VehiculoId", "Latitud", "Longitud", "CapturadaEn", "RecibidaEn"
+FROM ejecucion.posiciones_vehiculo
+WHERE "OperadorId" = '<OPERADOR_ID>'::uuid
+  AND "RutaId" = '<RUTA_ID>'::uuid
+ORDER BY "CapturadaEn" DESC, "Id" DESC
+LIMIT 20;
+```
+
+6. Probar sin red manteniendo la página abierta y visible: la PWA debe indicar que conserva posiciones pendientes y la base no recibe puntos nuevos. Al reconectar, comprobar que se envían las capturas atrasadas; `CapturadaEn` conserva su momento original y `RecibidaEn` refleja cuándo llegaron. Para recargar o abrir la aplicación completamente sin red hace falta la PWA publicada: el service worker de desarrollo no guarda toda la aplicación.
+7. Confirmar la declaración de rendición y esperar al menos 60 segundos con la PWA visible: no deben generarse capturas posteriores a esa confirmación. Todavía pueden sincronizarse puntos anteriores que estaban pendientes. Guardar sólo el borrador no detiene el seguimiento.
+
+Si no aparecen puntos: comprobar permiso de ubicación, visibilidad, ruta EnCurso, hoja descargada y ausencia de una rendición ya confirmada. El indicador distingue falta de permiso, ubicación no disponible y problemas de sincronización. La cola local está cifrada: no se espera leer coordenadas directamente de IndexedDB sin pasar por el código de la aplicación.
+
+## Comandos de pruebas automatizadas
+
+Desde la raíz:
 
 ```powershell
 npm --prefix scripts/tests test
