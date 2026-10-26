@@ -1,0 +1,33 @@
+@page "/backoffice/envios/{numero}/devolucion"
+@model Logistica.Modules.Envios.Presentation.Features.IniciarDevolucion.DevolucionModel
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = $"Iniciar devolución · {Model.Numero}";
+}
+
+<div class="backoffice-page-header mb-4">
+    <div>
+        <h1 class="mb-2">Iniciar la devolución del envío @Model.Numero</h1>
+        <span class="badge @EstadoEnvioBadge.Clase(Model.Estado)">@EstadoEnvioTexto.Mostrar(Model.Estado)</span>
+    </div>
+    <a href="/backoffice/envios/@Uri.EscapeDataString(Model.Numero)" class="btn btn-outline-secondary">Volver al envío</a>
+</div>
+
+<div class="alert alert-info" role="status">
+    El envío quedará <strong>En devolución</strong> y se le avisará al comercio.
+</div>
+
+<form method="post" class="card">
+    <div class="card-body p-4">
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+        <div class="mb-3">
+            <label asp-for="Motivo" class="form-label">Motivo</label>
+            <textarea asp-for="Motivo" class="form-control" rows="3" maxlength="500"></textarea>
+            <span asp-validation-for="Motivo" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-warning">Iniciar devolución</button>
+    </div>
+</form>
