@@ -35,6 +35,8 @@ public sealed class NuevoEnvioFormulario
 
     public string? Referencia { get; set; }
 
+    public string Modalidad { get; set; } = "Estandar";
+
     public List<BultoFormulario> Bultos { get; } = [new()];
 
     public CrearEnvioRequest ARequest() => new(
@@ -46,7 +48,8 @@ public sealed class NuevoEnvioFormulario
             Departamento,
             CodigoPostal.Trim(),
             Opcional(Referencia)),
-        Bultos.Select(b => new BultoRequest(b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList());
+        Bultos.Select(b => new BultoRequest(b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
+        Modalidad);
 
     // Un campo opcional que quedó vacío viaja como null, no como "".
     private static string? Opcional(string? valor)

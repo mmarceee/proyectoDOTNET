@@ -13,4 +13,5 @@ internal sealed record EnvioDetalleDto(
     VersionTarifarioDetalleDto? VersionTarifario,
     IReadOnlyList<IntentoEntregaDetalleDto> Intentos,
     IReadOnlyList<IncidenciaDetalleDto> Incidencias,
-    DevolucionDetalleDto? Devolucion);
+    DevolucionDetalleDto? Devolucion,
+    string Modalidad = "Estandar");

@@ -1,4 +1,5 @@
 using Logistica.SharedKernel;
+using Logistica.Modules.Administracion.Contracts;
 
 namespace Logistica.Modules.Envios.Domain.Envios;
 
@@ -16,6 +17,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public Direccion Direccion { get; private set; } = null!;
     public EstadoEnvio Estado { get; private set; }
     public decimal MontoTarifa { get; private set; }
+    public Modalidad Modalidad { get; private set; }
     // Nullable para los envíos admitidos con la tarifa provisoria del esqueleto inicial.
     public Guid? VersionTarifarioId { get; private set; }
     public int? VersionTarifarioNumero { get; private set; }
@@ -54,7 +56,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
 
     public static Envio Crear(Guid operadorId, Guid comercioId, string numero, Destinatario destinatario,
         Direccion direccion, IReadOnlyList<DatosBulto> bultos, OrigenEvento origen, Guid? responsableId,
-        DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null, Guid? versionReglasId = null)
+        DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null, Guid? versionReglasId = null,
+        Modalidad modalidad = Modalidad.Estandar)
     {
         if (string.IsNullOrWhiteSpace(numero))
         {
@@ -65,6 +68,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         {
             throw new DomainException("Un envío debe tener al menos un bulto.");
         }
+        if (!Enum.IsDefined(modalidad))
+            throw new DomainException("La modalidad del envío no es válida.");
 
         if (versionTarifario is not null && (versionTarifario.Id == Guid.Empty || versionTarifario.Numero < 1))
         {
@@ -84,6 +89,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             Destinatario = destinatario,
             Direccion = direccion,
             Estado = EstadoEnvio.Admitido,
+            Modalidad = modalidad,
             // Todos los instantes del envío se guardan en UTC: PostgreSQL no admite otro desfase.
             CreadoEn = ahora.ToUniversalTime(),
             VersionTarifarioId = versionTarifario?.Id,

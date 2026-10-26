@@ -105,7 +105,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     public async Task Capacidad_excedida_no_deja_ruta_asignacion_ni_outbox()
     {
         using var client = Cliente();
-        var envio = await RecibidoAsync(client, peso: 1001);
+        var envio = await RecibidoAsync(client, recibido: 1001);
         var response = await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(new(2035, 1, 2), envio.Id));
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("CapacidadPesoExcedida", await response.Content.ReadAsStringAsync());
@@ -116,8 +116,8 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     public async Task Agregado_revalida_toda_la_carga_y_una_modificacion_fallida_conserva_la_ruta()
     {
         using var client = Cliente();
-        var a = await RecibidoAsync(client, peso: 600);
-        var b = await RecibidoAsync(client, peso: 450);
+        var a = await RecibidoAsync(client, recibido: 600);
+        var b = await RecibidoAsync(client, recibido: 450);
         var ruta = await ExigirRutaAsync(await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(new(2035, 1, 3), a.Id)), HttpStatusCode.Created);
         var agregado = await client.PostAsJsonAsync($"/api/planificacion/rutas/{ruta.Id}/envios", new AgregarEnviosRutaRequest(ruta.Revision, [b.Id]));
         Assert.Equal(HttpStatusCode.BadRequest, agregado.StatusCode);
@@ -485,12 +485,39 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         var primero = Ejecutar(a); var segundo = Ejecutar(b); inicio.SetResult();
         return await Task.WhenAll(primero, segundo);
     }
-    private static async Task<CrearEnvioResponse> RecibidoAsync(HttpClient client, decimal peso = 2, decimal? recibido = null)
+    [Theory]
+    [InlineData("Estandar", false)]
+    [InlineData("Urgente", true)]
+    public async Task La_seleccion_de_envios_muestra_el_distintivo_solo_para_urgentes(string modalidad, bool urgente)
+    {
+        using var client = Cliente();
+        var envio = await RecibidoAsync(client, modalidad: modalidad);
+        var disponibles = (await client.GetFromJsonAsync<EnviosDisponiblesResponse>(
+            $"/api/planificacion/envios-disponibles?fecha=2035-04-20&texto={envio.Numero}"))!;
+        Assert.Equal(modalidad, Assert.Single(disponibles.Items).Modalidad);
+        var pagina = await client.GetStringAsync("/backoffice/rutas/nueva");
+        var token = Regex.Match(pagina, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+        Assert.True(token.Success);
+        var respuesta = await client.PostAsync("/backoffice/rutas/nueva?handler=Filtrar", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = WebUtility.HtmlDecode(token.Groups[1].Value),
+                ["Fecha"] = "2035-04-20", ["Texto"] = envio.Numero,
+            }));
+        respuesta.EnsureSuccessStatusCode();
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains(envio.Numero, html);
+        if (urgente) Assert.Contains("badge text-bg-warning", html);
+        else Assert.DoesNotContain("badge text-bg-warning", html);
+    }
+
+    private static async Task<CrearEnvioResponse> RecibidoAsync(HttpClient client, decimal peso = 2, decimal? recibido = null,
+        string modalidad = "Estandar")
     {
         var crear = await client.PostAsJsonAsync("/api/envios", new CrearEnvioRequest(
             new DestinatarioRequest("Ana", "099123456", null, null),
             new DireccionRequest("Av. Italia", Guid.NewGuid().ToString("N"), "Montevideo", "Montevideo", "11300", null),
-            [new BultoRequest(peso, 30, 20, 10)]));
+            [new BultoRequest(peso, 30, 20, 10)], modalidad));
         crear.EnsureSuccessStatusCode();
         var envio = (await crear.Content.ReadFromJsonAsync<CrearEnvioResponse>())!;
         var recepcion = await client.PostAsJsonAsync("/api/deposito/recepciones", new RecibirBultoRequest($"{envio.Numero}-1", recibido));

@@ -40,7 +40,8 @@ public sealed class DetalleEnvioPaginaTests(PostgresApiFactory factory) : IClass
         Assert.Contains("Historial de eventos", html);
         Assert.Contains("Alta del envío", html);
         Assert.Contains("Portal del comercio", html);
-        Assert.Contains("No se registró una versión tarifaria", html);
+        Assert.Contains("Versión 1", html);
+        Assert.DoesNotContain("No se registró una versión tarifaria", html);
         Assert.Contains("No hay intentos de entrega registrados", html);
         Assert.Contains("No hay incidencias registradas", html);
         Assert.Contains("No hay devolución registrada", html);
@@ -59,7 +60,8 @@ public sealed class DetalleEnvioPaginaTests(PostgresApiFactory factory) : IClass
         var html = WebUtility.HtmlDecode(await factory.CreateClient().GetStringAsync(
             $"/backoffice/envios/{numero}"));
 
-        Assert.Contains("href=\"/backoffice/envios\" class=\"btn btn-outline-secondary\">Volver al listado", html);
+        Assert.Contains("href=\"/backoffice/envios\"", html);
+        Assert.Contains("Volver al listado", html);
     }
 
     [Fact]

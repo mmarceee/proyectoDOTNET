@@ -4,7 +4,8 @@ namespace Logistica.Http.Contracts.Envios;
 public sealed record CrearEnvioRequest(
     DestinatarioRequest Destinatario,
     DireccionRequest Direccion,
-    IReadOnlyList<BultoRequest> Bultos);
+    IReadOnlyList<BultoRequest> Bultos,
+    string Modalidad = "Estandar");
 
 public sealed record DestinatarioRequest(string Nombre, string Telefono, string? Email, string? Documento);
 

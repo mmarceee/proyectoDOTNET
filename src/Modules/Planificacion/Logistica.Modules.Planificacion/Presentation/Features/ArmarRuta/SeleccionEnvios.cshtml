@@ -20,7 +20,14 @@
     <table class="table table-hover align-middle mb-0"><thead><tr><th>Seleccionar</th><th>Envío</th><th>Dirección</th><th>Peso kg</th><th>Volumen m³</th><th>Reintento</th></tr></thead><tbody>
     @foreach (var e in Model.Candidatos)
     {
-        <tr><td><input type="checkbox" name="Seleccion" value="@e.Id" checked="@(e.DisponibleParaFecha && Model.Seleccion.Contains(e.Id))" disabled="@(!e.DisponibleParaFecha)" aria-label="Seleccionar @e.Numero" /></td><td>@e.Numero</td><td>@e.Direccion</td><td>@e.PesoKg</td><td>@e.VolumenM3.ToString("0.######")</td>
+        <tr><td><input type="checkbox" name="Seleccion" value="@e.Id" checked="@(e.DisponibleParaFecha && Model.Seleccion.Contains(e.Id))" disabled="@(!e.DisponibleParaFecha)" aria-label="Seleccionar @e.Numero" /></td>
+            <td>
+                @e.Numero
+                @if (e.Modalidad == "Urgente")
+                {
+                    <span class="badge text-bg-warning text-nowrap ms-2">Urgente</span>
+                }
+            </td><td>@e.Direccion</td><td>@e.PesoKg</td><td>@e.VolumenM3.ToString("0.######")</td>
             <td>
                 @if (e.ReintentoDesde is DateTimeOffset desde)
                 {
