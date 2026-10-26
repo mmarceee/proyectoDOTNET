@@ -1,0 +1,42 @@
+.carga-bultos {
+    display: grid;
+    gap: .5rem;
+}
+
+.carga-bulto {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem 1rem;
+    padding: .625rem .75rem;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+}
+
+.carga-bulto-codigo {
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+.carga-bulto-estado {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    font-weight: 600;
+}
+
+.carga-bulto-cargado {
+    background-color: #d1e7dd;
+    border-color: #198754;
+}
+
+.carga-bulto-cargado .carga-bulto-estado {
+    color: #0f5132;
+}
+
+.carga-bulto-tick {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+}

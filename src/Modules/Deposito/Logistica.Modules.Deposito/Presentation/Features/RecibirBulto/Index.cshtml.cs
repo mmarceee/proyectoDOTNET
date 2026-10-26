@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Logistica.Modules.Deposito.Presentation.Features.RecibirBulto;
 
@@ -14,8 +17,15 @@ namespace Logistica.Modules.Deposito.Presentation.Features.RecibirBulto;
 // Misma política que la API de recepción: el middleware deja entrar a todo el personal al Backoffice, pero recibir
 // bultos es sólo del operario de depósito.
 [Authorize(Policy = Politicas.OperarioDeposito)]
-internal sealed class IndexModel(RecibirBultoHandler handler, ConsultarBultoParaRecepcionHandler consulta) : PageModel
+internal sealed class IndexModel(RecibirBultoHandler handler, ConsultarBultoParaRecepcionHandler consulta,
+    IDataProtectionProvider proteccion) : PageModel
 {
+    private readonly IDataProtector protector = proteccion.CreateProtector("Deposito.Recepcion.ConfirmacionMedidas.v1");
+
+    [BindProperty] public bool ConfirmarDiferencias { get; set; }
+    [BindProperty] public string? ConfirmacionMedidas { get; set; }
+    public IReadOnlyList<DiferenciaMedida> Diferencias { get; private set; } = [];
+
     [BindProperty(SupportsGet = true)]
     public string? CodigoBulto { get; set; }
 
@@ -92,7 +102,33 @@ internal sealed class IndexModel(RecibirBultoHandler handler, ConsultarBultoPara
 
         try
         {
-            var command = new RecibirBultoCommand(CodigoBulto, new Medidas(PesoKg, LargoCm, AnchoCm, AltoCm));
+            if (!ModelState.IsValid)
+            {
+                await CargarEnvioAsync(ct);
+                return Page();
+            }
+
+            var medidas = new Medidas(PesoKg, LargoCm, AnchoCm, AltoCm);
+            var bulto = await consulta.HandleAsync(new(CodigoBulto), ct)
+                ?? throw new DomainException("Bulto desconocido.");
+            NumeroEnvio = bulto.NumeroEnvio;
+            var diferencias = new List<DiferenciaMedida>();
+            Comparar("Peso", "kg", bulto.Declaradas.PesoKg, PesoKg, diferencias);
+            Comparar("Largo", "cm", bulto.Declaradas.LargoCm, LargoCm, diferencias);
+            Comparar("Ancho", "cm", bulto.Declaradas.AnchoCm, AnchoCm, diferencias);
+            Comparar("Alto", "cm", bulto.Declaradas.AltoCm, AltoCm, diferencias);
+            var datos = JsonSerializer.Serialize(new { bulto.CodigoBulto, bulto.Declaradas, Medidas = medidas });
+            if (diferencias.Count > 0 && !ConfirmacionValida(datos))
+            {
+                Diferencias = diferencias;
+                ConfirmarDiferencias = false;
+                ConfirmacionMedidas = protector.Protect(datos);
+                ModelState.Remove(nameof(ConfirmarDiferencias));
+                ModelState.Remove(nameof(ConfirmacionMedidas));
+                return Page();
+            }
+
+            var command = new RecibirBultoCommand(CodigoBulto, medidas);
             Resultado = await handler.HandleAsync(command, ct);
             NumeroEnvio = Resultado.NumeroEnvio;
         }
@@ -107,7 +143,27 @@ internal sealed class IndexModel(RecibirBultoHandler handler, ConsultarBultoPara
         ModelState.Clear();
         CodigoBulto = "";
         PesoKg = LargoCm = AnchoCm = AltoCm = null;
+        ConfirmarDiferencias = false;
+        ConfirmacionMedidas = null;
 
         return Page();
     }
+
+    private bool ConfirmacionValida(string datos)
+    {
+        if (!ConfirmarDiferencias || string.IsNullOrEmpty(ConfirmacionMedidas)) return false;
+        try { return protector.Unprotect(ConfirmacionMedidas) == datos; }
+        catch (CryptographicException) { return false; }
+    }
+
+    private static void Comparar(string nombre, string unidad, decimal? declarado, decimal? medido,
+        List<DiferenciaMedida> diferencias)
+    {
+        if (medido is not decimal valor) return;
+        if (valor <= 0) throw new DomainException($"El valor de {nombre.ToLowerInvariant()} debe ser mayor que cero.");
+        if (declarado is decimal original && original != valor)
+            diferencias.Add(new(nombre, unidad, original, valor));
+    }
 }
+
+internal sealed record DiferenciaMedida(string Nombre, string Unidad, decimal Declarado, decimal Medido);

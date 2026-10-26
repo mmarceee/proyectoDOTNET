@@ -1,4 +1,5 @@
 using Logistica.Modules.Envios.Domain.Envios;
+using Logistica.Modules.Administracion.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,6 +15,7 @@ internal sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         builder.HasIndex(e => new { e.OperadorId, e.Numero }).IsUnique();
 
         builder.Property(e => e.Estado).HasConversion<string>();
+        builder.Property(e => e.Modalidad).HasConversion<string>().HasDefaultValue(Modalidad.Estandar);
 
         // Concurrencia optimista sobre xmin, la versión de fila de PostgreSQL: si dos operaciones
         // cambian el mismo envío a la vez (por ejemplo, recepción y cancelación), la segunda falla
