@@ -250,6 +250,8 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
     {
         private readonly OperacionRepository original = new(db);
         public Task<OperacionDispositivo?> ObtenerAsync(Guid id, CancellationToken ct) => original.ObtenerAsync(id, ct);
+        public Task<IReadOnlyList<OperacionDispositivo>> ConflictosPendientesAsync(CancellationToken ct) => original.ConflictosPendientesAsync(ct);
+        public Task<OperacionDispositivo?> ObtenerParaRevisarAsync(Guid id, CancellationToken ct) => original.ObtenerParaRevisarAsync(id, ct);
         public void Agregar(OperacionDispositivo o) => original.Agregar(o);
         public async Task GuardarCambiosAsync(CancellationToken ct)
         {

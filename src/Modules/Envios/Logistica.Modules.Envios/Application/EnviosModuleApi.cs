@@ -170,6 +170,16 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         return new PaginaEnviosParaSeguimiento(filas, resultado.Pagina, resultado.TotalPaginas);
     }
 
+    // CU-66: traduce los envíos a lo que ve el tablero. "EntregaPendiente" usa la misma lista que CU-04.
+    public async Task<IReadOnlyList<EnvioParaTablero>> ListarParaTableroAsync(IReadOnlyCollection<Guid> deRutas,
+        DateOnly hasta, CancellationToken ct)
+    {
+        return (await envios.ListarParaTableroAsync(deRutas, hasta, ct))
+            .Select(e => new EnvioParaTablero(e.Id, e.Numero, e.Estado.ToString(), e.FechaEntregaProgramada,
+                e.FranjaHorariaId, Envio.EstadosConEntregaPendiente.Contains(e.Estado)))
+            .ToArray();
+    }
+
     public Task<IReadOnlyList<Guid>> EnviosSinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct)
     {
         return envios.SinFechaConFranjasAsync(franjaIds, ct);

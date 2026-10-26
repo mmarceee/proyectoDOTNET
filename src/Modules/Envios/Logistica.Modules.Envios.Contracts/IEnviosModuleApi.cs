@@ -54,4 +54,9 @@ public interface IEnviosModuleApi
     // CU-55, A1: los bultos que tenían que volver en una rendición y no llegaron. Abre una incidencia por envío con sus
     // códigos; el despachador decide si declara el extravío (CU-21).
     Task RegistrarFaltantesAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct);
+
+    // CU-66: los envíos de las rutas en la calle (para su avance) y los que esperan la entrega con fecha hasta "hasta"
+    // inclusive (para el riesgo). El operador lo pone el filtro "Tenant".
+    Task<IReadOnlyList<EnvioParaTablero>> ListarParaTableroAsync(IReadOnlyCollection<Guid> deRutas, DateOnly hasta,
+        CancellationToken ct);
 }

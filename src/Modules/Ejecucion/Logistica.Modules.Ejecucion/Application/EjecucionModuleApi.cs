@@ -7,8 +7,29 @@ namespace Logistica.Modules.Ejecucion.Application;
 
 internal sealed class EjecucionModuleApi(IRendicionRepository rendiciones, TimeProvider reloj,
     Domain.Posiciones.IPosicionRepository posiciones,
-    Microsoft.Extensions.Options.IOptions<Features.ReportarPosicion.RetencionPosiciones> retencion) : IEjecucionModuleApi
+    Microsoft.Extensions.Options.IOptions<Features.ReportarPosicion.RetencionPosiciones> retencion,
+    Domain.Operaciones.IOperacionRepository operaciones) : IEjecucionModuleApi
 {
+    public async Task<IReadOnlyList<ConflictoPendiente>> ListarConflictosPendientesAsync(CancellationToken ct)
+    {
+        return (await operaciones.ConflictosPendientesAsync(ct))
+            .Select(o => new ConflictoPendiente(o.Id, o.RutaId, o.EnvioId, o.RepartidorId, o.Tipo, o.Resultado.ToString(),
+                o.Motivo, o.OcurridoEn, o.RecibidoEn))
+            .ToArray();
+    }
+
+    public async Task<bool> MarcarConflictoRevisadoAsync(Guid operacionId, CancellationToken ct)
+    {
+        if (await operaciones.ObtenerParaRevisarAsync(operacionId, ct) is not { } operacion)
+        {
+            return false;
+        }
+
+        operacion.MarcarRevisada();
+        await operaciones.GuardarCambiosAsync(ct);
+        return true;
+    }
+
     public async Task<IReadOnlyList<PosicionVehiculoResult>> ConsultarUltimasPosicionesAsync(IReadOnlyCollection<Guid> vehiculos, CancellationToken ct)
     {
         if (vehiculos.Count > 500 || vehiculos.Contains(Guid.Empty)) throw new DomainException("La consulta admite hasta 500 vehículos válidos.");

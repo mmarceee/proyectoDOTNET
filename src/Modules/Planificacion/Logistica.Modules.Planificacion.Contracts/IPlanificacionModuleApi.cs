@@ -26,4 +26,7 @@ public interface IPlanificacionModuleApi
     // Administración lo pregunta antes de reemplazar una franja, con el bloqueo de planificación del operador tomado,
     // para que nadie asigne esos envíos a una ruta mientras tanto.
     Task<bool> HayRutasActivasConEnviosAsync(IReadOnlyCollection<Guid> envioIds, DateOnly desde, CancellationToken ct);
+
+    // CU-66: las rutas del operador que están en la calle (Despachada o EnCurso), para el tablero en vivo.
+    Task<IReadOnlyList<RutaEnCurso>> ListarEnCursoAsync(CancellationToken ct);
 }

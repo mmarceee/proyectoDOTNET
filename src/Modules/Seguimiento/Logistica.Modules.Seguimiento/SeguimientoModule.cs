@@ -25,6 +25,10 @@ using Logistica.Modules.Administracion.Contracts.Events;
 using Logistica.Modules.Seguimiento.Application.Features.HistorialAvisos;
 using Logistica.Modules.Seguimiento.Contracts.Events;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Logistica.Modules.Seguimiento.Application.Features.VerTablero;
+using Logistica.Modules.Ejecucion.Contracts.Events;
+using Logistica.Modules.Seguimiento.Presentation.Features.VerTablero;
+using StackExchange.Redis;
 
 namespace Logistica.Modules.Seguimiento;
 
@@ -61,6 +65,37 @@ public static class SeguimientoModule
             sp.GetRequiredService<ISecretosAviso>(), sp.GetRequiredService<SharedKernel.ICurrentTenant>(),
             sp.GetRequiredService<SharedKernel.IUnidadDeTrabajo>()));
         services.AddScoped<ConsultarAvisosHandler>();
+        // CU-66: como ConsultarSeguimientoHandler, usa contratos que sólo están en la API; con una fábrica, el Worker
+        // (que también registra este módulo) no intenta validarlo al arrancar.
+        services.AddScoped(sp => new ConsultarTableroHandler(
+            sp.GetRequiredService<Planificacion.Contracts.IPlanificacionModuleApi>(),
+            sp.GetRequiredService<Envios.Contracts.IEnviosModuleApi>(),
+            sp.GetRequiredService<Ejecucion.Contracts.IEjecucionModuleApi>(),
+            sp.GetRequiredService<Administracion.Contracts.IAdministracionModuleApi>(),
+            sp.GetRequiredService<TimeProvider>()));
+
+        // CU-66: SignalR y, si hay Valkey, su backplane: el Worker y la API publican en las mismas salas (decisión G1).
+        var signalR = services.AddSignalR();
+        var valkey = configuration.GetConnectionString("Valkey");
+        if (!string.IsNullOrWhiteSpace(valkey))
+        {
+            signalR.AddStackExchangeRedis(valkey, opciones =>
+            {
+                opciones.Configuration.AbortOnConnectFail = false; // arranca aunque Valkey no esté, como la caché
+                opciones.Configuration.ChannelPrefix = RedisChannel.Literal("logistica-tablero");
+            });
+        }
+        services.AddScoped<ITableroEnVivo, TableroSignalR>();
+        services.AddScoped<IConsumidorPosicionReportada, ActualizarPosicionTablero>();
+        // Con fábrica por el mismo motivo que ConsultarTableroHandler: el contrato de Ejecución sólo está en la API.
+        services.AddScoped(sp => new RevisarConflictoHandler(sp.GetRequiredService<Ejecucion.Contracts.IEjecucionModuleApi>()));
+
+        // CU-66, paso 3: una cola por hecho que el Worker manda al tablero por el backplane.
+        foreach (var tipo in NotificarNovedadTablero.Tipos)
+        {
+            services.AddKeyedScoped<IConsumidorIntegracion, NotificarNovedadTablero>(NotificarNovedadTablero.Cola(tipo));
+            services.AddSingleton(new SuscripcionIntegracion(NotificarNovedadTablero.Cola(tipo), tipo));
+        }
 
         // CU-64: una cola por evento de Envíos prepara las entregas; otra envía cada entrega y la reintenta sola.
         services.AddScoped<IEnviosSeguidosRepository, EnviosSeguidosRepository>();
@@ -126,6 +161,8 @@ public static class SeguimientoModule
         Presentation.Features.ConfigurarSuscripcionesAviso.ConfigurarSuscripcionesAvisoEndpoints.Map(endpoints);
         Presentation.Features.HistorialAvisos.HistorialAvisosEndpoints.Map(endpoints);
         Presentation.Features.ConsultarSeguimiento.ConsultarSeguimientoEndpoint.Map(endpoints);
+        Presentation.Features.VerTablero.ConsultarTableroEndpoint.Map(endpoints);
+        endpoints.MapHub<TableroHub>(TableroHub.Ruta);
         return endpoints;
     }
 }
