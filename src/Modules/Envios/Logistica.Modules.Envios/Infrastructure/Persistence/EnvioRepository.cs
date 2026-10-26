@@ -135,6 +135,14 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
                 nameof(OrigenEvento.Backoffice)), ahora);
     }
 
+    public void RegistrarDevolucion(Envio envio, Domain.Devoluciones.Devolucion devolucion, EstadoEnvio estadoAnterior,
+        Guid? responsableId, OrigenEvento origen, DateTimeOffset ahora)
+    {
+        db.AgregarAlOutbox(DevolucionIniciada.Tipo,
+            new DevolucionIniciada(envio.Id, envio.Numero, devolucion.Id, estadoAnterior.ToString(), devolucion.Motivo,
+                responsableId, origen.ToString()), ahora);
+    }
+
     public void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)
     {
         db.AgregarAlOutbox(EnvioDesasignadoDeRuta.Tipo,

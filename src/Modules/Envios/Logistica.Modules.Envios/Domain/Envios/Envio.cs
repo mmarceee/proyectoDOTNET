@@ -238,6 +238,26 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         Transicionar(EstadoEnvio.Extraviado, OrigenEvento.Backoffice, responsableId, ahora, detalle: motivo.Trim());
     }
 
+    // CU-20 (T12 o T14; T10 la aplica CU-18): el despachador o el comercio deciden devolver el envío al comercio.
+    // La Devolucion es otro agregado: la crea quien llama, en la misma transacción.
+    public void IniciarDevolucion(string motivo, OrigenEvento origen, Guid? responsableId, DateTimeOffset ahora)
+    {
+        // Paso 2: el motivo es obligatorio.
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            throw new DomainException("Para iniciar la devolución hay que indicar el motivo.");
+        }
+
+        // A2: el comercio sólo puede pedirla con el envío en el depósito (T12).
+        if (origen is OrigenEvento.PortalComercio or OrigenEvento.Api && Estado != EstadoEnvio.EnDeposito)
+        {
+            throw new DomainException("El comercio sólo puede pedir la devolución de un envío que está en el depósito.");
+        }
+
+        // A1: si el estado no lo permite (por ejemplo, EnTransito), Transicionar lanza TransicionInvalidaException.
+        Transicionar(EstadoEnvio.EnDevolucion, origen, responsableId, ahora, detalle: motivo.Trim());
+    }
+
     // Verifica la transición antes de tocar el envío, para no dejar un intento agregado sin su cambio de estado.
     private void ExigirTransicion(EstadoEnvio nuevo)
     {

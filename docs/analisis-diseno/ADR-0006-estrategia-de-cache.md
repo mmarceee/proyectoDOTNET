@@ -56,7 +56,7 @@ El acceso a la caché se concentra en **una sola pieza** común a todos los mód
 | Expiración | **60 segundos, absoluta.** |
 | Invalidación | Los eventos de cambio de estado que Envíos ya publica por Outbox y RabbitMQ (ADR-0003) llegan al Worker, donde el consumidor `InvalidarSeguimiento` borra la clave del envío. El consumidor corre con el operador del sobre del mensaje como inquilino, así arma la misma clave que guardó la API. |
 
-**Eventos que invalidan:** `EnvioAsignadoARuta`, `EnvioDesasignadoDeRuta`, `EnvioEnTransito`, `EnvioEntregado`, `IntentoFallidoRegistrado`, `EnvioReprogramado`, `EnvioCancelado`, `EnvioReintegradoADeposito` y `EnvioExtraviado`. Cada caso de uso nuevo que publique un cambio de estado visible para el destinatario se suma a esta lista (por ejemplo, `DevolucionIniciada` con CU-20).
+**Eventos que invalidan:** `EnvioAsignadoARuta`, `EnvioDesasignadoDeRuta`, `EnvioEnTransito`, `EnvioEntregado`, `IntentoFallidoRegistrado`, `EnvioReprogramado`, `EnvioCancelado`, `EnvioReintegradoADeposito`, `EnvioExtraviado` y `DevolucionIniciada`. Cada caso de uso nuevo que publique un cambio de estado visible para el destinatario se suma a esta lista.
 
 - `EnvioAdmitido` no se incluye: es el estado inicial y, antes de crearse el envío, nadie pudo guardar su seguimiento.
 - **La recepción en el depósito (T2) no publica un evento** (CU-30). Hasta que exista, el destinatario puede ver el estado anterior durante, como máximo, la expiración de un minuto. Se propone agregar `EnvioRecibidoEnDeposito` al módulo de Envíos, que también serviría para los avisos al comercio (CU-64).
@@ -134,7 +134,7 @@ El Aspire Dashboard muestra los tres por grupo y, con ellos, la tasa de aciertos
 
 **En contra / riesgos**
 - **Datos viejos acotados:** hasta 1 minuto en el seguimiento (por ejemplo, la cantidad de entregas que faltan) y, en una carrera poco probable, hasta 10 minutos en un puntero de configuración.
-- **Invalidaciones olvidadas:** un caso de uso nuevo que cambie un dato cacheado y no borre su clave mostrará datos viejos hasta que expiren. En el seguimiento, cada evento nuevo de cambio de estado tiene que sumarse a `InvalidarSeguimiento.Tipos` (por ejemplo, `DevolucionIniciada` con CU-20). Se mitiga con una prueba de integración por cada dato cacheado (cambiar y leer de nuevo).
+- **Invalidaciones olvidadas:** un caso de uso nuevo que cambie un dato cacheado y no borre su clave mostrará datos viejos hasta que expiren. En el seguimiento, cada evento nuevo de cambio de estado tiene que sumarse a `InvalidarSeguimiento.Tipos`, como se hizo con `EnvioExtraviado` (CU-21) y `DevolucionIniciada` (CU-20). Se mitiga con una prueba de integración por cada dato cacheado (cambiar y leer de nuevo).
 - **Cambios de estado sin evento:** la recepción en el depósito (T2) no publica un evento, así que el seguimiento puede mostrar el estado anterior hasta un minuto (sección 2.3).
 - **Serialización:** un cambio en un DTO cacheado puede dejar entradas con la forma vieja. Se mitiga incluyendo una versión del formato en la clave cuando el DTO cambie, o vaciando la caché al desplegar.
 - **Un servicio más que operar:** Valkey en desarrollo (Docker Compose) y en producción.

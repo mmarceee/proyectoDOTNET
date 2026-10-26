@@ -52,5 +52,9 @@ internal interface IEnvioRepository
     // CU-21: deja EnvioExtraviado en el Outbox; se guarda junto con el cambio de estado y la incidencia en GuardarCambiosAsync.
     void RegistrarExtravio(Envio envio, EstadoEnvio estadoAnterior, string motivo, Guid? responsableId, DateTimeOffset ahora);
 
+    // CU-20: deja DevolucionIniciada en el Outbox; se guarda junto con el cambio de estado y la devolución en GuardarCambiosAsync.
+    void RegistrarDevolucion(Envio envio, Devoluciones.Devolucion devolucion, EstadoEnvio estadoAnterior, Guid? responsableId,
+        OrigenEvento origen, DateTimeOffset ahora);
+
     Task GuardarCambiosAsync(CancellationToken ct);
 }

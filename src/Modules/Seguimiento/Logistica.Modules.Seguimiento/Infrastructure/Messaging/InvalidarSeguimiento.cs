@@ -17,7 +17,7 @@ internal sealed class InvalidarSeguimiento(ICacheDistribuida cache) : IConsumido
     [
         EnvioAsignadoARuta.Tipo, EnvioDesasignadoDeRuta.Tipo, EnvioEnTransito.Tipo, EnvioEntregado.Tipo,
         IntentoFallidoRegistrado.Tipo, EnvioReprogramado.Tipo, EnvioCancelado.Tipo, EnvioReintegradoADeposito.Tipo,
-        EnvioExtraviado.Tipo,
+        EnvioExtraviado.Tipo, DevolucionIniciada.Tipo,
     ];
 
     public static string Cola(string tipo) => $"seguimiento.invalidar.{tipo}";
