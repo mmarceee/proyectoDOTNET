@@ -56,5 +56,8 @@ internal interface IEnvioRepository
     void RegistrarDevolucion(Envio envio, Devoluciones.Devolucion devolucion, EstadoEnvio estadoAnterior, Guid? responsableId,
         OrigenEvento origen, DateTimeOffset ahora);
 
+    // CU-66: los envíos de esas rutas y los pendientes de entrega con fecha hasta "hasta", sin seguimiento de cambios.
+    Task<IReadOnlyList<Envio>> ListarParaTableroAsync(IReadOnlyCollection<Guid> ids, DateOnly hasta, CancellationToken ct);
+
     Task GuardarCambiosAsync(CancellationToken ct);
 }

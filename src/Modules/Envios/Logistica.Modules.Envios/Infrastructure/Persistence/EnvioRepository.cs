@@ -90,6 +90,16 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             && e.FechaEntregaProgramada >= desde && Envio.EstadosConEntregaPendiente.Contains(e.Estado), ct);
     }
 
+    public async Task<IReadOnlyList<Envio>> ListarParaTableroAsync(IReadOnlyCollection<Guid> ids, DateOnly hasta,
+    CancellationToken ct)
+    {
+        return await db.Envios.AsNoTracking()
+            .Where(e => ids.Contains(e.Id)
+                || (Envio.EstadosConEntregaPendiente.Contains(e.Estado)
+                    && e.FechaEntregaProgramada != null && e.FechaEntregaProgramada <= hasta))
+            .ToListAsync(ct);
+    }
+
     public Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct)
     {
         return db.Envios.Where(e => e.Numero == numero).Select(e => (Guid?)e.Id).SingleOrDefaultAsync(ct);

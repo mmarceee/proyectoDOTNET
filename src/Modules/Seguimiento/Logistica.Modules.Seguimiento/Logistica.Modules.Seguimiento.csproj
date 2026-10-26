@@ -14,6 +14,8 @@
     <PackageReference Include="MailKit" />
     <!-- Reemplaza la versión vulnerable que trae MimeKit (ver Directory.Packages.props). -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <!-- CU-66: backplane de SignalR sobre Valkey (decisión G1). -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,6 +31,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.SharedKernel\Logistica.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Logistica.Http.Contracts\Logistica.Http.Contracts.csproj" />
+    <ProjectReference Include="..\..\Ejecucion\Logistica.Modules.Ejecucion.Contracts\Logistica.Modules.Ejecucion.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

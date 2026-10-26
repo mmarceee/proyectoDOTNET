@@ -24,6 +24,11 @@
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.13" />
   </ItemGroup>
 
+  <ItemGroup Label="Tiempo real">
+    <!-- CU-66: backplane de SignalR sobre Valkey, para que el Worker publique en las salas que atiende la API. -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.13" />
+  </ItemGroup>
+
   <ItemGroup Label="Correo">
     <!-- CU-62: envío por SMTP (Mailpit en desarrollo, Brevo en producción). MailKit es el cliente que recomienda
          Microsoft en lugar de System.Net.Mail.SmtpClient. -->
@@ -43,6 +48,8 @@
   <ItemGroup Label="Pruebas">
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.13" />
+    <!-- CU-66: cliente SignalR para probar las salas por operador del tablero. -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.13" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageVersion Include="TngTech.ArchUnitNET.xUnit" Version="0.13.4" />

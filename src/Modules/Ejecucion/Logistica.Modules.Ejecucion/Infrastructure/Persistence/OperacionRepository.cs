@@ -12,6 +12,20 @@ internal sealed class OperacionRepository(EjecucionDbContext db) : IOperacionRep
         return await db.Operaciones.AsNoTracking().SingleOrDefaultAsync(o => o.Id == operacionId, ct);
     }
 
+    public async Task<IReadOnlyList<OperacionDispositivo>> ConflictosPendientesAsync(CancellationToken ct)
+    {
+        return await db.Operaciones.AsNoTracking()
+            .Where(o => o.Resultado != ResultadoOperacion.Aplicada && !o.Revisada)
+            .OrderBy(o => o.RecibidoEn).ThenBy(o => o.Id)
+            .Take(200)
+            .ToListAsync(ct);
+    }
+
+    public Task<OperacionDispositivo?> ObtenerParaRevisarAsync(Guid operacionId, CancellationToken ct)
+    {
+        return db.Operaciones.SingleOrDefaultAsync(o => o.Id == operacionId, ct);
+    }
+
     public void Agregar(OperacionDispositivo operacion)
     {
         db.Operaciones.Add(operacion);

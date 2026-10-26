@@ -9,7 +9,7 @@
 | **Decisión relacionada** | Estrategia de caché e invalidación (obligatorio, letra 6.7 y 8.2) |
 | **Relacionado con** | ADR-0001 (sección 2.5); ADR-0002 (sección 4); ADR-0003; Propuesta de stack y entorno de desarrollo (sección 3.6) |
 
-**Este registro define qué se guarda en la caché distribuida (Valkey), con qué clave, cuánto dura, cuándo se invalida y cómo se mide. Se cachean dos casos de uso con perfiles de acceso opuestos: el seguimiento público, que se lee mucho y cambia seguido, y la configuración del operador (tarifario, reglas, zonas e identidad visual), que se lee mucho y casi no cambia. La clave siempre incluye el operador, para que la caché no se convierta en una fuga entre inquilinos.**
+**Este registro define qué se guarda en la caché distribuida (Valkey), con qué clave, cuánto dura, cuándo se invalida y cómo se mide. Se cachean dos casos de uso con perfiles de acceso opuestos: el seguimiento público, que se lee mucho y cambia seguido, y la configuración del operador (cuadro tarifario y reglas operativas), que se lee mucho y casi no cambia. La clave siempre incluye el operador, para que la caché no se convierta en una fuga entre inquilinos.**
 
 > Las decisiones que siguen abiertas están en la sección 5. Con la revisión del equipo, el registro pasa a *Aceptado* (versión 1.0).
 
@@ -133,7 +133,7 @@ El Aspire Dashboard muestra los tres por grupo y, con ellos, la tasa de aciertos
 - Las métricas por caso permiten mostrar en la demostración el efecto de la caché (escenario 5: un cambio de tarifa en caliente invalida el puntero y la lectura siguiente es un fallo).
 
 **En contra / riesgos**
-- **Datos viejos acotados:** hasta 1 minuto en el seguimiento (por ejemplo, la cantidad de entregas que faltan) y, en una carrera poco probable, hasta 10 minutos en un puntero de configuración.
+- **Datos viejos acotados:** hasta 1 minuto en el seguimiento (por ejemplo, después de la recepción en el depósito, que no publica un evento) y, en una carrera poco probable, hasta 10 minutos en un puntero de configuración.
 - **Invalidaciones olvidadas:** un caso de uso nuevo que cambie un dato cacheado y no borre su clave mostrará datos viejos hasta que expiren. En el seguimiento, cada evento nuevo de cambio de estado tiene que sumarse a `InvalidarSeguimiento.Tipos`, como se hizo con `EnvioExtraviado` (CU-21) y `DevolucionIniciada` (CU-20). Se mitiga con una prueba de integración por cada dato cacheado (cambiar y leer de nuevo).
 - **Cambios de estado sin evento:** la recepción en el depósito (T2) no publica un evento, así que el seguimiento puede mostrar el estado anterior hasta un minuto (sección 2.3).
 - **Serialización:** un cambio en un DTO cacheado puede dejar entradas con la forma vieja. Se mitiga incluyendo una versión del formato en la clave cuando el DTO cambie, o vaciando la caché al desplegar.

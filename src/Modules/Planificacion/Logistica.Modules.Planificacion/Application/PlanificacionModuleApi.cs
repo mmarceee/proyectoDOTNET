@@ -12,6 +12,17 @@ internal sealed class PlanificacionModuleApi(IRutaRepository rutas) : IPlanifica
         var r = await rutas.ObtenerAsync(rutaId, ct);
         return r is null || r.RepartidorId != repartidorId ? null : new(r.VehiculoId, r.Estado.ToString(), r.DespachadaEn);
     }
+
+    // CU-66: reutiliza el listado de rutas del Backoffice, filtrado por los dos estados "en la calle".
+    public async Task<IReadOnlyList<RutaEnCurso>> ListarEnCursoAsync(CancellationToken ct)
+    {
+        var despachadas = await rutas.ListarAsync(null, EstadoRuta.Despachada, ct);
+        var enCurso = await rutas.ListarAsync(null, EstadoRuta.EnCurso, ct);
+        return despachadas.Concat(enCurso)
+            .Select(r => new RutaEnCurso(r.Id, r.Fecha, r.Estado.ToString(), r.VehiculoId, r.RepartidorId, r.EnvioIds.ToArray()))
+            .ToArray();
+    }
+
     public async Task<IReadOnlyList<RutaDelRepartidor>> ListarDelRepartidorAsync(Guid repartidorId, int pagina, CancellationToken ct)
     {
         if (pagina is < 1 or > 10000) throw new Logistica.SharedKernel.DomainException("La página no es válida.");
