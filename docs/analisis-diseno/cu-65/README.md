@@ -77,6 +77,9 @@ Ante errores de conexión al confirmar, el Portal pide actualizar el historial a
 
 ## Verificación
 
+Ver [guía de prueba manual y verificación del 26/10/2026](prueba-manual.md) para repetir el recorrido en el Portal
+y ejecutar las pruebas actuales. Distingue las comprobaciones en navegador de las automatizadas.
+
 `HistorialAvisosTests`, sobre PostgreSQL en Docker, cubre filtros y bordes de fecha en la zona del operador,
 paginación y orden, detalle sin secretos, intentos conservados, reenvío individual y masivo, solicitudes concurrentes,
 rechazo de estados no reenviables y suscripciones inactivas, aislamiento de operador/comercio, lotes sin aceptación
