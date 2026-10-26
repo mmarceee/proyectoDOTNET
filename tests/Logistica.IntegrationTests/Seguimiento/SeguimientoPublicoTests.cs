@@ -108,8 +108,8 @@ public class SeguimientoPublicoTests(PostgresApiFactory factory) : IClassFixture
         Assert.Equal(HttpStatusCode.NotFound, (await este.GetAsync($"/backoffice/seguimiento/{envio.Numero}")).StatusCode);
     }
 
-    // Sólo Administrador y Despachador mandan enlaces: el operario de depósito no ve el menú ni entra escribiendo la
-    // dirección de la página del listado o de la del enlace (403).
+    // El acceso a seguimiento está en cada fila de Envíos, sólo para Administrador y Despachador.
+    // El operario de depósito tampoco puede abrir las páginas de seguimiento por URL (403).
     [Fact]
     public async Task El_operario_de_deposito_no_ve_ni_entra_al_seguimiento()
     {
@@ -119,9 +119,14 @@ public class SeguimientoPublicoTests(PostgresApiFactory factory) : IClassFixture
         using var deposito = Cliente();
         await Sesion.IngresarAsync(deposito, "deposito@operador-demo.uy");
 
-        Assert.Contains("href=\"/backoffice/seguimiento\"", await despacho.GetStringAsync("/backoffice"));
+        Assert.DoesNotContain("href=\"/backoffice/seguimiento\"", await despacho.GetStringAsync("/backoffice"));
+        var listado = $"/backoffice/envios?Texto={envio.Numero}";
+        var enlace = $"href=\"/backoffice/seguimiento/{envio.Numero}\"";
+        Assert.Contains(enlace, await despacho.GetStringAsync(listado));
+        Assert.Equal(HttpStatusCode.OK, (await despacho.GetAsync($"/backoffice/seguimiento/{envio.Numero}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await despacho.GetAsync("/backoffice/seguimiento")).StatusCode);
         Assert.DoesNotContain("href=\"/backoffice/seguimiento\"", await deposito.GetStringAsync("/backoffice"));
+        Assert.DoesNotContain(enlace, await deposito.GetStringAsync(listado));
         Assert.Equal(HttpStatusCode.Forbidden, (await deposito.GetAsync("/backoffice/seguimiento")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await deposito.GetAsync($"/backoffice/seguimiento/{envio.Numero}")).StatusCode);
     }

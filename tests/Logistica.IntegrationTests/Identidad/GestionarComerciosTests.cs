@@ -106,12 +106,23 @@ public class GestionarComerciosTests(PostgresApiFactory factory) : IClassFixture
         await Sesion.EnviarFormularioAsync(admin, url, await CamposAsync(admin, url, "suspender"));
         try
         {
-            Assert.Equal(HttpStatusCode.BadRequest, (await comercio.PostAsJsonAsync("/api/envios", pedido)).StatusCode);
+            var suspendido = await comercio.PostAsJsonAsync("/api/envios", pedido);
+            Assert.Equal(HttpStatusCode.BadRequest, suspendido.StatusCode);
+            var problema = await suspendido.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+            Assert.Contains("no tiene una relación activa con este operador", problema?.Detail);
             using var este = Cliente();
             await Sesion.IngresarAsync(este, "comercio@tiendademo.uy");
             // Al quedar una sola relación activa, CU-03 la elige automáticamente al abrir la página.
             Assert.Equal(HttpStatusCode.Redirect, (await este.GetAsync("/cuenta/operador")).StatusCode);
-            Assert.Equal(HttpStatusCode.Created, (await este.PostAsJsonAsync("/api/envios", pedido)).StatusCode);
+            // El segundo operador tiene otra cobertura: la prueba del vínculo requiere una dirección válida para él.
+            var pedidoEste = pedido with
+            {
+                Direccion = pedido.Direccion with
+                {
+                    Localidad = "Ciudad de la Costa", Departamento = "Canelones", CodigoPostal = "15000",
+                },
+            };
+            Assert.Equal(HttpStatusCode.Created, (await este.PostAsJsonAsync("/api/envios", pedidoEste)).StatusCode);
         }
         finally { await Sesion.EnviarFormularioAsync(admin, url, await CamposAsync(admin, url, "reactivar")); }
     }
