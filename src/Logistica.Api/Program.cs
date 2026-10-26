@@ -4,6 +4,7 @@ using Logistica.Api.Seguridad;
 using Logistica.BuildingBlocks.Infrastructure.Caching;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
+using Logistica.BuildingBlocks.Infrastructure.Messaging.Fallidos;
 using Logistica.Modules.Administracion;
 using Logistica.Modules.Deposito;
 using Logistica.Modules.Ejecucion;
@@ -99,10 +100,14 @@ builder.Services
     .AddPlanificacionModule(builder.Configuration)
     .AddEjecucionModule(builder.Configuration)
     .AddSeguimientoModule(builder.Configuration)
-    .AddDepositoModule(builder.Configuration);
+    .AddDepositoModule(builder.Configuration)
+    .AddMensajesFallidos(builder.Configuration.GetConnectionString("Postgres"));
 
 if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("RabbitMQ")))
+{
     builder.Services.AddHostedService<PublicadorOutbox>();
+    builder.Services.AddHostedService<RegistradorFallidos>();
+}
 
 // CU-60, A3 (letra 6.3): el seguimiento público no tiene sesión, así que se limita por dirección IP. Frena a quien prueba
 // enlaces al azar y protege el componente de más tráfico. Superado el límite, responde 429.

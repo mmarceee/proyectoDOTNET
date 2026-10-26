@@ -228,7 +228,10 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             ?? throw new DomainException("El envío no existe.");
 
         // T2. Si el envío ya no está Admitido (por ejemplo, lo cancelaron), Transicionar lo rechaza.
-        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, reloj.GetUtcNow());
+        var ahora = reloj.GetUtcNow();
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora);
+        eventos.Registrar(EnvioRecibidoEnDeposito.Tipo,
+            new EnvioRecibidoEnDeposito(envio.Id, envio.Numero, ahora, responsableId), ahora);
 
         await envios.GuardarCambiosAsync(ct);
     }

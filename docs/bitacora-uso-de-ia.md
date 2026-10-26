@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 22 de octubre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 26 de octubre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal y Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -611,6 +611,21 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Consultar Envíos o Administración desde el Worker: se comunica sólo por la cola. `System.Net.Mail.SmtpClient`, que Microsoft no recomienda para código nuevo. El logo en el correo, que el seguimiento público tampoco muestra. |
 | **Verificación** | 15 pruebas unitarias y 6 de integración nuevas, incluida una de extremo a extremo con **Mailpit** en Testcontainers (envío creado en el Portal, outbox, RabbitMQ, Worker y correo recibido con el enlace). Corrida completa en Docker: 716 pruebas .NET (248 unitarias, 56 de arquitectura y 412 de integración); fallaron por tiempo de espera dos ajenas al cambio (`UnidadDeTrabajoTests`, al abrir la conexión a PostgreSQL, y `SeleccionarOperadorTests`, en un request HTTP), que pasaron al repetirlas solas. No se probó con `docker compose` ni contra Brevo. |
 
+## **3.39 Evento de la recepción en depósito (T2, CU-30) para CU-64 y CU-60**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 26/10/2026 |
+| **Archivos** | Envíos: `EnvioRecibidoEnDeposito` y `EnviosModuleApi.RecibirEnDepositoAsync`. Seguimiento: `PrepararAvisos.Tipos`, `InvalidarSeguimiento.Tipos` y `LectorHechosEnvio`. Pruebas: `RecibirBultoTests`, `EntregaAvisoTests` y `EntregarAvisosTests`. Documentos: README de CU-64. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cerrar el pendiente de CU-64: la transición T2 no publicaba evento, así que la llegada al depósito no se avisaba al comercio y el seguimiento público seguía mostrando *Admitido* hasta que vencía la caché. |
+| **Cómo se trabajó** | El responsable señaló el pendiente del README de CU-64. La IA ubicó la transición en `RecibirEnDepositoAsync`, propuso el cambio y lo escribió, con sus pruebas, a pedido del responsable y sin contradecir los ADR. |
+| **Aceptado sin modificaciones** | El evento sigue el nombre de la tabla de transiciones y del catálogo (`EnvioRecibidoEnDeposito`, sección de CU-30), se registra en el outbox de Envíos en la misma transacción que la recepción, igual que T8, y Seguimiento lo traduce al estado `EnDeposito`. El sobre no trae comercio (lo publica el operario de depósito): el comercio sale de `EnvioSeguido`, como en los demás eventos (ADR-0003, sección 2.2). |
+| **Modificado** | — |
+| **Descartado** | Notificar la recepción al destinatario: no figura entre los cambios relevantes de CU-62. |
+| **Verificación** | Un caso unitario y una prueba de integración nuevos, más la verificación del outbox en `RecibirBultoTests`. Corrida completa en Docker, junto con CU-09: 785 pruebas .NET (271 unitarias, 56 de arquitectura y 458 de integración), todas pasan; cobertura de líneas del 94,6 %. No se probó con `docker compose`. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -639,3 +654,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.22 | 21/10/2026 | Entrada de CU-64, entregar los avisos a los comercios; numeración ajustada al integrar main para conservar también las entradas de CU-53. | Ezequiel Marcenal |
 | 0.23 | 21/10/2026 | Revisión de main 04fab20 contra los ADR e integración con lukovski; resolución del conflicto conservando CU-53/CU-64, observaciones y verificación local. | Lucas Ottonello |
 | 0.24 | 22/10/2026 | Entrada de CU-62, notificar al destinatario por correo. | Ezequiel Marcenal |
+| 0.25 | 26/10/2026 | Entrada del evento de la recepción en depósito (T2) para CU-64 y CU-60. | Ezequiel Marcenal |

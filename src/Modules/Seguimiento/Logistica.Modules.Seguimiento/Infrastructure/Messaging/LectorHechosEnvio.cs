@@ -47,6 +47,8 @@ internal static class LectorHechosEnvio
             },
             EnvioCancelado.Tipo => Hecho("Cancelado"),
             EnvioReintegradoADeposito.Tipo => Hecho("EnDeposito"),
+            // T2 (CU-30): el depósito recibió el envío.
+            EnvioRecibidoEnDeposito.Tipo => Hecho("EnDeposito"),
             _ => throw new InvalidDataException("Tipo de evento de Envíos desconocido."),
         };
     }

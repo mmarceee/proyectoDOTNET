@@ -1,0 +1,78 @@
+@page "/backoffice/mensajes-fallidos"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarMensajesFallidos.IndexModel
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Mensajes fallidos";
+}
+
+<h1 class="mb-3">Mensajes fallidos</h1>
+<p class="text-muted">
+    Mensajes entre módulos o hacia el Worker que agotaron sus reintentos. Reintentarlos los vuelve a publicar en su cola
+    con el mismo identificador, así no se repite un efecto que ya se aplicó.
+</p>
+
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" asp-validation-summary="All" role="alert"></div>
+}
+
+<form method="get" class="mb-3">
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" asp-for="VerResueltos" onchange="this.form.submit()" />
+        <label class="form-check-label" asp-for="VerResueltos">Ver también los reintentados y descartados</label>
+    </div>
+</form>
+
+@if (Model.Mensajes.Count == 0)
+{
+    <p class="text-muted">No hay mensajes fallidos.</p>
+}
+else
+{
+    <form method="post" asp-page-handler="Reintentar">
+        <input type="hidden" asp-for="VerResueltos" />
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th scope="col"><span class="visually-hidden">Elegir</span></th>
+                        <th scope="col">Evento</th>
+                        <th scope="col">Ocurrió</th>
+                        <th scope="col">Cola</th>
+                        <th scope="col">Intentos</th>
+                        <th scope="col">Último error</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in Model.Mensajes)
+                    {
+                        <tr>
+                            <td>
+                                @if (m.Estado == "Pendiente")
+                                {
+                                    <input class="form-check-input" type="checkbox" name="Seleccionados" value="@m.Id"
+                                           aria-label="Elegir @m.Tipo" />
+                                }
+                            </td>
+                            <td><code>@m.Tipo</code></td>
+                            <td class="text-nowrap">@m.OcurridoEn.ToString("dd/MM/yyyy HH:mm") UTC</td>
+                            <td><code>@m.ColaOrigen</code></td>
+                            <td>@m.Intentos</td>
+                            <td>@m.UltimoError</td>
+                            <td>@m.Estado</td>
+                            <td><a href="/backoffice/mensajes-fallidos/@m.Id" class="btn btn-sm btn-outline-primary">Ver</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" class="btn btn-primary">Reintentar seleccionados</button>
+    </form>
+}

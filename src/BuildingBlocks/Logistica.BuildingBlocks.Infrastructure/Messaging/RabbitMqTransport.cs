@@ -8,6 +8,7 @@ public static class RabbitMqTransport
 {
     public const string Exchange = "logistica.events";
     public const string Fallidos = "logistica.fallidos";
+    public const string FallidosSinInquilino = "logistica.fallidos.sin-inquilino";
     public static readonly int[] Esperas = [5_000, 30_000, 120_000];
 
     public static ConnectionFactory CrearFactory(IConfiguration configuration) => new()

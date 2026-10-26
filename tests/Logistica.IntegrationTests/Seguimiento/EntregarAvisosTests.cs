@@ -111,6 +111,28 @@ public sealed class EntregarAvisosTests(PostgresApiFactory factory, RabbitMqFixt
     }
 
     [Fact]
+    public async Task La_recepcion_en_deposito_se_avisa_como_cambio_de_estado()
+    {
+        using var api = CrearApi(new Receptor());
+        var (operador, comercio, envio) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var todos = await SuscribirAsync(api.Services, operador, comercio, TipoEventoAviso.CambioDeEstado);
+        await SuscribirAsync(api.Services, operador, comercio, TipoEventoAviso.EntregaFallida);
+        await ProcesarAsync(api.Services, PrepararAvisos.Cola(EnvioAdmitido.Tipo),
+            Mensaje(EnvioAdmitido.Tipo, new EnvioAdmitido(envio, "ENV-CU64-T2", Ahora), operador, comercio));
+
+        // T2 lo publica el operario de depósito: el sobre no trae comercio.
+        var recibido = Mensaje(EnvioRecibidoEnDeposito.Tipo,
+            new EnvioRecibidoEnDeposito(envio, "ENV-CU64-T2", Ahora, null), operador, null);
+        await ProcesarAsync(api.Services, PrepararAvisos.Cola(EnvioRecibidoEnDeposito.Tipo), recibido);
+
+        await using var scope = api.Services.CreateAsyncScope();
+        await using var db = Contexto(scope, operador, null);
+        var entrega = Assert.Single(await db.EntregasAviso.Where(e => e.EventoId == recibido.Id).ToListAsync());
+        Assert.Equal((todos.Suscripcion.Id, TipoEventoAviso.CambioDeEstado, "EnDeposito"),
+            (entrega.SuscripcionAvisoId, entrega.Tipo, entrega.EstadoEnvio));
+    }
+
+    [Fact]
     public async Task Un_fallo_queda_registrado_y_el_reintento_entrega_el_mismo_aviso_firmado()
     {
         var receptor = new Receptor(500, 200);
