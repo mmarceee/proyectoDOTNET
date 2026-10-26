@@ -7,4 +7,5 @@ internal sealed record EnvioListadoDto(
     string Localidad,
     string Estado,
     DateTimeOffset CreadoEn,
-    decimal MontoTarifa);
+    decimal MontoTarifa,
+    string Modalidad = "Estandar");

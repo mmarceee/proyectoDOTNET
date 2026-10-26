@@ -7,11 +7,109 @@ using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
 using Logistica.BuildingBlocks.Infrastructure.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using Logistica.Modules.Deposito.Infrastructure.Persistence;
 
 namespace Logistica.IntegrationTests.Envios;
 
 public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : IClassFixture<PostgresApiFactory>
 {
+    [Theory]
+    [InlineData("PesoKg", "2.01", "Peso")]
+    [InlineData("LargoCm", "31", "Largo")]
+    [InlineData("AnchoCm", "21", "Ancho")]
+    [InlineData("AltoCm", "11", "Alto")]
+    public async Task Una_medida_distinta_exige_advertencia_y_confirmacion_antes_de_guardar(string campo, string valor, string etiqueta)
+    {
+        using var client = factory.CreateClient();
+        var envio = await CrearAsync(client);
+        var campos = await FormularioAsync(client, envio.Numero + "-1");
+        campos[campo] = valor;
+        // Enviar el checkbox sin haber revisado la advertencia tampoco permite registrar.
+        campos["ConfirmarDiferencias"] = "true";
+        var advertencia = await RegistrarPaginaAsync(client, campos);
+
+        Assert.Contains("Los valores medidos no coinciden", advertencia);
+        Assert.Contains("Declarado por el comercio", advertencia);
+        Assert.Contains($"<th scope=\"row\">{etiqueta}</th>", advertencia);
+        Assert.DoesNotContain("Bulto recibido", advertencia);
+        Assert.Equal(0, await RecepcionesAsync(envio.Id));
+
+        campos["ConfirmacionMedidas"] = Valor(advertencia, "ConfirmacionMedidas");
+        campos["ConfirmarDiferencias"] = "false";
+        var sinConfirmar = await RegistrarPaginaAsync(client, campos);
+        Assert.DoesNotContain("Bulto recibido", sinConfirmar);
+        Assert.Equal(0, await RecepcionesAsync(envio.Id));
+
+        campos["ConfirmacionMedidas"] = Valor(sinConfirmar, "ConfirmacionMedidas");
+        campos["ConfirmarDiferencias"] = "true";
+        Assert.Contains("Bulto recibido", await RegistrarPaginaAsync(client, campos));
+        Assert.Equal(1, await RecepcionesAsync(envio.Id));
+    }
+
+    [Fact]
+    public async Task Cambiar_una_medida_o_el_bulto_exige_revisar_y_confirmar_de_nuevo()
+    {
+        using var client = factory.CreateClient();
+        var envio = await CrearAsync(client);
+        var campos = await FormularioAsync(client, envio.Numero + "-1");
+        campos["PesoKg"] = "5";
+        var advertencia = await RegistrarPaginaAsync(client, campos);
+        campos["ConfirmacionMedidas"] = Valor(advertencia, "ConfirmacionMedidas");
+        campos["ConfirmarDiferencias"] = "true";
+        campos["PesoKg"] = "6";
+        var nuevasMedidas = await RegistrarPaginaAsync(client, campos);
+        Assert.Contains("Los valores medidos no coinciden", nuevasMedidas);
+        Assert.Equal(0, await RecepcionesAsync(envio.Id));
+
+        campos["ConfirmacionMedidas"] = Valor(nuevasMedidas, "ConfirmacionMedidas");
+        campos["CodigoBulto"] = envio.Numero + "-2";
+        Assert.Contains("Los valores medidos no coinciden", await RegistrarPaginaAsync(client, campos));
+        Assert.Equal(0, await RecepcionesAsync(envio.Id));
+
+        campos["ConfirmacionMedidas"] = "token-invalido";
+        Assert.Contains("Los valores medidos no coinciden", await RegistrarPaginaAsync(client, campos));
+        Assert.Equal(0, await RecepcionesAsync(envio.Id));
+    }
+
+    [Fact]
+    public async Task Corregir_las_medidas_para_igualar_lo_declarado_permite_registrar_sin_confirmar_diferencias()
+    {
+        using var client = factory.CreateClient();
+        var envio = await CrearAsync(client);
+        var campos = await FormularioAsync(client, envio.Numero + "-1");
+        campos["PesoKg"] = "5";
+        Assert.Contains("Los valores medidos no coinciden", await RegistrarPaginaAsync(client, campos));
+        campos["PesoKg"] = "2";
+        campos["LargoCm"] = "30";
+        campos["AnchoCm"] = "20";
+        campos["AltoCm"] = "10";
+        Assert.Contains("Bulto recibido", await RegistrarPaginaAsync(client, campos));
+        Assert.Equal(1, await RecepcionesAsync(envio.Id));
+    }
+
+    private static async Task<Dictionary<string, string>> FormularioAsync(HttpClient client, string codigo)
+    {
+        var html = await client.GetStringAsync("/backoffice/deposito/recepcion");
+        return new() { ["CodigoBulto"] = codigo, ["__RequestVerificationToken"] = Valor(html, "__RequestVerificationToken") };
+    }
+
+    private static string Valor(string html, string nombre) => WebUtility.HtmlDecode(
+        Regex.Match(Input(html, nombre), "value=\"([^\"]*)\"").Groups[1].Value);
+
+    private static async Task<string> RegistrarPaginaAsync(HttpClient client, Dictionary<string, string> campos)
+    {
+        var response = await client.PostAsync("/backoffice/deposito/recepcion", new FormUrlEncodedContent(campos));
+        response.EnsureSuccessStatusCode();
+        return WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+    }
+
+    private async Task<int> RecepcionesAsync(Guid envioId)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<DepositoDbContext>().Recepciones.CountAsync(r => r.EnvioId == envioId);
+    }
+
     [Fact]
     public async Task Conserva_filtros_al_abrir_registrar_y_volver_desde_recepcion()
     {

@@ -182,7 +182,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             e.FranjaHorariaId, e.FechaEntregaProgramada, $"{e.Direccion.Calle} {e.Direccion.Numero}, {e.Direccion.Localidad}",
             e.Direccion.CodigoPostal, e.Bultos.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
             new PuntoEntregaPlanificable(e.Direccion.Calle, e.Direccion.Numero, e.Direccion.Localidad, e.Direccion.Departamento, e.Direccion.CodigoPostal),
-            e.ReintentoDesde)).ToList();
+            e.ReintentoDesde, e.Modalidad.ToString())).ToList();
     }
     public async Task AsignarARutaAsync(Guid rutaId, IReadOnlyList<AsignacionEnvioRuta> asignaciones, Guid? responsableId, CancellationToken ct)
     {

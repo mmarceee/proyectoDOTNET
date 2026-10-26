@@ -5,4 +5,5 @@ namespace Logistica.Modules.Envios.Contracts.Results;
 // al armar y al despachar la ruta.
 public sealed record EnvioPlanificable(Guid Id, Guid OperadorId, string Numero, string Estado, Guid? ZonaId,
     Guid? FranjaHorariaId, DateOnly? FechaEntregaProgramada, string Direccion, string CodigoPostal,
-    IReadOnlyList<BultoPlanificable> Bultos, PuntoEntregaPlanificable? Punto = null, DateTimeOffset? ReintentoDesde = null);
+    IReadOnlyList<BultoPlanificable> Bultos, PuntoEntregaPlanificable? Punto = null, DateTimeOffset? ReintentoDesde = null,
+    string Modalidad = "Estandar");

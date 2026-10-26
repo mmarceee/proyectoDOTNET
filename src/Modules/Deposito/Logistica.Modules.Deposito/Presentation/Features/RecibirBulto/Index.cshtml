@@ -60,7 +60,7 @@
     </table>
 }
 
-<form method="post" class="row g-3 align-items-end">
+<form id="formulario-recepcion" method="post" class="row g-3 align-items-end">
     <input type="hidden" asp-for="Pagina" />
     <input type="hidden" asp-for="TamanoPagina" />
     <input type="hidden" asp-for="Estado" />
@@ -89,6 +89,51 @@
         <input asp-for="AltoCm" type="number" step="0.1" min="0" class="form-control" />
     </div>
     <div class="col-12">
-        <button type="submit" class="btn btn-primary">Registrar</button>
+        @if (Model.Diferencias.Count > 0)
+        {
+            <div class="alert alert-warning" role="alert" aria-labelledby="advertencia-medidas" data-advertencia-recepcion>
+                <h2 id="advertencia-medidas" class="h5">Los valores medidos no coinciden con lo declarado por el comercio</h2>
+                <p>El bulto <strong>@Model.CodigoBulto</strong> todavía no se registró. Revisá las diferencias y corregí los valores si hubo un error de ingreso.</p>
+                <div class="table-responsive">
+                    <table class="table table-sm w-auto">
+                        <thead><tr><th scope="col">Dato</th><th scope="col">Declarado por el comercio</th><th scope="col">Medido en depósito</th></tr></thead>
+                        <tbody>
+                            @foreach (var diferencia in Model.Diferencias)
+                            {
+                                <tr><th scope="row">@diferencia.Nombre</th><td>@diferencia.Declarado.ToString("0.############################") @diferencia.Unidad</td><td>@diferencia.Medido.ToString("0.############################") @diferencia.Unidad</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <input type="hidden" asp-for="ConfirmacionMedidas" />
+                <div class="form-check">
+                    <input asp-for="ConfirmarDiferencias" class="form-check-input" required />
+                    <label asp-for="ConfirmarDiferencias" class="form-check-label">Confirmo que los valores medidos son correctos y difieren de lo declarado por el comercio.</label>
+                </div>
+            </div>
+        }
+        <button type="submit" class="btn btn-primary" data-registrar-recepcion>@(Model.Diferencias.Count > 0 ? "Confirmar y registrar" : "Registrar")</button>
     </div>
 </form>
+
+@section Scripts {
+    <script>
+        (() => {
+            const formulario = document.getElementById('formulario-recepcion');
+            const advertencia = formulario.querySelector('[data-advertencia-recepcion]');
+            if (!advertencia) return;
+            const confirmacion = formulario.querySelector('#ConfirmarDiferencias');
+            const datos = formulario.querySelector('#ConfirmacionMedidas');
+            const registrar = formulario.querySelector('[data-registrar-recepcion]');
+            formulario.querySelectorAll('#CodigoBulto, #PesoKg, #LargoCm, #AnchoCm, #AltoCm').forEach(campo => {
+                campo.addEventListener('input', () => {
+                    advertencia.hidden = true;
+                    confirmacion.checked = false;
+                    confirmacion.required = false;
+                    datos.value = '';
+                    registrar.textContent = 'Registrar';
+                });
+            });
+        })();
+    </script>
+}

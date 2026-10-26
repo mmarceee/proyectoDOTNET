@@ -67,7 +67,8 @@ internal sealed class EnvioDetalleReader(EnviosDbContext db) : IEnvioDetalleRead
                             i.Evidencia.DocumentoReceptor, i.Evidencia.Latitud, i.Evidencia.Longitud, i.Evidencia.CapturadaEn)))
                     .ToList(),
                 new List<IncidenciaDetalleDto>(),
-                null) })
+                null,
+                e.Modalidad.ToString()) })
             .SingleOrDefaultAsync(ct);
 
         if (encontrado is null)

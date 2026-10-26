@@ -1,4 +1,5 @@
 using Logistica.Modules.Envios.Domain.Envios;
+using Logistica.Modules.Administracion.Contracts;
 
 namespace Logistica.Modules.Envios.Application.Features.CrearEnvio;
 
@@ -8,7 +9,8 @@ internal sealed record CrearEnvioCommand(
     Destinatario Destinatario,
     Direccion Direccion,
     IReadOnlyList<BultoACrear> Bultos,
-    OrigenEvento Origen);
+    OrigenEvento Origen,
+    Modalidad Modalidad = Modalidad.Estandar);
 
 // Peso y medidas de un bulto. La tarifa no viene del cliente: la calcula el sistema.
 internal sealed record BultoACrear(decimal PesoKg, decimal LargoCm, decimal AnchoCm, decimal AltoCm);

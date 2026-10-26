@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
+using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Envios.Presentation.Features.CrearEnvio;
 
@@ -23,12 +24,19 @@ internal static class CrearEnvioEndpoint
     {
         var d = request.Destinatario;
         var dir = request.Direccion;
+        var modalidad = request.Modalidad switch
+        {
+            "Estandar" => Modalidad.Estandar,
+            "Urgente" => Modalidad.Urgente,
+            _ => throw new DomainException("Elegí una modalidad válida: Estándar o Urgente."),
+        };
 
         var command = new CrearEnvioCommand(
             new Destinatario(d.Nombre, d.Telefono, d.Email, d.Documento),
             new Direccion(dir.Calle, dir.Numero, dir.Localidad, dir.Departamento, dir.CodigoPostal, dir.Referencia),
             request.Bultos.Select(b => new BultoACrear(b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
-            OrigenEvento.PortalComercio);
+            OrigenEvento.PortalComercio,
+            modalidad);
 
         var envio = await handler.HandleAsync(command, ct);
 

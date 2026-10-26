@@ -5,30 +5,50 @@ using Logistica.Modules.Administracion.Contracts;
 
 namespace Logistica.Modules.Envios.Application.Features.CrearEnvio;
 
-// CU-10, versión mínima del 8/10: un envío del Portal, sin zona, franja ni tarifa.
-// Coordina los pasos; las reglas del envío están en Envio.Crear.
+// CU-10: resuelve la cobertura y tarifa cada bulto con el cuadro vigente de Administración.
+// La modalidad elegida en el Portal determina las reglas y los ajustes aplicables.
 internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant tenant, TimeProvider reloj,
     IRelacionComercialActiva relacion, IUnidadDeTrabajo unidad, IAdministracionModuleApi administracion,
     IIntegrationEventPublisher eventos)
 {
-    // Hasta el 15/10 la tarifa es cero. Después la calcula Administración para cada bulto (CU-10, paso 7).
-    private const decimal TarifaProvisoria = 0m;
-
     public async Task<Envio> HandleAsync(CrearEnvioCommand command, CancellationToken ct)
     {
         var operadorId = tenant.OperadorId
             ?? throw new InvalidOperationException("La sesión no tiene un operador.");
         var comercioId = tenant.ComercioId
             ?? throw new InvalidOperationException("La sesión no tiene un comercio.");
+        if (!Enum.IsDefined(command.Modalidad))
+            throw new DomainException("Elegí una modalidad válida: Estándar o Urgente.");
 
         // El envío guarda la versión de reglas que rige al admitirlo: las entregas y los intentos se juzgan con ella,
         // aunque después se publique otra (letra 6.6). Sin reglas vigentes no se admiten envíos.
         var reglas = await administracion.ReglasDeEntregaVigentesAsync(ct)
             ?? throw new DomainException("El operador no tiene reglas operativas vigentes: todavía no puede admitir envíos.");
 
-        var bultos = command.Bultos
-            .Select(b => new DatosBulto(b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm, TarifaProvisoria))
-            .ToList();
+        if (command.Bultos.Count == 0)
+            throw new DomainException("Un envío debe tener al menos un bulto.");
+        if (command.Bultos.Any(b => b.PesoKg <= 0 || b.LargoCm <= 0 || b.AnchoCm <= 0 || b.AltoCm <= 0))
+            throw new DomainException("El peso y las medidas del bulto deben ser mayores a cero.");
+
+        var recursos = await administracion.ConsultarRecursosPlanificacionAsync(DateOnly.FromDateTime(reloj.GetUtcNow().UtcDateTime), ct);
+        var zona = recursos.Zonas.SingleOrDefault(z => z.CodigosPostales.Contains(command.Direccion.CodigoPostal))
+            ?? throw new DomainException("El operador no cubre el código postal de la dirección.");
+
+        var bultos = new List<DatosBulto>();
+        DatosVersionTarifario? versionTarifario = null;
+        foreach (var bulto in command.Bultos)
+        {
+            decimal volumenM3;
+            try { volumenM3 = (bulto.LargoCm / 100m) * (bulto.AnchoCm / 100m) * (bulto.AltoCm / 100m); }
+            catch (OverflowException) { throw new DomainException($"Las medidas del bulto {bultos.Count + 1} son demasiado grandes."); }
+
+            var tarifa = await administracion.CalcularTarifaAsync(zona.Id, command.Modalidad, bulto.PesoKg, volumenM3, ct)
+                ?? throw new DomainException($"El bulto {bultos.Count + 1} no tiene una tarifa aplicable en el cuadro tarifario vigente.");
+            if (versionTarifario is not null && versionTarifario.Id != tarifa.VersionTarifarioId)
+                throw new DomainException("El cuadro tarifario cambió durante el alta. Volvé a confirmar el envío.");
+            versionTarifario = new DatosVersionTarifario(tarifa.VersionTarifarioId, tarifa.VersionTarifarioNumero);
+            bultos.Add(new DatosBulto(bulto.PesoKg, bulto.LargoCm, bulto.AnchoCm, bulto.AltoCm, tarifa.Monto));
+        }
 
         var numero = await envios.SiguienteNumeroAsync(ct);
 
@@ -42,7 +62,10 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             command.Origen,
             responsableId: null,
             reloj.GetUtcNow(),
-            versionReglasId: reglas.VersionId);
+            versionTarifario: versionTarifario,
+            versionReglasId: reglas.VersionId,
+            modalidad: command.Modalidad);
+        envio.DefinirPlanificacion(zona.Id, null, null);
 
         await unidad.EjecutarAsync(async () =>
         {

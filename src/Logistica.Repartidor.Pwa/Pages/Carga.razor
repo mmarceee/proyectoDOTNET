@@ -63,7 +63,22 @@ else if (envios.Length == 0) { <div class="alert alert-success">No quedan envío
         {
             <section class="card mb-2"><div class="card-body">
                 <h2 class="h5">@envio.Numero · @(envio.Bultos.All(b => codigos.Contains(b.Codigo)) ? "Completo" : "Incompleto")</h2>
-                <ul class="mb-0">@foreach (var b in envio.Bultos) { <li>@b.Codigo — @(codigos.Contains(b.Codigo) ? "Cargado" : "Faltante")</li> }</ul>
+                <ul class="list-unstyled mb-0 carga-bultos">
+                    @foreach (var b in envio.Bultos)
+                    {
+                        var cargado = codigos.Contains(b.Codigo);
+                        <li class="carga-bulto @(cargado ? "carga-bulto-cargado" : "")" @key="b.Codigo">
+                            <span class="carga-bulto-codigo">@b.Codigo</span>
+                            <span class="carga-bulto-estado">
+                                @if (cargado)
+                                {
+                                    <svg class="carga-bulto-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6" /></svg>
+                                }
+                                @(cargado ? "Cargado" : "Faltante")
+                            </span>
+                        </li>
+                    }
+                </ul>
             </div></section>
         }
         @if (sobrantes.Length > 0)
