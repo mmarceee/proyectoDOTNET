@@ -44,9 +44,46 @@ else if (seguimiento is not null)
         </div>
     }
 
+    @* CU-61: elegir otra fecha y franja. Las opciones ya respetan la zona y la anticipación del operador (H3). *@
+    @if (mensaje is not null)
+    {
+        <div class="alert alert-success" role="status">@mensaje</div>
+    }
     @if (seguimiento.PuedeReprogramar)
     {
-        <p class="small text-muted">¿No vas a estar? Pronto vas a poder elegir otro día desde esta página.</p>
+        @if (opciones is null)
+        {
+            <button type="button" class="btn btn-outline-primary mb-3" @onclick="VerOpcionesAsync" disabled="@ocupado">
+                ¿No vas a estar? Elegí otro día
+            </button>
+        }
+        else
+        {
+            <section class="card mb-3" aria-labelledby="reprogramar-titulo">
+                <div class="card-body">
+                    <h2 id="reprogramar-titulo" class="h6">Elegí cuándo querés recibirlo</h2>
+                    @if (error is not null)
+                    {
+                        <div class="alert alert-danger" role="alert">@error</div>
+                    }
+                    @if (opciones.Count == 0)
+                    {
+                        <p class="text-muted mb-0">No hay fechas disponibles en los próximos días. Comunicate con el comercio.</p>
+                    }
+                    else
+                    {
+                        <select class="form-select mb-3" aria-label="Fecha y horario" @bind="elegida">
+                            @foreach (var opcion in opciones)
+                            {
+                                <option value="@Clave(opcion)">@opcion.Texto</option>
+                            }
+                        </select>
+                        <button type="button" class="btn btn-primary" @onclick="ConfirmarAsync" disabled="@ocupado">Confirmar</button>
+                        <button type="button" class="btn btn-link" @onclick="() => opciones = null">Cancelar</button>
+                    }
+                </div>
+            </section>
+        }
     }
 
     <h2 class="h6 mt-4">Historial</h2>
@@ -76,7 +113,70 @@ else if (seguimiento is not null)
     private Estado estado = Estado.Cargando;
     private SeguimientoPublicoResponse? seguimiento;
 
-    protected override async Task OnParametersSetAsync()
+    // CU-61
+    private List<OpcionReprogramacionResponse>? opciones;
+    private string? elegida;
+    private string? error;
+    private string? mensaje;
+    private bool ocupado;
+
+    private string Url => $"/api/seguimiento/{Uri.EscapeDataString(Token)}/reprogramacion";
+
+    private static string Clave(OpcionReprogramacionResponse o) => $"{o.Fecha:yyyy-MM-dd}|{o.FranjaId}";
+
+    private async Task VerOpcionesAsync()
+    {
+        ocupado = true; error = null; mensaje = null;
+        try
+        {
+            var respuesta = await Http.GetFromJsonAsync<OpcionesReprogramacionResponse>(Url);
+            opciones = respuesta?.Opciones.ToList() ?? [];
+            elegida = opciones.Count > 0 ? Clave(opciones[0]) : null;
+        }
+        catch (HttpRequestException)
+        {
+            opciones = [];
+            error = "No pudimos cargar las fechas. Probá de nuevo en unos minutos.";
+        }
+        finally { ocupado = false; }
+    }
+
+    private async Task ConfirmarAsync()
+    {
+        var opcion = opciones?.SingleOrDefault(o => Clave(o) == elegida);
+        if (opcion is null) return;
+
+        ocupado = true; error = null;
+        try
+        {
+            var respuesta = await Http.PostAsJsonAsync(Url, new SolicitarReprogramacionRequest(opcion.Fecha, opcion.FranjaId));
+            if (respuesta.IsSuccessStatusCode)
+            {
+                opciones = null;
+                mensaje = $"Listo: tu envío se va a entregar el {opcion.Texto}.";
+                await CargarAsync();
+            }
+            else
+            {
+                // A1, A2 o A3: el servidor explica el motivo (ProblemDetails).
+                var problema = await respuesta.Content.ReadFromJsonAsync<ProblemaResponse>();
+                error = respuesta.StatusCode == HttpStatusCode.TooManyRequests
+                    ? "Demasiados intentos. Esperá un minuto y volvé a probar."
+                    : problema?.Detail ?? "No se pudo reprogramar. Probá con otra fecha.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            error = "No pudimos reprogramar. Probá de nuevo en unos minutos.";
+        }
+        finally { ocupado = false; }
+    }
+
+    private sealed record ProblemaResponse(string? Title, string? Detail);
+
+    protected override Task OnParametersSetAsync() => CargarAsync();
+
+    private async Task CargarAsync()
     {
         estado = Estado.Cargando;
         try

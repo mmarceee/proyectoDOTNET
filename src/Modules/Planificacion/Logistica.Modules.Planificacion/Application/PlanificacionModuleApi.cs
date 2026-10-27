@@ -1,3 +1,4 @@
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Planificacion.Contracts;
 using Logistica.Modules.Planificacion.Contracts.Results;
 using Logistica.Modules.Planificacion.Domain.Rutas;
@@ -5,8 +6,34 @@ using Logistica.Modules.Planificacion.Domain.Rutas;
 namespace Logistica.Modules.Planificacion.Application;
 
 // Implementación del contrato de Planificación. Es internal: los otros módulos sólo ven la interfaz.
-internal sealed class PlanificacionModuleApi(IRutaRepository rutas) : IPlanificacionModuleApi
+internal sealed class PlanificacionModuleApi(IRutaRepository rutas, IAdministracionModuleApi administracion,
+    TimeProvider reloj) : IPlanificacionModuleApi
 {
+    // CU-61 (T19): la ruta es de Planificación, así que es ella quien saca al envío. Toma el mismo bloqueo que armar,
+    // quitar y despachar, para que nadie despache la ruta mientras tanto. No pasa el envío a EnDeposito (T4): la
+    // transición la hace Envíos (T19, a Reprogramado) en la misma transacción.
+    public async Task<bool> QuitarPorReprogramacionAsync(Guid envioId, string numeroEnvio, CancellationToken ct)
+    {
+        await administracion.BloquearPlanificacionAsync(ct);
+
+        if (await rutas.RutaActivaDelEnvioAsync(envioId, ct) is not Guid rutaId
+            || await rutas.ObtenerAsync(rutaId, ct) is not { } ruta)
+        {
+            return true;
+        }
+
+        if (ruta.Estado != EstadoRuta.Planificada)
+        {
+            return false;
+        }
+
+        var orden = ruta.Paradas.Single(p => p.Envios.Any(e => e.EnvioId == envioId)).Orden;
+        ruta.QuitarEnvio(envioId);
+        rutas.Agregar(RetiroEnvioRuta.Registrar(ruta, envioId, numeroEnvio, orden, null, reloj.GetUtcNow()));
+        await rutas.GuardarAsync(ct);
+        return true;
+    }
+
     public async Task<RutaParaPosicion?> ConsultarParaPosicionAsync(Guid rutaId, Guid repartidorId, CancellationToken ct)
     {
         var r = await rutas.ObtenerAsync(rutaId, ct);

@@ -47,7 +47,8 @@ internal interface IEnvioRepository
     void RegistrarCancelacion(Envio envio, string? motivo, DateTimeOffset ahora);
 
     // CU-19: deja EnvioReprogramado en el Outbox; se guarda junto con la nueva fecha en GuardarCambiosAsync.
-    void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora);
+    // CU-61: el mismo evento, con origen en el seguimiento público.
+    void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora, OrigenEvento origen = OrigenEvento.Backoffice);
 
     // CU-21: deja EnvioExtraviado en el Outbox; se guarda junto con el cambio de estado y la incidencia en GuardarCambiosAsync.
     void RegistrarExtravio(Envio envio, EstadoEnvio estadoAnterior, string motivo, Guid? responsableId, DateTimeOffset ahora);

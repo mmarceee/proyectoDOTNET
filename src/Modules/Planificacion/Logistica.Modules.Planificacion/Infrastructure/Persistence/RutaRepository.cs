@@ -36,6 +36,13 @@ internal sealed class RutaRepository(PlanificacionDbContext db) : IRutaRepositor
     public async Task<IReadOnlyList<Guid>> EnviosOcupadosAsync(IReadOnlyCollection<Guid> ids, Guid? propia, CancellationToken ct)
         => await db.EnviosParada.AsNoTracking().Where(p => ids.Contains(p.EnvioId)
             && p.Estado == EstadoParada.Pendiente && p.RutaId != propia).Select(p => p.EnvioId).ToListAsync(ct);
+    public async Task<Guid?> RutaActivaDelEnvioAsync(Guid envioId, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.EnviosParada.AsNoTracking()
+            .Where(p => p.EnvioId == envioId && p.Estado == EstadoParada.Pendiente)
+            .Select(p => (Guid?)p.RutaId).FirstOrDefaultAsync(ct);
+    }
     public async Task<IReadOnlyList<string>> RecursosOcupadosAsync(DateOnly fecha, Guid repartidor, Guid vehiculo, Guid? propia, CancellationToken ct)
     {
         var rutas = await Consulta.AsNoTracking().Where(r => r.Id != propia && r.ReservaActiva && (r.Fecha == fecha

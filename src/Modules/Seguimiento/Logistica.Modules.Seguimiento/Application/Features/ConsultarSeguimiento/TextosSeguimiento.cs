@@ -12,7 +12,8 @@ internal static class TextosSeguimiento
     private static readonly string[] Finales = ["Entregado", "EnDevolucion", "Devuelto", "Extraviado", "Cancelado"];
 
     // CU-61: el destinatario puede pedir otra fecha mientras el envío no salió a reparto (ficha de CU-61, precondición).
-    private static readonly string[] Reprogramables = ["Admitido", "EnDeposito", "NoEntregado"];
+    // CU-61 (Envio.EstadosReprogramablesPorDestinatario). Con una ruta ya despachada, el pedido se rechaza (A1).
+    private static readonly string[] Reprogramables = ["Admitido", "EnDeposito", "AsignadoARuta", "Reprogramado"];
 
     public static string Estado(string estado) => estado switch
     {
