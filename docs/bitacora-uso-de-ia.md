@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 26 de octubre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 27 de octubre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal y Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -626,6 +626,21 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Notificar la recepción al destinatario: no figura entre los cambios relevantes de CU-62. |
 | **Verificación** | Un caso unitario y una prueba de integración nuevos, más la verificación del outbox en `RecibirBultoTests`. Corrida completa en Docker, junto con CU-09: 785 pruebas .NET (271 unitarias, 56 de arquitectura y 458 de integración), todas pasan; cobertura de líneas del 94,6 %. No se probó con `docker compose`. |
 
+## **3.40 Confirmar la devolución al comercio (CU-31)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 27/10/2026 |
+| **Archivos** | Envíos: `Devolucion.MarcarRecibida` y `Devolucion.Cerrar`, `EnvioDevuelto`, `DevolucionParaEntrega`, los métodos nuevos de `IEnviosModuleApi` y del repositorio. Depósito: `ConfirmarDevolucionHandler`, la página `/backoffice/devoluciones` y el registro en `ConfirmarRendicionHandler` (CU-55). Seguimiento: `EnvioDevuelto` en los avisos, la caché y `ClasificadorAvisos`. Menú del Backoffice. Pruebas: `DevolucionTests`, `ConfirmarDevolucionTests` y `EntregaAvisoTests`. Documentos: casos de uso, modelo de dominio y README de CU-64. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-31 en nivel mínimo: el operario registra que el comercio recibió el envío devuelto (T15) y quién lo recibió. |
+| **Cómo se trabajó** | La IA relevó lo que existía (la devolución con los campos del receptor, sin métodos que la cerraran; T15 en la tabla; sin `EnvioDevuelto`) y propuso cinco decisiones. El responsable las aceptó con la condición de no contradecir los ADR y pidió que la IA escribiera el código, las pruebas y la documentación. |
+| **Aceptado sin modificaciones** | Pantalla y coordinación en Depósito, reglas en Envíos, como CU-30 y CU-55. CU-55 deja la devolución recibida en el depósito, y sólo esa se puede cerrar (A1 ampliado). Entrega parcial con confirmación e incidencia (A2). Nombre y documento obligatorios. `EnvioDevuelto` por Outbox, clasificado como `Devolucion` en los avisos. |
+| **Modificado** | La primera corrida mostró que, si la confirmación no se completa (A1, A2 o falta el receptor), volver a consultar en el mismo request falla porque la transacción ya terminó. Como en CU-55, la página vuelve con un GET nuevo y lo que cargó el operario viaja en TempData. También que TempData devuelve como `Guid` un texto con esa forma: con un solo bulto marcado, la página volvía a marcarlos todos; se lee con `ToString()`. |
+| **Descartado** | Notificar la devolución al destinatario: no figura entre los cambios relevantes de CU-62. Un listado de devoluciones pendientes: el caso de uso empieza por la búsqueda del envío. |
+| **Verificación** | 7 casos unitarios y 6 pruebas de integración nuevas (rendición que deja la devolución recibida, entrega completa con el evento, entrega parcial con la incidencia, A1, receptor obligatorio, permisos y aislamiento entre operadores). Corrida completa en Docker: 798 pruebas .NET (278 unitarias, 56 de arquitectura y 464 de integración), todas pasan; cobertura de líneas del 94,7 %. No se probó con `docker compose`. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -655,3 +670,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.23 | 21/10/2026 | Revisión de main 04fab20 contra los ADR e integración con lukovski; resolución del conflicto conservando CU-53/CU-64, observaciones y verificación local. | Lucas Ottonello |
 | 0.24 | 22/10/2026 | Entrada de CU-62, notificar al destinatario por correo. | Ezequiel Marcenal |
 | 0.25 | 26/10/2026 | Entrada del evento de la recepción en depósito (T2) para CU-64 y CU-60. | Ezequiel Marcenal |
+| 0.26 | 27/10/2026 | Entrada de CU-31, confirmar la devolución al comercio. | Ezequiel Marcenal |

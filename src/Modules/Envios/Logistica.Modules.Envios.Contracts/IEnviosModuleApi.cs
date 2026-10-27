@@ -50,4 +50,17 @@ public interface IEnviosModuleApi
     // CU-55, A1: los bultos que tenían que volver en una rendición y no llegaron. Abre una incidencia por envío con sus
     // códigos; el despachador decide si declara el extravío (CU-21).
     Task RegistrarFaltantesAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct);
+
+    // CU-55: los envíos en devolución cuyos bultos volvieron en la rendición quedan con la devolución recibida en el
+    // depósito, lista para entregar al comercio (CU-31). Los envíos sin devolución se ignoran.
+    Task RegistrarDevolucionesRecibidasAsync(IReadOnlyCollection<Guid> envioIds, CancellationToken ct);
+
+    // CU-31: la devolución de un envío, buscada por su número o por el código de uno de sus bultos. null si no existe,
+    // es de otro operador o el envío no tiene una devolución.
+    Task<DevolucionParaEntrega?> ConsultarDevolucionAsync(string numeroOCodigo, CancellationToken ct);
+
+    // CU-31 (T15): cierra la devolución con quién la recibió, pasa el envío a Devuelto, abre una incidencia por los
+    // bultos que no se entregaron (A2) y publica EnvioDevuelto por Outbox. DomainException si el envío no está en
+    // devolución o todavía no volvió al depósito (A1).
+    Task ConfirmarDevolucionAsync(DevolucionAConfirmar confirmacion, CancellationToken ct);
 }
