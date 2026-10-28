@@ -680,7 +680,7 @@ Produccion, Prueba
 
 **Métodos**
 
-* marcarRecibida(): void
+* marcarRecibida(): void — los bultos volvieron al depósito en la rendición (CU-55); recién entonces se puede cerrar
 
 * cerrar(nombreReceptor: string, documentoReceptor: string): void — el comercio recibió el envío devuelto (T15, CU-31)
 

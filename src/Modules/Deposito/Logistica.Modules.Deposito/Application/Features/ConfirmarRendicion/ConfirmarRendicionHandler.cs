@@ -104,6 +104,11 @@ internal sealed class ConfirmarRendicionHandler(
             var faltantes = cerrada.Lineas.Where(l => l.Recibida == false).Select(l => l.BultoId).ToArray();
             await envios.RegistrarFaltantesAsync(faltantes, ct);
 
+            // CU-31: un envío en devolución cuyos bultos volvieron ya está en el depósito, listo para entregar al
+            // comercio. Envíos ignora los que no tienen devolución.
+            var conBultosDevueltos = cerrada.Lineas.Where(l => l.Recibida == true).Select(l => l.EnvioId).Distinct().ToArray();
+            await envios.RegistrarDevolucionesRecibidasAsync(conBultosDevueltos, ct);
+
             var entregados = cerrada.Lineas.GroupBy(l => l.EnvioId)
                 .Where(g => g.All(l => l.EstadoFinal == "EntregadoEnCalle"))
                 .Select(g => g.Key).ToArray();

@@ -355,8 +355,14 @@ Se detalla como **CU-81** en la sección 2.7 (API pública para comercios).
 | **Post-Condición** | **Éxito:** el envío queda **Devuelto** (estado terminal); su `Devolucion` queda *Cerrada*. Se publica `EnvioDevuelto` por Outbox.<br>**Fracaso:** el envío no cambia. |
 | **Actores** | **Principal:** operario de depósito, desde el Backoffice.<br>**Secundario:** módulo de Envíos. |
 | **Flujo de evento principal** | 1. El operario busca el envío por su número o escanea uno de sus bultos.<br>2. El sistema muestra la devolución con sus bultos.<br>3. El operario ingresa el nombre y el documento de quien recibe por el comercio.<br>4. El operario confirma.<br>5. El sistema registra la entrega, cierra la devolución y pasa el envío a *Devuelto* (T15). |
-| **Flujos alternativos** | **A1 · El envío no está en devolución (paso 2).** El sistema lo informa.<br><br>**A2 · Faltan bultos (paso 4).** El sistema pide confirmar la entrega parcial y registra la discrepancia. |
+| **Flujos alternativos** | **A1 · El envío no está en devolución o todavía no volvió al depósito (paso 2).** El sistema lo informa. Un envío pasa a *EnDevolucion* cuando el repartidor todavía lo tiene; se entrega al comercio después de que sus bultos vuelven en la rendición (CU-55).<br><br>**A2 · Faltan bultos (paso 4).** El sistema pide confirmar la entrega parcial y registra la discrepancia. |
 | **Requerimientos especiales** | 1. Queda registrado quién recibió por el comercio, para dirimir reclamos (sección 3.1 de la letra). |
+
+**Implementación en nivel mínimo (27/10/2026, Ezequiel Marcenal):**
+* La pantalla está en el Backoffice, en el módulo Depósito (`/backoffice/devoluciones`), sólo para el perfil Operario de depósito. Depósito coordina; la devolución y el envío son de Envíos, que los cambia por su contrato (`IEnviosModuleApi.ConsultarDevolucionAsync` y `ConfirmarDevolucionAsync`) en una sola transacción, con el mismo bloqueo por operador que CU-55.
+* CU-55 deja la devolución *RecibidaEnDeposito* cuando vuelve algún bulto del envío (`Devolucion.MarcarRecibida`). Sólo una devolución recibida se puede cerrar (A1).
+* El operario desmarca los bultos que no se entregan; si falta alguno, confirma la entrega parcial y se abre una incidencia del envío con sus códigos (A2), como en CU-55.
+* El nombre y el documento de quien recibe son obligatorios y quedan en la devolución, con la fecha, y en el detalle del evento del envío. El evento `EnvioDevuelto` llega a Seguimiento: avisa al comercio (CU-64, tipo *Devolución*) y borra el seguimiento público de la caché (CU-60).
 
 ### **CU-32 · Generar la liquidación de un comercio**
 
@@ -837,3 +843,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 1.2 | 19/10/2026 | CU-06: el máximo de paradas de Planificación sale de las reglas operativas; motivos validados por la versión del envío. | Cristian Reyes |
 | 1.1 | 19/10/2026 | CU-18, A2: con los intentos agotados, la devolución automática depende de la política de devolución de la versión de reglas del envío. | Ezequiel Marcenal |
 | 1.3 | 20/10/2026 | CU-55: implementación en nivel mínimo (coordinación desde Depósito, T8 con todos los bultos, faltantes con incidencia, sobrantes que impiden confirmar). | Ezequiel Marcenal |
+| 1.4 | 27/10/2026 | CU-31: implementación en nivel mínimo (devolución recibida en la rendición, receptor obligatorio, entrega parcial con incidencia, `EnvioDevuelto`); A1 incluye la devolución que todavía no volvió al depósito. | Ezequiel Marcenal |

@@ -40,6 +40,9 @@ public static class AdministracionModule
         services.AddScoped<Application.Features.GestionarIdentidadVisual.ActualizarIdentidadVisualHandler>();
         services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 
+        // CU-09
+        services.AddScoped<Application.Features.GestionarMensajesFallidos.MensajesFallidosHandler>();
+
         // CU-04: zonas y franjas horarias.
         services.AddScoped<Domain.Planificacion.IZonaRepository, ZonaRepository>();
         services.AddScoped<Application.Features.DefinirZonas.ConsultarZonasHandler>();

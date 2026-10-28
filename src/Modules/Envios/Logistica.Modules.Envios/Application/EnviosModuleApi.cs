@@ -258,7 +258,10 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             ?? throw new DomainException("El envío no existe.");
 
         // T2. Si el envío ya no está Admitido (por ejemplo, lo cancelaron), Transicionar lo rechaza.
-        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, reloj.GetUtcNow());
+        var ahora = reloj.GetUtcNow();
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora);
+        eventos.Registrar(EnvioRecibidoEnDeposito.Tipo,
+            new EnvioRecibidoEnDeposito(envio.Id, envio.Numero, ahora, responsableId), ahora);
 
         await envios.GuardarCambiosAsync(ct);
     }
@@ -308,6 +311,86 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
                 ahora));
         }
 
+        await envios.GuardarCambiosAsync(ct);
+    }
+
+    public async Task RegistrarDevolucionesRecibidasAsync(IReadOnlyCollection<Guid> envioIds, CancellationToken ct)
+    {
+        if (envioIds.Count == 0)
+        {
+            return;
+        }
+
+        var ahora = reloj.GetUtcNow();
+        foreach (var devolucion in await envios.ObtenerDevolucionesAsync(envioIds, ct))
+        {
+            if (devolucion.Estado != EstadoDevolucion.Cerrada)
+            {
+                devolucion.MarcarRecibida(ahora);
+            }
+        }
+
+        await envios.GuardarCambiosAsync(ct);
+    }
+
+    public async Task<DevolucionParaEntrega?> ConsultarDevolucionAsync(string numeroOCodigo, CancellationToken ct)
+    {
+        // El lector escribe el código como un teclado: se busca sin espacios y en mayúsculas.
+        var texto = numeroOCodigo.Trim().ToUpperInvariant();
+        if (texto.Length == 0)
+        {
+            return null;
+        }
+
+        var envio = await envios.IdPorNumeroAsync(texto, ct) is Guid id
+            ? await envios.ObtenerConBultosAsync(id, ct)
+            : await envios.ObtenerPorCodigoBultoAsync(texto, ct);
+        if (envio is null || await envios.ObtenerDevolucionAsync(envio.Id, ct) is not { } devolucion)
+        {
+            return null;
+        }
+
+        return new DevolucionParaEntrega(envio.Id, envio.Numero, envio.Estado.ToString(), devolucion.Motivo,
+            devolucion.Estado == EstadoDevolucion.RecibidaEnDeposito, devolucion.Estado == EstadoDevolucion.Cerrada,
+            envio.Bultos.OrderBy(b => b.Codigo).Select(b => new BultoDevuelto(b.Id, b.Codigo)).ToList());
+    }
+
+    public async Task ConfirmarDevolucionAsync(DevolucionAConfirmar confirmacion, CancellationToken ct)
+    {
+        var envio = await envios.ObtenerConBultosAsync(confirmacion.EnvioId, ct)
+            ?? throw new DomainException("El envío no existe.");
+
+        // A1: sólo un envío en devolución, con su devolución abierta.
+        if (envio.Estado != EstadoEnvio.EnDevolucion || await envios.ObtenerDevolucionAsync(envio.Id, ct) is not { } devolucion)
+        {
+            throw new DomainException($"El envío {envio.Numero} no está en devolución.");
+        }
+
+        var entregados = confirmacion.BultosEntregados.ToHashSet();
+        if (entregados.Count == 0)
+        {
+            throw new DomainException("Marcá los bultos que se entregan al comercio.");
+        }
+
+        if (!entregados.IsSubsetOf(envio.Bultos.Select(b => b.Id)))
+        {
+            throw new DomainException("Uno de los bultos marcados no es de este envío.");
+        }
+
+        var ahora = reloj.GetUtcNow();
+        devolucion.Cerrar(confirmacion.NombreReceptor, confirmacion.DocumentoReceptor, ahora);
+        envio.Transicionar(EstadoEnvio.Devuelto, OrigenEvento.Backoffice, confirmacion.ResponsableId, ahora,
+            detalle: $"Lo recibió {devolucion.NombreReceptor} (documento {devolucion.DocumentoReceptor}) por el comercio.");
+
+        // A2: la entrega parcial queda registrada como incidencia del envío, con los códigos que faltaron.
+        var faltantes = envio.Bultos.Where(b => !entregados.Contains(b.Id)).Select(b => b.Codigo).Order().ToArray();
+        if (faltantes.Length > 0)
+        {
+            envios.Agregar(Incidencia.Crear(envio, TipoIncidencia.Extravio,
+                $"Devolución entregada al comercio sin los bultos: {string.Join(", ", faltantes)}.", ahora));
+        }
+
+        eventos.Registrar(EnvioDevuelto.Tipo, new EnvioDevuelto(envio.Id, envio.Numero, ahora, confirmacion.ResponsableId), ahora);
         await envios.GuardarCambiosAsync(ct);
     }
 }

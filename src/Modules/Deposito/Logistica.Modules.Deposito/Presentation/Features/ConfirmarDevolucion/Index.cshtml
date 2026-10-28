@@ -1,0 +1,102 @@
+@page "/backoffice/devoluciones"
+@model Logistica.Modules.Deposito.Presentation.Features.ConfirmarDevolucion.IndexModel
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Devoluciones";
+}
+
+<h1 class="mb-3">Devolución al comercio</h1>
+<p class="text-muted">
+    Escaneá un bulto o escribí el número del envío devuelto. Registrá quién lo recibe por el comercio, ya sea que lo
+    retire del depósito o que se lo entreguen.
+</p>
+
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" asp-validation-summary="All" role="alert"></div>
+}
+
+<form method="get" class="row g-2 mb-4" role="search">
+    <div class="col-sm-6">
+        <label for="buscar" class="visually-hidden">Número de envío o código de bulto</label>
+        <input id="buscar" name="Buscar" value="@Model.Buscar" class="form-control" autocomplete="off" autofocus
+               placeholder="ENV-000123 o ENV-000123-1" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+    </div>
+</form>
+
+@if (Model.Buscado && Model.Devolucion is null)
+{
+    <div class="alert alert-warning" role="status">No hay una devolución para ese envío o bulto.</div>
+}
+else if (Model.Devolucion is { } devolucion)
+{
+    <h2 class="h4">Envío <code>@devolucion.Numero</code></h2>
+    <p><strong>Motivo de la devolución:</strong> @devolucion.Motivo</p>
+
+    @if (devolucion.Cerrada)
+    {
+        <div class="alert alert-info" role="status">Esta devolución ya se entregó al comercio.</div>
+    }
+    else if (devolucion.EstadoEnvio != "EnDevolucion")
+    {
+        <div class="alert alert-warning" role="status">El envío no está en devolución.</div>
+    }
+    else if (!devolucion.RecibidaEnDeposito)
+    {
+        <div class="alert alert-warning" role="status">
+            El envío todavía no volvió al depósito. Se entrega al comercio después de confirmar la rendición de su ruta.
+        </div>
+    }
+    else
+    {
+        <form method="post">
+            <input type="hidden" asp-for="Buscar" />
+            <fieldset class="mb-3">
+                <legend class="h6">Bultos que se entregan</legend>
+                @foreach (var bulto in devolucion.Bultos)
+                {
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="Entregados" value="@bulto.Id" id="bulto-@bulto.Id"
+                               checked="@Model.Entregados.Contains(bulto.Id)" />
+                        <label class="form-check-label" for="bulto-@bulto.Id"><code>@bulto.Codigo</code></label>
+                    </div>
+                }
+            </fieldset>
+
+            <div class="row g-3 mb-3">
+                <div class="col-sm-6">
+                    <label asp-for="NombreReceptor" class="form-label">Nombre de quien recibe por el comercio</label>
+                    <input asp-for="NombreReceptor" class="form-control" maxlength="200" required />
+                </div>
+                <div class="col-sm-4">
+                    <label asp-for="DocumentoReceptor" class="form-label">Documento</label>
+                    <input asp-for="DocumentoReceptor" class="form-control" maxlength="50" required />
+                </div>
+            </div>
+
+            @if (Model.FaltanBultos)
+            {
+                <div class="alert alert-warning" role="alert">
+                    No marcaste todos los bultos. Si confirmás, el envío queda devuelto y se abre una incidencia con los
+                    bultos que faltan.
+                    <div class="mt-2 d-flex gap-2">
+                        <button type="submit" name="ConfirmarParcial" value="true" class="btn btn-warning">Confirmar entrega parcial</button>
+                        <a href="/backoffice/devoluciones?Buscar=@Uri.EscapeDataString(Model.Buscar ?? "")" class="btn btn-outline-secondary">Revisar los bultos</a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <button type="submit" class="btn btn-primary">Confirmar la entrega</button>
+            }
+        </form>
+    }
+}

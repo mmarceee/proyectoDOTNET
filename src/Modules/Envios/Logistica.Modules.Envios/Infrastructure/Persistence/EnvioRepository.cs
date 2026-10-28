@@ -28,6 +28,25 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         return db.Envios.SingleOrDefaultAsync(e => e.Id == id, ct);
     }
 
+    public async Task<Envio?> ObtenerConBultosAsync(Guid id, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Envios.Include(e => e.Bultos).SingleOrDefaultAsync(e => e.Id == id, ct);
+    }
+
+    public async Task<Domain.Devoluciones.Devolucion?> ObtenerDevolucionAsync(Guid envioId, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Devoluciones.SingleOrDefaultAsync(d => d.EnvioId == envioId, ct);
+    }
+
+    public async Task<IReadOnlyList<Domain.Devoluciones.Devolucion>> ObtenerDevolucionesAsync(
+        IReadOnlyCollection<Guid> envioIds, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Devoluciones.Where(d => envioIds.Contains(d.EnvioId)).ToListAsync(ct);
+    }
+
     public Task<Envio?> ObtenerConIntentosAsync(Guid id, CancellationToken ct)
     {
         return db.Envios.Include(e => e.Intentos).SingleOrDefaultAsync(e => e.Id == id, ct);

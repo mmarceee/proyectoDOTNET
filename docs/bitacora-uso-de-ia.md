@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 23 de octubre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 27 de octubre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal y Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -620,7 +620,6 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Consultar Envíos o Administración desde el Worker: se comunica sólo por la cola. `System.Net.Mail.SmtpClient`, que Microsoft no recomienda para código nuevo. El logo en el correo, que el seguimiento público tampoco muestra. |
 | **Verificación** | 15 pruebas unitarias y 6 de integración nuevas, incluida una de extremo a extremo con **Mailpit** en Testcontainers (envío creado en el Portal, outbox, RabbitMQ, Worker y correo recibido con el enlace). Corrida completa en Docker: 716 pruebas .NET (248 unitarias, 56 de arquitectura y 412 de integración); fallaron por tiempo de espera dos ajenas al cambio (`UnidadDeTrabajoTests`, al abrir la conexión a PostgreSQL, y `SeleccionarOperadorTests`, en un request HTTP), que pasaron al repetirlas solas. No se probó con `docker compose` ni contra Brevo. |
 
-
 ## **3.39 Ajustes del historial de avisos del Portal (CU-65)**
 
 | Campo | Detalle |
@@ -688,6 +687,36 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Verificación y límites** | Se envió un POST sintético, se comprobó HTTP 200 y se consultó la API del receptor para verificar que conservaba método y cuerpo. No se ejecutó desde el Portal una nueva prueba de CU-63 ni se acreditó la recepción automática de CU-64. Este capturador permite inspeccionar mensajes y cabeceras, pero no valida HMAC ni sustituye al receptor con escenarios de error y demora pendiente para la defensa. Se recordó que la prueba manual de CU-63 no genera historial en CU-65. |
 | **Referencia** | [Ejemplos oficiales de la API de Webhook.site](https://docs.webhook.site/api/examples.html). La URL temporal entregada en el chat no se incorpora como configuración permanente del proyecto. |
 
+## **3.46 Evento de la recepción en depósito (T2, CU-30) para CU-64 y CU-60**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 26/10/2026 |
+| **Archivos** | Envíos: `EnvioRecibidoEnDeposito` y `EnviosModuleApi.RecibirEnDepositoAsync`. Seguimiento: `PrepararAvisos.Tipos`, `InvalidarSeguimiento.Tipos` y `LectorHechosEnvio`. Pruebas: `RecibirBultoTests`, `EntregaAvisoTests` y `EntregarAvisosTests`. Documentos: README de CU-64. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cerrar el pendiente de CU-64: la transición T2 no publicaba evento, así que la llegada al depósito no se avisaba al comercio y el seguimiento público seguía mostrando *Admitido* hasta que vencía la caché. |
+| **Cómo se trabajó** | El responsable señaló el pendiente del README de CU-64. La IA ubicó la transición en `RecibirEnDepositoAsync`, propuso el cambio y lo escribió, con sus pruebas, a pedido del responsable y sin contradecir los ADR. |
+| **Aceptado sin modificaciones** | El evento sigue el nombre de la tabla de transiciones y del catálogo (`EnvioRecibidoEnDeposito`, sección de CU-30), se registra en el outbox de Envíos en la misma transacción que la recepción, igual que T8, y Seguimiento lo traduce al estado `EnDeposito`. El sobre no trae comercio (lo publica el operario de depósito): el comercio sale de `EnvioSeguido`, como en los demás eventos (ADR-0003, sección 2.2). |
+| **Modificado** | — |
+| **Descartado** | Notificar la recepción al destinatario: no figura entre los cambios relevantes de CU-62. |
+| **Verificación** | Un caso unitario y una prueba de integración nuevos, más la verificación del outbox en `RecibirBultoTests`. Corrida completa en Docker, junto con CU-09: 785 pruebas .NET (271 unitarias, 56 de arquitectura y 458 de integración), todas pasan; cobertura de líneas del 94,6 %. No se probó con `docker compose`. |
+
+## **3.47 Confirmar la devolución al comercio (CU-31)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 27/10/2026 |
+| **Archivos** | Envíos: `Devolucion.MarcarRecibida` y `Devolucion.Cerrar`, `EnvioDevuelto`, `DevolucionParaEntrega`, los métodos nuevos de `IEnviosModuleApi` y del repositorio. Depósito: `ConfirmarDevolucionHandler`, la página `/backoffice/devoluciones` y el registro en `ConfirmarRendicionHandler` (CU-55). Seguimiento: `EnvioDevuelto` en los avisos, la caché y `ClasificadorAvisos`. Menú del Backoffice. Pruebas: `DevolucionTests`, `ConfirmarDevolucionTests` y `EntregaAvisoTests`. Documentos: casos de uso, modelo de dominio y README de CU-64. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-31 en nivel mínimo: el operario registra que el comercio recibió el envío devuelto (T15) y quién lo recibió. |
+| **Cómo se trabajó** | La IA relevó lo que existía (la devolución con los campos del receptor, sin métodos que la cerraran; T15 en la tabla; sin `EnvioDevuelto`) y propuso cinco decisiones. El responsable las aceptó con la condición de no contradecir los ADR y pidió que la IA escribiera el código, las pruebas y la documentación. |
+| **Aceptado sin modificaciones** | Pantalla y coordinación en Depósito, reglas en Envíos, como CU-30 y CU-55. CU-55 deja la devolución recibida en el depósito, y sólo esa se puede cerrar (A1 ampliado). Entrega parcial con confirmación e incidencia (A2). Nombre y documento obligatorios. `EnvioDevuelto` por Outbox, clasificado como `Devolucion` en los avisos. |
+| **Modificado** | La primera corrida mostró que, si la confirmación no se completa (A1, A2 o falta el receptor), volver a consultar en el mismo request falla porque la transacción ya terminó. Como en CU-55, la página vuelve con un GET nuevo y lo que cargó el operario viaja en TempData. También que TempData devuelve como `Guid` un texto con esa forma: con un solo bulto marcado, la página volvía a marcarlos todos; se lee con `ToString()`. |
+| **Descartado** | Notificar la devolución al destinatario: no figura entre los cambios relevantes de CU-62. Un listado de devoluciones pendientes: el caso de uso empieza por la búsqueda del envío. |
+| **Verificación** | 7 casos unitarios y 6 pruebas de integración nuevas (rendición que deja la devolución recibida, entrega completa con el evento, entrega parcial con la incidencia, A1, receptor obligatorio, permisos y aislamiento entre operadores). Corrida completa en Docker: 798 pruebas .NET (278 unitarias, 56 de arquitectura y 464 de integración), todas pasan; cobertura de líneas del 94,7 %. No se probó con `docker compose`. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -718,3 +747,5 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.24 | 22/10/2026 | Entrada de CU-62, notificar al destinatario por correo. | Ezequiel Marcenal |
 | 0.25 | 23/10/2026 | Ampliaciones faltantes de este chat: cierre e historial de ruta, cierre administrativo sin devoluciones, textos de PWA, diagnóstico Blazor, configuración y explicación de claves, texto del Portal e interfaz del historial de avisos. | Lucas Ottonello |
 | 0.26 | 23/10/2026 | Registro de lo faltante en el chat de CU-63: implementación de CU-65, corrección del escaneo vacío y confirmación de faltantes, reapertura de rutas actuales y futuras, simplificación de carga, estabilización de CI y preparación del receptor HTTPS temporal. Se conservan las ampliaciones previas y se distinguen verificaciones ejecutadas de pasos pendientes de prueba. | Lucas Ottonello |
+| 0.27 | 26/10/2026 | Entrada del evento de la recepción en depósito (T2) para CU-64 y CU-60. | Ezequiel Marcenal |
+| 0.28 | 27/10/2026 | Entrada de CU-31, confirmar la devolución al comercio. | Ezequiel Marcenal |

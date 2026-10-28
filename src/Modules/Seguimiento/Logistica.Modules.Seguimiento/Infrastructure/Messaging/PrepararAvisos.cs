@@ -14,6 +14,7 @@ internal sealed class PrepararAvisos(SeguimientoDbContext db, PrepararAvisosHand
     [
         EnvioAdmitido.Tipo, EnvioAsignadoARuta.Tipo, EnvioDesasignadoDeRuta.Tipo, EnvioEnTransito.Tipo, EnvioEntregado.Tipo,
         IntentoFallidoRegistrado.Tipo, EnvioReprogramado.Tipo, EnvioCancelado.Tipo, EnvioReintegradoADeposito.Tipo,
+        EnvioRecibidoEnDeposito.Tipo, EnvioDevuelto.Tipo,
         DevolucionIniciada.Tipo, EnvioExtraviado.Tipo,
     ];
 
