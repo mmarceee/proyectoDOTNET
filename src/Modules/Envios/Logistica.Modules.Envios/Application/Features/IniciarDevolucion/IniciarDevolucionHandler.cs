@@ -1,11 +1,13 @@
 using Logistica.Modules.Envios.Domain.Devoluciones;
 using Logistica.Modules.Envios.Domain.Envios;
+using Logistica.Modules.Planificacion.Contracts;
 
 namespace Logistica.Modules.Envios.Application.Features.IniciarDevolucion;
 
 // CU-20: el despachador o el comercio deciden devolver un envío al comercio (T12 o T14).
 // Coordina los pasos; el motivo, los estados permitidos y la regla del comercio los decide Envio.
-internal sealed class IniciarDevolucionHandler(IEnvioRepository envios, TimeProvider reloj)
+internal sealed class IniciarDevolucionHandler(IEnvioRepository envios, IPlanificacionModuleApi planificacion,
+    TimeProvider reloj)
 {
     // false: el envío no existe o es de otro inquilino (o de otro comercio). Para quien pregunta es lo mismo
     // (ADR-0002, sección 2.9).
@@ -25,6 +27,15 @@ internal sealed class IniciarDevolucionHandler(IEnvioRepository envios, TimeProv
 
         // Requerimiento especial 1: la Devolucion es otro agregado y se crea en la misma transacción.
         var devolucion = Devolucion.Crear(envio, command.Motivo, ahora);
+
+        // CU-31 sólo entrega al comercio una devolución recibida en el depósito. En T12 el paquete ya está ahí; en T14
+        // también, salvo que siga arriba del vehículo: en ese caso la marca la rendición (CU-55) cuando vuelve, como en
+        // CU-18.
+        if (anterior == EstadoEnvio.EnDeposito || !await planificacion.EnvioEnLaCalleAsync(envio.Id, ct))
+        {
+            devolucion.MarcarRecibida(ahora);
+        }
+
         envios.Agregar(devolucion);
 
         // DevolucionIniciada va al Outbox, también en la misma transacción (ADR-0003).

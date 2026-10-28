@@ -33,4 +33,8 @@ public interface IPlanificacionModuleApi
     // CU-61 (T19): saca al envío de su ruta si la ruta todavía está Planificada, conservando el historial del retiro.
     // true si no estaba en una ruta o se lo pudo sacar; false si su ruta ya se despachó (A1: ya salió a reparto).
     Task<bool> QuitarPorReprogramacionAsync(Guid envioId, string numeroEnvio, CancellationToken ct);
+
+    // CU-20: ¿el envío está arriba de un vehículo? (su ruta está Despachada o EnCurso). Si sí, su devolución la marca
+    // recibida la rendición (CU-55) cuando el bulto vuelve.
+    Task<bool> EnvioEnLaCalleAsync(Guid envioId, CancellationToken ct);
 }
