@@ -9,6 +9,11 @@ namespace Logistica.Modules.Planificacion.Application;
 internal sealed class PlanificacionModuleApi(IRutaRepository rutas, IAdministracionModuleApi administracion,
     TimeProvider reloj) : IPlanificacionModuleApi
 {
+    // CU-20: el envío está arriba de un vehículo si su parada pendiente es de una ruta Despachada o EnCurso.
+    public async Task<bool> EnvioEnLaCalleAsync(Guid envioId, CancellationToken ct)
+        => await rutas.RutaActivaDelEnvioAsync(envioId, ct) is Guid rutaId
+            && await rutas.ObtenerAsync(rutaId, ct) is { Estado: EstadoRuta.Despachada or EstadoRuta.EnCurso };
+
     // CU-61 (T19): la ruta es de Planificación, así que es ella quien saca al envío. Toma el mismo bloqueo que armar,
     // quitar y despachar, para que nadie despache la ruta mientras tanto. No pasa el envío a EnDeposito (T4): la
     // transición la hace Envíos (T19, a Reprogramado) en la misma transacción.

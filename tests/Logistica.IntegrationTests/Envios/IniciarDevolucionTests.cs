@@ -20,7 +20,7 @@ public class IniciarDevolucionTests(PostgresApiFactory factory) : IClassFixture<
         .WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false"))
         .CreateClient(Sesion.Opciones);
 
-    // Flujo principal (T12): el envío queda EnDevolucion, con su evento, la Devolucion Pendiente y el mensaje del Outbox.
+    // Flujo principal (T12): el envío queda EnDevolucion, con su evento, la Devolucion ya recibida en el depósito (lista para CU-31) y el mensaje del Outbox.
     [Fact]
     public async Task El_despachador_inicia_la_devolucion_y_queda_todo_registrado()
     {
@@ -35,9 +35,33 @@ public class IniciarDevolucionTests(PostgresApiFactory factory) : IClassFixture<
         Assert.Equal("EnDevolucion", await EstadoAsync(envio.Id));
         Assert.Equal("Backoffice", await ConsultarAsync<string>(
             """SELECT "Origen" FROM envios."EventosEnvio" WHERE "EnvioId" = @id AND "EstadoNuevo" = 'EnDevolucion'""", envio.Id));
-        Assert.Equal("Pendiente", await ConsultarAsync<string>(
+        Assert.Equal("RecibidaEnDeposito", await ConsultarAsync<string>(
             """SELECT "Estado" FROM envios."Devoluciones" WHERE "EnvioId" = @id AND "Motivo" = 'El cliente canceló la compra'""", envio.Id));
         Assert.Equal(1L, await MensajesAsync(envio.Id));
+    }
+
+    // CU-20 → CU-31: una devolución iniciada con el paquete en el depósito se puede entregar al comercio (antes quedaba
+    // Pendiente y ninguna rendición la marcaba recibida).
+    [Fact]
+    public async Task La_devolucion_iniciada_desde_el_deposito_se_puede_entregar_al_comercio()
+    {
+        var envio = await EnvioAsync(DatosIniciales.OperadorDemoId, enDeposito: true);
+        using var despacho = Cliente();
+        await Sesion.IngresarAsync(despacho, "despacho@operador-demo.uy");
+        await IniciarDesdeBackofficeAsync(despacho, envio.Numero, "El cliente canceló la compra");
+        using var operario = Cliente();
+        await Sesion.IngresarAsync(operario, "deposito@operador-demo.uy");
+        const string pagina = "/backoffice/devoluciones";
+
+        var respuesta = await operario.PostAsync(pagina, new FormUrlEncodedContent(
+        [
+            new("__RequestVerificationToken", await Sesion.TokenAsync(operario, $"{pagina}?Buscar={envio.Numero}")),
+            new("Buscar", envio.Numero), new("NombreReceptor", "María Gómez"), new("DocumentoReceptor", "1.234.567-8"),
+            .. envio.Bultos.Select(b => new KeyValuePair<string, string>("Entregados", b.Id.ToString())),
+        ]));
+
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        Assert.Equal("Devuelto", await EstadoAsync(envio.Id));
     }
 
     // Paso 2: sin motivo no se confirma y no cambia nada.
