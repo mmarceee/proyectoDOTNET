@@ -30,6 +30,6 @@ internal sealed class ConsultarEnviosDisponiblesHandler(IRutaRepository rutas, I
         return new(lista.Skip((pagina - 1) * tamano).Take(tamano).Select(p => new EnvioDisponibleResponse(p.Envio.Id,
             p.Envio.Numero, p.Envio.Direccion, p.Datos.ZonaId, p.Datos.Franja?.Id, p.Envio.FechaEntregaProgramada,
             p.Datos.Bultos.Sum(b => b.PesoKg), p.Datos.Bultos.Sum(b => b.VolumenM3),
-            p.Datos.ReintentoDesde, p.Datos.CumplePlazoEntreIntentos)).ToList(), lista.Count, pagina, tamano);
+            p.Datos.ReintentoDesde, p.Datos.CumplePlazoEntreIntentos, p.Envio.Modalidad)).ToList(), lista.Count, pagina, tamano);
     }
 }

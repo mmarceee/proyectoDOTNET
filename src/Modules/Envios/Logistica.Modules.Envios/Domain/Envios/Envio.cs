@@ -1,4 +1,5 @@
 using Logistica.SharedKernel;
+using Logistica.Modules.Administracion.Contracts;
 
 namespace Logistica.Modules.Envios.Domain.Envios;
 
@@ -16,6 +17,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public Direccion Direccion { get; private set; } = null!;
     public EstadoEnvio Estado { get; private set; }
     public decimal MontoTarifa { get; private set; }
+    public Modalidad Modalidad { get; private set; }
     // Nullable para los envíos admitidos con la tarifa provisoria del esqueleto inicial.
     public Guid? VersionTarifarioId { get; private set; }
     public int? VersionTarifarioNumero { get; private set; }
@@ -54,7 +56,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
 
     public static Envio Crear(Guid operadorId, Guid comercioId, string numero, Destinatario destinatario,
         Direccion direccion, IReadOnlyList<DatosBulto> bultos, OrigenEvento origen, Guid? responsableId,
-        DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null, Guid? versionReglasId = null)
+        DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null, Guid? versionReglasId = null,
+        Modalidad modalidad = Modalidad.Estandar)
     {
         if (string.IsNullOrWhiteSpace(numero))
         {
@@ -65,6 +68,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         {
             throw new DomainException("Un envío debe tener al menos un bulto.");
         }
+        if (!Enum.IsDefined(modalidad))
+            throw new DomainException("La modalidad del envío no es válida.");
 
         if (versionTarifario is not null && (versionTarifario.Id == Guid.Empty || versionTarifario.Numero < 1))
         {
@@ -84,6 +89,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             Destinatario = destinatario,
             Direccion = direccion,
             Estado = EstadoEnvio.Admitido,
+            Modalidad = modalidad,
             // Todos los instantes del envío se guardan en UTC: PostgreSQL no admite otro desfase.
             CreadoEn = ahora.ToUniversalTime(),
             VersionTarifarioId = versionTarifario?.Id,
@@ -218,6 +224,99 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         {
             throw new DomainException(
                 $"La franja empieza antes del plazo entre intentos: el envío se puede volver a intentar desde {desde:yyyy-MM-dd HH:mm} UTC.");
+        }
+
+        DefinirPlanificacion(ZonaId, franjaId, fecha);
+    }
+
+    // CU-21 (T16): el administrador o el despachador declara perdido un envío que estaba en el depósito, en tránsito o
+    // en devolución. Extraviado es terminal. La Incidencia de tipo Extravío es otro agregado: la crea quien llama,
+    // en la misma transacción.
+    public void DeclararExtravio(string motivo, Guid? responsableId, DateTimeOffset ahora)
+    {
+        // A1: el motivo es obligatorio (guarda de T16).
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            throw new DomainException("Para declarar un extravío hay que indicar el motivo.");
+        }
+
+        // A2: si el estado no lo permite (por ejemplo, Entregado), Transicionar lanza TransicionInvalidaException.
+        Transicionar(EstadoEnvio.Extraviado, OrigenEvento.Backoffice, responsableId, ahora, detalle: motivo.Trim());
+    }
+
+    // CU-20 (T12 o T14; T10 la aplica CU-18): el despachador o el comercio deciden devolver el envío al comercio.
+    // La Devolucion es otro agregado: la crea quien llama, en la misma transacción.
+    public void IniciarDevolucion(string motivo, OrigenEvento origen, Guid? responsableId, DateTimeOffset ahora)
+    {
+        // Paso 2: el motivo es obligatorio.
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            throw new DomainException("Para iniciar la devolución hay que indicar el motivo.");
+        }
+
+        // A2: el comercio sólo puede pedirla con el envío en el depósito (T12).
+        if (origen is OrigenEvento.PortalComercio or OrigenEvento.Api && Estado != EstadoEnvio.EnDeposito)
+        {
+            throw new DomainException("El comercio sólo puede pedir la devolución de un envío que está en el depósito.");
+        }
+
+        // A1: si el estado no lo permite (por ejemplo, EnTransito), Transicionar lanza TransicionInvalidaException.
+        Transicionar(EstadoEnvio.EnDevolucion, origen, responsableId, ahora, detalle: motivo.Trim());
+    }
+
+    // CU-61: los estados desde los que el destinatario puede elegir otra fecha y franja. NoEntregado no figura porque es
+    // transitorio (T11 se eliminó): después de un intento fallido el envío ya está Reprogramado.
+    public static readonly EstadoEnvio[] EstadosReprogramablesPorDestinatario =
+    [
+        EstadoEnvio.Admitido, EstadoEnvio.EnDeposito, EstadoEnvio.AsignadoARuta, EstadoEnvio.Reprogramado
+    ];
+
+    // CU-61 (RF 26): el destinatario elige desde el seguimiento público una nueva fecha y franja de entrega.
+    // - Admitido: sólo se registra la nueva fecha y franja, sin cambiar de estado.
+    // - EnDeposito (T18) o AsignadoARuta (T19): queda Reprogramado. Que la ruta no esté despachada y sacarlo de ella lo
+    //   resuelve Planificación antes de llamar (la ruta es su agregado).
+    // - Reprogramado: elige su nuevo intento, como el despachador en CU-19.
+    // comienzoFranja es cuándo empieza la franja ese día, en la zona horaria del operador; anticipación y máximo de
+    // intentos salen de las reglas del envío (CU-06). Primero se valida todo y recién después se cambia algo.
+    public void ReprogramarPorDestinatario(DateOnly fecha, Guid franjaId, DateTimeOffset comienzoFranja,
+        TimeSpan anticipacion, int maxIntentos, DateTimeOffset ahora)
+    {
+        // A1: ya salió a reparto o terminó.
+        if (!EstadosReprogramablesPorDestinatario.Contains(Estado))
+        {
+            throw new DomainException("El envío ya no se puede reprogramar: salió a reparto o ya terminó.");
+        }
+
+        // A2: la nueva franja tiene que empezar con la anticipación mínima del operador.
+        if (comienzoFranja < ahora + anticipacion)
+        {
+            throw new DomainException(
+                $"La nueva entrega tiene que pedirse con al menos {anticipacion.TotalHours:0.#} horas de anticipación.");
+        }
+
+        if (ZonaId is null)
+        {
+            throw new DomainException("El envío todavía no tiene zona: no se puede elegir una franja.");
+        }
+
+        if (Estado == EstadoEnvio.Reprogramado)
+        {
+            // A2: con los intentos agotados decide el despachador (CU-18 o CU-20), no el destinatario.
+            if (_intentos.Count(i => i.Resultado == ResultadoIntento.Fallido) >= maxIntentos)
+            {
+                throw new DomainException("Se agotaron los intentos de entrega: el envío ya no se puede reprogramar.");
+            }
+
+            // Respeta además el plazo entre intentos (CU-19, A1).
+            ElegirNuevoIntento(fecha, franjaId, comienzoFranja);
+            return;
+        }
+
+        if (Estado != EstadoEnvio.Admitido)
+        {
+            // T18 o T19. Después de la transición el envío ya acepta un nuevo compromiso.
+            Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.SeguimientoPublico, null, ahora,
+                detalle: $"El destinatario pidió la entrega para el {fecha:dd/MM/yyyy}.");
         }
 
         DefinirPlanificacion(ZonaId, franjaId, fecha);

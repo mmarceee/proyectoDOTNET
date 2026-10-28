@@ -10,10 +10,12 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Messaging;
 // selección de lo relevante (paso 3): los demás eventos no llegan (A1).
 internal sealed class NotificarDestinatario(SeguimientoDbContext db, NotificarDestinatarioHandler handler) : IConsumidorIntegracion
 {
-    // Admitido (con el enlace), en tránsito, no entregado (reprogramado o en devolución), reprogramado y entregado.
+    // Admitido (con el enlace), en tránsito, no entregado (reprogramado o en devolución), reprogramado, entregado y la
+    // devolución manual (CU-20).
     public static readonly string[] Tipos =
     [
         EnvioAdmitido.Tipo, EnvioEnTransito.Tipo, IntentoFallidoRegistrado.Tipo, EnvioReprogramado.Tipo, EnvioEntregado.Tipo,
+        DevolucionIniciada.Tipo,
     ];
 
     public static string Cola(string tipo) => $"seguimiento.notificar-destinatario.{tipo}";

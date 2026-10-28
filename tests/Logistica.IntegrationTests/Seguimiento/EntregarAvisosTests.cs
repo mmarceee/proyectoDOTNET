@@ -247,6 +247,63 @@ public sealed class EntregarAvisosTests(PostgresApiFactory factory, RabbitMqFixt
         Assert.False(recibido.Json.GetProperty("prueba").GetBoolean());
     }
 
+    [Fact]
+    public async Task Reenvio_desde_el_historial_llega_por_outbox_y_RabbitMQ_conservando_id_e_intentos()
+    {
+        var receptor = new Receptor();
+        using var api = CrearApi(receptor).WithWebHostBuilder(b =>
+            b.UseSetting("Identity:PermitirTenantProvisorio", "false")
+             .UseSetting("ConnectionStrings:RabbitMQ", rabbit.ConnectionString));
+        var operador = DatosIniciales.OperadorDemoId;
+        var comercio = DatosIniciales.ComercioDemoId;
+        var suscripcion = await SuscribirAsync(api.Services, operador, comercio, TipoEventoAviso.CambioDeEstado);
+        Guid id;
+        // Preparar una entrega agotada sin un mensaje original pendiente: sólo el reenvío manual podrá recuperarla.
+        await using (var scope = api.Services.CreateAsyncScope())
+        {
+            await using var db = Contexto(scope, operador, comercio);
+            var envio = EnvioSeguido.Crear(operador, comercio, Guid.NewGuid(), "ENV-CU65-RECUPERACION");
+            var entrega = EntregaAviso.Crear(suscripcion.Suscripcion, Guid.NewGuid(), envio,
+                "Admitido", TipoEventoAviso.CambioDeEstado, Ahora);
+            entrega.RegistrarIntento(Ahora, false, 503, "Receptor no disponible", ultimo: true);
+            db.EnviosSeguidos.Add(envio);
+            db.EntregasAviso.Add(entrega);
+            await db.SaveChangesAsync();
+            id = entrega.Id;
+        }
+
+        using var portal = api.CreateClient(Sesion.Opciones);
+        await Sesion.IngresarAsync(portal, "comercio@tiendademo.uy");
+        await Sesion.ElegirOperadorAsync(portal, operador);
+        var ruta = $"/api/avisos/entregas/{id}";
+        var fallida = await portal.GetFromJsonAsync<DetalleEntregaAvisoResponse>(ruta);
+        Assert.True(fallida!.Entrega.PuedeReenviar);
+        var token = (await portal.GetFromJsonAsync<TokenAntifalsificacionResponse>(
+            "/api/avisos/suscripciones/antifalsificacion"))!.Token;
+        using var peticion = new HttpRequestMessage(HttpMethod.Post, ruta + "/reenvio");
+        peticion.Headers.Add("RequestVerificationToken", token);
+        using var respuesta = await portal.SendAsync(peticion);
+        Assert.Equal(HttpStatusCode.Accepted, respuesta.StatusCode);
+
+        using var worker = CrearWorker(receptor);
+        await worker.StartAsync();
+        try
+        {
+            var recuperada = await EsperarAsync(async () =>
+            {
+                var detalle = await portal.GetFromJsonAsync<DetalleEntregaAvisoResponse>(ruta);
+                return detalle?.Entrega.Estado == "Exitosa" ? detalle : null;
+            });
+            Assert.Equal(id, recuperada.Entrega.Id);
+            Assert.False(recuperada.Entrega.PuedeReenviar);
+            Assert.Equal(new int?[] { 503, 200 }, recuperada.Intentos.Select(i => i.CodigoRespuesta));
+            Assert.Equal(new[] { 1, 2 }, recuperada.Intentos.Select(i => i.Numero));
+            var recibido = Assert.Single(receptor.Recibidos, r => r.Id == id);
+            recibido.Verificar(suscripcion.Secreto);
+        }
+        finally { await worker.StopAsync(); }
+    }
+
     private WebApplicationFactory<Program> CrearApi(Receptor receptor) =>
         factory.WithWebHostBuilder(b => b.UseSetting("Seguimiento:Avisos:ClaveCifrado", Clave)
             .ConfigureServices(s => s.AddHttpClient<IEmisorAvisos, EmisorAvisosHttp>()

@@ -204,6 +204,12 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("FranjaHorariaId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Modalidad")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Estandar");
+
                     b.Property<decimal>("MontoTarifa")
                         .HasColumnType("numeric");
 

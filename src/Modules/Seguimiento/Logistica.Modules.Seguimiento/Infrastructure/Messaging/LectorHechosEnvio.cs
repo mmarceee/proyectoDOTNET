@@ -51,6 +51,11 @@ internal static class LectorHechosEnvio
             EnvioRecibidoEnDeposito.Tipo => Hecho("EnDeposito"),
             // T15 (CU-31): el comercio recibió el envío devuelto.
             EnvioDevuelto.Tipo => Hecho("Devuelto"),
+            // CU-20: la devolución manual (T12 o T14); el clasificador la avisa como Devolucion. La automática de CU-18
+            // ya llega como IntentoFallidoRegistrado con EstadoFinal EnDevolucion, así que no se avisa dos veces.
+            DevolucionIniciada.Tipo => Hecho("EnDevolucion"),
+            // CU-21 (T16): un cambio de estado más para el comercio.
+            EnvioExtraviado.Tipo => Hecho("Extraviado"),
             _ => throw new InvalidDataException("Tipo de evento de Envíos desconocido."),
         };
     }

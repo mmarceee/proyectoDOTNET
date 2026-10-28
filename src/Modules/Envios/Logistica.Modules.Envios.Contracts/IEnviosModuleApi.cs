@@ -43,6 +43,10 @@ public interface IEnviosModuleApi
     // el Backoffice. null si no existe o es de otro operador.
     Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct);
 
+    // CU-60: los envíos del operador, del más nuevo al más viejo, para elegir desde el Backoffice cuál enlace de
+    // seguimiento mandar. texto busca por número o destinatario, igual que el listado de envíos (CU-13).
+    Task<PaginaEnviosParaSeguimiento> ListarParaSeguimientoAsync(string? texto, int pagina, CancellationToken ct);
+
     // CU-55 (T8): los envíos que salieron y no llegaron a intentarse vuelven al depósito, y cada uno publica
     // EnvioReintegradoADeposito por Outbox. Si alguno ya no está EnTransito, lanza una DomainException.
     Task ReintegrarADepositoAsync(IReadOnlyCollection<Guid> envioIds, Guid? responsableId, CancellationToken ct);
@@ -63,4 +67,17 @@ public interface IEnviosModuleApi
     // bultos que no se entregaron (A2) y publica EnvioDevuelto por Outbox. DomainException si el envío no está en
     // devolución o todavía no volvió al depósito (A1).
     Task ConfirmarDevolucionAsync(DevolucionAConfirmar confirmacion, CancellationToken ct);
+
+    // CU-66: los envíos de las rutas en la calle (para su avance) y los que esperan la entrega con fecha hasta "hasta"
+    // inclusive (para el riesgo). El operador lo pone el filtro "Tenant".
+    Task<IReadOnlyList<EnvioParaTablero>> ListarParaTableroAsync(IReadOnlyCollection<Guid> deRutas, DateOnly hasta,
+        CancellationToken ct);
+
+    // CU-61, paso 2: las fechas y franjas que el destinatario puede elegir. null si el envío no existe o es de otro
+    // operador (el inquilino sale del token del enlace); vacía si ya no se puede reprogramar.
+    Task<IReadOnlyList<OpcionReprogramacion>?> OpcionesReprogramacionAsync(Guid envioId, CancellationToken ct);
+
+    // CU-61, pasos 3 a 5 (T18, T19 o nuevo intento). false si el envío no existe o es de otro operador; una regla rota
+    // (A1, A2, A3) lanza DomainException.
+    Task<bool> ReprogramarPorDestinatarioAsync(Guid envioId, DateOnly fecha, Guid franjaId, CancellationToken ct);
 }

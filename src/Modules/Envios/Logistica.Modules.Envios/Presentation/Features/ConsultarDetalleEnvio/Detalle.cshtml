@@ -9,15 +9,32 @@
     var envio = Model.Detalle;
     ViewData["Title"] = $"Envío {envio.Numero}";
     var puedeRecibir = (await Autorizacion.AuthorizeAsync(User, Politicas.OperarioDeposito)).Succeeded;
+    // CU-21: sólo el administrador o el despachador, y sólo desde los estados de origen de T16.
+    var puedeDeclararExtravio = (User.IsInRole("Administrador") || User.IsInRole("Despachador"))
+        && envio.Estado is "EnDeposito" or "EnTransito" or "EnDevolucion";
+    // CU-20: sólo el despachador, y sólo desde los estados de T12 y T14.
+    var puedeIniciarDevolucion = (await Autorizacion.AuthorizeAsync(User, Politicas.Despachador)).Succeeded
+        && envio.Estado is "EnDeposito" or "Reprogramado";
 }
 
-<div class="backoffice-page-header mb-4">
-    <div>
+<div class="mb-4">
+    <div class="text-center">
         <h1 class="mb-2">Envío @envio.Numero</h1>
         <span class="badge @EstadoEnvioBadge.Clase(envio.Estado)">@EstadoEnvioTexto.Mostrar(envio.Estado)</span>
+        <span class="badge @(envio.Modalidad == "Urgente" ? "text-bg-warning" : "text-bg-secondary") ms-2">@(envio.Modalidad == "Urgente" ? "Urgente" : "Estándar")</span>
         <span class="text-muted ms-2">Fecha de alta: @Model.MostrarFecha(envio.CreadoEn)</span>
     </div>
-    <a href="@Model.UrlVolver" class="btn btn-outline-secondary">Volver al listado</a>
+    <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+        @if (puedeIniciarDevolucion)
+        {
+            <a href="/backoffice/envios/@Uri.EscapeDataString(envio.Numero)/devolucion" class="btn btn-outline-warning btn-sm">Iniciar devolución</a>
+        }
+        @if (puedeDeclararExtravio)
+        {
+            <a href="/backoffice/envios/@Uri.EscapeDataString(envio.Numero)/extravio" class="btn btn-outline-danger btn-sm">Declarar extravío</a>
+        }
+        <a href="@Model.UrlVolver" class="btn btn-outline-secondary btn-sm">Volver al listado</a>
+    </div>
 </div>
 
 <section class="card mb-4" aria-labelledby="resumen-titulo">

@@ -1,6 +1,7 @@
 using Logistica.Modules.Envios.Contracts;
 using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Contracts.Results;
+using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
 using Logistica.Modules.Envios.Domain.Devoluciones;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Domain.Incidencias;
@@ -10,8 +11,16 @@ namespace Logistica.Modules.Envios.Application;
 
 // Implementación del contrato de Envíos. Es internal: los otros módulos sólo ven la interfaz.
 internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj, IReglasDeEntrega reglasDeEntrega,
-    IIntegrationEventPublisher eventos) : IEnviosModuleApi
+    IIntegrationEventPublisher eventos, ConsultarEnviosHandler listado,
+    Features.ReprogramarPorDestinatario.ReprogramarPorDestinatarioHandler reprogramar) : IEnviosModuleApi
 {
+    // CU-61: el seguimiento público pide las opciones y la reprogramación por este contrato.
+    public Task<IReadOnlyList<OpcionReprogramacion>?> OpcionesReprogramacionAsync(Guid envioId, CancellationToken ct)
+        => reprogramar.OpcionesAsync(envioId, ct);
+
+    public Task<bool> ReprogramarPorDestinatarioAsync(Guid envioId, DateOnly fecha, Guid franjaId, CancellationToken ct)
+        => reprogramar.ReprogramarAsync(envioId, fecha, franjaId, ct);
+
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
@@ -158,6 +167,27 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         return envios.IdPorNumeroAsync(numero.Trim().ToUpperInvariant(), ct);
     }
 
+    // CU-60: reusa el listado del Backoffice (CU-13), con sus validaciones y el filtro "Tenant", y devuelve sólo lo que
+    // la página de seguimiento muestra.
+    public async Task<PaginaEnviosParaSeguimiento> ListarParaSeguimientoAsync(string? texto, int pagina, CancellationToken ct)
+    {
+        var resultado = await listado.HandleAsync(new ConsultarEnviosQuery(Pagina: pagina, Texto: texto), ct);
+        var filas = resultado.Envios
+            .Select(e => new EnvioParaSeguimiento(e.Numero, e.Estado, e.DestinatarioNombre, e.Localidad, e.CreadoEn))
+            .ToArray();
+        return new PaginaEnviosParaSeguimiento(filas, resultado.Pagina, resultado.TotalPaginas);
+    }
+
+    // CU-66: traduce los envíos a lo que ve el tablero. "EntregaPendiente" usa la misma lista que CU-04.
+    public async Task<IReadOnlyList<EnvioParaTablero>> ListarParaTableroAsync(IReadOnlyCollection<Guid> deRutas,
+        DateOnly hasta, CancellationToken ct)
+    {
+        return (await envios.ListarParaTableroAsync(deRutas, hasta, ct))
+            .Select(e => new EnvioParaTablero(e.Id, e.Numero, e.Estado.ToString(), e.FechaEntregaProgramada,
+                e.FranjaHorariaId, Envio.EstadosConEntregaPendiente.Contains(e.Estado)))
+            .ToArray();
+    }
+
     public Task<IReadOnlyList<Guid>> EnviosSinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct)
     {
         return envios.SinFechaConFranjasAsync(franjaIds, ct);
@@ -170,7 +200,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             e.FranjaHorariaId, e.FechaEntregaProgramada, $"{e.Direccion.Calle} {e.Direccion.Numero}, {e.Direccion.Localidad}",
             e.Direccion.CodigoPostal, e.Bultos.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
             new PuntoEntregaPlanificable(e.Direccion.Calle, e.Direccion.Numero, e.Direccion.Localidad, e.Direccion.Departamento, e.Direccion.CodigoPostal),
-            e.ReintentoDesde)).ToList();
+            e.ReintentoDesde, e.Modalidad.ToString())).ToList();
     }
     public async Task AsignarARutaAsync(Guid rutaId, IReadOnlyList<AsignacionEnvioRuta> asignaciones, Guid? responsableId, CancellationToken ct)
     {

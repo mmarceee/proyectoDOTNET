@@ -91,16 +91,30 @@ else
                 @foreach (var envio in Model.Resultado.Envios)
                 {
                     <tr>
-                        <td>@envio.Numero</td>
+                        <td>
+                            @envio.Numero
+                            @if (envio.Modalidad == "Urgente")
+                            {
+                                <span class="badge text-bg-warning text-nowrap ms-2">Urgente</span>
+                            }
+                        </td>
                         <td>@envio.DestinatarioNombre</td>
                         <td>@envio.Localidad</td>
                         <td><span class="badge @EstadoEnvioBadge.Clase(envio.Estado)">@EstadoEnvioTexto.Mostrar(envio.Estado)</span></td>
                         <td>@envio.CreadoEn.ToString("dd/MM/yyyy HH:mm")</td>
                         <td>@envio.MontoTarifa.ToString("0.00")</td>
                         <td>
-                            <a class="btn btn-outline-primary btn-sm text-nowrap"
-                               href="@QueryHelpers.AddQueryString($"/backoffice/envios/{Uri.EscapeDataString(envio.Numero)}", Model.ParametrosListado)"
-                               aria-label="Ver detalle del envío @envio.Numero">Ver detalle</a>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-outline-primary btn-sm text-nowrap"
+                                   href="@QueryHelpers.AddQueryString($"/backoffice/envios/{Uri.EscapeDataString(envio.Numero)}", Model.ParametrosListado)"
+                                   aria-label="Ver detalle del envío @envio.Numero">Ver detalle</a>
+                                @if (User.IsInRole("Administrador") || User.IsInRole("Despachador"))
+                                {
+                                    <a class="btn btn-outline-secondary btn-sm text-nowrap"
+                                       href="/backoffice/seguimiento/@Uri.EscapeDataString(envio.Numero)"
+                                       aria-label="Ver seguimiento del envío @envio.Numero">Seguimiento</a>
+                                }
+                            </div>
                         </td>
                     </tr>
                 }

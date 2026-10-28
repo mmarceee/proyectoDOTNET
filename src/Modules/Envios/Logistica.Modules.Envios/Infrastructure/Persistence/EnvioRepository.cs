@@ -109,6 +109,16 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             && e.FechaEntregaProgramada >= desde && Envio.EstadosConEntregaPendiente.Contains(e.Estado), ct);
     }
 
+    public async Task<IReadOnlyList<Envio>> ListarParaTableroAsync(IReadOnlyCollection<Guid> ids, DateOnly hasta,
+    CancellationToken ct)
+    {
+        return await db.Envios.AsNoTracking()
+            .Where(e => ids.Contains(e.Id)
+                || (Envio.EstadosConEntregaPendiente.Contains(e.Estado)
+                    && e.FechaEntregaProgramada != null && e.FechaEntregaProgramada <= hasta))
+            .ToListAsync(ct);
+    }
+
     public Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct)
     {
         return db.Envios.Where(e => e.Numero == numero).Select(e => (Guid?)e.Id).SingleOrDefaultAsync(ct);
@@ -139,11 +149,27 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             new EnvioCancelado(envio.Id, envio.Numero, motivo, nameof(OrigenEvento.PortalComercio)), ahora);
     }
 
-    public void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora)
+    public void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora, OrigenEvento origen = OrigenEvento.Backoffice)
     {
         db.AgregarAlOutbox(EnvioReprogramado.Tipo,
             new EnvioReprogramado(envio.Id, envio.Numero, envio.FechaEntregaProgramada!.Value, envio.FranjaHorariaId!.Value,
+                origen.ToString()), ahora);
+    }
+
+    public void RegistrarExtravio(Envio envio, EstadoEnvio estadoAnterior, string motivo, Guid? responsableId,
+        DateTimeOffset ahora)
+    {
+        db.AgregarAlOutbox(EnvioExtraviado.Tipo,
+            new EnvioExtraviado(envio.Id, envio.Numero, estadoAnterior.ToString(), motivo.Trim(), responsableId,
                 nameof(OrigenEvento.Backoffice)), ahora);
+    }
+
+    public void RegistrarDevolucion(Envio envio, Domain.Devoluciones.Devolucion devolucion, EstadoEnvio estadoAnterior,
+        Guid? responsableId, OrigenEvento origen, DateTimeOffset ahora)
+    {
+        db.AgregarAlOutbox(DevolucionIniciada.Tipo,
+            new DevolucionIniciada(envio.Id, envio.Numero, devolucion.Id, estadoAnterior.ToString(), devolucion.Motivo,
+                responsableId, origen.ToString()), ahora);
     }
 
     public void RegistrarDesasignacion(Guid envioId, Guid rutaId, Guid? responsableId, DateTimeOffset ahora)

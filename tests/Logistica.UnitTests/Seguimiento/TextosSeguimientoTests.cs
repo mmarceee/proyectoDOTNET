@@ -35,7 +35,9 @@ public class TextosSeguimientoTests
     [Theory]
     [InlineData("Admitido", true)]
     [InlineData("EnDeposito", true)]
-    [InlineData("NoEntregado", true)]
+    [InlineData("AsignadoARuta", true)]
+    [InlineData("Reprogramado", true)]
+    [InlineData("NoEntregado", false)] // transitorio: después de un intento fallido ya está Reprogramado (CU-61, H1)
     [InlineData("EnTransito", false)]
     [InlineData("Entregado", false)]
     public void Se_ofrece_reprogramar_mientras_no_salio_a_reparto(string estado, bool puede)

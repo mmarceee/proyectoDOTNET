@@ -5,6 +5,7 @@ using Logistica.IntegrationTests.Seguimiento;
 using Logistica.Modules.Planificacion.Contracts.Events;
 using Logistica.Modules.Planificacion.Infrastructure.Persistence;
 using Logistica.Modules.Seguimiento;
+using Logistica.Modules.Seguimiento.Infrastructure.Messaging;
 using Logistica.SharedKernel;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -63,8 +64,11 @@ public sealed class TrazasMensajeriaTests(PostgresApiFactory factory, RabbitMqFi
 
         using var worker = CrearWorker();
         await worker.StartAsync();
+        // RutaDespachada la procesan dos consumidores (el aviso al repartidor y el tablero de CU-66): se verifica el del
+        // aviso, eligiéndolo por su cola.
         var procesamiento = await EsperarAsync(() =>
-            actividades.SingleOrDefault(a => a.Kind == ActivityKind.Consumer && a.TraceId == traza));
+            actividades.SingleOrDefault(a => a.Kind == ActivityKind.Consumer && a.TraceId == traza
+                && (string?)a.GetTagItem("messaging.destination.name") == NotificarRutaDespachada.Cola));
         await worker.StopAsync();
 
         var publicacion = Assert.Single(actividades, a => a.Kind == ActivityKind.Producer && a.TraceId == traza);

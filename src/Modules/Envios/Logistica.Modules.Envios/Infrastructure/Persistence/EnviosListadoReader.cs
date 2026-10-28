@@ -68,7 +68,8 @@ internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoRe
                 e.Direccion.Localidad,
                 e.Estado.ToString(),
                 e.CreadoEn,
-                e.MontoTarifa))
+                e.MontoTarifa,
+                e.Modalidad.ToString()))
             .ToListAsync(ct);
 
         return new ConsultarEnviosResult(

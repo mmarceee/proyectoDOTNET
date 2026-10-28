@@ -78,6 +78,8 @@ public sealed class ConfirmarCargaTests(PostgresApiFactory factory) : IClassFixt
         private readonly OperacionRepository original = new(db);
         private bool aplicada;
         public Task<OperacionDispositivo?> ObtenerAsync(Guid id, CancellationToken ct) => original.ObtenerAsync(id, ct);
+        public Task<IReadOnlyList<OperacionDispositivo>> ConflictosPendientesAsync(CancellationToken ct) => original.ConflictosPendientesAsync(ct);
+        public Task<OperacionDispositivo?> ObtenerParaRevisarAsync(Guid id, CancellationToken ct) => original.ObtenerParaRevisarAsync(id, ct);
         public void Agregar(OperacionDispositivo operacion)
         {
             aplicada = operacion.Resultado == ResultadoOperacion.Aplicada;

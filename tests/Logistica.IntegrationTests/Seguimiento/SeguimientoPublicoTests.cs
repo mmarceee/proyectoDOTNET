@@ -108,6 +108,46 @@ public class SeguimientoPublicoTests(PostgresApiFactory factory) : IClassFixture
         Assert.Equal(HttpStatusCode.NotFound, (await este.GetAsync($"/backoffice/seguimiento/{envio.Numero}")).StatusCode);
     }
 
+    // El acceso a seguimiento está en cada fila de Envíos, sólo para Administrador y Despachador.
+    // El operario de depósito tampoco puede abrir las páginas de seguimiento por URL (403).
+    [Fact]
+    public async Task El_operario_de_deposito_no_ve_ni_entra_al_seguimiento()
+    {
+        var envio = await EnvioAsync(DatosIniciales.OperadorDemoId);
+        using var despacho = Cliente();
+        await Sesion.IngresarAsync(despacho, "despacho@operador-demo.uy");
+        using var deposito = Cliente();
+        await Sesion.IngresarAsync(deposito, "deposito@operador-demo.uy");
+
+        Assert.DoesNotContain("href=\"/backoffice/seguimiento\"", await despacho.GetStringAsync("/backoffice"));
+        var listado = $"/backoffice/envios?Texto={envio.Numero}";
+        var enlace = $"href=\"/backoffice/seguimiento/{envio.Numero}\"";
+        Assert.Contains(enlace, await despacho.GetStringAsync(listado));
+        Assert.Equal(HttpStatusCode.OK, (await despacho.GetAsync($"/backoffice/seguimiento/{envio.Numero}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await despacho.GetAsync("/backoffice/seguimiento")).StatusCode);
+        Assert.DoesNotContain("href=\"/backoffice/seguimiento\"", await deposito.GetStringAsync("/backoffice"));
+        Assert.DoesNotContain(enlace, await deposito.GetStringAsync(listado));
+        Assert.Equal(HttpStatusCode.Forbidden, (await deposito.GetAsync("/backoffice/seguimiento")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await deposito.GetAsync($"/backoffice/seguimiento/{envio.Numero}")).StatusCode);
+    }
+
+    // El listado del Backoffice muestra los envíos del operador de la sesión y nunca los de otro (ADR-0002).
+    [Fact]
+    public async Task El_listado_muestra_solo_los_envios_del_operador()
+    {
+        var deDemo = await EnvioAsync(DatosIniciales.OperadorDemoId);
+        var deEste = await EnvioAsync(DatosIniciales.OperadorEsteId);
+        using var admin = Cliente();
+        await Sesion.IngresarAsync(admin, "admin@operador-demo.uy");
+
+        var propio = await admin.GetStringAsync($"/backoffice/seguimiento?Texto={deDemo.Numero}");
+        var ajeno = await admin.GetStringAsync($"/backoffice/seguimiento?Texto={deEste.Numero}");
+
+        Assert.Contains($"/backoffice/seguimiento/{deDemo.Numero}", propio);
+        Assert.DoesNotContain($"/backoffice/seguimiento/{deEste.Numero}", ajeno);
+        Assert.Contains("No hay envíos para mostrar.", ajeno);
+    }
+
     private string Token(Guid operadorId, Guid envioId) =>
         factory.Services.GetRequiredService<TokenSeguimiento>().Generar(operadorId, envioId);
 

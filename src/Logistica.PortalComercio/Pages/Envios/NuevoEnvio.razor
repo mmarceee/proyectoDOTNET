@@ -90,6 +90,17 @@ else
         </fieldset>
 
         <fieldset class="mb-4">
+            <legend class="h5">Servicio</legend>
+            <div class="col-md-4">
+                <label class="form-label" for="modalidad">Modalidad</label>
+                <InputSelect id="modalidad" class="form-select" @bind-Value="_formulario.Modalidad">
+                    <option value="Estandar">Estándar</option>
+                    <option value="Urgente">Urgente</option>
+                </InputSelect>
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-4">
             <legend class="h5">Bultos</legend>
             <div class="table-responsive">
                 <table class="table align-middle">
