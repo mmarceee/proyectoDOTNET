@@ -44,6 +44,8 @@ Para depurar la Api o el Worker, levantar sólo los servicios de soporte y ejecu
 
 La [guía de prueba del worker independiente](docs/prueba-worker-independiente.md) permite demostrar la separación
 de procesos, la recuperación de mensajes pendientes, los reintentos y la cola de fallidos.
+Para simular éxito y fallos del comercio, usar el [receptor de demostración](tools/Logistica.ReceptorDemo/README.md),
+con panel para alternar entre HTTP 200 y 503 y consultar los avisos recibidos.
 
 ### Compilar y probar
 

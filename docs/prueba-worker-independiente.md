@@ -35,8 +35,9 @@ guarde en el outbox de Seguimiento esperan hasta que vuelva el publicador. Esto 
 4. Abrir el Portal (`http://localhost:8080/portal/`, ajustando el puerto si cambió en `.env`), ingresar como comercio
    y seleccionar operador. En **Integraciones → Avisos**, crear una suscripción activa para `CambioDeEstado`.
 5. Usar un receptor HTTPS público controlado por el equipo que registre los POST y permita devolver 200 o 503.
-   Los destinos locales, privados y reservados están bloqueados por el emisor. El receptor de demostración figura
-   pendiente en CU-64; no asumir que ya viene incluido en Compose. No usar un receptor de terceros con datos reales.
+   Los destinos locales, privados y reservados están bloqueados por el emisor. El
+   [receptor de demostración](../tools/Logistica.ReceptorDemo/README.md) permite alternar 200/503 desde un panel:
+   ejecutar `dotnet run --project tools/Logistica.ReceptorDemo` y seguir su guía para el túnel HTTPS.
 6. Devolver 200 y usar **Enviar prueba** para verificar URL y firma. Ese botón llama al receptor desde la API:
    **por sí solo no prueba RabbitMQ ni el Worker**.
 
@@ -118,6 +119,8 @@ Si Windows bloquea los DLL, el README ofrece `bash scripts/test-en-docker.sh` pa
 
 En la revisión del código del 27/10, el worker, los avisos, los reintentos y la cola de fallidos tienen implementación
 y pruebas escritas. Eso no sustituye ejecutar la demostración completa con el receptor del equipo.
+El 28/10 se incorporó el receptor de demostración en `tools/Logistica.ReceptorDemo`; se ejecuta por separado
+y requiere un túnel HTTPS público para conectarlo al Worker.
 
 El tablero operativo en tiempo real es CU-66: exige SignalR, grupos por operador y reconexión con recarga completa.
 En este checkout no se encontraron un Hub ni registros `AddSignalR`/`MapHub`; verificar e integrar ese trabajo antes

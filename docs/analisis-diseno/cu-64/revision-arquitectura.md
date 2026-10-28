@@ -26,7 +26,8 @@ En `Infrastructure/Persistence/EntregaAvisoConfiguration.cs` el índice único d
 
 - Los envíos anteriores a EnvioAdmitido no tienen proyección y sus eventos pueden terminar en fallidos. Falta una estrategia de puesta en marcha para esos datos si se necesita notificarlos.
 - T2, T12, T14, T15 y T16 aún no generan los eventos de integración que CU-64 necesita para avisar todos los cambios.
-- El receptor HTTPS público de demostración sigue pendiente.
+- Actualización del 28/10: se incorporó el [receptor de demostración 200/503](../../../tools/Logistica.ReceptorDemo/README.md).
+  Sigue pendiente conectar el túnel HTTPS y ejecutar la demostración completa con el Worker.
 
 Estas limitaciones no se presentan como violaciones de dependencias; impiden interpretar el commit como cobertura completa de todas las notificaciones.
 
