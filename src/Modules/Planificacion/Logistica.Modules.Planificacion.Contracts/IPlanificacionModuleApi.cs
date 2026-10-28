@@ -29,4 +29,8 @@ public interface IPlanificacionModuleApi
 
     // CU-66: las rutas del operador que están en la calle (Despachada o EnCurso), para el tablero en vivo.
     Task<IReadOnlyList<RutaEnCurso>> ListarEnCursoAsync(CancellationToken ct);
+
+    // CU-61 (T19): saca al envío de su ruta si la ruta todavía está Planificada, conservando el historial del retiro.
+    // true si no estaba en una ruta o se lo pudo sacar; false si su ruta ya se despachó (A1: ya salió a reparto).
+    Task<bool> QuitarPorReprogramacionAsync(Guid envioId, string numeroEnvio, CancellationToken ct);
 }

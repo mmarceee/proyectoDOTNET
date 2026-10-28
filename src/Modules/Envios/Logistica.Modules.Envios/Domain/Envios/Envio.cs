@@ -264,6 +264,64 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         Transicionar(EstadoEnvio.EnDevolucion, origen, responsableId, ahora, detalle: motivo.Trim());
     }
 
+    // CU-61: los estados desde los que el destinatario puede elegir otra fecha y franja. NoEntregado no figura porque es
+    // transitorio (T11 se eliminó): después de un intento fallido el envío ya está Reprogramado.
+    public static readonly EstadoEnvio[] EstadosReprogramablesPorDestinatario =
+    [
+        EstadoEnvio.Admitido, EstadoEnvio.EnDeposito, EstadoEnvio.AsignadoARuta, EstadoEnvio.Reprogramado
+    ];
+
+    // CU-61 (RF 26): el destinatario elige desde el seguimiento público una nueva fecha y franja de entrega.
+    // - Admitido: sólo se registra la nueva fecha y franja, sin cambiar de estado.
+    // - EnDeposito (T18) o AsignadoARuta (T19): queda Reprogramado. Que la ruta no esté despachada y sacarlo de ella lo
+    //   resuelve Planificación antes de llamar (la ruta es su agregado).
+    // - Reprogramado: elige su nuevo intento, como el despachador en CU-19.
+    // comienzoFranja es cuándo empieza la franja ese día, en la zona horaria del operador; anticipación y máximo de
+    // intentos salen de las reglas del envío (CU-06). Primero se valida todo y recién después se cambia algo.
+    public void ReprogramarPorDestinatario(DateOnly fecha, Guid franjaId, DateTimeOffset comienzoFranja,
+        TimeSpan anticipacion, int maxIntentos, DateTimeOffset ahora)
+    {
+        // A1: ya salió a reparto o terminó.
+        if (!EstadosReprogramablesPorDestinatario.Contains(Estado))
+        {
+            throw new DomainException("El envío ya no se puede reprogramar: salió a reparto o ya terminó.");
+        }
+
+        // A2: la nueva franja tiene que empezar con la anticipación mínima del operador.
+        if (comienzoFranja < ahora + anticipacion)
+        {
+            throw new DomainException(
+                $"La nueva entrega tiene que pedirse con al menos {anticipacion.TotalHours:0.#} horas de anticipación.");
+        }
+
+        if (ZonaId is null)
+        {
+            throw new DomainException("El envío todavía no tiene zona: no se puede elegir una franja.");
+        }
+
+        if (Estado == EstadoEnvio.Reprogramado)
+        {
+            // A2: con los intentos agotados decide el despachador (CU-18 o CU-20), no el destinatario.
+            if (_intentos.Count(i => i.Resultado == ResultadoIntento.Fallido) >= maxIntentos)
+            {
+                throw new DomainException("Se agotaron los intentos de entrega: el envío ya no se puede reprogramar.");
+            }
+
+            // Respeta además el plazo entre intentos (CU-19, A1).
+            ElegirNuevoIntento(fecha, franjaId, comienzoFranja);
+            return;
+        }
+
+        if (Estado != EstadoEnvio.Admitido)
+        {
+            // T18 o T19. Después de la transición el envío ya acepta un nuevo compromiso.
+            Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.SeguimientoPublico, null, ahora,
+                detalle: $"El destinatario pidió la entrega para el {fecha:dd/MM/yyyy}.");
+        }
+
+        DefinirPlanificacion(ZonaId, franjaId, fecha);
+    }
+
     // Verifica la transición antes de tocar el envío, para no dejar un intento agregado sin su cambio de estado.
     private void ExigirTransicion(EstadoEnvio nuevo)
     {

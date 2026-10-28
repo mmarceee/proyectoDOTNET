@@ -11,8 +11,16 @@ namespace Logistica.Modules.Envios.Application;
 
 // Implementación del contrato de Envíos. Es internal: los otros módulos sólo ven la interfaz.
 internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj, IReglasDeEntrega reglasDeEntrega,
-    IIntegrationEventPublisher eventos, ConsultarEnviosHandler listado) : IEnviosModuleApi
+    IIntegrationEventPublisher eventos, ConsultarEnviosHandler listado,
+    Features.ReprogramarPorDestinatario.ReprogramarPorDestinatarioHandler reprogramar) : IEnviosModuleApi
 {
+    // CU-61: el seguimiento público pide las opciones y la reprogramación por este contrato.
+    public Task<IReadOnlyList<OpcionReprogramacion>?> OpcionesReprogramacionAsync(Guid envioId, CancellationToken ct)
+        => reprogramar.OpcionesAsync(envioId, ct);
+
+    public Task<bool> ReprogramarPorDestinatarioAsync(Guid envioId, DateOnly fecha, Guid franjaId, CancellationToken ct)
+        => reprogramar.ReprogramarAsync(envioId, fecha, franjaId, ct);
+
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);

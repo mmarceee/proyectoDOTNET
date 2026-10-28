@@ -130,11 +130,11 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             new EnvioCancelado(envio.Id, envio.Numero, motivo, nameof(OrigenEvento.PortalComercio)), ahora);
     }
 
-    public void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora)
+    public void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora, OrigenEvento origen = OrigenEvento.Backoffice)
     {
         db.AgregarAlOutbox(EnvioReprogramado.Tipo,
             new EnvioReprogramado(envio.Id, envio.Numero, envio.FechaEntregaProgramada!.Value, envio.FranjaHorariaId!.Value,
-                nameof(OrigenEvento.Backoffice)), ahora);
+                origen.ToString()), ahora);
     }
 
     public void RegistrarExtravio(Envio envio, EstadoEnvio estadoAnterior, string motivo, Guid? responsableId,

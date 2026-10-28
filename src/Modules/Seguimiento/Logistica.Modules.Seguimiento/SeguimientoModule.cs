@@ -144,6 +144,10 @@ public static class SeguimientoModule
             sp.GetRequiredService<Envios.Contracts.IEnviosModuleApi>(),
             sp.GetRequiredService<Administracion.Contracts.IAdministracionModuleApi>(),
             sp.GetRequiredService<SharedKernel.ICacheDistribuida>()));
+        // CU-61: con fábrica por el mismo motivo (el contrato de Envíos sólo está en la API).
+        services.AddScoped(sp => new Application.Features.SolicitarReprogramacion.SolicitarReprogramacionHandler(
+            sp.GetRequiredService<Envios.Contracts.IEnviosModuleApi>(),
+            sp.GetRequiredService<SharedKernel.ICacheDistribuida>()));
 
         // CU-60: cada cambio de estado de un envío borra su seguimiento de la caché; una cola por tipo de evento.
         foreach (var tipo in InvalidarSeguimiento.Tipos)
@@ -161,6 +165,7 @@ public static class SeguimientoModule
         Presentation.Features.ConfigurarSuscripcionesAviso.ConfigurarSuscripcionesAvisoEndpoints.Map(endpoints);
         Presentation.Features.HistorialAvisos.HistorialAvisosEndpoints.Map(endpoints);
         Presentation.Features.ConsultarSeguimiento.ConsultarSeguimientoEndpoint.Map(endpoints);
+        Presentation.Features.SolicitarReprogramacion.SolicitarReprogramacionEndpoint.Map(endpoints);
         Presentation.Features.VerTablero.ConsultarTableroEndpoint.Map(endpoints);
         endpoints.MapHub<TableroHub>(TableroHub.Ruta);
         return endpoints;
