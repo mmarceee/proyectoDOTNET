@@ -122,8 +122,10 @@ El historial, los endpoints y las garantías del reenvío están documentados en
 
 ## Pendiente
 
-- **Receptor de demostración** (escenario 6 de la defensa): la guía de CU-63 no admite destinos internos, ni siquiera
-  en desarrollo, así que hace falta un receptor HTTPS público con escenarios de éxito, error y demora.
+- **Demostración pública** (escenario 6 de la defensa): desde el 28/10 está disponible el
+  [receptor con panel 200/503](../../../tools/Logistica.ReceptorDemo/README.md). Requiere un túnel HTTPS público
+  para conectarlo al Worker. Sigue pendiente ejecutar el recorrido completo del equipo y simular demoras;
+  el receptor actual permite éxito y error inmediato.
 - Los eventos de las transiciones que todavía no se publican (sección 2).
 
 ## Verificación

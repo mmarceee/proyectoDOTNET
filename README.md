@@ -35,6 +35,17 @@ Para depurar la Api o el Worker, levantar sólo los servicios de soporte y ejecu
    bash scripts/configurar-secretos.sh
    ```
 3. Ejecutar `Logistica.Api` desde Visual Studio o con `dotnet run --project src/Logistica.Api`. La Api sirve también el Backoffice y las tres aplicaciones Blazor WebAssembly; no hace falta ejecutarlas por separado.
+4. Ejecutar **también** `Logistica.Worker`, en otro proceso de Visual Studio o en otra terminal:
+   ```bash
+   dotnet run --project src/Logistica.Worker
+   ```
+   Ejecutar sólo la API no procesa los avisos. Si se depuran ambos proyectos localmente, mantener detenidos los
+   contenedores `api` y `worker` para evitar instancias adicionales consumiendo o publicando mensajes.
+
+La [guía de prueba del worker independiente](docs/prueba-worker-independiente.md) permite demostrar la separación
+de procesos, la recuperación de mensajes pendientes, los reintentos y la cola de fallidos.
+Para simular éxito y fallos del comercio, usar el [receptor de demostración](tools/Logistica.ReceptorDemo/README.md),
+con panel para alternar entre HTTP 200 y 503 y consultar los avisos recibidos.
 
 ### Compilar y probar
 

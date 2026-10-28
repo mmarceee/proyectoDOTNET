@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receptor de avisos · Demostración</title>
+  <link rel="stylesheet" href="/panel.css">
+  <script src="/panel.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Receptor de avisos</h1>
+    <p>Demostración de reintentos del worker. Los últimos 100 POST se conservan en memoria hasta cerrar el receptor.</p>
+    <p id="mensaje" role="status" aria-live="polite">Conectando…</p>
+    <section aria-labelledby="respuesta-titulo">
+      <h2 id="respuesta-titulo">Respuesta a los próximos avisos</h2>
+      <p id="estado">—</p>
+      <div class="acciones">
+        <button id="exito" type="button">Responder 200 · Éxito</button>
+        <button id="fallo" type="button">Responder 503 · Fallo</button>
+      </div>
+      <p>El cambio afecta a los próximos POST, incluidos los reintentos. La URL receptora se mantiene.</p>
+    </section>
+    <section aria-labelledby="url-titulo">
+      <h2 id="url-titulo">URL para la suscripción</h2>
+      <label for="base-publica">Base HTTPS pública del túnel</label>
+      <input id="base-publica" type="url" placeholder="https://tu-tunel.example" autocomplete="off">
+      <p id="ruta"></p>
+      <output id="url-aviso"></output>
+      <p>Usá esta URL en el Portal, con el evento CambioDeEstado. El worker requiere HTTPS público.</p>
+    </section>
+    <section aria-labelledby="recibidos-titulo">
+      <div class="cabecera">
+        <h2 id="recibidos-titulo">Avisos recibidos <span id="cantidad"></span></h2>
+        <button id="limpiar" type="button">Limpiar historial local</button>
+      </div>
+      <p>Se actualiza cada segundo. Compará el campo <code>id</code> para reconocer los reintentos.
+        Las cabeceras de firma se muestran sin verificar el HMAC.</p>
+      <div id="recibidos"></div>
+    </section>
+  </main>
+</body>
+</html>
