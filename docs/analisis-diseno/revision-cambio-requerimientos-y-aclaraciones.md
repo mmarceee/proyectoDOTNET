@@ -4,17 +4,17 @@
 | --- | --- |
 | Equipo | Equipo 1: Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Fecha de revisión | 31/10/2026 |
-| Base de código revisada | Commit `b119c3e` |
+| Base de código revisada | Revisión inicial: `b119c3e`. Actualizada tras integrar `main`: `96b341e` (incluye `main` en `7bfa6e2`). |
 | Estado | Análisis para conversar con el equipo; propuestas pendientes de acuerdo |
 | Alcance del trabajo realizado | Lectura del documento, inspección del código y ejecución de pruebas existentes. Sin cambios funcionales. |
 
 ## 1. Conclusión para el equipo
 
-La solución tiene una base de caché compatible con la aclaración: usa Valkey cuando está configurado, separa las claves por operador, publica métricas por caso de uso y permite consultar la fuente cuando falla el caché. **Se ejecutaron 25 pruebas de integración: 25 aprobadas, 0 fallidas y 0 omitidas.**
+La solución tiene una base de caché compatible con la aclaración: usa Valkey cuando está configurado, separa las claves por operador, publica métricas por caso de uso y permite consultar la fuente cuando falla el caché. **Tras integrar `main`, se ejecutaron 33 pruebas de integración: 33 aprobadas, 0 fallidas y 0 omitidas.** Incluyen las 25 iniciales y 8 de recepción y SignalR.
 
 Esto no permite declarar cumplimiento integral demostrado. La prueba de distribución usa dos proveedores de servicios conectados a un Valkey real, no dos procesos completos de la API. Las pruebas funcionales de tarifario, reglas y seguimiento usan PostgreSQL real, pero caché en memoria. Falta unir esas evidencias en una demostración completa y verificar la visualización de métricas en el tablero.
 
-Se encontraron dos puntos concretos a atender: la ausencia de una cadena de Valkey habilita memoria local sin distinguir el entorno, y la recepción en depósito no publica un evento que invalide el seguimiento. También quedan riesgos de datos viejos por concurrencia o invalidación fallida que ya reconoce el ADR de caché.
+La ausencia de una cadena de Valkey sigue habilitando memoria local sin distinguir el entorno. También quedan riesgos de datos viejos por concurrencia o invalidación fallida que ya reconoce el ADR de caché. **La falta del evento de recepción detectada inicialmente quedó resuelta en el código integrado de `main`: ahora se registra `EnvioRecibidoEnDeposito` en el Outbox y se incluye entre los eventos de invalidación.**
 
 No se encontró una implementación de banderas de funcionalidad. **No es un incumplimiento obligatorio si el equipo no elige ese opcional.** El plan actual selecciona otros opcionales por 9 puntos y deja las banderas como reemplazo posible.
 
@@ -42,7 +42,7 @@ En esta tabla, «verificado» se limita al escenario efectivamente ejecutado. «
 | Dos casos con distintos perfiles de acceso | Seguimiento: expiración absoluta de 1 minuto. Tarifario: puntero vigente de 10 minutos y versiones de 24 horas. Las reglas usan también caché versionado. | Aprobaron las pruebas de seguimiento, tarifario y reglas. **Implementado; las pruebas de negocio ejecutadas usan caché en memoria.** |
 | Claves separadas por operador | La pieza común construye `{nombre}:{OperadorId}:{clave}`, con prefijo del proveedor `logistica:`. Sin operador lanza `TenantMismatchException`. | Aprobaron aislamiento por operador y rechazo sin tenant. La prueba de aislamiento de la pieza común usa memoria compartida; las funcionales usan PostgreSQL. **Verificado en esos escenarios.** |
 | Invalidar seguimiento al procesar eventos | El Worker registra un consumidor por tipo de evento; fija el tenant del mensaje antes de resolver el consumidor. Este elimina la clave del envío. | Aprobó una prueba que invoca directamente el consumidor. **Verificado el consumidor; esta prueba no recorre Outbox, RabbitMQ y Worker como procesos separados.** |
-| Invalidación de todos los cambios visibles | La recepción en depósito cambia el estado sin registrar un evento de integración en `RecibirEnDepositoAsync`. | La prueba de seguimiento confirma que un cambio en base puede seguir mostrando el valor cacheado hasta invalidar. **Cobertura incompleta de invalidación por eventos; el TTL limita el valor viejo a 1 minuto en el camino normal.** |
+| Invalidación de recepción y devolución | Tras integrar `main`, `RecibirEnDepositoAsync` registra `EnvioRecibidoEnDeposito`; la confirmación de devolución registra `EnvioDevuelto`. Ambos están en `InvalidarSeguimiento.Tipos`. | La prueba de recepción comprueba que el evento se guarda una sola vez en el Outbox al completar la recepción. **La omisión detectada en la revisión inicial está corregida en código.** Sigue pendiente observar el recorrido completo hasta la invalidación por el Worker. |
 | Tarifas versionadas e invalidación al publicar | Se guarda la publicación y después se elimina el puntero `vigente`. Las versiones publicadas no admiten editar reglas. El puntero incluye `ValidoHasta` para próximas vigencias. | Aprobó el recorrido de $150/v1 a $175/v2 y el caso de publicación futura que mantiene la versión anterior. **Verificado con memoria; falta verificar el cruce del instante de vigencia y el recorrido distribuido completo.** |
 | Métricas por caso de uso en el tablero | Contadores `logistica.cache.aciertos`, `fallos` y `errores`, etiqueta `cache`. API y Worker registran el medidor y exportan por OTLP cuando está configurado. | Un `MeterListener` verificó valores de contadores. **Instrumentación comprobada; exportación y consulta en Aspire no verificadas en esta ejecución.** |
 | Continuar contra la base si cae el caché | La pieza común captura errores de caché y ejecuta la función fuente. No revierte publicaciones si falla invalidar. | Aprobaron la caché simulada caída y Valkey inaccesible en `127.0.0.1:1`. **Verificado el fallback de infraestructura; no se detuvo un Valkey activo durante un flujo HTTP contra PostgreSQL.** |
@@ -65,7 +65,7 @@ En esta tabla, «verificado» se limita al escenario efectivamente ejecutado. «
 
 **Memoria local si falta configuración.** `CachingExtensions` llama a `AddDistributedMemoryCache()` cuando la cadena es vacía. El nombre de la abstracción no convierte esa memoria en un almacén compartido. Es útil para pruebas, pero el código no limita ese comportamiento a Development/Testing. Propuesta: hacer explícita la excepción de pruebas/desarrollo y detectar la falta de configuración en producción. Distinguir esto de un Valkey configurado pero temporalmente caído: en ese caso debe seguir operando contra la base.
 
-**Recepción sin evento.** El consumidor sabe invalidar los eventos registrados, pero no puede reaccionar a un evento que no se publica. Propuesta: incorporar el evento de recepción y su consumidor de invalidación; al implementar estados por bulto, revisar también cada nuevo evento visible.
+**Recepción con evento: hallazgo inicial corregido por `main`.** `RecibirEnDepositoAsync` ahora publica el evento en el Outbox y `InvalidarSeguimiento` lo reconoce. La prueba `Al_recibir_todos_los_bultos_el_envio_pasa_a_EnDeposito` comprueba cero eventos tras el primer bulto y uno al completar la recepción. La prueba histórica `CacheSeguimientoTests` sigue modificando el estado directamente e invocando el consumidor con un evento simulado; no sustituye la prueba completa del recorrido de recepción por RabbitMQ. Al implementar estados por bulto, revisar cada nuevo evento visible. El ADR-0006 todavía contiene afirmaciones antiguas de que la recepción no publica eventos y debe alinearse con este código.
 
 **Carrera entre lectura y publicación.** Una lectura puede obtener el puntero viejo de la base, otra solicitud publicar e invalidar, y la primera guardar después el puntero viejo. En ese caso el TTL puede mantenerlo hasta 10 minutos, salvo que `ValidoHasta` fuerce una recarga antes. Es un riesgo deducido del código y reconocido en el ADR; **no se reprodujo en esta revisión**. La aclaración de actualización inmediata justifica decidir cómo prevenirlo o demostrar que el escenario exigido queda cubierto. Usar Valkey no elimina por sí solo esta carrera.
 
@@ -75,7 +75,7 @@ En esta tabla, «verificado» se limita al escenario efectivamente ejecutado. «
 
 **Telemetría durante fallos.** Una excepción al leer suma `errores`, no `fallos`. La tasa `aciertos / (aciertos + fallos)` representa las consultas exitosas al caché y debe observarse junto con errores para no interpretar una caída como buen rendimiento.
 
-## 4. Pruebas realmente ejecutadas
+## 4. Pruebas de la revisión inicial (`b119c3e`)
 
 Entorno: Windows, .NET SDK `10.0.401` y Docker Desktop Engine `29.9.2`. Docker no estaba disponible al comienzo; se inició Docker Desktop y se ejecutaron las pruebas con acceso al motor local. Los primeros intentos restringidos no constituyen resultados de pruebas. La ejecución final compiló correctamente y produjo reportes TRX.
 
@@ -124,7 +124,9 @@ El RF 33 exige configurar la admisión de entregas parciales como regla operativ
 
 La exención de balanceo para equipos de tres no elimina el caché distribuido. El documento también advierte sobre SignalR, protección de cookies, tareas programadas y limitación de tasa entre instancias.
 
-En esta revisión estática se encontró un limitador de ventana fija de ASP.NET Core por IP en `Program.cs`: su contador es local a cada instancia. No se encontró configuración de backplane de SignalR ni una configuración explícita de claves de Data Protection compartidas. El servicio `DepurarPosiciones` usa un temporizador local; en el archivo revisado no hay coordinación distribuida de su ejecución. Esto no prueba por sí solo un error de negocio, ya que una limpieza repetida puede tolerarse, pero tampoco demuestra ejecución única.
+En esta revisión estática se encontró un limitador de ventana fija de ASP.NET Core por IP en `Program.cs`: su contador es local a cada instancia. No se encontró una configuración explícita de claves de Data Protection compartidas. El servicio `DepurarPosiciones` usa un temporizador local; en el archivo revisado no hay coordinación distribuida de su ejecución. Esto no prueba por sí solo un error de negocio, ya que una limpieza repetida puede tolerarse, pero tampoco demuestra ejecución única.
+
+**Actualización de `main`: sí existe ahora SignalR con backplane Valkey.** `SeguimientoModule` registra `AddSignalR()` y, cuando existe cadena de Valkey, `AddStackExchangeRedis()` con prefijo `logistica-tablero`. `TableroHub` autoriza Administrador/Despachador y toma la sala del operador desde la sesión. API y Worker registran el mismo módulo. Las pruebas `TableroEnVivoTests` usan un cliente SignalR real contra TestServer para comprobar sala por operador, posiciones y autorización; como el factory deja Valkey vacío, no demuestran comunicación entre dos procesos por el backplane. La observación inicial de que no se encontró backplane queda reemplazada por esta actualización.
 
 Estos puntos deben revisarse si se despliegan varias instancias. **No se presentan como nuevos requisitos de balanceo para el equipo de tres**, ni se declara auditado todo el subsistema de tareas o seguridad. Tampoco se verificó un despliegue productivo: `infra/terraform` contiene únicamente `.gitkeep` en el checkout revisado.
 
@@ -175,9 +177,35 @@ El reparto es una propuesta basada en las áreas actuales, no una asignación ya
 - [ ] Interrumpir un Valkey de prueba que estaba activo, consultar seguimiento y calcular tarifa contra la base, recuperarlo y comprobar frescura. No detener servicios compartidos sin coordinar con el equipo.
 - [ ] Probar el instante en que comienza una versión programada con un reloj controlado.
 - [ ] Resolver o acotar explícitamente la carrera de repoblación de caché y el dato viejo tras una invalidación fallida.
-- [ ] Completar el evento de recepción y verificar invalidación a través de Outbox, RabbitMQ y Worker.
+- [x] Incorporar el evento de recepción y registrarlo como evento que invalida seguimiento (resuelto por los cambios integrados desde `main`).
+- [ ] Verificar el recorrido de recepción e invalidación completo a través de Outbox, RabbitMQ y Worker.
 - [ ] Revisar la configuración productiva para impedir una sustitución accidental por memoria local.
 - [ ] Actualizar el ADR-0006 con evidencias, límites reales de latencia y resultados de estos escenarios.
 - [ ] Confirmar que las banderas continúan fuera del conjunto de opcionales elegido o planificarlas con todas las condiciones de la aclaración.
 
 El ADR dedicado al cambio funcional es obligatorio y puede contarse dentro de los ocho exigidos. Debe registrar lo que efectivamente se modificó, qué resultó sencillo, qué no y por qué; este informe preparatorio no sustituye esa evaluación posterior.
+
+## 10. Cambios integrados de `main` que afectan este análisis
+
+Comparación: `git diff b119c3e 96b341e`. La revisión inicial quedó guardada en `a471053`; la integración posterior está en `96b341e`. Esta sección distingue las nuevas evidencias de los resultados históricos de la sección 4.
+
+| Cambio recibido | Relación con lo conversado | Conclusión actual |
+| --- | --- | --- |
+| Evento `EnvioRecibidoEnDeposito`, publicación en T2 y suscripción de invalidación | Resuelve la omisión de recepción señalada inicialmente. | Corregido en código y con aserción de Outbox en la prueba de recepción; falta el recorrido completo con Worker. |
+| CU-66: tablero SignalR con salas por operador y backplane Valkey (`ceffa63`) | Atiende el estado compartido del canal de tiempo real mencionado en la aclaración. | Implementado; el backplane entre procesos requiere demostración específica. |
+| CU-61: reprogramación pública (`8e7aca9`) | Agrega una funcionalidad real que podría ponerse bajo bandera si se eligiera ese opcional. Invalida directamente el seguimiento después de reprogramar. | Mejora relacionada; no incorpora el sistema de banderas ni sus condiciones. |
+| CU-31: confirmación de devolución al comercio (`90d8a22`) | Acepta marcar los bultos devueltos y registra una incidencia por faltantes; incorpora `EnvioDevuelto` en avisos e invalidación. | No equivale a RF 31–36: cierra la devolución del envío y no añade estado propio al bulto ni entrega parcial offline al destinatario. |
+| CU-09: consulta y reintento de mensajes fallidos (`550538f`) | Amplía el soporte operativo de mensajería sobre el que se apoyarán los nuevos eventos. | No implementa contratos de avisos versionados para resultados por bulto. |
+| ADR-0006 | Se ajustaron dos frases, pero aún dice que T2 no publica evento. | La documentación del ADR quedó desactualizada respecto del código integrado. |
+
+No cambiaron en este intervalo la infraestructura de caché, el modelo `Bulto`, los contratos de sincronización del repartidor ni la PWA. Por eso siguen pendientes el fallback accidental a memoria en producción, las carreras de frescura y la implementación de la entrega parcial. Tampoco se encontró gestión de banderas, claves compartidas explícitas de Data Protection o un limitador distribuido.
+
+### 10.1 Verificación ejecutada después de integrar `main`
+
+Sobre `96b341e` se volvieron a ejecutar las cinco clases de la revisión inicial y se agregaron `RecibirBultoTests` (5 pruebas) y `TableroEnVivoTests` (3 pruebas). **Resultado: 33 aprobadas, 0 fallidas y 0 omitidas.** La prueba de recepción confirmó la escritura del evento en Outbox; las de SignalR confirmaron entrega en la sala correcta, recepción de posición y rechazo de perfiles no autorizados. Estas últimas usan un solo TestServer sin Valkey y no prueban el backplane entre procesos.
+
+```powershell
+dotnet test tests/Logistica.IntegrationTests/Logistica.IntegrationTests.csproj --filter "FullyQualifiedName~CacheDistribuidaTests|FullyQualifiedName~CacheSeguimientoTests|FullyQualifiedName~ConfigurarTarifarioTests|FullyQualifiedName~ConfigurarReglasTests|FullyQualifiedName~SeguimientoPublicoTests|FullyQualifiedName~RecibirBultoTests|FullyQualifiedName~TableroEnVivoTests" --logger "trx;LogFileName=revision-post-main.trx" --results-directory TestResults/revision-aclaraciones --verbosity quiet
+```
+
+Evidencia local: `TestResults/revision-aclaraciones/revision-post-main.trx`. No se ejecutaron en esta segunda revisión todas las pruebas de devoluciones, reprogramación pública o mensajes fallidos; sus cambios se inspeccionaron para determinar el impacto en el informe.
