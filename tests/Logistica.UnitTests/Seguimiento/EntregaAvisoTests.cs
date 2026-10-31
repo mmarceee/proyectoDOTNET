@@ -26,6 +26,7 @@ public class EntregaAvisoTests
     [Theory]
     [InlineData("EnDevolucion", true, "Devolucion")]
     [InlineData("EnDevolucion", false, "Devolucion")]
+    [InlineData("Devuelto", false, "Devolucion")]
     [InlineData("Reprogramado", true, "EntregaFallida")]
     [InlineData("Entregado", false, "CambioDeEstado")]
     [InlineData("Admitido", false, "CambioDeEstado")]
@@ -113,6 +114,8 @@ public class EntregaAvisoTests
     [InlineData(EnvioDesasignadoDeRuta.Tipo, "EnDeposito", false, false)]
     [InlineData(EnvioEntregado.Tipo, "Entregado", false, false)]
     [InlineData(EnvioReintegradoADeposito.Tipo, "EnDeposito", false, false)]
+    [InlineData(EnvioRecibidoEnDeposito.Tipo, "EnDeposito", false, false)]
+    [InlineData(EnvioDevuelto.Tipo, "Devuelto", false, false)]
     public void El_consumidor_traduce_cada_evento_de_Envios_a_un_hecho(string tipo, string estado, bool fallido, bool alta)
     {
         var envio = Guid.NewGuid();
@@ -123,6 +126,8 @@ public class EntregaAvisoTests
             hecho.IntentoFallido, hecho.EsAlta));
         Assert.Equal(mensaje.OcurridoEn, hecho.FechaEvento);
         Assert.Contains(tipo, PrepararAvisos.Tipos);
+        // Todo cambio de estado, salvo el alta, borra el seguimiento público de la caché (CU-60).
+        if (!alta) Assert.Contains(tipo, InvalidarSeguimiento.Tipos);
     }
 
     [Fact]

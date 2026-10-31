@@ -23,6 +23,7 @@ public class RecibirBultoTests(PostgresApiFactory factory) : IClassFixture<Postg
 
         Assert.False(primero.EnvioEnDeposito);
         Assert.Equal("Admitido", await EstadoAsync(envio.Id));
+        Assert.Equal(0L, await ContarAsync(EventoRecibido, envio.Id));
 
         var segundo = await RecibirAsync(client, new RecibirBultoRequest($"{envio.Numero}-2"));
 
@@ -32,7 +33,14 @@ public class RecibirBultoTests(PostgresApiFactory factory) : IClassFixture<Postg
         Assert.Equal(2L, await ContarAsync("""SELECT count(*) FROM deposito."Recepciones" WHERE "EnvioId" = @id""", envio.Id));
         Assert.Equal(1L, await ContarAsync(
             """SELECT count(*) FROM envios."EventosEnvio" WHERE "EnvioId" = @id AND "EstadoNuevo" = 'EnDeposito'""", envio.Id));
+        // T2 llega a Seguimiento por el outbox, en la misma transacción que la recepción (CU-64 y CU-60).
+        Assert.Equal(1L, await ContarAsync(EventoRecibido, envio.Id));
     }
+
+    private const string EventoRecibido = """
+        SELECT count(*) FROM envios.outbox_messages
+        WHERE "Tipo" = 'EnvioRecibidoEnDeposito.v1' AND "Contenido"::jsonb ->> 'EnvioId' = @id::text
+        """;
 
     [Fact]
     public async Task El_codigo_se_acepta_en_minusculas_y_con_espacios_como_lo_escribe_un_lector()

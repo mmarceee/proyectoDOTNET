@@ -28,6 +28,25 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         return db.Envios.SingleOrDefaultAsync(e => e.Id == id, ct);
     }
 
+    public async Task<Envio?> ObtenerConBultosAsync(Guid id, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Envios.Include(e => e.Bultos).SingleOrDefaultAsync(e => e.Id == id, ct);
+    }
+
+    public async Task<Domain.Devoluciones.Devolucion?> ObtenerDevolucionAsync(Guid envioId, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Devoluciones.SingleOrDefaultAsync(d => d.EnvioId == envioId, ct);
+    }
+
+    public async Task<IReadOnlyList<Domain.Devoluciones.Devolucion>> ObtenerDevolucionesAsync(
+        IReadOnlyCollection<Guid> envioIds, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Devoluciones.Where(d => envioIds.Contains(d.EnvioId)).ToListAsync(ct);
+    }
+
     public Task<Envio?> ObtenerConIntentosAsync(Guid id, CancellationToken ct)
     {
         return db.Envios.Include(e => e.Intentos).SingleOrDefaultAsync(e => e.Id == id, ct);
@@ -90,6 +109,16 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             && e.FechaEntregaProgramada >= desde && Envio.EstadosConEntregaPendiente.Contains(e.Estado), ct);
     }
 
+    public async Task<IReadOnlyList<Envio>> ListarParaTableroAsync(IReadOnlyCollection<Guid> ids, DateOnly hasta,
+    CancellationToken ct)
+    {
+        return await db.Envios.AsNoTracking()
+            .Where(e => ids.Contains(e.Id)
+                || (Envio.EstadosConEntregaPendiente.Contains(e.Estado)
+                    && e.FechaEntregaProgramada != null && e.FechaEntregaProgramada <= hasta))
+            .ToListAsync(ct);
+    }
+
     public Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct)
     {
         return db.Envios.Where(e => e.Numero == numero).Select(e => (Guid?)e.Id).SingleOrDefaultAsync(ct);
@@ -120,11 +149,11 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             new EnvioCancelado(envio.Id, envio.Numero, motivo, nameof(OrigenEvento.PortalComercio)), ahora);
     }
 
-    public void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora)
+    public void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora, OrigenEvento origen = OrigenEvento.Backoffice)
     {
         db.AgregarAlOutbox(EnvioReprogramado.Tipo,
             new EnvioReprogramado(envio.Id, envio.Numero, envio.FechaEntregaProgramada!.Value, envio.FranjaHorariaId!.Value,
-                nameof(OrigenEvento.Backoffice)), ahora);
+                origen.ToString()), ahora);
     }
 
     public void RegistrarExtravio(Envio envio, EstadoEnvio estadoAnterior, string motivo, Guid? responsableId,

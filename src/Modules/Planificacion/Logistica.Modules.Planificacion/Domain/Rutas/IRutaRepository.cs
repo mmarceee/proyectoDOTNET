@@ -3,6 +3,8 @@ namespace Logistica.Modules.Planificacion.Domain.Rutas;
 internal interface IRutaRepository
 {
     Task<Ruta?> ObtenerAsync(Guid id, CancellationToken ct);
+    // CU-61: la ruta en la que el envío tiene su parada pendiente, si está en alguna.
+    Task<Guid?> RutaActivaDelEnvioAsync(Guid envioId, CancellationToken ct);
     Task<IReadOnlyList<Ruta>> ListarDelRepartidorAsync(Guid repartidor, int pagina, CancellationToken ct);
     Task<IReadOnlyList<Ruta>> ListarAsync(DateOnly? fecha, EstadoRuta? estado, CancellationToken ct);
     // CU-04: ¿alguno de estos envíos está en una ruta Planificada, Despachada o EnCurso desde esa fecha?

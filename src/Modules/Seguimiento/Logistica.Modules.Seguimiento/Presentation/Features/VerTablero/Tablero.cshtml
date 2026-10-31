@@ -1,0 +1,241 @@
+@page "/backoffice/tablero"
+@model Logistica.Modules.Seguimiento.Presentation.Features.VerTablero.TableroModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Tablero";
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+      integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous" />
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Tablero en vivo</h1>
+        <p class="text-muted mb-0">Flota, avance de las rutas, envíos en riesgo y alertas. Se actualiza solo.</p>
+    </div>
+    <span id="estado-conexion" class="badge text-bg-secondary" role="status">Conectando…</span>
+</div>
+
+<div class="row g-3">
+    <section class="col-12 col-xl-8" aria-labelledby="mapa-titulo">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 id="mapa-titulo" class="h5">Flota</h2>
+                <div id="mapa" style="height: 420px;" class="rounded border"></div>
+                <p class="small text-muted mt-2 mb-0">Una ubicación sin renovar hace más de 5 minutos se muestra atenuada: puede faltar señal, permiso de ubicación o la PWA abierta.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="col-12 col-xl-4" aria-labelledby="novedades-titulo">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 id="novedades-titulo" class="h5">Novedades</h2>
+                <ul id="novedades" class="list-unstyled small mb-0" aria-live="polite">
+                    <li class="text-muted" id="sin-novedades">Todavía no hay novedades.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="col-12" aria-labelledby="rutas-titulo">
+        <div class="card">
+            <div class="card-body">
+                <h2 id="rutas-titulo" class="h5">Rutas en la calle</h2>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Repartidor</th><th>Vehículo</th><th>Estado</th><th>Avance</th><th>Última ubicación</th></tr></thead>
+                        <tbody id="rutas"><tr><td colspan="5" class="text-muted">Cargando…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="col-12 col-lg-6" aria-labelledby="riesgo-titulo">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 id="riesgo-titulo" class="h5">Envíos en riesgo</h2>
+                <p class="small text-muted">Sin entregar y con menos de 60 minutos hasta el fin de su ventana.</p>
+                <ul id="riesgo" class="list-group list-group-flush"></ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="col-12 col-lg-6" aria-labelledby="conflictos-titulo">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 id="conflictos-titulo" class="h5">Conflictos de sincronización</h2>
+                <p class="small text-muted">Operaciones de la PWA que el servidor rechazó. Revisarlas no cambia el envío, pero destraba la rendición.</p>
+                <ul id="conflictos" class="list-group list-group-flush"></ul>
+            </div>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
+            integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"
+            integrity="sha384-mU1xC5yC2LldSW74Rj1Ax8wPiLw/28V5eh51uKJMlBbRVsOtUYd4xyzNsgIAJARB" crossorigin="anonymous"></script>
+    <script>
+        (() => {
+            const AntiguaMs = 5 * 60 * 1000; // una ubicación sin renovar en 5 minutos se atenúa
+            const hora = new Intl.DateTimeFormat('es-UY', { hour: '2-digit', minute: '2-digit' });
+
+            // Crea un elemento con texto (nunca HTML): los datos vienen del servidor, pero igual se escapan.
+            const el = (etiqueta, texto, clase) => {
+                const e = document.createElement(etiqueta);
+                if (texto !== undefined) e.textContent = texto;
+                if (clase) e.className = clase;
+                return e;
+            };
+
+            // --- Mapa (decisión G5: Leaflet y OpenStreetMap) ---
+            const mapa = L.map('mapa').setView([-34.9011, -56.1645], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19, attribution: '&copy; OpenStreetMap'
+            }).addTo(mapa);
+
+            const vehiculos = new Map(); // vehiculoId → { marcador, posicion }
+            const etiquetas = new Map(); // vehiculoId → "Repartidor · Vehículo"
+
+            // CU-53: se compara por la hora de captura y, si empatan, por el Id. Una posición que llega tarde pero se
+            // capturó antes no reemplaza a la que ya se ve.
+            const esMasNueva = (nueva, actual) => {
+                if (!actual) return true;
+                const a = Date.parse(actual.capturadaEn), b = Date.parse(nueva.capturadaEn);
+                return b > a || (b === a && nueva.id > actual.id);
+            };
+
+            const ponerPosicion = p => {
+                const actual = vehiculos.get(p.vehiculoId);
+                if (actual && !esMasNueva(p, actual.posicion)) return;
+                const texto = `${etiquetas.get(p.vehiculoId) ?? 'Vehículo'} · ${hora.format(new Date(p.capturadaEn))}`;
+                if (actual) {
+                    actual.marcador.setLatLng([p.latitud, p.longitud]).setPopupContent(texto);
+                    actual.posicion = p;
+                } else {
+                    const marcador = L.marker([p.latitud, p.longitud]).addTo(mapa).bindPopup(texto);
+                    vehiculos.set(p.vehiculoId, { marcador, posicion: p });
+                }
+                atenuarAntiguas();
+            };
+
+            const atenuarAntiguas = () => {
+                const ahora = Date.now();
+                for (const { marcador, posicion } of vehiculos.values()) {
+                    marcador.setOpacity(ahora - Date.parse(posicion.capturadaEn) > AntiguaMs ? 0.45 : 1);
+                }
+            };
+            setInterval(atenuarAntiguas, 30000);
+
+            // --- La foto completa (paso 2; también al reconectar, A1) ---
+            const dibujarRutas = rutas => {
+                const cuerpo = document.getElementById('rutas');
+                cuerpo.replaceChildren();
+                if (rutas.length === 0) {
+                    const fila = el('tr'); const celda = el('td', 'No hay rutas en la calle.', 'text-muted');
+                    celda.colSpan = 5; fila.append(celda); cuerpo.append(fila);
+                }
+                for (const r of rutas) {
+                    etiquetas.set(r.vehiculoId, `${r.repartidor} · ${r.vehiculo}`);
+                    const fila = el('tr');
+                    fila.append(el('td', r.repartidor), el('td', r.vehiculo), el('td', r.estado),
+                        el('td', `${r.entregados} de ${r.envios} entregados (${r.pendientes} pendientes)`),
+                        el('td', r.posicion ? hora.format(new Date(r.posicion.capturadaEn)) : 'Sin ubicación'));
+                    cuerpo.append(fila);
+                    if (r.posicion) ponerPosicion(r.posicion);
+                }
+            };
+
+            const dibujarRiesgo = envios => {
+                const lista = document.getElementById('riesgo');
+                lista.replaceChildren();
+                if (envios.length === 0) lista.append(el('li', 'Ningún envío en riesgo.', 'list-group-item text-muted'));
+                for (const e of envios) {
+                    const item = el('li', undefined, 'list-group-item d-flex justify-content-between align-items-center');
+                    const enlace = el('a', e.numero); // CU-14: el detalle del envío
+                    enlace.href = `/backoffice/envios/${encodeURIComponent(e.numero)}`;
+                    const cuanto = e.vencido
+                        ? el('span', `Vencido hace ${-e.minutosRestantes} min`, 'badge text-bg-danger')
+                        : el('span', `Quedan ${e.minutosRestantes} min`, 'badge text-bg-warning');
+                    item.append(enlace, cuanto);
+                    lista.append(item);
+                }
+            };
+
+            const dibujarConflictos = conflictos => {
+                const lista = document.getElementById('conflictos');
+                lista.replaceChildren();
+                if (conflictos.length === 0) lista.append(el('li', 'No hay conflictos pendientes.', 'list-group-item text-muted'));
+                for (const c of conflictos) {
+                    const item = el('li', undefined, 'list-group-item');
+                    item.append(
+                        el('div', `${c.repartidor} · ${c.tipo}${c.envioNumero ? ' · ' + c.envioNumero : ''}`, 'fw-semibold'),
+                        el('div', `${c.resultado}: ${c.motivo ?? 'sin motivo'} (${hora.format(new Date(c.ocurridoEn))})`, 'small text-muted'));
+                    const boton = el('button', 'Marcar revisado', 'btn btn-sm btn-outline-secondary mt-1');
+                    boton.type = 'button';
+                    boton.addEventListener('click', async () => {
+                        boton.disabled = true;
+                        await fetch(`/api/tablero/conflictos/${c.operacionId}/revision`, { method: 'POST', credentials: 'same-origin' });
+                        await cargarFoto();
+                    });
+                    item.append(boton);
+                    lista.append(item);
+                }
+            };
+
+            const cargarFoto = async () => {
+                const respuesta = await fetch('/api/tablero', { credentials: 'same-origin' });
+                if (!respuesta.ok) return;
+                const tablero = await respuesta.json();
+                dibujarRutas(tablero.rutas);
+                dibujarRiesgo(tablero.enRiesgo);
+                dibujarConflictos(tablero.conflictos);
+            };
+
+            // Varias novedades seguidas piden una sola foto.
+            let recarga;
+            const programarRecarga = () => { clearTimeout(recarga); recarga = setTimeout(cargarFoto, 1000); };
+
+            const agregarNovedad = n => {
+                document.getElementById('sin-novedades')?.remove();
+                const lista = document.getElementById('novedades');
+                const item = el('li', `${hora.format(new Date(n.ocurridoEn))} · ${n.texto}`, n.alerta ? 'text-danger fw-semibold' : '');
+                lista.prepend(item);
+                while (lista.children.length > 30) lista.lastElementChild.remove();
+            };
+
+            // --- Tiempo real (paso 3) y reconexión (A1) ---
+            const estado = document.getElementById('estado-conexion');
+            const mostrarEstado = (texto, clase) => { estado.textContent = texto; estado.className = `badge ${clase}`; };
+
+            const conexion = new signalR.HubConnectionBuilder()
+                .withUrl('/hubs/tablero')
+                .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+                .build();
+
+            conexion.on('posicion', ponerPosicion);
+            conexion.on('novedad', n => { agregarNovedad(n); programarRecarga(); });
+            conexion.onreconnecting(() => mostrarEstado('Reconectando…', 'text-bg-warning'));
+            // Al volver, la foto completa: lo que pasó mientras estaba cortado no llegó por SignalR.
+            conexion.onreconnected(async () => { mostrarEstado('En vivo', 'text-bg-success'); await cargarFoto(); });
+            conexion.onclose(() => { mostrarEstado('Sin conexión', 'text-bg-danger'); setTimeout(iniciar, 5000); });
+
+            // Primero se conecta y después pide la foto: así no se pierde una novedad entre las dos cosas (CU-53).
+            async function iniciar() {
+                try {
+                    await conexion.start();
+                    mostrarEstado('En vivo', 'text-bg-success');
+                    await cargarFoto();
+                } catch {
+                    mostrarEstado('Sin conexión', 'text-bg-danger');
+                    setTimeout(iniciar, 5000);
+                }
+            }
+
+            iniciar();
+        })();
+    </script>
+}

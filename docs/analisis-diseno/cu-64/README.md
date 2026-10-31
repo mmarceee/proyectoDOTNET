@@ -41,7 +41,7 @@ Cada hecho se clasifica en un único tipo (`ClasificadorAvisos`):
 
 | Hecho | Tipo |
 | --- | --- |
-| Termina *EnDevolucion* (por ejemplo, el intento fallido que agota los intentos, T7 y T10) | `Devolucion` |
+| Termina *EnDevolucion* (por ejemplo, el intento fallido que agota los intentos, T7 y T10) o *Devuelto* (CU-31, T15) | `Devolucion` |
 | Otro intento fallido (T7 y T9) | `EntregaFallida` |
 | Todos los demás | `CambioDeEstado` |
 
@@ -54,6 +54,7 @@ Eventos de Envíos que generan avisos y estado que informan:
 | Evento | `estado` |
 | --- | --- |
 | `EnvioAdmitido` | `Admitido` |
+| `EnvioRecibidoEnDeposito` | `EnDeposito` |
 | `EnvioAsignadoARuta` | `AsignadoARuta` |
 | `EnvioDesasignadoDeRuta` | `EnDeposito` |
 | `EnvioEnTransito` | `EnTransito` |
@@ -62,9 +63,13 @@ Eventos de Envíos que generan avisos y estado que informan:
 | `EnvioReprogramado` | `Reprogramado` |
 | `EnvioCancelado` | `Cancelado` |
 | `EnvioReintegradoADeposito` | `EnDeposito` |
+| `EnvioDevuelto` | `Devuelto` |
 
-La recepción en depósito (T2), las devoluciones iniciadas por el operador o el comercio (T12, T14), la devolución
-confirmada (T15) y el extravío (T16) todavía no publican eventos de integración. Cuando Envíos los publique, alcanza
+La recepción en depósito (T2) publica `EnvioRecibidoEnDeposito.v1` desde el 26/10; como la registra el operario de
+depósito, el sobre no trae comercio y el aviso sale de `EnvioSeguido`, igual que los demás. El mismo evento borra el
+seguimiento público de la caché (CU-60). La devolución confirmada (T15, CU-31) publica `EnvioDevuelto.v1` desde el
+27/10. Las devoluciones iniciadas por el operador o el comercio (T12, T14) y el extravío (T16) todavía no publican
+eventos de integración. Cuando Envíos los publique, alcanza
 con agregarlos a `PrepararAvisos.Tipos` y a su traducción en `LectorHechosEnvio`, que comparte con CU-62.
 
 ### 3. Entrega en dos etapas
@@ -139,3 +144,5 @@ El historial, los endpoints y las garantías del reenvío están documentados en
 | :---: | :---: | :---- | :---- |
 | 1.0 | 21/10/2026 | Versión inicial: diseño e implementación de CU-64. | Ezequiel Marcenal |
 | 1.1 | 22/10/2026 | El hecho del envío y su lector pasan a compartirse con CU-62 (`HechoEnvio`, `EnviosSeguidos`, `LectorHechosEnvio`). | Ezequiel Marcenal |
+| 1.2 | 26/10/2026 | T2 publica `EnvioRecibidoEnDeposito.v1`: avisa la recepción en depósito e invalida el seguimiento público. | Ezequiel Marcenal |
+| 1.3 | 27/10/2026 | T15 (CU-31) publica `EnvioDevuelto.v1`; *Devuelto* se clasifica como `Devolucion`. | Ezequiel Marcenal |

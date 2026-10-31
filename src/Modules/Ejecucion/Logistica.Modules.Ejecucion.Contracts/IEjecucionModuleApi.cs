@@ -9,6 +9,11 @@ public interface IEjecucionModuleApi
     Task<IReadOnlyList<PosicionVehiculoResult>> ConsultarUltimasPosicionesAsync(IReadOnlyCollection<Guid> vehiculos, CancellationToken ct);
     // CU-43: incluye cargas sin envíos completos, escaneos y rendiciones. No ve colas sin sincronizar.
     Task<bool> TieneActividadRegistradaAsync(Guid rutaId, CancellationToken ct);
+
+    // CU-66 (ADR-0004, sección 2.5): los conflictos de sincronización sin revisar, y marcar uno como revisado. false si
+    // no existe o es de otro operador; DomainException si la operación no fue rechazada.
+    Task<IReadOnlyList<ConflictoPendiente>> ListarConflictosPendientesAsync(CancellationToken ct);
+    Task<bool> MarcarConflictoRevisadoAsync(Guid operacionId, CancellationToken ct);
     Task<RendicionPendiente?> ConsultarRendicionAsync(Guid rutaId, CancellationToken ct);
     Task<IReadOnlyList<RendicionPendiente>> ListarRendicionesPendientesAsync(int pagina, CancellationToken ct);
 

@@ -12,6 +12,13 @@ internal interface IEnvioRepository
 
     Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct);
 
+    // CU-31: el envío con sus bultos, dentro de la transacción en curso.
+    Task<Envio?> ObtenerConBultosAsync(Guid id, CancellationToken ct);
+
+    // CU-31 y CU-55: la devolución de cada envío, si tiene una.
+    Task<Devoluciones.Devolucion?> ObtenerDevolucionAsync(Guid envioId, CancellationToken ct);
+    Task<IReadOnlyList<Devoluciones.Devolucion>> ObtenerDevolucionesAsync(IReadOnlyCollection<Guid> envioIds, CancellationToken ct);
+
     // Con sus intentos: CU-17 y CU-18 numeran el intento nuevo y cuentan los fallidos.
     Task<Envio?> ObtenerConIntentosAsync(Guid id, CancellationToken ct);
 
@@ -47,7 +54,8 @@ internal interface IEnvioRepository
     void RegistrarCancelacion(Envio envio, string? motivo, DateTimeOffset ahora);
 
     // CU-19: deja EnvioReprogramado en el Outbox; se guarda junto con la nueva fecha en GuardarCambiosAsync.
-    void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora);
+    // CU-61: el mismo evento, con origen en el seguimiento público.
+    void RegistrarReprogramacion(Envio envio, DateTimeOffset ahora, OrigenEvento origen = OrigenEvento.Backoffice);
 
     // CU-21: deja EnvioExtraviado en el Outbox; se guarda junto con el cambio de estado y la incidencia en GuardarCambiosAsync.
     void RegistrarExtravio(Envio envio, EstadoEnvio estadoAnterior, string motivo, Guid? responsableId, DateTimeOffset ahora);
@@ -55,6 +63,9 @@ internal interface IEnvioRepository
     // CU-20: deja DevolucionIniciada en el Outbox; se guarda junto con el cambio de estado y la devolución en GuardarCambiosAsync.
     void RegistrarDevolucion(Envio envio, Devoluciones.Devolucion devolucion, EstadoEnvio estadoAnterior, Guid? responsableId,
         OrigenEvento origen, DateTimeOffset ahora);
+
+    // CU-66: los envíos de esas rutas y los pendientes de entrega con fecha hasta "hasta", sin seguimiento de cambios.
+    Task<IReadOnlyList<Envio>> ListarParaTableroAsync(IReadOnlyCollection<Guid> ids, DateOnly hasta, CancellationToken ct);
 
     Task GuardarCambiosAsync(CancellationToken ct);
 }

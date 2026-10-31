@@ -44,6 +44,7 @@ public static class EnviosModule
         services.AddScoped<ReprogramarEnvioHandler>();
         services.AddScoped<DeclararExtravioHandler>();
         services.AddScoped<IniciarDevolucionHandler>();
+        services.AddScoped<Application.Features.ReprogramarPorDestinatario.ReprogramarPorDestinatarioHandler>();
 
         // Las reglas de entrega y el catálogo de motivos de la versión del envío, pedidos a Administración (CU-06).
         services.AddScoped<IReglasDeEntrega, Infrastructure.ReglasDeEntregaDeAdministracion>();

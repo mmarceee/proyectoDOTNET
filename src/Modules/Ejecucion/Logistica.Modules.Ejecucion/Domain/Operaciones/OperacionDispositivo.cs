@@ -52,6 +52,18 @@ internal sealed class OperacionDispositivo : Entity, IOperadorOwned
         return Crear(operacionId, datos, resultado, motivo, detalle, contenido);
     }
 
+    // CU-66 (ADR-0004, sección 2.5): el despachador revisó el conflicto en el tablero. No cambia el envío: sólo deja de
+    // estar pendiente, y con eso deja de bloquear la rendición (CU-54). Revisar dos veces no cambia nada.
+    public void MarcarRevisada()
+    {
+        if (Resultado == ResultadoOperacion.Aplicada)
+        {
+            throw new DomainException("Sólo se revisa una operación rechazada.");
+        }
+
+        Revisada = true;
+    }
+
     private static OperacionDispositivo Crear(Guid operacionId, DatosOperacion datos, ResultadoOperacion resultado,
         string? motivo, string? detalle, string? contenido)
     {

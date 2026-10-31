@@ -5,9 +5,12 @@ namespace Logistica.Modules.Seguimiento.Domain.Avisos;
 internal static class ClasificadorAvisos
 {
     public const string EnDevolucion = "EnDevolucion";
+    public const string Devuelto = "Devuelto";
 
+    // Devolucion abarca el inicio (EnDevolucion) y el cierre (Devuelto, CU-31): quien eligió avisos de devolución recibe
+    // los dos.
     public static TipoEventoAviso Clasificar(string estadoEnvio, bool intentoFallido) =>
-        estadoEnvio == EnDevolucion ? TipoEventoAviso.Devolucion
+        estadoEnvio is EnDevolucion or Devuelto ? TipoEventoAviso.Devolucion
         : intentoFallido ? TipoEventoAviso.EntregaFallida
         : TipoEventoAviso.CambioDeEstado;
 }

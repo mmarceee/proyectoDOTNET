@@ -29,6 +29,9 @@ public static class DepositoModule
         // CU-55: confirmar la rendición.
         services.AddScoped<Application.Features.ConfirmarRendicion.ConfirmarRendicionHandler>();
 
+        // CU-31: confirmar la devolución al comercio.
+        services.AddScoped<Application.Features.ConfirmarDevolucion.ConfirmarDevolucionHandler>();
+
         return services;
     }
 
