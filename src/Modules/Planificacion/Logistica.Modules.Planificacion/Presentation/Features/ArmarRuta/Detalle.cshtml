@@ -23,11 +23,16 @@
     @if (Model.Editable)
     {
         <div class="d-flex flex-wrap gap-2">
-        @if (Model.Ruta?.Paradas.Count > 0)
-        {
-            <button type="button" class="btn btn-outline-secondary" data-editar-paradas aria-pressed="false" disabled="@Model.EditandoDatos">Editar paradas</button>
-        }
-        <button form="formulario-ruta" asp-page-handler="AbrirEnvios" class="btn btn-primary" formnovalidate disabled="@Model.EditandoDatos">Agregar envíos</button>
+            <button type="button" class="btn btn-warning" data-editar-paradas aria-pressed="false" aria-controls="acciones-edicion-paradas" disabled="@Model.EditandoDatos">Editar</button>
+            <div id="acciones-edicion-paradas" data-acciones-edicion hidden>
+                <div class="d-flex flex-wrap gap-2">
+                    @if (Model.Ruta?.Paradas.Count > 0)
+                    {
+                        <a href="/backoffice/rutas/@Model.Ruta.Id/orden" class="btn btn-outline-primary">Ordenar paradas</a>
+                    }
+                    <button form="formulario-ruta" asp-page-handler="AbrirEnvios" class="btn btn-primary" formnovalidate disabled="@Model.EditandoDatos">Agregar envíos</button>
+                </div>
+            </div>
         </div>
     }
 </div>

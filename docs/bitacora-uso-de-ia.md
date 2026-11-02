@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 27 de octubre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 2 de noviembre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal y Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -717,6 +717,34 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Notificar la devolución al destinatario: no figura entre los cambios relevantes de CU-62. Un listado de devoluciones pendientes: el caso de uso empieza por la búsqueda del envío. |
 | **Verificación** | 7 casos unitarios y 6 pruebas de integración nuevas (rendición que deja la devolución recibida, entrega completa con el evento, entrega parcial con la incidencia, A1, receptor obligatorio, permisos y aislamiento entre operadores). Corrida completa en Docker: 798 pruebas .NET (278 unitarias, 56 de arquitectura y 464 de integración), todas pasan; cobertura de líneas del 94,7 %. No se probó con `docker compose`. |
 
+## **3.48 Ordenar las paradas de una ruta (CU-42)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 02/11/2026 |
+| **Archivos** | Planificación: `OrdenadorParadas.cs`, `Ruta.OrdenarParadas` y `Ruta.MoverParada`, `OrdenarParadasHandler`, `OrdenarParadasEndpoint`, la página `/backoffice/rutas/{id}/orden`, el registro en `PlanificacionModule`, el detalle de ruta y el script de `ConfirmacionQuitarEnvio.cshtml`. DTOs en `Logistica.Http.Contracts/Planificacion/OrdenParadas.cs`. Pruebas unitarias y de integración `OrdenarParadasTests`. Documentación en `docs/analisis-diseno/cu-42/README.md`. |
+| **¿Se usó IA?** | Sí, Codex en la aplicación de escritorio. |
+| **Finalidad** | Implementar CU-42/RF 16: ordenar por franja horaria, zona y código postal, permitir ajuste manual del despachador y confirmar antes de guardar. Analizar si podía desarrollarse en paralelo a las decisiones pendientes de entrega parcial (RF 31 a 36). |
+| **Cómo se trabajó** | Lucas solicitó la implementación. Codex leyó la ficha de CU-42, el modelo de dominio, la agrupación de paradas y los patrones de los casos de Planificación existentes; escribió el código, las pruebas y la documentación. A pedido de Lucas explicó el flujo, la distribución por capas, el criterio de orden y cómo probarlo en el front, y contrastó explícitamente el resultado con los ADR relevantes. Luego Lucas pidió cambiar el modo de edición de la pantalla. |
+| **Aceptado sin modificaciones** | Se mantuvo la propuesta automática revisable, el ajuste con Subir/Bajar y la persistencia sólo al confirmar. El criterio ordena por inicio de franja, fin como desempate entre ventanas, zona y código postal; las visitas sin franja quedan al final y los empates mantienen el orden previo. Se conservan identidades y miembros de las paradas, recursos y reservas; un cambio real incrementa una vez la revisión. |
+| **Modificado** | La recuperación de errores se ajustó para leer desde un scope nuevo y no reutilizar entidades rastreadas por una transacción fallida. En las pruebas se corrigió la limpieza de una ruta que quedaba EnCurso y ocupaba el repartidor y el vehículo de los casos siguientes. Por pedido explícito de Lucas, Editar paradas pasó a llamarse Editar, con color amarillo: Agregar envíos y Ordenar paradas quedan ocultos hasta activar la edición, junto con las acciones de quitar; Terminar edición vuelve a ocultarlos. Se mantuvo la posibilidad de activar Editar en una ruta vacía para agregar envíos. |
+| **Arquitectura y ADR** | Caso localizado en Planificación como vertical slice, con reglas en Domain, coordinación en Application y página/endpoints en Presentation (ADR-0001). Lecturas de Envíos y Administración exclusivamente por contratos públicos, sin acceder a sus DbContext. Tenant de sesión, repositorio filtrado y protección de escrituras existentes (ADR-0002); perfil Despachador y antiforgery. Confirmación con unidad de trabajo, bloqueo por operador y revisión esperada, como CU-40/41/43. No se agregó Outbox porque no se introdujo una reacción asíncrona durable (ADR-0001/0003). No se alteraron los contratos offline ni la política del ADR-0004: sólo se ordenan rutas Planificadas. |
+| **Descartado y límites** | No se incorporó optimización de distancias ni una estimación ficticia de viaje: no hay duraciones de traslado o visita para calcularla. A1 usa una cota inferior sin traslados para advertir órdenes incompatibles con las franjas y permite guardar con confirmación explícita; no garantiza puntualidad. El criterio fijo no requiere un ADR nuevo, según la ficha de CU-42. No se adelantaron decisiones sobre estados de bultos, evidencia, intentos ni sincronización parcial; RF 34 podrá reutilizar el ordenamiento de las visitas resultantes. |
+| **Verificación** | Compilación de la solución sin errores ni advertencias. Antes del último ajuste de visibilidad de botones aprobaron 28 pruebas unitarias de Planificación, 56 de arquitectura, 11 de integración de CU-42 y 35 regresiones de rutas: 130 escenarios distintos, no la suite completa. Incluyen persistencia, agrupación, advertencias, listas inválidas, permisos, aislamiento, antiforgery, concurrencia y formularios. La primera ejecución quedó bloqueada por Docker; Lucas recuperó el motor y se completaron las pruebas, tras corregir la limpieza mencionada. Después del ajuste de Editar se recompiló correctamente el módulo; no se repitió la integración para ese ajuste ni se hizo inspección visual automatizada en navegador. Logs y TRX en `TestResults/cu-42/` (ignorados por Git); las corridas iniciales fallidas y su corrección se distinguen en el README. |
+
+## **3.49 Decisión de entrega parcial y ADR-0007**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable y fecha** | Lucas Ottonello · 02/11/2026 |
+| **¿Se usó IA?** | Sí, Codex. |
+| **Finalidad** | Registrar en el repositorio el acuerdo funcional cerrado y crear el ADR exigido para el cambio de RF 31 a 36. |
+| **Cómo se trabajó** | Se analizaron los borradores aportados por Cristian y el código disponible. Lucas confirmó En operación como nombre del resumen y pidió documentar la decisión cerrada. Codex verificó las secciones 8.2 de la letra y 2.3 del cambio, inspeccionó el estado actual y redactó ambos documentos y sus enlaces. |
+| **Decisión registrada** | Estados operativos en bultos; resumen persistido y derivado del envío con Creado, En operación, Entregado parcialmente y Entregado; Terminado y desglose; visita por envío, atomicidad, evidencia, reglas y recargo de revisita según lo acordado en este chat. El criterio técnico de inicio de ejecución y demás contratos detallados quedan explícitamente pendientes. |
+| **Alternativas y límites** | Se registraron alternativas descartadas y consecuencias. Se distingue decisión aceptada de implementación pendiente: las pruebas de CU-42 no se presentan como validación de parcial. La retrospectiva exigida por el docente queda preparada para completar con commits y evidencia después de implementar. No se atribuyen aprobaciones individuales adicionales a los compañeros. |
+| **Verificación** | Revisión documental, enlaces relativos y consistencia de nombres, referencias y estados de avance. Esta tarea modifica documentación, no código; no se ejecutaron pruebas nuevas de negocio. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -749,3 +777,5 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.26 | 23/10/2026 | Registro de lo faltante en el chat de CU-63: implementación de CU-65, corrección del escaneo vacío y confirmación de faltantes, reapertura de rutas actuales y futuras, simplificación de carga, estabilización de CI y preparación del receptor HTTPS temporal. Se conservan las ampliaciones previas y se distinguen verificaciones ejecutadas de pasos pendientes de prueba. | Lucas Ottonello |
 | 0.27 | 26/10/2026 | Entrada del evento de la recepción en depósito (T2) para CU-64 y CU-60. | Ezequiel Marcenal |
 | 0.28 | 27/10/2026 | Entrada de CU-31, confirmar la devolución al comercio. | Ezequiel Marcenal |
+| 0.29 | 02/11/2026 | CU-42: implementación asistida, revisión de arquitectura y ADR, decisiones y límites, resultados de pruebas y ajuste de Editar solicitado por Lucas. | Lucas Ottonello |
+| 0.30 | 02/11/2026 | Decisión cerrada de entrega parcial, ADR-0007 y referencias a la evolución de los documentos existentes. | Lucas Ottonello |

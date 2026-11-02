@@ -1,5 +1,7 @@
 # **Modelo de dominio**
 
+> **Actualización de diseño · 02/11/2026:** los estados operativos por bulto y el resumen del envío se rigen por la [decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). Las definiciones anteriores que siguen en este documento describen el modelo previo; su actualización detallada y su implementación están pendientes.
+
 *Plataforma Multioperador de Distribución de Última Milla — Taller de Sistemas de Información .NET (UTEC), edición 2026*
 
 Este documento reúne el modelo de dominio completo como un único modelo, agrupado por tema para que se lea ordenado. Cada clase se define una sola vez, en la sección de su tema; el resto de las relaciones que la involucran se resuelven en la tabla de relaciones al final del documento, que cubre el modelo completo.

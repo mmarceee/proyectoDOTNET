@@ -1,5 +1,7 @@
 ESTADOS: 
 
+> **Actualización de diseño · 02/11/2026:** consultar la [decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). Esta tabla T1 a T19 documenta el flujo anterior. Debe adaptarse a transiciones por bulto y resumen derivado; conservarla aquí no autoriza a forzar NoEntregado sobre un envío que ya tiene entregas parciales.
+
 | ESTADO | TIPO | SIGNIFICADO | DONDE ESTA EL PAQUETE |
 | :---- | :---- | :---- | :---- |
 | Admitido | Inicial | El comercio cargó el envío y se calculó la tarifa. El operador aún no lo recibió.  | Con el comercio  |

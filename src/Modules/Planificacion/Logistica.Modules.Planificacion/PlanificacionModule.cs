@@ -37,6 +37,7 @@ public static class PlanificacionModule
         services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
         services.AddScoped<IResponsablePlanificacion, ResponsablePlanificacion>();
         services.AddScoped<ArmarRutaHandler>();
+        services.AddScoped<Application.Features.OrdenarParadas.OrdenarParadasHandler>();
         services.AddScoped<Application.Features.DespacharRuta.DespacharRutaHandler>();
         services.AddScoped<Application.Features.AnularDespacho.AnularDespachoHandler>();
         services.AddScoped<Application.Services.EvaluadorRuta>();
@@ -57,6 +58,7 @@ public static class PlanificacionModule
 
         PlanificacionEndpointFilters.Add(group);
         ArmarRutaEndpoint.Map(group);
+        Presentation.Features.OrdenarParadas.OrdenarParadasEndpoint.Map(group);
         Presentation.Features.DespacharRuta.DespacharRutaEndpoint.Map(group);
         Presentation.Features.AnularDespacho.AnularDespachoEndpoint.Map(group);
         QuitarEnvioDeRutaEndpoint.Map(group);
