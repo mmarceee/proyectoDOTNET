@@ -39,4 +39,32 @@ public class RepartidorTests
     {
         Assert.Throws<DomainException>(() => UnRepartidor().VincularUsuario(Guid.Empty));
     }
+
+    // CU-08: se modifica el nombre; el documento queda igual.
+    [Fact]
+    public void Se_modifica_el_nombre_y_el_documento_no_cambia()
+    {
+        var repartidor = UnRepartidor();
+
+        repartidor.Modificar("  Ana López ");
+
+        Assert.Equal("Ana López", repartidor.Nombre);
+        Assert.Equal("DOC-1", repartidor.Documento);
+    }
+
+    [Fact]
+    public void El_nombre_no_puede_quedar_vacio()
+    {
+        Assert.Throws<DomainException>(() => UnRepartidor().Modificar(" "));
+    }
+
+    [Fact]
+    public void Un_repartidor_desactivado_queda_inactivo()
+    {
+        var repartidor = UnRepartidor();
+
+        repartidor.Desactivar();
+
+        Assert.False(repartidor.Activo);
+    }
 }

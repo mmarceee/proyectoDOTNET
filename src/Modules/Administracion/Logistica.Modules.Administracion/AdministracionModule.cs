@@ -48,6 +48,11 @@ public static class AdministracionModule
         services.AddScoped<Application.Features.DefinirZonas.ConsultarZonasHandler>();
         services.AddScoped<Application.Features.DefinirZonas.GestionarZonasHandler>();
 
+        // CU-08: repartidores y vehículos.
+        services.AddScoped<Domain.Planificacion.IFlotaRepository, FlotaRepository>();
+        services.AddScoped<Application.Features.GestionarFlota.ConsultarFlotaHandler>();
+        services.AddScoped<Application.Features.GestionarFlota.GestionarFlotaHandler>();
+
         // CU-05: cuadro tarifario.
         services.AddScoped<Domain.Tarifas.ITarifarioRepository, TarifarioRepository>();
         services.AddScoped<Application.Features.ConfigurarTarifario.TarifarioVigente>();

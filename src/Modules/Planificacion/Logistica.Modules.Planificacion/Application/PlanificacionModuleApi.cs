@@ -108,4 +108,7 @@ internal sealed class PlanificacionModuleApi(IRutaRepository rutas, IAdministrac
     {
         return envioIds.Count == 0 ? Task.FromResult(false) : rutas.HayActivasConEnviosAsync(envioIds, desde, ct);
     }
+
+    public Task<bool> HayRutaSinFinalizarConAsync(Guid? repartidorId, Guid? vehiculoId, CancellationToken ct)
+        => rutas.HaySinFinalizarConAsync(repartidorId, vehiculoId, ct);
 }

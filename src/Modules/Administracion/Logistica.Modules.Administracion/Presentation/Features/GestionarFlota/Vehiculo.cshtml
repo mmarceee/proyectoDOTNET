@@ -1,0 +1,61 @@
+@page "/backoffice/flota/vehiculos/{id:guid}"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarFlota.VehiculoModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = Model.Vehiculo.Matricula;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">
+        @Model.Vehiculo.Matricula · @Model.Vehiculo.Tipo
+        @if (Model.Vehiculo.Activo)
+        {
+            <span class="badge text-bg-success align-middle">Activo</span>
+        }
+        else
+        {
+            <span class="badge text-bg-secondary align-middle">Inactivo</span>
+        }
+    </h1>
+    <a href="/backoffice/flota" class="btn btn-outline-secondary">Volver a la flota</a>
+</div>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <h2 class="h6">Modificar</h2>
+        <form method="post" asp-page-handler="Modificar">
+            <div class="mb-2">
+                <label asp-for="Tipo" class="form-label">Tipo</label>
+                <input asp-for="Tipo" class="form-control" />
+            </div>
+            <div class="row g-2 mb-2">
+                <div class="col"><label asp-for="CapacidadPesoKg" class="form-label">Peso (kg)</label><input asp-for="CapacidadPesoKg" type="text" class="form-control" inputmode="decimal" /></div>
+                <div class="col"><label asp-for="CapacidadVolumenM3" class="form-label">Volumen (m³)</label><input asp-for="CapacidadVolumenM3" type="text" class="form-control" inputmode="decimal" /></div>
+            </div>
+            <div class="row g-2 mb-3">
+                <div class="col"><label asp-for="LargoCargaCm" class="form-label">Largo (cm)</label><input asp-for="LargoCargaCm" type="text" class="form-control" inputmode="decimal" /></div>
+                <div class="col"><label asp-for="AnchoCargaCm" class="form-label">Ancho (cm)</label><input asp-for="AnchoCargaCm" type="text" class="form-control" inputmode="decimal" /></div>
+                <div class="col"><label asp-for="AltoCargaCm" class="form-label">Alto (cm)</label><input asp-for="AltoCargaCm" type="text" class="form-control" inputmode="decimal" /></div>
+            </div>
+            <div class="form-text mb-2">La matrícula no se puede cambiar. Las capacidades tienen que ser mayores que cero.</div>
+            <button type="submit" class="btn btn-outline-primary">Guardar cambios</button>
+        </form>
+    </div>
+
+    @if (Model.Vehiculo.Activo)
+    {
+        <div class="col-lg-6">
+            <h2 class="h6">Desactivar</h2>
+            <p class="text-muted small mb-2">No se ofrece para rutas nuevas. No se puede mientras tenga una ruta sin finalizar.</p>
+            <form method="post" asp-page-handler="Desactivar">
+                <button type="submit" class="btn btn-outline-danger">Desactivar vehículo</button>
+            </form>
+        </div>
+    }
+</div>

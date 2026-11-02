@@ -22,6 +22,17 @@ internal sealed class Repartidor : Entity, IOperadorOwned
         return new(id ?? Guid.CreateVersion7()) { OperadorId = operador, Nombre = nombre.Trim(), Documento = documento.Trim(), Activo = true };
     }
 
+    // CU-08: cambia el nombre; el documento no, porque identifica a la persona (A1).
+    public void Modificar(string nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre))
+            throw new DomainException("El repartidor necesita operador, nombre y documento.");
+        Nombre = nombre.Trim();
+    }
+
+    // CU-08: deja de ofrecerse para rutas nuevas; las rutas anteriores lo conservan. A3 la controla quien llama.
+    public void Desactivar() => Activo = false;
+
     // Con este vínculo, la sesión del usuario sabe qué repartidor es (claim repartidor_id), y la sincronización
     // verifica que la ruta sea suya (ADR-0004, sección 2.3).
     public void VincularUsuario(Guid usuarioId)
