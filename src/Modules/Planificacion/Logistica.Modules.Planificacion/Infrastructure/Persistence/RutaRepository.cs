@@ -33,6 +33,12 @@ internal sealed class RutaRepository(PlanificacionDbContext db) : IRutaRepositor
             && r.Fecha >= desde && (r.Estado == EstadoRuta.Planificada || r.Estado == EstadoRuta.Despachada
                 || r.Estado == EstadoRuta.EnCurso)), ct);
     }
+    public async Task<bool> HaySinFinalizarConAsync(Guid? repartidorId, Guid? vehiculoId, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await Consulta.AnyAsync(r => r.Estado != EstadoRuta.Finalizada
+            && (r.RepartidorId == repartidorId || r.VehiculoId == vehiculoId), ct);
+    }
     public async Task<IReadOnlyList<Guid>> EnviosOcupadosAsync(IReadOnlyCollection<Guid> ids, Guid? propia, CancellationToken ct)
         => await db.EnviosParada.AsNoTracking().Where(p => ids.Contains(p.EnvioId)
             && p.Estado == EstadoParada.Pendiente && p.RutaId != propia).Select(p => p.EnvioId).ToListAsync(ct);

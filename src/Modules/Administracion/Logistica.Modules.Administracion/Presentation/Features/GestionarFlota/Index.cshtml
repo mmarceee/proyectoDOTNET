@@ -1,0 +1,137 @@
+@page "/backoffice/flota"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarFlota.IndexModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Flota";
+}
+
+<h1 class="h3 mb-4">Flota</h1>
+
+<div asp-validation-summary="All" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+
+<h2 class="h5 mt-4">Repartidores</h2>
+@if (Model.Repartidores.Count == 0)
+{
+    <p class="text-muted">Todavía no hay repartidores.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Documento</th>
+                    <th>Usuario de la app</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var repartidor in Model.Repartidores)
+                {
+                    <tr>
+                        <td><a href="/backoffice/flota/repartidores/@repartidor.Id">@repartidor.Nombre</a></td>
+                        <td>@repartidor.Documento</td>
+                        <td>@(repartidor.TieneUsuario ? "Vinculado" : "Sin usuario")</td>
+                        <td>
+                            @if (repartidor.Activo)
+                            {
+                                <span class="badge text-bg-success">Activo</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Inactivo</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<form method="post" asp-page-handler="Repartidor" class="row g-2 align-items-end mb-5">
+    <div class="col-md-4">
+        <label asp-for="Nombre" class="form-label">Nombre</label>
+        <input asp-for="Nombre" class="form-control" />
+        <span asp-validation-for="Nombre" class="text-danger"></span>
+    </div>
+    <div class="col-md-3">
+        <label asp-for="Documento" class="form-label">Documento</label>
+        <input asp-for="Documento" class="form-control" />
+        <span asp-validation-for="Documento" class="text-danger"></span>
+    </div>
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-primary">Agregar repartidor</button>
+    </div>
+    <div class="form-text">El documento es único en el operador y no se puede cambiar después. El usuario de la app se vincula en Usuarios.</div>
+</form>
+
+<h2 class="h5">Vehículos</h2>
+@if (Model.Vehiculos.Count == 0)
+{
+    <p class="text-muted">Todavía no hay vehículos.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Tipo</th>
+                    <th>Peso (kg)</th>
+                    <th>Volumen (m³)</th>
+                    <th>Caja (cm)</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var vehiculo in Model.Vehiculos)
+                {
+                    <tr>
+                        <td><a href="/backoffice/flota/vehiculos/@vehiculo.Id">@vehiculo.Matricula</a></td>
+                        <td>@vehiculo.Tipo</td>
+                        <td>@vehiculo.CapacidadPesoKg</td>
+                        <td>@vehiculo.CapacidadVolumenM3</td>
+                        <td>@vehiculo.LargoCargaCm × @vehiculo.AnchoCargaCm × @vehiculo.AltoCargaCm</td>
+                        <td>
+                            @if (vehiculo.Activo)
+                            {
+                                <span class="badge text-bg-success">Activo</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Inactivo</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<form method="post" asp-page-handler="Vehiculo" class="row g-2 align-items-end">
+    <div class="col-6 col-md-2">
+        <label asp-for="Matricula" class="form-label">Matrícula</label>
+        <input asp-for="Matricula" class="form-control" />
+    </div>
+    <div class="col-6 col-md-2">
+        <label asp-for="Tipo" class="form-label">Tipo</label>
+        <input asp-for="Tipo" class="form-control" placeholder="Furgón" />
+    </div>
+    <div class="col-4 col-md-1"><label asp-for="CapacidadPesoKg" class="form-label">Kg</label><input asp-for="CapacidadPesoKg" type="text" class="form-control" inputmode="decimal" /></div>
+    <div class="col-4 col-md-1"><label asp-for="CapacidadVolumenM3" class="form-label">m³</label><input asp-for="CapacidadVolumenM3" type="text" class="form-control" inputmode="decimal" /></div>
+    <div class="col-4 col-md-1"><label asp-for="LargoCargaCm" class="form-label">Largo</label><input asp-for="LargoCargaCm" type="text" class="form-control" inputmode="decimal" /></div>
+    <div class="col-4 col-md-1"><label asp-for="AnchoCargaCm" class="form-label">Ancho</label><input asp-for="AnchoCargaCm" type="text" class="form-control" inputmode="decimal" /></div>
+    <div class="col-4 col-md-1"><label asp-for="AltoCargaCm" class="form-label">Alto</label><input asp-for="AltoCargaCm" type="text" class="form-control" inputmode="decimal" /></div>
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-primary">Agregar vehículo</button>
+    </div>
+    <div class="form-text">La matrícula es única en el operador y no se puede cambiar después. Las capacidades tienen que ser mayores que cero.</div>
+</form>

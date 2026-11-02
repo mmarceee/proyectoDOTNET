@@ -37,4 +37,8 @@ public interface IPlanificacionModuleApi
     // CU-20: ¿el envío está arriba de un vehículo? (su ruta está Despachada o EnCurso). Si sí, su devolución la marca
     // recibida la rendición (CU-55) cuando el bulto vuelve.
     Task<bool> EnvioEnLaCalleAsync(Guid envioId, CancellationToken ct);
+
+    // CU-08, A3: ¿el repartidor o el vehículo está en una ruta que todavía no se finalizó? Administración lo pregunta
+    // antes de desactivarlo, con el bloqueo de planificación del operador tomado, para que nadie lo asigne mientras tanto.
+    Task<bool> HayRutaSinFinalizarConAsync(Guid? repartidorId, Guid? vehiculoId, CancellationToken ct);
 }
