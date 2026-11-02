@@ -2,6 +2,8 @@
 
 Laboratorio .NET 2026 · Equipo 1. La documentación de análisis y diseño está en [`docs/analisis-diseno`](docs/analisis-diseno).
 
+El cambio de entrega parcial se documenta en las [decisiones cerradas](docs/analisis-diseno/decisiones-entrega-parcial.md) y el [ADR-0007 de adaptación arquitectónica](docs/analisis-diseno/ADR-0007-adaptacion-a-entrega-parcial.md). La decisión de diseño está aceptada; la implementación y la evaluación retrospectiva se registran por separado.
+
 ## Requisitos
 
 - .NET 10 SDK (versión fijada en `global.json`)

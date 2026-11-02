@@ -733,6 +733,18 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado y límites** | No se incorporó optimización de distancias ni una estimación ficticia de viaje: no hay duraciones de traslado o visita para calcularla. A1 usa una cota inferior sin traslados para advertir órdenes incompatibles con las franjas y permite guardar con confirmación explícita; no garantiza puntualidad. El criterio fijo no requiere un ADR nuevo, según la ficha de CU-42. No se adelantaron decisiones sobre estados de bultos, evidencia, intentos ni sincronización parcial; RF 34 podrá reutilizar el ordenamiento de las visitas resultantes. |
 | **Verificación** | Compilación de la solución sin errores ni advertencias. Antes del último ajuste de visibilidad de botones aprobaron 28 pruebas unitarias de Planificación, 56 de arquitectura, 11 de integración de CU-42 y 35 regresiones de rutas: 130 escenarios distintos, no la suite completa. Incluyen persistencia, agrupación, advertencias, listas inválidas, permisos, aislamiento, antiforgery, concurrencia y formularios. La primera ejecución quedó bloqueada por Docker; Lucas recuperó el motor y se completaron las pruebas, tras corregir la limpieza mencionada. Después del ajuste de Editar se recompiló correctamente el módulo; no se repitió la integración para ese ajuste ni se hizo inspección visual automatizada en navegador. Logs y TRX en `TestResults/cu-42/` (ignorados por Git); las corridas iniciales fallidas y su corrección se distinguen en el README. |
 
+## **3.49 Decisión de entrega parcial y ADR-0007**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable y fecha** | Lucas Ottonello · 02/11/2026 |
+| **¿Se usó IA?** | Sí, Codex. |
+| **Finalidad** | Registrar en el repositorio el acuerdo funcional cerrado y crear el ADR exigido para el cambio de RF 31 a 36. |
+| **Cómo se trabajó** | Se analizaron los borradores aportados por Cristian y el código disponible. Lucas confirmó En operación como nombre del resumen y pidió documentar la decisión cerrada. Codex verificó las secciones 8.2 de la letra y 2.3 del cambio, inspeccionó el estado actual y redactó ambos documentos y sus enlaces. |
+| **Decisión registrada** | Estados operativos en bultos; resumen persistido y derivado del envío con Creado, En operación, Entregado parcialmente y Entregado; Terminado y desglose; visita por envío, atomicidad, evidencia, reglas y recargo de revisita según lo acordado en este chat. El criterio técnico de inicio de ejecución y demás contratos detallados quedan explícitamente pendientes. |
+| **Alternativas y límites** | Se registraron alternativas descartadas y consecuencias. Se distingue decisión aceptada de implementación pendiente: las pruebas de CU-42 no se presentan como validación de parcial. La retrospectiva exigida por el docente queda preparada para completar con commits y evidencia después de implementar. No se atribuyen aprobaciones individuales adicionales a los compañeros. |
+| **Verificación** | Revisión documental, enlaces relativos y consistencia de nombres, referencias y estados de avance. Esta tarea modifica documentación, no código; no se ejecutaron pruebas nuevas de negocio. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -766,3 +778,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.27 | 26/10/2026 | Entrada del evento de la recepción en depósito (T2) para CU-64 y CU-60. | Ezequiel Marcenal |
 | 0.28 | 27/10/2026 | Entrada de CU-31, confirmar la devolución al comercio. | Ezequiel Marcenal |
 | 0.29 | 02/11/2026 | CU-42: implementación asistida, revisión de arquitectura y ADR, decisiones y límites, resultados de pruebas y ajuste de Editar solicitado por Lucas. | Lucas Ottonello |
+| 0.30 | 02/11/2026 | Decisión cerrada de entrega parcial, ADR-0007 y referencias a la evolución de los documentos existentes. | Lucas Ottonello |

@@ -1,5 +1,7 @@
 # **ADR-0004 · Resolución de conflictos de sincronización**
 
+> **Evolución por entrega parcial · 02/11/2026:** el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) y la [decisión cerrada](decisiones-entrega-parcial.md) extienden esta política con resultados por bulto y atomicidad por visita de un envío. Se conservan OperacionId, transacción y evidencia de rechazos. Las secciones originales siguen describiendo el contrato anterior; su adaptación y el tratamiento de operaciones antiguas deben completarse antes de activar el contrato nuevo.
+
 | Estado | Aceptado — aprobado por el equipo el 15/10/2026 |
 | :---- | :---- |
 | **Fecha** | 12 de octubre de 2026 |

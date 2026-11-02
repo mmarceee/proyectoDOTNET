@@ -1,5 +1,7 @@
 # Revisión del cambio de requerimientos y sus aclaraciones
 
+> **Decisión posterior · 02/11/2026:** este informe conserva el análisis y las pruebas históricas. Las propuestas de resumen del envío quedaron reemplazadas por la [decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). No confundir las verificaciones previas con una implementación ya terminada de RF 31 a 36.
+
 | Dato | Valor |
 | --- | --- |
 | Equipo | Equipo 1: Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
