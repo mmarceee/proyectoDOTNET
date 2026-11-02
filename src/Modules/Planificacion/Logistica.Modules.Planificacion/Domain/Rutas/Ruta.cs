@@ -63,6 +63,27 @@ internal sealed class Ruta : Entity, IOperadorOwned
         Actualizar();
     }
 
+    // CU-42: sólo cambia la secuencia de las visitas existentes; conserva sus miembros e identidad.
+    public void OrdenarParadas(IReadOnlyList<Guid> orden)
+    {
+        ExigirPlanificada();
+        OrdenadorParadas.ExigirPermutacion(_paradas.Select(p => p.Id).ToArray(), orden);
+        if (_paradas.OrderBy(p => p.Orden).Select(p => p.Id).SequenceEqual(orden)) return;
+        var porId = _paradas.ToDictionary(p => p.Id);
+        for (var i = 0; i < orden.Count; i++) porId[orden[i]].CambiarOrden(i + 1);
+        Actualizar();
+    }
+
+    public void MoverParada(Guid paradaId, int nuevoOrden)
+    {
+        ExigirPlanificada();
+        var orden = _paradas.OrderBy(p => p.Orden).Select(p => p.Id).ToList();
+        if (nuevoOrden < 1 || nuevoOrden > orden.Count || !orden.Remove(paradaId))
+            throw new DomainException("La parada y su nueva posición deben pertenecer a la ruta.");
+        orden.Insert(nuevoOrden - 1, paradaId);
+        OrdenarParadas(orden);
+    }
+
     public void Despachar(DateTimeOffset ahora)
     {
         ExigirPlanificada();

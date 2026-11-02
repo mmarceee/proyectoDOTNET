@@ -1,0 +1,51 @@
+@page "/backoffice/rutas/{id:guid}/orden"
+@model Logistica.Modules.Planificacion.Presentation.Features.OrdenarParadas.IndexModel
+@{ ViewData["Title"] = "Ordenar paradas"; }
+<div class="backoffice-page-header mb-4">
+    <div><h1>Ordenar paradas</h1><p class="text-muted mb-0">Proponé un orden por franja, zona y código postal, o ajustalo manualmente antes de confirmar.</p></div>
+    <a href="/backoffice/rutas/@Model.Id" class="btn btn-outline-secondary">Volver a la ruta</a>
+</div>
+<div asp-validation-summary="All" class="text-danger mb-3" role="alert"></div>
+@if (Model.Propuesta is { } propuesta)
+{
+    <form method="post" class="card">
+        <div class="card-body p-4">
+            <input type="hidden" asp-for="RevisionEsperada" />
+            <p>Revisión @propuesta.Revision. La propuesta y los movimientos se guardan únicamente al confirmar.</p>
+            <button asp-page-handler="Proponer" class="btn btn-outline-primary mb-3">Proponer orden automático</button>
+            @if (propuesta.Advertencias.Count > 0)
+            {
+                <div class="alert alert-warning" role="alert">
+                    <strong>El orden puede incumplir franjas horarias.</strong>
+                    <ul class="mb-0">@foreach (var aviso in propuesta.Advertencias) { <li>@aviso.Mensaje</li> }</ul>
+                </div>
+            }
+            <div class="table-responsive"><table class="table align-middle">
+                <thead><tr><th>Orden</th><th>Parada</th><th>Franja</th><th>Zona</th><th>Código postal</th><th>Ajustar</th></tr></thead>
+                <tbody>
+                @for (var i = 0; i < propuesta.Paradas.Count; i++)
+                {
+                    var parada = propuesta.Paradas[i];
+                    <tr data-parada-orden="@parada.Id">
+                        <td>@parada.Orden<input type="hidden" name="ParadaIds" value="@parada.Id" /></td>
+                        <td>@parada.Direccion</td>
+                        <td>@(parada.Desde is { } desde && parada.Hasta is { } hasta ? $"{desde:HH:mm}–{hasta:HH:mm}" : "Sin franja")</td>
+                        <td>@(string.IsNullOrWhiteSpace(parada.Zona) ? "Sin zona" : parada.Zona)</td><td>@parada.CodigoPostal</td>
+                        <td class="text-nowrap">
+                            <button asp-page-handler="Mover" name="Movimiento" value="@($"{parada.Id}:{i}")" disabled="@(i == 0)" class="btn btn-outline-secondary btn-sm" aria-label="Subir parada @parada.Orden">Subir</button>
+                            <button asp-page-handler="Mover" name="Movimiento" value="@($"{parada.Id}:{i + 2}")" disabled="@(i == propuesta.Paradas.Count - 1)" class="btn btn-outline-secondary btn-sm" aria-label="Bajar parada @parada.Orden">Bajar</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+            <p class="text-muted">Las paradas sin franja se proponen al final. La revisión horaria no calcula traslados ni duración de visitas y no garantiza llegar a tiempo.</p>
+            @if (propuesta.Advertencias.Count > 0)
+            {
+                <div class="form-check mb-3"><input asp-for="ConfirmarAdvertencias" class="form-check-input" /><label asp-for="ConfirmarAdvertencias" class="form-check-label">Revisé las advertencias y confirmo guardar este orden igualmente.</label></div>
+            }
+            <button asp-page-handler="Guardar" class="btn btn-primary">Confirmar y guardar orden</button>
+            <a href="/backoffice/rutas/@Model.Id" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+    </form>
+}
