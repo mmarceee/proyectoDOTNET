@@ -105,6 +105,9 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("EnvioId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("EsPrueba")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Estado")
                         .IsRequired()
                         .HasMaxLength(30)

@@ -17,7 +17,8 @@ internal interface IEnvioRepository
         CancellationToken ct);
 
     // CU-11: el envío del comercio con esa referencia, sólo para leer.
-    Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, CancellationToken ct);
+    Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, bool esPrueba, CancellationToken ct);
+    Task<Envio?> ObtenerPruebaPorNumeroAsync(string numero, CancellationToken ct);
 
     // CU-31: el envío con sus bultos, dentro de la transacción en curso.
     Task<Envio?> ObtenerConBultosAsync(Guid id, CancellationToken ct);

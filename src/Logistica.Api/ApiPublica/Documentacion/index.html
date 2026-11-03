@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API pública de Logística · v1</title>
+  <link rel="stylesheet" href="/api/docs/docs.css">
+  <script src="/api/docs/docs.js" defer></script>
+</head>
+<body>
+  <header class="cabecera">
+    <div>
+      <p class="marca">Logística</p>
+      <h1 id="titulo">API pública</h1>
+    </div>
+    <div class="enlaces">
+      <span id="version" class="etiqueta">v1</span>
+      <a href="/api/openapi/v1.json">Descargar OpenAPI</a>
+    </div>
+  </header>
+  <main class="distribucion">
+    <aside>
+      <nav aria-label="Documentación de la API">
+        <a href="#autenticacion">Autenticación y límites</a>
+        <p class="grupo">Operaciones</p>
+        <div id="navegacion"></div>
+        <a href="#modelos">Modelos de datos</a>
+      </nav>
+    </aside>
+    <div class="contenido">
+      <section id="autenticacion">
+        <h2>Autenticación y límites</h2>
+        <p id="descripcion" class="descripcion">Cargando la especificación OpenAPI…</p>
+        <div class="consola">
+          <p><strong>Consola de prueba</strong></p>
+          <p>Generá una clave de prueba en <a href="/portal/integraciones/claves-api">Claves de API</a>.
+            Los envíos de prueba quedan fuera de la operación real.</p>
+          <label for="clave">Clave de API de prueba</label>
+          <div class="fila">
+            <input id="clave" type="password" maxlength="64" placeholder="log_prueba_…"
+                   autocomplete="off" spellcheck="false" autocapitalize="off">
+            <button type="button" id="borrar" class="secundario">Borrar clave</button>
+          </div>
+          <p class="ayuda">La clave se conserva en esta página hasta que la borres o cierres la página.</p>
+        </div>
+      </section>
+      <div id="operaciones"></div>
+      <section id="modelos">
+        <h2>Modelos de datos</h2>
+        <div id="esquemas"></div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,296 @@
+@page "/integraciones/claves-api"
+@using System.Net
+@using System.Text.Json
+@using Logistica.Http.Contracts.ClavesApi
+@inject HttpClient Http
+@inject NavigationManager Navegacion
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Claves de API</PageTitle>
+
+<h1>Claves de API</h1>
+<p class="text-muted">Administrá las claves que usa tu sistema para conectarse con el operador seleccionado.</p>
+<p><a href="/api/docs">Abrir la documentación de la API</a></p>
+
+@if (_error is not null)
+{
+    <p class="alert alert-danger" role="alert">@_error</p>
+}
+@if (_sinOperador)
+{
+    <p><a href="/cuenta/operador?ReturnUrl=%2Fportal%2Fintegraciones%2Fclaves-api">Elegir operador</a></p>
+}
+@if (_mensaje is not null)
+{
+    <p class="alert alert-success" role="status">@_mensaje</p>
+}
+
+@if (_creada is not null)
+{
+    <section class="card border-warning mb-4" aria-labelledby="titulo-clave">
+        <div class="card-body">
+            <h2 id="titulo-clave" class="h5">Guardá tu clave de @NombreTipo(_creada.Clave.Tipo)</h2>
+            <p>Copiala ahora. Si la perdés, podés generar otra y revocar esta.</p>
+            <label for="clave-api-secreto" class="form-label">Clave de API</label>
+            <input id="clave-api-secreto" class="form-control font-monospace mb-3"
+                   readonly autocomplete="off" spellcheck="false" value="@_creada.Secreto" />
+            <button type="button" class="btn btn-primary" @onclick="CopiarAsync">Copiar clave</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="CerrarSecreto">Ya la guardé</button>
+        </div>
+    </section>
+}
+
+@if (_porRevocar is not null)
+{
+    <section class="alert alert-warning" aria-labelledby="titulo-revocacion">
+        <h2 id="titulo-revocacion" class="h5">Revocar «@_porRevocar.Nombre»</h2>
+        <p>La clave dejará de ser válida. Si tu sistema todavía la usa, actualizalo antes de revocarla.</p>
+        <button type="button" class="btn btn-danger" disabled="@_ocupado" @onclick="RevocarAsync">Confirmar revocación</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@_ocupado" @onclick="CancelarRevocacion">Cancelar</button>
+    </section>
+}
+
+@if (_claves is not null)
+{
+    <form class="card card-body mb-4" @onsubmit="CrearAsync" @onsubmit:preventDefault>
+        <h2 class="h5">Nueva clave</h2>
+        <fieldset disabled="@Bloqueado">
+            <div class="row g-3 align-items-end">
+                <div class="col-md">
+                    <label for="clave-api-nombre" class="form-label">Nombre</label>
+                    <input id="clave-api-nombre" class="form-control" required maxlength="100"
+                           @bind="_nombre" placeholder="Ej. Tienda en línea" />
+                </div>
+                <div class="col-md-auto">
+                    <label for="clave-api-tipo" class="form-label">Ambiente</label>
+                    <select id="clave-api-tipo" class="form-select" @bind="_tipo">
+                        <option value="Prueba">Prueba</option>
+                        <option value="Produccion">Producción</option>
+                    </select>
+                </div>
+                <div class="col-md-auto">
+                    <button type="submit" class="btn btn-primary">Generar clave</button>
+                </div>
+            </div>
+        </fieldset>
+    </form>
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h2 class="h5 mb-0">Claves del operador seleccionado</h2>
+        <button type="button" class="btn btn-outline-secondary" disabled="@Bloqueado" @onclick="CargarAsync">Actualizar</button>
+    </div>
+
+    @if (_claves.Count == 0)
+    {
+        <p>Todavía no generaste claves para este operador.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr><th>Nombre</th><th>Ambiente</th><th>Prefijo</th><th>Creación</th><th>Último uso</th><th>Estado</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var clave in _claves)
+                    {
+                        <tr @key="clave.Id">
+                            <th scope="row">@clave.Nombre</th>
+                            <td>@NombreTipo(clave.Tipo)</td>
+                            <td><code>@clave.Prefijo…</code></td>
+                            <td>@Fecha(clave.CreadaEn)</td>
+                            <td>@(clave.UltimoUsoEn is { } uso ? Fecha(uso) : "Sin uso registrado")</td>
+                            <td>@(clave.RevocadaEn is null ? "Activa" : "Revocada")</td>
+                            <td>
+                                @if (clave.RevocadaEn is null)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-danger" disabled="@Bloqueado"
+                                            @onclick="() => PedirRevocacion(clave)">Revocar</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+else if (_ocupado)
+{
+    <p role="status">Cargando claves…</p>
+}
+else if (!_sinOperador)
+{
+    <button type="button" class="btn btn-outline-secondary" @onclick="CargarAsync">Volver a intentar</button>
+}
+
+@code {
+    private const string Ruta = "/api/portal/claves-api";
+    private readonly CancellationTokenSource _vida = new();
+    private IReadOnlyList<ClaveApiResponse>? _claves;
+    private ClaveApiCreadaResponse? _creada;
+    private ClaveApiResponse? _porRevocar;
+    private string _nombre = "";
+    private string _tipo = "Prueba";
+    private string? _error;
+    private string? _mensaje;
+    private bool _ocupado;
+    private bool _sinOperador;
+    private bool Bloqueado => _ocupado || _creada is not null || _porRevocar is not null;
+
+    protected override Task OnInitializedAsync() => CargarAsync();
+
+    private Task CargarAsync() => EjecutarAsync(LeerListaAsync, "No se pudo consultar la lista de claves.");
+
+    private async Task LeerListaAsync(CancellationToken ct)
+    {
+        using var respuesta = await Http.GetAsync(Ruta, ct);
+        if (!await VerificarAsync(respuesta, ct)) return;
+        _claves = await respuesta.Content.ReadFromJsonAsync<List<ClaveApiResponse>>(ct) ?? throw new JsonException();
+        _sinOperador = false;
+    }
+
+    private Task CrearAsync()
+    {
+        if (Bloqueado) return Task.CompletedTask;
+
+        return EjecutarAsync(async ct =>
+        {
+            using var peticion = new HttpRequestMessage(HttpMethod.Post, Ruta)
+            {
+                Content = JsonContent.Create(new CrearClaveApiRequest(_nombre, _tipo)),
+            };
+            using var respuesta = await EnviarAsync(peticion, ct);
+            if (respuesta is null || !await VerificarAsync(respuesta, ct)) return;
+            _creada = await respuesta.Content.ReadFromJsonAsync<ClaveApiCreadaResponse>(ct) ?? throw new JsonException();
+            _claves = [_creada.Clave, .. _claves ?? []];
+            _nombre = "";
+        }, "No se pudo confirmar el alta. Actualizá la lista antes de volver a generar una clave.");
+    }
+
+    private Task RevocarAsync()
+    {
+        if (_porRevocar is not { } clave) return Task.CompletedTask;
+
+        return EjecutarAsync(async ct =>
+        {
+            using var peticion = new HttpRequestMessage(HttpMethod.Post, $"{Ruta}/{clave.Id}/revocacion");
+            using var respuesta = await EnviarAsync(peticion, ct);
+            if (respuesta is null || !await VerificarAsync(respuesta, ct)) return;
+            _porRevocar = null;
+            _mensaje = "La clave quedó revocada.";
+            await LeerListaAsync(ct);
+        }, "Actualizá la lista para comprobar el estado de la clave.");
+    }
+
+    private async Task<HttpResponseMessage?> EnviarAsync(HttpRequestMessage peticion, CancellationToken ct)
+    {
+        using var respuestaToken = await Http.GetAsync($"{Ruta}/antifalsificacion", ct);
+        if (!await VerificarAsync(respuestaToken, ct)) return null;
+        var token = await respuestaToken.Content.ReadFromJsonAsync<TokenClaveApiResponse>(ct) ?? throw new JsonException();
+        peticion.Headers.Add("RequestVerificationToken", token.Token);
+        return await Http.SendAsync(peticion, ct);
+    }
+
+    private async Task EjecutarAsync(Func<CancellationToken, Task> accion, string error)
+    {
+        if (_ocupado) return;
+        _ocupado = true;
+        _error = null;
+        _mensaje = null;
+        using var limite = CancellationTokenSource.CreateLinkedTokenSource(_vida.Token);
+        limite.CancelAfter(TimeSpan.FromSeconds(20));
+        try
+        {
+            await accion(limite.Token);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or OperationCanceledException)
+        {
+            if (!_vida.IsCancellationRequested) _error = error;
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+
+    private async Task<bool> VerificarAsync(HttpResponseMessage respuesta, CancellationToken ct)
+    {
+        if (respuesta.IsSuccessStatusCode) return true;
+
+        if (respuesta.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            Navegacion.NavigateTo("/portal/ingresar", forceLoad: true);
+            return false;
+        }
+
+        if (respuesta.StatusCode == HttpStatusCode.Forbidden)
+        {
+            _sinOperador = true;
+            _claves = null;
+            _porRevocar = null;
+            _creada = null;
+            _error = "Verificá el operador seleccionado.";
+            return false;
+        }
+
+        _error = respuesta.StatusCode switch
+        {
+            HttpStatusCode.NotFound => "No se encontró la clave. Actualizá la lista.",
+            HttpStatusCode.Conflict => "La clave cambió mientras trabajabas. Actualizá la lista.",
+            _ => "No se pudo completar la operación.",
+        };
+
+        if (respuesta.StatusCode == HttpStatusCode.BadRequest)
+        {
+            try
+            {
+                var problema = await respuesta.Content.ReadFromJsonAsync<Problema>(ct);
+                _error = problema?.Detail ?? problema?.Title ?? _error;
+            }
+            catch (JsonException) { }
+        }
+
+        return false;
+    }
+
+    private async Task CopiarAsync()
+    {
+        if (_creada is not { } creada) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _vida.Token, creada.Secreto);
+            _mensaje = "Clave copiada.";
+        }
+        catch (JSException)
+        {
+            _error = "Seleccioná la clave y copiala manualmente.";
+        }
+    }
+
+    private void PedirRevocacion(ClaveApiResponse clave)
+    {
+        _porRevocar = clave;
+        _mensaje = null;
+        _error = null;
+    }
+
+    private void CancelarRevocacion() => _porRevocar = null;
+    private void CerrarSecreto()
+    {
+        _creada = null;
+        _mensaje = null;
+    }
+
+    private static string Fecha(DateTimeOffset fecha) => fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+    private static string NombreTipo(string tipo) => tipo == "Prueba" ? "prueba" : "producción";
+    private sealed record Problema(string? Title, string? Detail);
+
+    public void Dispose()
+    {
+        _creada = null;
+        _vida.Cancel();
+        _vida.Dispose();
+    }
+}

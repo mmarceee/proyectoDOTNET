@@ -1,5 +1,6 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Administracion.Application;
+using Logistica.Modules.Administracion.Application.Features.GestionarClavesApi;
 using Logistica.Modules.Administracion.Application.Features.ConsultarRecursosPlanificacion;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
@@ -33,6 +34,11 @@ public static class AdministracionModule
         services.AddScoped<IContextoHojaRuta, ContextoHojaRutaReader>();
         services.AddScoped<UsuariosIniciales>();
         services.AddScoped<VinculoRepartidor>();
+
+        services.AddScoped<IClavesApiRepository, ClavesApiRepository>();
+        services.AddScoped<IClavesApiAutenticacion, AutenticarClavesApiHandler>();
+        services.AddScoped<GestionarClavesApiHandler>();
+        services.AddAntiforgery(options => options.HeaderName = "RequestVerificationToken");
 
         // CU-07: identidad visual.
         services.AddScoped<Domain.Operadores.IOperadorRepository, OperadorRepository>();
@@ -157,6 +163,7 @@ public static class AdministracionModule
         // CU-07: la marca del operador de la sesión, para los layouts.
         Presentation.Features.GestionarIdentidadVisual.MarcaDelOperadorEndpoint.Map(endpoints);
         Presentation.Features.IniciarSesion.SesionPortalEndpoint.Map(endpoints);
+        Presentation.Features.GestionarClavesApi.ClavesApiEndpoints.Map(endpoints);
         return endpoints;
     }
 

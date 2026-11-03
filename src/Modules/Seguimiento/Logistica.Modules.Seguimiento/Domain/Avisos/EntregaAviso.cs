@@ -19,12 +19,13 @@ internal sealed class EntregaAviso : Entity, IOperadorOwned, IComercioOwned
     public TipoEventoAviso Tipo { get; private set; }
     public DateTimeOffset FechaEvento { get; private set; }
     public EstadoEntregaAviso Estado { get; private set; }
+    public bool EsPrueba { get; private set; }
     public IReadOnlyCollection<IntentoAviso> Intentos => _intentos.AsReadOnly();
 
     private EntregaAviso() { }
 
     public static EntregaAviso Crear(SuscripcionAviso suscripcion, Guid eventoId, EnvioSeguido envio,
-        string estadoEnvio, TipoEventoAviso tipo, DateTimeOffset fechaEvento)
+        string estadoEnvio, TipoEventoAviso tipo, DateTimeOffset fechaEvento, bool esPrueba = false)
     {
         if (eventoId == Guid.Empty || string.IsNullOrWhiteSpace(estadoEnvio))
             throw new DomainException("La entrega del aviso necesita el evento y el estado del envío.");
@@ -44,7 +45,8 @@ internal sealed class EntregaAviso : Entity, IOperadorOwned, IComercioOwned
             EstadoEnvio = estadoEnvio,
             Tipo = tipo,
             FechaEvento = fechaEvento,
-            Estado = EstadoEntregaAviso.Pendiente
+            Estado = EstadoEntregaAviso.Pendiente,
+            EsPrueba = esPrueba,
         };
     }
 

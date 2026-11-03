@@ -8,6 +8,7 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Configurations;
 internal sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
 {
     public const string IndiceReferencia = "UX_Envios_ReferenciaComercio";
+    public const string FiltroPrueba = "Prueba";
 
     public void Configure(EntityTypeBuilder<Envio> builder)
     {
@@ -16,12 +17,14 @@ internal sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         // El número es único dentro de cada operador (CU-10).
         builder.HasIndex(e => new { e.OperadorId, e.Numero }).IsUnique();
 
-        // CU-11 (RF 7): la referencia del comercio es única por operador y comercio, es decir, por relación comercial.
+        // CU-11 y CU-81: la referencia es única por relación comercial y ambiente.
         // Es la garantía contra dos importaciones simultáneas (A4). Los envíos sin referencia (null) no chocan entre sí,
         // porque PostgreSQL considera distintos los NULL de un índice único.
         builder.Property(e => e.ReferenciaComercio).HasMaxLength(Envio.LargoMaximoReferencia);
-        builder.HasIndex(e => new { e.OperadorId, e.ComercioId, e.ReferenciaComercio }).IsUnique()
+        builder.HasIndex(e => new { e.OperadorId, e.ComercioId, e.EsPrueba, e.ReferenciaComercio }).IsUnique()
             .HasDatabaseName(IndiceReferencia);
+        builder.HasQueryFilter(FiltroPrueba, e => !e.EsPrueba);
+        builder.Property(e => e.EsPrueba).HasDefaultValue(false);
 
         builder.Property(e => e.Estado).HasConversion<string>();
         builder.Property(e => e.Modalidad).HasConversion<string>().HasDefaultValue(Modalidad.Estandar);
