@@ -1,6 +1,8 @@
 ESTADOS: 
 
 > **Actualización de diseño · 02/11/2026:** consultar la [decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). Esta tabla T1 a T19 documenta el flujo anterior. Debe adaptarse a transiciones por bulto y resumen derivado; conservarla aquí no autoriza a forzar NoEntregado sobre un envío que ya tiene entregas parciales.
+>
+> **Actualización · 03/11/2026:** la adaptación está en la sección [Entrega parcial: transiciones por bulto y resumen del envío](#entrega-parcial-transiciones-por-bulto-y-resumen-del-envío), al final. Los estados y las guardas de T1 a T19 siguen valiendo, pero ahora se aplican a cada bulto.
 
 | ESTADO | TIPO | SIGNIFICADO | DONDE ESTA EL PAQUETE |
 | :---- | :---- | :---- | :---- |
@@ -47,3 +49,78 @@ TABLA DE TRANSICIONES:
 * `EnTransito → Reprogramado`: el envío ya salió.  
 * `AsignadoARuta → Reprogramado` con la ruta despachada
 
+
+## Entrega parcial: transiciones por bulto y resumen del envío
+
+| Dato | Valor |
+| :---- | :---- |
+| Versión y fecha | 1.0 · 03/11/2026 |
+| Responsable | Cristian Reyes |
+| Base | [Decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) (secciones 2 a 5, pendiente 1 de la sección 6) y [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md), sección 2.1 |
+| Estado | Propuesta para revisión del equipo. Implementación pendiente |
+
+### 1. Idea central
+
+**Las transiciones T1 a T19 se conservan, con los mismos estados y las mismas guardas, pero cada una se aplica a un bulto.** El envío ya no transiciona: al final de cada operación recalcula su resumen a partir de los estados de sus bultos (RF 31).
+
+- El estado operativo vive en el bulto y usa los once estados de la tabla anterior. No hay un estado "Pendiente".
+- Una operación puede afectar a varios bultos de un mismo envío (por ejemplo, una visita). Se valida cada bulto contra la tabla, y si uno falla se rechaza la operación completa sobre ese envío (atomicidad por visita, sección 4 de la decisión).
+- El resumen se recalcula **una sola vez**, al final de la operación, en la misma transacción que los bultos, la evidencia y el Outbox.
+- Ninguna operación decide mirando el resumen del envío: recepción, asignación, carga, entrega y devolución validan el estado del bulto.
+
+### 2. Transiciones por bulto
+
+| # | Origen → Destino del bulto | Bultos a los que se aplica | Diferencia con el flujo anterior |
+| :---- | :---- | :---- | :---- |
+| T1 | *(ninguno)* → Admitido | Todos, al crear el envío | Igual |
+| T2 | Admitido → EnDeposito | Cada bulto escaneado en la recepción | Antes el envío entero pasaba a EnDeposito con el primer escaneo, y el escaneo del segundo bulto se rechazaba |
+| T3 | EnDeposito → AsignadoARuta | Los bultos del envío disponibles para planificar | El bulto no puede estar en otra ruta activa (pendiente 3 de la decisión, con Planificación) |
+| T4 | AsignadoARuta → EnDeposito | Los bultos de esa ruta | Igual, por bulto. También se aplica a los bultos que no se cargaron al confirmar la carga (T5) |
+| T5 | AsignadoARuta → EnTransito | Los bultos escaneados en la carga | Si el operador **no admite** entrega parcial y falta un bulto del envío, no se carga ninguno de ese envío; los demás envíos de la ruta no se afectan (RF 33, sección 5 de la decisión) |
+| T6 | EnTransito → Entregado | Los bultos entregados en la visita | Firma obligatoria y las pruebas de la versión de reglas del envío, asociadas a esos bultos |
+| T7 | EnTransito → NoEntregado | Los bultos no entregados en la visita | Motivo del catálogo y evidencia. El contador de intentos es **por bulto** y sólo aumenta con un intento real |
+| T8 | EnTransito → EnDeposito | Los bultos que vuelven sin haberse intentado | Igual, por bulto. No consume intentos |
+| T9 | NoEntregado → Reprogramado | Los bultos de T7 | Se aplica en la misma operación que T7 (NoEntregado sigue siendo transitorio). Guarda: intentos del bulto < máximo, motivo reprogramable y la política de pendientes del operador lo permite (RF 33) |
+| T10 | NoEntregado → EnDevolucion | Los bultos de T7 | Misma operación que T7. Guarda: intentos agotados, motivo no reprogramable o la política del operador indica devolución |
+| T12 | EnDeposito → EnDevolucion | Los bultos en depósito del envío | Igual, por bulto |
+| T13 | Reprogramado → AsignadoARuta | Los bultos reprogramados | Mismas validaciones que T3 |
+| T14 | Reprogramado → EnDevolucion | Los bultos reprogramados | Igual, por bulto |
+| T15 | EnDevolucion → Devuelto | Los bultos que recibe el comercio | Igual, por bulto |
+| T16 | EnDeposito, EnTransito o EnDevolucion → Extraviado | El bulto declarado perdido | El alcance y la autorización del extravío individual quedan por confirmar (pendiente 4 de la decisión) |
+| T17 | Admitido → Cancelado | **Todos los bultos del envío juntos** | La cancelación sigue siendo del envío: exige que ningún bulto se haya recibido |
+| T18 | EnDeposito → Reprogramado | Los bultos del envío en EnDeposito | El destinatario reprograma el envío, no un bulto |
+| T19 | AsignadoARuta → Reprogramado | Los bultos del envío en una ruta Planificada | Igual que T18 |
+
+**Cualquier par origen → destino de bulto que no esté en esta tabla se rechaza** con `TransicionInvalidaException`, igual que antes. T11 sigue eliminada.
+
+**Estados terminales del bulto (declarados, no deducidos por el nombre):** Entregado, Devuelto, Extraviado y Cancelado.
+
+### 3. Resumen del envío
+
+El envío guarda su resumen (para consultar y filtrar sin reconstruirlo) y nadie lo asigna directamente. Se calcula en este orden; gana la primera regla que se cumple:
+
+| Orden | Condición sobre los bultos | Resumen |
+| :---- | :---- | :---- |
+| 1 | Todos están en Entregado | **Entregado** |
+| 2 | Al menos uno está en Entregado | **Entregado parcialmente** |
+| 3 | Al menos uno se recibió alguna vez (está en un estado distinto de Admitido y Cancelado), o el resumen ya era En operación | **En operación** |
+| 4 | Ninguna de las anteriores | **Creado** |
+
+- **Terminado:** verdadero cuando todos los bultos están en un estado terminal.
+- **Contador:** bultos entregados / total de bultos originales, incluidos los devueltos, extraviados y cancelados.
+- **Nunca vuelve a Creado:** ninguna transición de bulto vuelve a Admitido, y Cancelado no dice si el bulto se había recibido; por eso la regla 3 conserva En operación.
+- **Presentación de un cierre sin entrega:** si Terminado es verdadero y no hay entregas, se muestra «Finalizado sin entrega» con el desglose. No es un quinto valor del resumen.
+- **Hechos que no cambian el resumen:** pasar de 1/3 a 2/3 entregados mantiene Entregado parcialmente; una revisita fallida después de una entrega parcial también. Igual deben invalidar el seguimiento y actualizar el tablero (pendiente 7 de la decisión).
+
+### 4. Pares inalcanzables y consulta abierta
+
+- La sección 3 de la decisión incluye el ejemplo «Todos cancelados después de recibir alguno». Con T17 como está, no puede ocurrir: un bulto recibido ya no se cancela. **Se propone mantener T17 y tratar ese ejemplo como inalcanzable**; queda a confirmar por el equipo.
+- NoEntregado no se observa al terminar una operación: T7 siempre va seguida de T9 o T10 en la misma transacción.
+
+### 5. Ejemplos de aceptación
+
+Los diez ejemplos de la sección 3 de la decisión son las pruebas de aceptación del resumen: cada uno se convierte en una prueba unitaria del dominio, salvo el que se declare inalcanzable.
+
+| Versión | Fecha | Cambio | Responsable |
+| :---- | :---- | :---- | :---- |
+| 1.0 | 03/11/2026 | Transiciones por bulto, cálculo del resumen, terminales declarados y consulta sobre la cancelación después de recibir | Cristian Reyes |

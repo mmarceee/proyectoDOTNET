@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Logistica.Modules.Envios.Application.Features.ConsultarEnvios;
+using Logistica.Modules.Envios.Application.Features.ConsultarEnviosApi;
+using Logistica.Modules.Envios.Presentation.Features.ConsultarEnviosApi;
 using Logistica.Modules.Envios.Application.Features.ConsultarDetalleEnvio;
 using Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio;
 using Logistica.Modules.Envios.Application.Features.CancelarEnvio;
@@ -35,6 +37,8 @@ public static class EnviosModule
 
         services.AddScoped<IEnviosListadoReader, EnviosListadoReader>();
         services.AddScoped<ConsultarEnviosHandler>();
+        services.AddScoped<IEnviosApiReader, EnviosApiReader>();
+        services.AddScoped<ConsultarEnviosApiHandler>();
         services.AddScoped<IEnvioDetalleReader, EnvioDetalleReader>();
         services.AddScoped<ConsultarDetalleEnvioHandler>();
         services.AddScoped<IArchivoEvidenciaReader, ArchivoEvidenciaReader>();
@@ -70,5 +74,14 @@ public static class EnviosModule
         EvidenciaEndpoint.Map(endpoints);
 
         return endpoints;
+    }
+
+    public static void MapEnviosApiPublica(this RouteGroupBuilder version, bool esConsola = false)
+    {
+        var sufijo = esConsola ? "ConsolaV1" : "V1";
+        CrearEnvioApiEndpoint.Map(version, sufijo);
+        ConsultarEnviosApiEndpoints.Map(version, sufijo);
+        if (!esConsola)
+            CrearEnvioApiEndpoint.MapSeguimientoPrueba(version);
     }
 }

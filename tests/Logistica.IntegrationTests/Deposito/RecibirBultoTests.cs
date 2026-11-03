@@ -24,18 +24,27 @@ public class RecibirBultoTests(PostgresApiFactory factory) : IClassFixture<Postg
         Assert.False(primero.EnvioEnDeposito);
         Assert.Equal("Admitido", await EstadoAsync(envio.Id));
         Assert.Equal(0L, await ContarAsync(EventoRecibido, envio.Id));
+        // RF 31: el bulto escaneado ya está en depósito y, con él, el envío está En operación.
+        Assert.Equal("EnOperacion", await EscalarAsync<string>(ResumenDelEnvio, envio.Id));
+        Assert.Equal(1L, await ContarAsync(BultosEnDeposito, envio.Id));
 
         var segundo = await RecibirAsync(client, new RecibirBultoRequest($"{envio.Numero}-2"));
 
         Assert.True(segundo.EnvioEnDeposito);
         Assert.All(segundo.Bultos, b => Assert.True(b.Recibido));
         Assert.Equal("EnDeposito", await EstadoAsync(envio.Id));
+        Assert.Equal(2L, await ContarAsync(BultosEnDeposito, envio.Id));
         Assert.Equal(2L, await ContarAsync("""SELECT count(*) FROM deposito."Recepciones" WHERE "EnvioId" = @id""", envio.Id));
         Assert.Equal(1L, await ContarAsync(
             """SELECT count(*) FROM envios."EventosEnvio" WHERE "EnvioId" = @id AND "EstadoNuevo" = 'EnDeposito'""", envio.Id));
         // T2 llega a Seguimiento por el outbox, en la misma transacción que la recepción (CU-64 y CU-60).
         Assert.Equal(1L, await ContarAsync(EventoRecibido, envio.Id));
     }
+
+    private const string ResumenDelEnvio = """SELECT "Resumen" FROM envios."Envios" WHERE "Id" = @id""";
+
+    private const string BultosEnDeposito =
+        """SELECT count(*) FROM envios."Bultos" WHERE "EnvioId" = @id AND "Estado" = 'EnDeposito'""";
 
     private const string EventoRecibido = """
         SELECT count(*) FROM envios.outbox_messages

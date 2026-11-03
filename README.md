@@ -98,6 +98,8 @@ costo y secretos en [`infra/terraform`](infra/terraform/README.md).
 | Ruta | Contenido |
 | --- | --- |
 | `/api/...` | Minimal APIs de los módulos |
+| `/api/docs` | Documentación de la API pública y consola para claves de prueba |
+| `/api/openapi/v1.json` | Especificación OpenAPI de la API pública v1 |
 | `/backoffice` | Backoffice (Razor Pages) |
 | `/portal/` | Portal del comercio (Blazor WebAssembly) |
 | `/seguimiento/{token}` | Seguimiento público (Blazor WebAssembly) |

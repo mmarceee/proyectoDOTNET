@@ -1,12 +1,14 @@
 using Logistica.Api.Errores;
 using Logistica.Api.Tenancy;
 using Logistica.Api.Seguridad;
+using Logistica.Api.ApiPublica;
 using Logistica.BuildingBlocks.Infrastructure.Caching;
 using Logistica.BuildingBlocks.Infrastructure.Configuracion;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.BuildingBlocks.Infrastructure.Messaging.Fallidos;
 using Logistica.Modules.Administracion;
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Deposito;
 using Logistica.Modules.Ejecucion;
 using Logistica.Modules.Envios;
@@ -102,6 +104,14 @@ builder.Services.AddScoped<ICurrentTenant>(sp =>
     return trabajo.OperadorId is not null ? trabajo : sp.GetRequiredService<TenantDeSesion>();
 });
 builder.Services.AddAuthorization();
+builder.Services.AddAuthentication()
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, AutenticarClaveApi>(
+        AutenticarClaveApi.Esquema, _ => { });
+builder.Services.AddAuthorization(opciones => opciones.AddPolicy(AutenticarClaveApi.Esquema,
+    politica => politica.AddAuthenticationSchemes(AutenticarClaveApi.Esquema).RequireAuthenticatedUser()));
+builder.Services.AddAuthorization(opciones => opciones.AddPolicy(DocumentacionApi.SoloPruebas,
+    politica => politica.RequireClaim(AccesoApiPublica.AmbienteClaim, "true")));
+DocumentacionApi.Configurar(builder.Services, builder.Configuration);
 
 // Backoffice: las páginas viven en Logistica.Backoffice y en Presentation/Features de cada módulo.
 // La raíz "/" permite descubrirlas fuera de la carpeta Pages; cada página declara su ruta absoluta
@@ -128,6 +138,7 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Rabbit
 builder.Services.AddRateLimiter(opciones =>
 {
     opciones.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    LimitesApiPublica.Configurar(opciones, builder.Configuration);
     opciones.AddPolicy(LimitesSeguimiento.Politica, http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "sin-ip",
         _ => new FixedWindowRateLimiterOptions
@@ -185,11 +196,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseWhen(http => http.Request.Path.StartsWithSegments("/api/v1"), publica => publica.UseStatusCodePages());
 // Lee la cookie de sesión en cada request y arma el usuario, antes de que llegue a cualquier endpoint o página.
 app.UseAuthentication();
 app.UseMiddleware<AccesoAplicacionesMiddleware>();
+app.UseMiddleware<LimitarSolicitudesApiPublica>();
 app.UseAuthorization();
 app.UseRateLimiter();
+app.UseMiddleware<RegistrarUsoClaveApi>();
 
 
 // Por defecto se usa el catálogo generado para las aplicaciones web. Los hosts de pruebas de negocio pueden
@@ -208,6 +222,15 @@ app.MapAdministracionEndpoints()
     .MapEjecucionEndpoints()
     .MapSeguimientoEndpoints()
     .MapDepositoEndpoints();
+
+var apiPublica = app.MapGroup("/api/v1")
+    .WithGroupName(DocumentacionApi.Version)
+    .RequireAuthorization(AutenticarClaveApi.Esquema)
+    .RequireRateLimiting(LimitesApiPublica.Politica);
+apiPublica.MapEnviosApiPublica();
+apiPublica.MapGroup("/pruebas").RequireAuthorization(DocumentacionApi.SoloPruebas)
+    .ExcludeFromDescription().MapEnviosApiPublica(esConsola: true);
+DocumentacionApi.Map(app);
 
 // Aplicaciones Blazor WebAssembly servidas desde el mismo origen que la API (ADR-0001, addendum 5).
 // Cada ruta sin extensión de archivo cae en el index.html de su aplicación, que resuelve la navegación.

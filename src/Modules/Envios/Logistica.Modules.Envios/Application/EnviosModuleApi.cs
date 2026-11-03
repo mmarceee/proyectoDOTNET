@@ -260,18 +260,22 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         await envios.GuardarCambiosAsync(ct);
     }
 
-    public async Task RecibirEnDepositoAsync(Guid envioId, Guid? responsableId, CancellationToken ct)
+    public async Task<bool> RecibirBultoAsync(Guid envioId, Guid bultoId, Guid? responsableId, CancellationToken ct)
     {
         var envio = await envios.ObtenerAsync(envioId, ct)
             ?? throw new DomainException("El envío no existe.");
 
-        // T2. Si el envío ya no está Admitido (por ejemplo, lo cancelaron), Transicionar lo rechaza.
+        // T2 por bulto. Si el envío ya no está Admitido (por ejemplo, lo cancelaron), el dominio lo rechaza.
         var ahora = reloj.GetUtcNow();
-        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora);
-        eventos.Registrar(EnvioRecibidoEnDeposito.Tipo,
-            new EnvioRecibidoEnDeposito(envio.Id, envio.Numero, ahora, responsableId), ahora);
+        var completo = envio.RecibirBulto(bultoId, responsableId, ahora);
+        if (completo)
+        {
+            eventos.Registrar(EnvioRecibidoEnDeposito.Tipo,
+                new EnvioRecibidoEnDeposito(envio.Id, envio.Numero, ahora, responsableId), ahora);
+        }
 
         await envios.GuardarCambiosAsync(ct);
+        return completo;
     }
 
     // CU-55 (T8). Si un envío ya no está EnTransito (lo entregaron o lo declararon extraviado mientras tanto),

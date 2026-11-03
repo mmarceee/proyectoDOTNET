@@ -458,7 +458,7 @@ Produccion, Prueba
 
 * relacionComercialId: Guid
 
-* referenciaComercio: string (opcional, hasta 50 caracteres; identificador propio del comercio, sin espacios en los extremos y distinguiendo mayúsculas. Único dentro de una misma RelacionComercial, implementado como índice sobre operadorId, comercioId y referenciaComercio — sostiene la idempotencia de la importación masiva, RF 7, CU-11, y del alta por API, CU-81\)
+* referenciaComercio: string (opcional en el alta individual, hasta 50 caracteres. Identificador propio del comercio, sin espacios en los extremos y distinguiendo mayúsculas. El índice único abarca operadorId, comercioId, esPrueba y referenciaComercio. Sostiene la idempotencia de CU-11 y CU-81, RF 7\)
 
 * numero: string (único por operador: índice único {operadorId, numero} — ADR-0002; CU-10)
 
@@ -1368,6 +1368,7 @@ Puntos del modelo que dependen de una decisión del equipo (o, en algún caso, d
 * Zona y FranjaHoraria (18/10/2026, Cristian Reyes y Lucas Ottonello): FranjaHoraria es una entidad propia asociada a Zona por zonaId, no una parte de su composición, porque Planificación y CU-19 ya la consultan y reemplazan por separado. Las reglas que comparan franjas entre sí (superposición, CU-04 A3) usan FranjaHoraria.seSuperponeCon y las coordina el caso de uso. La reprogramación por lote de la ampliación de CU-04 queda pendiente; mientras tanto, el reemplazo se bloquea si hay envíos comprometidos (sección de Zona y FranjaHoraria).
 
 * Referencia del comercio (03/11/2026, Ezequiel Marcenal): el índice único es (operadorId, comercioId, referenciaComercio), que identifica la relación comercial sin agregarle al envío un relacionComercialId. Los envíos sin referencia no chocan entre sí, porque PostgreSQL considera distintos los NULL de un índice único. La propuesta de API pública sugiere sumar el ambiente de pruebas a esa unicidad; se agrega al implementar CU-81.
+* Ambiente de la referencia del comercio (03/11/2026, Lucas Ottonello): CU-81 incorporó esPrueba al índice y a la búsqueda por referencia. CU-11 comparte el ámbito de producción con la API. Una misma referencia puede existir una vez por relación comercial en producción y otra en prueba.
 
 **Abiertos**
 

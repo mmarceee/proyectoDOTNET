@@ -161,6 +161,13 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("EnvioId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("IntentosFallidos")
+                        .HasColumnType("integer");
+
                     b.Property<decimal>("LargoCm")
                         .HasColumnType("numeric");
 
@@ -188,11 +195,19 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("BultosEntregados")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("ComercioId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EsPrueba")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Estado")
                         .IsRequired()
@@ -226,6 +241,13 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("ReintentoDesde")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Resumen")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Terminado")
+                        .HasColumnType("boolean");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
@@ -301,7 +323,9 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.HasIndex("OperadorId", "Numero")
                         .IsUnique();
 
-                    b.HasIndex("OperadorId", "ComercioId", "ReferenciaComercio")
+                    b.HasIndex("OperadorId", "Resumen");
+
+                    b.HasIndex("OperadorId", "ComercioId", "EsPrueba", "ReferenciaComercio")
                         .IsUnique()
                         .HasDatabaseName("UX_Envios_ReferenciaComercio");
 
@@ -359,6 +383,10 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
+
+                    b.PrimitiveCollection<Guid[]>("BultoIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]");
 
                     b.Property<Guid>("ComercioId")
                         .HasColumnType("uuid");

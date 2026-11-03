@@ -1,5 +1,6 @@
 using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Domain.Envios;
+using Logistica.Modules.Envios.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -84,7 +85,7 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
     {
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateException e) when (e.InnerException is PostgresException
-            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: Configurations.EnvioConfiguration.IndiceReferencia })
+            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: EnvioConfiguration.IndiceReferencia })
         { throw new ReferenciaRepetidaException(); }
     }
 
@@ -106,13 +107,16 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         return cerrados.Select(e => new EnvioCerrado(e.Id, e.Numero, e.Estado, e.LlegoEn!.Value, e.MontoTarifa)).ToList();
     }
 
-    public async Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, CancellationToken ct)
+    public async Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, bool esPrueba, CancellationToken ct)
     {
         // Tras un guardado rechazado por el índice (CU-11, A4), el contexto se desengancha de la transacción revertida.
         await db.ParticiparEnTransaccionAsync(ct);
-        return await db.Envios.AsNoTracking()
+        return await db.Envios.DelAmbiente(esPrueba).AsNoTracking()
             .SingleOrDefaultAsync(e => e.ComercioId == comercioId && e.ReferenciaComercio == referencia, ct);
     }
+
+    public Task<Envio?> ObtenerPruebaPorNumeroAsync(string numero, CancellationToken ct) =>
+        db.Envios.DelAmbiente(esPrueba: true).AsNoTracking().SingleOrDefaultAsync(e => e.Numero == numero, ct);
 
     public async Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct)
     {

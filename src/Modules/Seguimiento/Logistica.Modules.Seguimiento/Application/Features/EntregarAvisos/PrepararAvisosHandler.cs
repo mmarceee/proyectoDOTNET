@@ -16,7 +16,7 @@ internal sealed class PrepararAvisosHandler(EnviosSeguidos envios, ISuscripcione
         foreach (var suscripcion in await suscripciones.ListarActivasAsync(envio.ComercioId, ct))
         {
             if (!suscripcion.Recibe(tipo) || await entregas.ExisteAsync(hecho.EventoId, suscripcion.Id, ct)) continue;
-            var entrega = EntregaAviso.Crear(suscripcion, hecho.EventoId, envio, hecho.EstadoEnvio, tipo, hecho.FechaEvento);
+            var entrega = EntregaAviso.Crear(suscripcion, hecho.EventoId, envio, hecho.EstadoEnvio, tipo, hecho.FechaEvento, hecho.EsPrueba);
             entregas.Agregar(entrega);
             eventos.Registrar(AvisoPendiente.Tipo, new AvisoPendiente(entrega.Id), hecho.FechaEvento);
         }

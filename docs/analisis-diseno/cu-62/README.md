@@ -101,8 +101,9 @@ que el Worker necesita para firmar los enlaces. En desarrollo los correos se ven
   todavía no tiene archivos.
 - **Envíos anteriores a CU-64:** no tienen `EnvioSeguido`, así que sus eventos terminan en la cola de fallidos.
 - **Operadores sin identidad guardada:** usan la marca neutra hasta que el administrador guarde la de CU-07.
-- **CU-02:** la invitación (`UsuarioInvitado`) todavía no se envía; puede reutilizar `IEmisorCorreo` y
-  `Aplicacion:UrlPublica`.
+- **CU-02:** la invitación (`UsuarioInvitado`) la manda el consumidor `EnviarInvitacion` (cola
+  `seguimiento.enviar-invitacion`), con el mismo `IEmisorCorreo`, la plantilla con marca y `Aplicacion:UrlPublica`.
+  Prueba: `EnviarInvitacionTests`.
 
 ## Verificación
 

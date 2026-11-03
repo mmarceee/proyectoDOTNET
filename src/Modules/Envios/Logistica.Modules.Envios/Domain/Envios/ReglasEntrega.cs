@@ -16,8 +16,12 @@ internal sealed record ReglasEntrega
     // sola (T10); false deja el envío Reprogramado para que el despachador decida (CU-19, A2, y CU-20).
     public bool DevolverTrasIntentosAgotados { get; }
 
+    // RF 33: si una visita puede entregar parte de los bultos. Falso por defecto, como en las versiones ya publicadas
+    // (decisiones-entrega-parcial.md, sección 5): sin parcial, se entregan todos los bultos o ninguno.
+    public bool AdmiteEntregaParcial { get; }
+
     public ReglasEntrega(bool exigeFoto, bool exigeNombreYDocumento, int maxIntentos, TimeSpan plazoEntreIntentos,
-        bool devolverTrasIntentosAgotados = true)
+        bool devolverTrasIntentosAgotados = true, bool admiteEntregaParcial = false)
     {
         if (maxIntentos < 1)
         {
@@ -34,5 +38,6 @@ internal sealed record ReglasEntrega
         MaxIntentos = maxIntentos;
         PlazoEntreIntentos = plazoEntreIntentos;
         DevolverTrasIntentosAgotados = devolverTrasIntentosAgotados;
+        AdmiteEntregaParcial = admiteEntregaParcial;
     }
 }

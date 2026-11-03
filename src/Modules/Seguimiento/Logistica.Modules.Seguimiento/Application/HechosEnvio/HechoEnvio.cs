@@ -7,7 +7,7 @@ namespace Logistica.Modules.Seguimiento.Application.HechosEnvio;
 // destinatario (CU-62). EsAlta: es EnvioAdmitido, el único con el comercio en el sobre y los datos del destinatario.
 internal sealed record HechoEnvio(Guid EventoId, Guid EnvioId, string? Numero, string EstadoEnvio, bool IntentoFallido,
     DateTimeOffset FechaEvento, bool EsAlta, string? NombreDestinatario = null, string? EmailDestinatario = null,
-    DateOnly? NuevaFecha = null);
+    DateOnly? NuevaFecha = null, bool EsPrueba = false);
 
 // El alta del envío todavía no llegó: el orden entre colas no está garantizado (ADR-0003, sección 2.4), así que
 // el mensaje se reintenta con la espera creciente hasta que llegue.

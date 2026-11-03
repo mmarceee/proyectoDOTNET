@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 2 de noviembre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 3 de noviembre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal y Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -800,7 +800,67 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Decisiones** | Un solo PostgreSQL para la suite y una base por clase clonada de una plantilla ya migrada y sembrada; las clonaciones van de a una, porque PostgreSQL no copia una plantilla en uso, y `max_connections` sube a 300 por los pools de las API en paralelo. Las clases corren en paralelo hasta cuatro a la vez, el número de núcleos de los runners de GitHub; las pruebas de una clase siguen en serie. Las siete clases con contenedores propios y esperas de 30 a 45 s corren solas, en una colección sin paralelismo. `RabbitMqFixture` espera el mensaje "Server startup complete" en lugar del puerto: el puerto abre antes de que el broker esté listo, y eso causó el fallo intermitente de `TrazasMensajeriaTests` con la máquina cargada. El script acepta un filtro sin cobertura para el trabajo diario y guarda los paquetes de NuGet en un volumen. Se mantienen el límite de 4 GiB de heap por proceso y el catálogo estático vacío de la entrada 3.44. |
 | **Verificación** | Corrida completa en Docker: 963 pruebas (365 unitarias, 56 de arquitectura y 542 de integración), todas pasan, cobertura del 95,4 %, en 8 min 29 s en total (integración en 7 min 4 s, antes 17,5 a 23 min). Con filtro, las 66 pruebas de Depósito, compilación incluida, en 2 minutos. En el CI del 03/11, el paso de pruebas bajó de 8 min 46 s (última corrida de main, 02/11) a 4 min 49 s, y `build-and-test` completo tardó 6 minutos. |
 
-## **3.54 Entorno productivo en DigitalOcean**
+## **3.54 CU-80 · Gestionar las claves de API**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 02–03/11/2026 |
+| **Archivos** | Administración: `ClaveApi` en `Domain/Comercios`, handlers en `Application/Features/GestionarClavesApi`, repositorio, configuración y migración en `Infrastructure/Persistence`, endpoints en `Presentation/Features/GestionarClavesApi`. Contrato de autenticación en Administración.Contracts, DTOs en Http.Contracts y pantalla `ClavesApi.razor` en el Portal. Esquema HTTP en `Logistica.Api/ApiPublica`. |
+| **¿Se usó IA?** | Sí, Codex. |
+| **Finalidad** | Analizar el opcional 7.4 y luego implementar el alta, listado y revocación de claves por relación comercial, con una prueba del uso real de la credencial. |
+| **Cómo se trabajó** | Lucas pidió contrastar los casos y el cambio de requerimientos con los ADR. Codex escribió la propuesta, código, migración y pruebas. Se implementó primero la gestión del Portal y se conectó después la autenticación al alta de CU-81. |
+| **Aceptado sin modificaciones** | Claves separadas por relación y ambiente, secreto aleatorio de 32 bytes visible una vez, SHA-256 e índice único del hash. Revocación lógica y consulta de vigencia en base. La sesión de Identity autoriza la gestión del Portal. |
+| **Modificado** | La auditoría acotó la excepción del ADR-0002 a la consulta de la clave por hash. La relación activa se comprueba con el tenant fijado y el último uso se guarda con `SaveChanges`. El contrato se atiende desde un handler de Application y la persistencia queda en el repositorio de Administración. |
+| **Descartado** | Recuperar el secreto, compartir credenciales entre operadores y almacenar en caché una clave activa. La consulta directa permite que la siguiente solicitud observe una revocación ya confirmada. |
+| **Verificación** | `ClavesApiTests` cubre ambos tipos, secreto y hash, aislamiento y protección antifalsificación. `CrearEnvioApiTests` verifica Portal → alta → último uso → revocación → 401. La revisión añadió la comprobación de que una relación suspendida rechaza la clave y conserva el último uso. |
+
+## **3.55 CU-81 · Crear envíos por API**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | Envíos: `Presentation/Features/CrearEnvio/CrearEnvioApiEndpoint.cs`, handler y command de CU-10, agregado, repositorio, filtro de pruebas y migración. Evento `EnvioAdmitido` en Envíos.Contracts. Seguimiento: lectores y consumidores de avisos, `EntregaAviso` y migración. Contratos HTTP en Http.Contracts. Cuotas en `Logistica.Api/ApiPublica`. |
+| **¿Se usó IA?** | Sí, Codex. |
+| **Finalidad** | Exponer el alta de envíos de CU-10 por API versionada y completar CU-12. Mantener el aislamiento de prueba y la idempotencia de la referencia comercial. |
+| **Cómo se trabajó** | Lucas transmitió la indicación de Ezequiel de reutilizar `ReferenciaComercio` y `CrearOObtenerAsync` de CU-11. Codex contrastó la rama y adaptó el código existente, escribió las migraciones y verificó los flujos HTTP y de mensajería. |
+| **Aceptado sin modificaciones** | `POST /api/v1/envios` reutiliza el handler y conserva el origen API. La unicidad distingue relación y ambiente. Envíos confirma el alta y el Outbox juntos según ADR-0003. El filtro `Prueba` conserva `Tenant`. Seguimiento marca el aviso al comercio y omite el correo al destinatario de prueba. Las cuotas son configurables por relación y ambiente y se aplican por instancia. |
+| **Modificado** | Las pruebas detectaron que el registro de último uso dejaba una transacción terminada en Administración. Se desasoció antes de consultar las tarifas. Se ajustó la respuesta de errores para que un JSON malformado devuelva ProblemDetails también en producción. |
+| **Descartado** | Duplicar el alta o la cotización en la API, aplicar la unicidad de referencias sin distinguir el ambiente y habilitar seguimiento público para un envío de prueba. |
+| **Verificación** | `CrearEnvioApiTests` comprueba 201, 200 al repetir, concurrencia sin duplicar el envío ni su evento, 400, 401, 422 y 429 con `Retry-After`. El evento real del Outbox se procesó con los consumidores de Seguimiento y dejó un aviso de prueba sin notificación al destinatario. También se corrieron regresiones de CU-10, CU-11, depósito, liquidaciones y Seguimiento. |
+
+## **3.56 CU-82 · Consultar envíos por API**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | Envíos: `Application/Features/ConsultarEnviosApi`, `Presentation/Features/ConsultarEnviosApi` y `Infrastructure/Persistence/EnviosApiReader.cs`. DTOs públicos en Http.Contracts y pruebas en `ConsultarEnviosApiTests`. |
+| **¿Se usó IA?** | Sí, Codex. |
+| **Finalidad** | Publicar listado paginado y detalle por número, con filtros, historial e información pública de bultos. |
+| **Cómo se trabajó** | Codex implementó la lectura, el contrato HTTP y las pruebas. Lucas decidió dejar para la integración con Envíos el progreso real por bulto y continuar con CU-83. |
+| **Aceptado sin modificaciones** | Consulta por estado, fechas de Montevideo y referencia. Aislamiento por tenant y ambiente. El detalle publica número, códigos de bulto e historial sin GUID internos, responsables, coordenadas ni notas operativas. |
+| **Modificado** | El contrato adopta el vocabulario del ADR-0007 mediante una proyección del resultado disponible por envío completo. La conexión al resumen persistido y a los hechos por bulto queda pendiente de coordinar con Envíos. |
+| **Descartado** | Publicar el DTO de Backoffice, inventar resultados por bulto a partir de un envío aún en operación y marcar el caso como completo con la proyección actual. |
+| **Verificación** | `ConsultarEnviosApiTests` comprueba filtros, paginación, historial, privacidad y 404 entre comercios, operadores y ambientes. Queda demostrar 2 de 3 entregados con uno pendiente y luego el mismo envío con uno devuelto y `terminado: true`. |
+
+## **3.57 CU-83 · Consultar la documentación de la API**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | `Logistica.Api/ApiPublica/DocumentacionApi.cs` y recursos de `Documentacion/`, registro de rutas en `Program.cs`, metadata en los endpoints de Envíos, enlace en el Portal, `DocumentacionApiTests`, README y propuesta de API pública. |
+| **¿Se usó IA?** | Sí, Codex. |
+| **Finalidad** | Publicar documentación navegable con OpenAPI generado desde el código, esquemas, ejemplos, límites, errores y ejecución con claves de prueba. |
+| **Cómo se trabajó** | Codex implementó la generación y la interfaz local, reutilizó los endpoints en un grupo de prueba y verificó el renderizado en Edge. Lucas generó una clave de prueba en el Portal y reportó un 201 al ejecutar el ejemplo desde la página. |
+| **Aceptado sin modificaciones** | `/api/docs` y `/api/openapi/v1.json` se sirven en el host existente. El documento incluye las operaciones públicas v1. La consola conserva la clave en memoria y el servidor exige una clave de prueba en sus rutas. |
+| **Modificado** | Se alineó `Microsoft.AspNetCore.OpenApi` de 10.0.12 a 10.0.13 durante la auditoría, de acuerdo con el parche fijado en el repositorio. Se actualizó la documentación de implementación con el alcance de cada CU. |
+| **Descartado** | Una especificación duplicada a mano y una consola que sólo filtre claves de producción en el navegador. La validación en el servidor devuelve 403 incluso al invocar directamente las rutas de la consola. |
+| **Verificación** | `DocumentacionApiTests` comprueba acceso anónimo, alcance del OpenAPI, esquema de la clave, ejemplo de alta, listado y detalle y rechazo de producción. Auditoría conjunta de CU-80 a CU-83 en Release: 82 pruebas de integración y 56 de arquitectura aprobadas. El opcional 7.4 sigue abierto por el progreso por bulto de CU-82. |
+
+## **3.58 Entorno productivo en DigitalOcean**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -852,4 +912,5 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.33 | 03/11/2026 | CU-32: eliminación del borrador (A4). | Ezequiel Marcenal |
 | 0.34 | 03/11/2026 | Entrada de CU-33, consultar la cuenta corriente y las liquidaciones. | Ezequiel Marcenal |
 | 0.35 | 03/11/2026 | Entrada de la suite de pruebas más rápida. | Ezequiel Marcenal |
-| 0.36 | 03/11/2026 | Entrada del entorno productivo en DigitalOcean. | Ezequiel Marcenal |
+| 0.36 | 03/11/2026 | Entradas de CU-80 a CU-83, auditoría de ADR y carpetas, ajustes de autenticación y OpenAPI, y registro del pendiente de entrega parcial en CU-82. | Lucas Ottonello |
+| 0.37 | 03/11/2026 | Entrada del entorno productivo en DigitalOcean (3.58). | Ezequiel Marcenal |

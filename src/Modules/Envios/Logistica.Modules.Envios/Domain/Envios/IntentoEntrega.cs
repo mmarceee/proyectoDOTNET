@@ -13,11 +13,14 @@ internal sealed class IntentoEntrega : Entity, IOperadorOwned, IComercioOwned
     public Guid? MotivoNoEntregaId { get; private set; }
     public PruebaEntrega? Evidencia { get; private set; }
     public string? Observaciones { get; private set; }
+    // RF 31: los bultos a los que corresponde este resultado; la firma o la evidencia respaldan sólo a esos.
+    public Guid[] BultoIds { get; private set; } = [];
 
     private IntentoEntrega() { }
 
     public IntentoEntrega(Envio envio, int numero, DateTimeOffset fechaHora, ResultadoIntento resultado,
-        Guid? motivoNoEntregaId, PruebaEntrega? evidencia, string? observaciones)
+        Guid? motivoNoEntregaId, PruebaEntrega? evidencia, string? observaciones,
+        IReadOnlyCollection<Guid>? bultoIds = null)
     {
         if (numero < 1 || !Enum.IsDefined(resultado))
         {
@@ -44,5 +47,6 @@ internal sealed class IntentoEntrega : Entity, IOperadorOwned, IComercioOwned
         MotivoNoEntregaId = motivoNoEntregaId;
         Evidencia = evidencia;
         Observaciones = observaciones;
+        BultoIds = bultoIds?.ToArray() ?? [];
     }
 }

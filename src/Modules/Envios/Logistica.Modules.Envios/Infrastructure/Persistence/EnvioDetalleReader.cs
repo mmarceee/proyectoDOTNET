@@ -44,7 +44,9 @@ internal sealed class EnvioDetalleReader(EnviosDbContext db) : IEnvioDetalleRead
                         b.LargoCm,
                         b.AnchoCm,
                         b.AltoCm,
-                        b.MontoTarifa, false, false))
+                        b.MontoTarifa, false, false,
+                        b.Estado.ToString(),
+                        b.IntentosFallidos))
                     .ToList(),
                 e.Eventos.OrderBy(ev => ev.OcurridoEn).ThenBy(ev => ev.Id)
                     .Select(ev => new EventoEnvioDetalleDto(
@@ -68,7 +70,10 @@ internal sealed class EnvioDetalleReader(EnviosDbContext db) : IEnvioDetalleRead
                     .ToList(),
                 new List<IncidenciaDetalleDto>(),
                 null,
-                e.Modalidad.ToString()) })
+                e.Modalidad.ToString(),
+                e.Resumen.ToString(),
+                e.Terminado,
+                e.BultosEntregados) })
             .SingleOrDefaultAsync(ct);
 
         if (encontrado is null)
