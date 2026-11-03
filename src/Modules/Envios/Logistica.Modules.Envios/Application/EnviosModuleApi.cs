@@ -57,53 +57,26 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         return true;
     }
 
-    // CU-17 (T6). Las reglas de negocio no lanzan hacia afuera: vuelven como resultado, para que Ejecución aplique la
-    // política de conflictos (ADR-0004, sección 2.4). Los archivos se agregan recién cuando el dominio aceptó la entrega.
-    public async Task<RegistroEnCalle> RegistrarEntregaAsync(EntregaARegistrar entrega, CancellationToken ct)
+    // ADR-0004, sección 2.11: Ejecución clasifica cada bulto de la visita con su estado actual antes de registrarla.
+    public async Task<EnvioParaVisita?> ConsultarParaVisitaAsync(Guid envioId, CancellationToken ct)
     {
-        var envio = await envios.ObtenerConIntentosAsync(entrega.EnvioId, ct);
-        if (envio is null)
+        if (await envios.ObtenerConBultosAsync(envioId, ct) is not { } envio)
         {
-            return new(ResultadoRegistro.EnvioNoEncontrado);
+            return null;
         }
 
-        try
-        {
-            var reglas = await reglasDeEntrega.DelEnvioAsync(envio, ct);
-            var firma = ArchivoEvidencia.Crear(envio, entrega.Firma.TipoContenido, entrega.Firma.Contenido);
-            var foto = entrega.Foto is null ? null : ArchivoEvidencia.Crear(envio, entrega.Foto.TipoContenido, entrega.Foto.Contenido);
-            var prueba = new PruebaEntrega(firma.Id, foto?.Id, entrega.NombreReceptor, entrega.DocumentoReceptor,
-                new Ubicacion(entrega.Latitud, entrega.Longitud), entrega.OcurridoEn);
-
-            envio.RegistrarEntrega(prueba, reglas, entrega.ResponsableId, entrega.OcurridoEn);
-
-            envios.Agregar(firma);
-            if (foto is not null)
-            {
-                envios.Agregar(foto);
-            }
-
-            var entregadoEn = envio.Eventos[^1].OcurridoEn;
-            eventos.Registrar(EnvioEntregado.Tipo,
-                new EnvioEntregado(envio.Id, envio.Numero, entregadoEn, entrega.ResponsableId), entregadoEn);
-
-            await envios.GuardarCambiosAsync(ct);
-            return new(ResultadoRegistro.Aplicado, envio.Estado.ToString());
-        }
-        catch (TransicionInvalidaException)
-        {
-            return new(ResultadoRegistro.Conflicto, envio.Estado.ToString());
-        }
-        catch (DomainException ex)
-        {
-            return new(ResultadoRegistro.Invalido, envio.Estado.ToString(), ex.Message);
-        }
+        var reglas = await reglasDeEntrega.DelEnvioAsync(envio, ct);
+        return new EnvioParaVisita(envio.Id,
+            envio.Bultos.Select(b => new BultoParaVisita(b.Id, b.Codigo, b.Estado.ToString())).ToList(),
+            reglas.AdmiteEntregaParcial);
     }
 
-    // CU-18 (T7 con T9 o T10). Si el envío queda EnDevolucion, inicia la Devolucion en la misma transacción (CU-20).
-    public async Task<RegistroEnCalle> RegistrarIntentoFallidoAsync(IntentoFallidoARegistrar intento, CancellationToken ct)
+    // CU-17 y CU-18 por bulto (RF 31 y 32): la visita de un envío se aplica entera o no se aplica (Envio.RegistrarVisita).
+    // Las reglas de negocio no lanzan hacia afuera: vuelven como resultado, para que Ejecución aplique la política de
+    // conflictos (ADR-0004, sección 2.4). Los archivos se agregan recién cuando el dominio aceptó la visita.
+    public async Task<RegistroEnCalle> RegistrarVisitaAsync(VisitaARegistrar visita, CancellationToken ct)
     {
-        var envio = await envios.ObtenerConIntentosAsync(intento.EnvioId, ct);
+        var envio = await envios.ObtenerConIntentosAsync(visita.EnvioId, ct);
         if (envio is null)
         {
             return new(ResultadoRegistro.EnvioNoEncontrado);
@@ -112,29 +85,64 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         try
         {
             var reglas = await reglasDeEntrega.DelEnvioAsync(envio, ct);
-            var motivo = await reglasDeEntrega.MotivoAsync(envio, intento.MotivoId, ct)
-                ?? throw new DomainException("El motivo no está en el catálogo de las reglas del envío.");
-            var ubicacion = new Ubicacion(intento.Latitud, intento.Longitud);
-            var foto = intento.Foto is null ? null : ArchivoEvidencia.Crear(envio, intento.Foto.TipoContenido, intento.Foto.Contenido);
-            var evidencia = foto is null ? null : new PruebaEntrega(null, foto.Id, null, null, ubicacion, intento.OcurridoEn);
+            var motivos = new Dictionary<Guid, MotivoNoEntrega>();
+            foreach (var motivoId in visita.Resultados.Select(r => r.MotivoId).OfType<Guid>().Distinct())
+            {
+                motivos[motivoId] = await reglasDeEntrega.MotivoAsync(envio, motivoId, ct)
+                    ?? throw new DomainException("El motivo no está en el catálogo de las reglas del envío.");
+            }
 
-            var registrado = envio.RegistrarIntentoFallido(motivo, evidencia, intento.Observaciones, ubicacion, reglas,
-                intento.ResponsableId, intento.OcurridoEn);
+            var ubicacion = new Ubicacion(visita.Latitud, visita.Longitud);
+            var firma = visita.Firma is null ? null
+                : ArchivoEvidencia.Crear(envio, visita.Firma.TipoContenido, visita.Firma.Contenido);
+            var foto = visita.Foto is null ? null
+                : ArchivoEvidencia.Crear(envio, visita.Foto.TipoContenido, visita.Foto.Contenido);
+            // La prueba de entrega lleva la firma; la evidencia del intento fallido, sólo la foto (como en CU-17 y CU-18).
+            var prueba = firma is null ? null : new PruebaEntrega(firma.Id, foto?.Id, visita.NombreReceptor,
+                visita.DocumentoReceptor, ubicacion, visita.OcurridoEn);
+            var evidencia = foto is null ? null : new PruebaEntrega(null, foto.Id, null, null, ubicacion, visita.OcurridoEn);
+
+            var intentos = envio.RegistrarVisita(
+                visita.Resultados.Select(r => new ResultadoBulto(r.BultoId, r.MotivoId is Guid id ? motivos[id] : null)).ToList(),
+                prueba, evidencia, visita.Observaciones, ubicacion, reglas, visita.ResponsableId, visita.OcurridoEn);
+
+            if (firma is not null)
+            {
+                envios.Agregar(firma);
+            }
 
             if (foto is not null)
             {
                 envios.Agregar(foto);
             }
 
+            // Con todos sus pendientes devueltos, el envío queda EnDevolucion e inicia la Devolucion (CU-20), como antes.
+            // Un bulto devuelto mientras otros se reprograman espera la devolución por bulto (pendiente 2 de la decisión).
             if (envio.Estado == EstadoEnvio.EnDevolucion)
             {
-                envios.Agregar(Devolucion.Crear(envio, $"Intento fallido: {motivo.Codigo}.", intento.OcurridoEn));
+                var motivo = motivos.Values.First();
+                envios.Agregar(Devolucion.Crear(envio, $"Intento fallido: {motivo.Codigo}.", visita.OcurridoEn));
             }
 
-            eventos.Registrar(IntentoFallidoRegistrado.Tipo,
-                new IntentoFallidoRegistrado(envio.Id, envio.Numero, registrado.NumeroIntento, motivo.Codigo,
-                    envio.Estado.ToString(), registrado.FechaHora, envio.ReintentoDesde),
-                registrado.FechaHora);
+            // Avisos v1 (pendiente 6): EnvioEntregado sólo si se entregaron todos los bultos; si quedó alguno, el intento
+            // fallido. Un comercio v1 nunca recibe una entrega completa que no ocurrió.
+            if (intentos.All(i => i.Resultado == ResultadoIntento.Exitoso))
+            {
+                var entregadoEn = envio.Eventos[^1].OcurridoEn;
+                eventos.Registrar(EnvioEntregado.Tipo,
+                    new EnvioEntregado(envio.Id, envio.Numero, entregadoEn, visita.ResponsableId), entregadoEn);
+            }
+            else
+            {
+                foreach (var fallido in intentos.Where(i => i.Resultado == ResultadoIntento.Fallido))
+                {
+                    eventos.Registrar(IntentoFallidoRegistrado.Tipo,
+                        new IntentoFallidoRegistrado(envio.Id, envio.Numero, fallido.NumeroIntento,
+                            motivos[fallido.MotivoNoEntregaId!.Value].Codigo, envio.Estado.ToString(), fallido.FechaHora,
+                            envio.ReintentoDesde),
+                        fallido.FechaHora);
+                }
+            }
 
             await envios.GuardarCambiosAsync(ct);
             return new(ResultadoRegistro.Aplicado, envio.Estado.ToString());

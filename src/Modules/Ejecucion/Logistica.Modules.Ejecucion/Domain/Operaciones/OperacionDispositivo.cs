@@ -29,6 +29,10 @@ internal sealed class OperacionDispositivo : Entity, IOperadorOwned
     // Sólo en las rechazadas: la operación tal como llegó, en JSON.
     public string? Contenido { get; private set; }
 
+    // Sólo en una visita rechazada: el diagnóstico de cada bulto, en JSON, para responder lo mismo a un reenvío
+    // (ADR-0004, sección 2.11).
+    public string? Bultos { get; private set; }
+
     // Un conflicto queda pendiente hasta que el despachador lo revisa (tablero, CU-66).
     public bool Revisada { get; private set; }
 
@@ -42,14 +46,16 @@ internal sealed class OperacionDispositivo : Entity, IOperadorOwned
     }
 
     public static OperacionDispositivo Rechazada(Guid operacionId, DatosOperacion datos, ResultadoOperacion resultado,
-        string motivo, string? detalle, string contenido)
+        string motivo, string? detalle, string contenido, string? bultos = null)
     {
         if (resultado == ResultadoOperacion.Aplicada || string.IsNullOrWhiteSpace(motivo))
         {
             throw new DomainException("Una operación rechazada necesita un conflicto o una invalidez, con su motivo.");
         }
 
-        return Crear(operacionId, datos, resultado, motivo, detalle, contenido);
+        var operacion = Crear(operacionId, datos, resultado, motivo, detalle, contenido);
+        operacion.Bultos = bultos;
+        return operacion;
     }
 
     // CU-66 (ADR-0004, sección 2.5): el despachador revisó el conflicto en el tablero. No cambia el envío: sólo deja de
