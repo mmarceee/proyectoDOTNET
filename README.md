@@ -87,6 +87,12 @@ si una prueba falla. Tres minutos sin actividad de pruebas abortan el proceso y 
 tiene un límite de veinte minutos. El script de Docker usa los mismos diagnósticos y guarda cada ejecución por separado
 en `TestResults/docker-*`.
 
+## Despliegue
+
+El entorno productivo (DigitalOcean App Platform con la Api y el Worker, PostgreSQL y Valkey administrados, y RabbitMQ en
+CloudAMQP) se crea y se destruye con Terraform. Cada push a `main` que pasa el CI se despliega solo. Requisitos, comandos,
+costo y secretos en [`infra/terraform`](infra/terraform/README.md).
+
 ## Rutas
 
 | Ruta | Contenido |

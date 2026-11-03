@@ -2,7 +2,7 @@
 
 | Estado | Aceptado |
 | :---- | :---- |
-| **Fecha** | 25 de septiembre de 2026 (actualizado el 3 de octubre de 2026) |
+| **Fecha** | 25 de septiembre de 2026 (actualizado el 3 de noviembre de 2026) |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Alcance** | Entrega de análisis y diseño del 4 de octubre de 2026 |
 
@@ -181,19 +181,21 @@ Cada módulo conserva internamente Domain, Application, Infrastructure y Present
 ```
 Rama de trabajo -> Pull request -> GitHub Actions
 GitHub Actions  -> restore -> build -> test, y construcción de las imágenes de la API y el worker
-Merge aprobado a main -> DigitalOcean App Platform -> despliegue automático de la API y el worker
+Push a main con el CI en verde -> job deploy -> DigitalOcean App Platform compila y despliega la API y el worker
 Terraform -> creación, actualización y destrucción de la infraestructura
 ```
 
-La rama main permanecerá protegida y solamente recibirá cambios mediante pull requests con verificaciones exitosas. App Platform observará main y desplegará dos servicios: la API, que sirve también el Backoffice y las aplicaciones WebAssembly, y el worker. Terraform definirá los recursos de DigitalOcean, sus variables por ambiente y las operaciones reproducibles de plan, aplicación y destrucción.
+La rama main permanecerá protegida y solamente recibirá cambios mediante pull requests con verificaciones exitosas. App Platform ejecutará dos componentes: la API, que sirve también el Backoffice y las aplicaciones WebAssembly, y el worker. No despliega con cada push: lo pide el job `deploy` del CI, sólo cuando las pruebas pasan y las imágenes compilan. Terraform (`infra/terraform`) definirá los recursos de DigitalOcean y CloudAMQP, sus variables por ambiente y las operaciones reproducibles de plan, aplicación y destrucción; su README detalla los requisitos, el costo y los secretos.
 
 App Platform administrará el enrutamiento público y HTTPS, por lo que no se incorporará Caddy. El equipo de tres integrantes está eximido del requisito de ejecutar dos instancias balanceadas de la API.
 
 # **7 Decisiones operativas pendientes**
 
-* Alojamiento definitivo de RabbitMQ en producción: servicio administrado o instancia separada.  
-* Contratación de DigitalOcean Managed Valkey y PostgreSQL según el costo disponible.  
-* Despliegue y protección del Aspire Dashboard en el ambiente remoto.  
+* ~~Alojamiento definitivo de RabbitMQ en producción.~~ Resuelto el 03/11: CloudAMQP, plan gratuito `lemur`.  
+* ~~Contratación de DigitalOcean Managed Valkey y PostgreSQL.~~ Resuelto el 03/11: un nodo de cada uno, del tamaño más chico, en Nueva York, la región más cercana a Montevideo. El ambiente completo cuesta unos 47 USD por mes y se destruye cuando no se usa.  
+* ~~Despliegue y protección del Aspire Dashboard en el ambiente remoto.~~ Resuelto el 03/11: no se despliega. El tablero de observabilidad se demostró en el entorno local; la instrumentación queda en el código y se activa en producción configurando `OTEL_EXPORTER_OTLP_ENDPOINT`.  
+* ~~Datos de demostración en producción.~~ Resuelto el 03/11: se cargan los mismos operadores y usuarios que en desarrollo, con una contraseña que genera Terraform, porque el repositorio es público.  
+* ~~Estado de Terraform.~~ Resuelto el 03/11: local y fuera de Git, porque guarda secretos; lo administra el responsable del despliegue.  
 * ~~Biblioteca cliente de RabbitMQ.~~ Propuesta en el ADR-0003: RabbitMQ.Client.  
 * ~~Almacenamiento de fotografías, firmas y otros archivos de evidencia.~~ Resuelto: en PostgreSQL (sección 3.9).  
 * ~~Proveedor de correo.~~ Resuelto: SMTP, con Mailpit en desarrollo y Brevo en el ambiente desplegado (sección 3.9).
@@ -230,3 +232,4 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | 1.2 | 03/10/2026 | Se incorporan Playwright y los requerimientos opcionales de pruebas elegidos por el equipo (sección 3.8). |
 | 1.3 | 12/10/2026 | Estado de los ADR obligatorios: ADR-0003 aceptado y ADR-0004 (conflictos de sincronización) propuesto. |
 | 1.4 | 15/10/2026 | ADR-0004 aceptado. |
+| 1.5 | 03/11/2026 | Despliegue: el CI despliega en App Platform después de las pruebas (sección 6) y se cierran las decisiones operativas de RabbitMQ, PostgreSQL y Valkey, observabilidad, datos de demostración y estado de Terraform (sección 7). |

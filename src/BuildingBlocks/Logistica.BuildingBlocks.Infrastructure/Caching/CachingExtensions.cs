@@ -7,7 +7,8 @@ namespace Logistica.BuildingBlocks.Infrastructure.Caching;
 public static class CachingExtensions
 {
     // Valkey si hay cadena de conexión (Docker Compose, user-secrets y producción); si no, la memoria del proceso,
-    // para depurar sin Valkey y para las pruebas. Valkey usa el protocolo de Redis, por eso el proveedor es el de Redis.
+    // para depurar sin Valkey y para las pruebas. En producción la cadena es obligatoria (ConexionesObligatorias), así
+    // que ese respaldo no se usa por accidente. Valkey usa el protocolo de Redis, por eso el proveedor es el de Redis.
     public static IServiceCollection AddCacheDistribuida(this IServiceCollection services, string? connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))

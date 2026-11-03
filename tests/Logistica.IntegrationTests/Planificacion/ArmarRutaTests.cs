@@ -467,7 +467,13 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     [Fact]
     public async Task La_excepcion_de_desarrollo_no_habilita_acceso_en_produccion()
     {
-        using var host = factory.WithWebHostBuilder(b => b.UseEnvironment("Production").UseSetting("Planificacion:HabilitarDesarrolloSinIdentity", "true"));
+        // En producción la API exige Valkey, RabbitMQ y la contraseña de demostración para arrancar (ConexionesObligatorias
+        // y UsuariosIniciales). Direcciones sin servidor alcanzan: la caché y el outbox toleran que no respondan.
+        using var host = factory.WithWebHostBuilder(b => b.UseEnvironment("Production")
+            .UseSetting("Planificacion:HabilitarDesarrolloSinIdentity", "true")
+            .UseSetting("ConnectionStrings:Valkey", "127.0.0.1:1")
+            .UseSetting("ConnectionStrings:RabbitMQ", "amqp://127.0.0.1:1/")
+            .UseSetting("Demo:Contrasena", "Produccion-2026!"));
         using var client = host.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/planificacion/recursos?fecha=2035-01-01")).StatusCode);
     }

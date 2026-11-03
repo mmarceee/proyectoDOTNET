@@ -2,6 +2,7 @@ using Logistica.Api.Errores;
 using Logistica.Api.Tenancy;
 using Logistica.Api.Seguridad;
 using Logistica.BuildingBlocks.Infrastructure.Caching;
+using Logistica.BuildingBlocks.Infrastructure.Configuracion;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.BuildingBlocks.Infrastructure.Messaging.Fallidos;
@@ -14,6 +15,8 @@ using System.Threading.RateLimiting;
 using Logistica.Modules.Seguimiento;
 using Logistica.Modules.Seguimiento.Contracts;
 using Logistica.SharedKernel;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -53,8 +56,19 @@ builder.Services.AddOpenTelemetry()
         }
     });
 
+// En producción no se arranca sin la base, Valkey ni RabbitMQ (ConexionesObligatorias).
+ConexionesObligatorias.Exigir(builder.Configuration, builder.Environment, "Postgres", "Valkey", "RabbitMQ");
+
 // Caché distribuida: Valkey si hay cadena de conexión; si no, la memoria del proceso (CachingExtensions).
 builder.Services.AddCacheDistribuida(builder.Configuration.GetConnectionString("Valkey"));
+
+// Claves de Data Protection en PostgreSQL, para que la sesión sobreviva a un nuevo despliegue (ClavesProteccionDbContext).
+builder.Services.AddDbContext<ClavesProteccionDbContext>(opciones => opciones.UseNpgsql(
+    builder.Configuration.GetConnectionString("Postgres"),
+    npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", ClavesProteccionDbContext.Schema)));
+builder.Services.AddDataProtection()
+    .SetApplicationName("logistica")
+    .PersistKeysToDbContext<ClavesProteccionDbContext>();
 
 // Errores como ProblemDetails; las reglas de negocio violadas responden 400. Una escritura sobre datos
 // de otro inquilino responde 404, igual que un recurso inexistente (ADR-0002, sección 2.9).
@@ -132,6 +146,10 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await app.Services.MigrateModuleDatabasesAsync();
     await app.Services.MigrarIdentidadAsync();
+    using (var scope = app.Services.CreateScope())
+    {
+        await scope.ServiceProvider.GetRequiredService<ClavesProteccionDbContext>().Database.MigrateAsync();
+    }
     await app.Services.SembrarDatosInicialesAsync();
 }
 

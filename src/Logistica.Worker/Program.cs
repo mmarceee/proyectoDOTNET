@@ -1,4 +1,5 @@
 using Logistica.BuildingBlocks.Infrastructure.Caching;
+using Logistica.BuildingBlocks.Infrastructure.Configuracion;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.Modules.Seguimiento;
 using Logistica.SharedKernel;
@@ -34,6 +35,9 @@ builder.Services.AddOpenTelemetry()
             metricas.AddOtlpExporter();
         }
     });
+
+// En producción no se arranca sin la base, Valkey ni RabbitMQ (ConexionesObligatorias).
+ConexionesObligatorias.Exigir(builder.Configuration, builder.Environment, "Postgres", "Valkey", "RabbitMQ");
 
 builder.Services.AddScoped<InquilinoMensaje>();
 builder.Services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<InquilinoMensaje>());
