@@ -23,6 +23,10 @@ internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lecto
             ? comercios.ObtenerRelacionIdAsync(comercioId, ct)
             : Task.FromResult<Guid?>(null);
 
+    // CU-32: la misma consulta del listado de comercios (CU-01), sin filtros.
+    public async Task<IReadOnlyList<ComercioRelacionado>> ConsultarComerciosAsync(CancellationToken ct) =>
+        (await comercios.ListarAsync(null, null, ct)).Select(c => new ComercioRelacionado(c.Id, c.RazonSocial)).ToList();
+
     // CU-07 para CU-60: la misma consulta que usan los estilos de cada operador, sin el logo.
     public async Task<MarcaOperador?> MarcaDelOperadorAsync(CancellationToken ct) =>
         await identidad.HandleAsync(ct) is { } marca

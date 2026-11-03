@@ -1,0 +1,75 @@
+@page "/backoffice/liquidaciones/{id:guid}"
+@model Logistica.Modules.Deposito.Presentation.Features.GenerarLiquidacion.DetalleModel
+@using Logistica.Modules.Deposito.Domain.Liquidaciones
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Liquidación";
+    var liquidacion = Model.Liquidacion;
+}
+
+<p><a href="/backoffice/liquidaciones">Volver a las liquidaciones</a></p>
+<h1 class="mb-1">Liquidación de @Model.Comercio</h1>
+<p class="text-muted">
+    Del @liquidacion.PeriodoDesde.ToString("dd/MM/yyyy") al @liquidacion.PeriodoHasta.ToString("dd/MM/yyyy") ·
+    <strong>@liquidacion.Estado</strong>
+</p>
+
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" asp-validation-summary="All" role="alert"></div>
+}
+
+<div class="table-responsive">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th scope="col">Envío</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Concepto</th>
+                <th scope="col" class="text-end">Monto</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var linea in liquidacion.Lineas.OrderBy(l => l.Fecha))
+            {
+                <tr>
+                    <td><a href="/backoffice/envios/@linea.NumeroEnvio">@linea.NumeroEnvio</a></td>
+                    <td>@linea.Fecha.ToString("dd/MM/yyyy") UTC</td>
+                    <td>@linea.Concepto</td>
+                    <td class="text-end">@linea.Monto.ToString("N2")</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr><th colspan="3">Total bruto</th><td class="text-end">@liquidacion.TotalBruto.ToString("N2")</td></tr>
+            <tr><th colspan="3">Ajustes</th><td class="text-end">@liquidacion.TotalAjustes.ToString("N2")</td></tr>
+            <tr><th colspan="3">Total neto</th><td class="text-end"><strong>@liquidacion.TotalNeto.ToString("N2")</strong></td></tr>
+        </tfoot>
+    </table>
+</div>
+
+@if (liquidacion.Estado == EstadoLiquidacion.Borrador)
+{
+    <div class="d-flex flex-wrap gap-2">
+        <form method="post" asp-page-handler="Emitir">
+            <button type="submit" class="btn btn-primary">Emitir</button>
+        </form>
+        <form method="post" asp-page-handler="Eliminar">
+            <button type="submit" class="btn btn-outline-danger"
+                    onclick="return confirm('¿Eliminar este borrador? Sus envíos quedan libres para otra liquidación.');">
+                Eliminar borrador
+            </button>
+        </form>
+    </div>
+}
+else if (liquidacion.Estado == EstadoLiquidacion.Emitida)
+{
+    <form method="post" asp-page-handler="Pagada">
+        <button type="submit" class="btn btn-success">Marcar como pagada</button>
+    </form>
+}

@@ -759,6 +759,20 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | La descarga del informe por fila: se muestra en pantalla, que alcanza para el nivel mínimo. Sumar el ambiente de pruebas a la unicidad: lo agrega CU-81 cuando exista `EsPrueba`. |
 | **Verificación** | 22 casos unitarios (referencia del envío, lectura del archivo y armado de cada envío) y 6 pruebas de integración (vista previa y confirmación, reimportación completa y ampliada, errores por envío, A1, A2 y dos importaciones simultáneas). Corrida completa en Docker: 950 pruebas .NET (357 unitarias, 56 de arquitectura y 537 de integración), todas pasan; cobertura de líneas del 95,2 %. Después se agregó arrastrar y soltar el archivo, sin JavaScript (el `InputFile` transparente cubre la zona), y la página se probó en el navegador con `docker compose`: vista previa de un CSV y rechazo de un archivo que no es CSV. El arrastre real con el mouse no se pudo automatizar. |
 
+## **3.51 Generar la liquidación de un comercio (CU-32)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | Depósito: `Liquidacion` y `LineaLiquidacion`, `ILiquidacionRepository` y `LiquidacionRepository`, configuraciones y migración, `GenerarLiquidacionHandler`, las páginas `/backoffice/liquidaciones` y `/backoffice/liquidaciones/{id}`. Envíos: `ListarLiquidablesAsync` en el contrato, `EnvioCerrado` y `ListarCerradosAsync`. Administración: `ConsultarComerciosAsync` y `ComercioRelacionado`. Menú del Backoffice. Pruebas: `LiquidacionTests` y `GenerarLiquidacionTests`. Documentos: casos de uso y modelo de dominio. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-32 en nivel básico: el administrador genera la liquidación de un comercio y un período, la emite y registra el pago. |
+| **Cómo se trabajó** | El responsable pidió que la IA continuara con CU-32 después de CU-11, sin consultas porque no iba a estar disponible. La IA tomó las decisiones y las dejó documentadas. |
+| **Decisiones** | Los envíos liquidables se piden al contrato síncrono de Envíos en lugar de mantener una copia alimentada por eventos, como decía el requerimiento especial 1: `EnvioEntregado` y `EnvioDevuelto` no traen la tarifa, los consumidores de RabbitMQ sólo corren en el Worker (sumar uno a la API cambiaba la arquitectura) y la definición de envío liquidable cambia con la entrega parcial. El instante liquidable sale del evento de la transición (T6 o T15) y el período son días completos en la zona horaria del operador. Índice único sobre el envío de la línea (A2 y requerimiento 3). La liquidación guarda operador y comercio en lugar de `relacionComercialId`. A pedido del responsable se agregó A4: un borrador se elimina con sus líneas (borrado en cascada) y sus envíos quedan libres para otra liquidación; una emitida o pagada no se elimina, y si otro administrador la emite mientras tanto, la concurrencia optimista rechaza el borrado. |
+| **Descartado** | Publicar `LiquidacionEmitida`: no tiene consumidor ni aviso definido. Los ajustes, que quedan en cero porque el requerimiento 2 cobra sólo la tarifa de admisión. La generación desde el cierre diario: corresponde a CU-70. |
+| **Verificación** | 6 casos unitarios del agregado y 2 pruebas de integración (generación con entregados, devueltos, cancelados, otro mes y la última hora del período en la zona del operador; regeneración sin duplicados; emisión y pago; aislamiento entre operadores y perfil). Las de integración llevan el envío a su estado final por SQL, sin recorrer la ruta. Corrida completa en Docker: 958 pruebas .NET (363 unitarias, 56 de arquitectura y 539 de integración), todas pasan; cobertura de líneas del 95,4 %. No se probaron las páginas en un navegador ni con `docker compose`. Con A4: un caso unitario y una prueba de integración más (borrado del borrador, regeneración con el mismo envío, rechazo sobre una emitida y 404 para otro operador); corrida completa en Docker con 960 pruebas (364 unitarias, 56 de arquitectura y 540 de integración), todas pasan, cobertura del 95,4 %. El botón se vio en el navegador sobre un borrador creado en la base local. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -794,3 +808,5 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.29 | 02/11/2026 | CU-42: implementación asistida, revisión de arquitectura y ADR, decisiones y límites, resultados de pruebas y ajuste de Editar solicitado por Lucas. | Lucas Ottonello |
 | 0.30 | 02/11/2026 | Decisión cerrada de entrega parcial, ADR-0007 y referencias a la evolución de los documentos existentes. | Lucas Ottonello |
 | 0.31 | 03/11/2026 | Entrada de CU-11, importar envíos desde un archivo. | Ezequiel Marcenal |
+| 0.32 | 03/11/2026 | Entrada de CU-32, generar la liquidación de un comercio. | Ezequiel Marcenal |
+| 0.33 | 03/11/2026 | CU-32: eliminación del borrador (A4). | Ezequiel Marcenal |
