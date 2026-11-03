@@ -1,0 +1,8 @@
+# Estado y variables con secretos: no se versionan.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+crash.log
+# .terraform.lock.hcl sí se versiona: fija las versiones de los proveedores.

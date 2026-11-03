@@ -79,3 +79,38 @@ jobs:
 
       - name: Build Worker image
         run: docker build -f src/Logistica.Worker/Dockerfile .
+
+  deploy:
+    # Despliegue continuo (letra, sección 6.14): cada push a main que pasa las pruebas y compila las imágenes se
+    # despliega en App Platform, que compila la API y el Worker desde la rama. Si el ambiente está destruido, no hace nada.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-and-test, docker-images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: despliegue-produccion
+      cancel-in-progress: false
+    env:
+      DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+    steps:
+      # Sin el secreto (repositorio sin configurar o un fork), el job termina sin desplegar.
+      - name: Check token
+        if: ${{ env.DIGITALOCEAN_ACCESS_TOKEN == '' }}
+        run: echo "::notice::Falta el secreto DIGITALOCEAN_ACCESS_TOKEN; no se despliega."
+
+      - uses: digitalocean/action-doctl@v2
+        if: ${{ env.DIGITALOCEAN_ACCESS_TOKEN != '' }}
+        with:
+          token: ${{ env.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      # La aplicación se busca por su nombre (infra/terraform): el identificador cambia al reconstruir el ambiente.
+      - name: Deploy to App Platform
+        if: ${{ env.DIGITALOCEAN_ACCESS_TOKEN != '' }}
+        run: |
+          app_id=$(doctl apps list --format ID,Spec.Name --no-header | awk '$2 == "logistica-produccion" { print $1 }')
+          if [ -z "$app_id" ]; then
+            echo "::notice::No existe la aplicación logistica-produccion; no se despliega."
+            exit 0
+          fi
+          doctl apps create-deployment "$app_id" --wait

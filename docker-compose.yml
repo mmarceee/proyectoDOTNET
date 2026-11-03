@@ -88,6 +88,9 @@ services:
       <<: *app-environment
       # Sólo la Api aplica las migraciones al iniciar; el Worker no toca el esquema.
       Database__MigrateOnStartup: "true"
+      # Los contenedores corren en Production, que exige la contraseña de los usuarios de demostración (UsuariosIniciales).
+      # En local se usa la de siempre; en DigitalOcean la genera Terraform.
+      Demo__Contrasena: ${DEMO_CONTRASENA:-Demo-2026!}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on: &app-depends-on

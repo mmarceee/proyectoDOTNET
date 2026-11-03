@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptado como decisión de diseño. Implementación y evaluación retrospectiva pendientes.** |
-| Versión y fecha | 1.1 · 02/11/2026 |
+| Versión y fecha | 1.2 · 03/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | `586f630` (CU-42) |
@@ -97,6 +97,8 @@ CU-42 aporta una evidencia acotada de separación: se implementó sobre las para
 
 El cierre resumido no reemplaza la custodia física, la rendición ni el cierre financiero. Las consultas deben usar la dimensión adecuada. Una corrección posterior de un estado terminal no se introduce como excepción de sincronización: exige su propia transición y política.
 
+**Bultos entregados que pueden quedar sin aplicarse.** Por la atomicidad por visita de un envío (sección 2.2; [ADR-0004](ADR-0004-resolucion-de-conflictos-de-sincronizacion.md), sección 2.11), si un bulto de la visita está en conflicto, los demás bultos entregados en esa visita tampoco se aplican: siguen en tránsito en el servidor, el resumen no los cuenta y el comercio no recibe su aviso, hasta que el despachador revise el conflicto. La visita queda guardada con su evidencia y el diagnóstico por bulto, pero no hay una operación para aplicar después sus bultos válidos. RF 32 no exige que el conflicto de un bulto deje aplicar los demás; elegir la visita como unidad es una interpretación del equipo, justificada en el ADR-0004 (sección 2.11) y verificada con su prueba 10. Si el extravío individual (pendiente 4 de la decisión) se vuelve frecuente, conviene revisarla.
+
 Se deben actualizar [modelo de dominio](modelo-de-dominio.md), [tabla de transiciones](tabla-de-transiciones-de-estados.md), [casos de uso](casos-de-uso.md), ADR-0004, ADR-0006, contratos de avisos y manuales de prueba. Los vínculos añadidos ahora señalan la decisión nueva; no convierten automáticamente sus tablas históricas en el diseño ya implementado.
 
 Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de entrega parcial](decisiones-entrega-parcial.md): matriz completa, custodia y carga incompleta, exclusividad, extravío individual, migración y compatibilidad, avisos, progreso y contrato monetario. Este ADR no los presenta como resueltos por omisión.
@@ -106,7 +108,7 @@ Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de 
 | Evidencia requerida | Qué debe comprobar | Estado al 02/11/2026 |
 | --- | --- | --- |
 | Pruebas de dominio | Tablas declarativas, pares prohibidos, combinaciones alcanzables, resumen, Terminado y ausencia de eventos intermedios ficticios. | Pendiente. |
-| Atomicidad y concurrencia | Fallo de una línea revierte toda la visita; otros envíos continúan; dos operaciones no resuelven dos veces el mismo bulto. | Pendiente para parcial. |
+| Atomicidad y concurrencia | Fallo de una línea revierte toda la visita; otros envíos continúan; dos operaciones no resuelven dos veces el mismo bulto. | Política y pruebas definidas en el ADR-0004 (sección 2.11 y pruebas 10 a 13, 03/11); implementación pendiente. |
 | Reenvío idempotente | Un OperacionId repetido no duplica evidencia, intentos, eventos ni cargos; el consumidor no duplica avisos. | Pendiente para parcial. |
 | Rutas y depósito | Sólo pendientes elegibles se reasignan; no hay doble reserva activa por bulto; recepción y rendición preservan custodia y estados. | Pendiente. |
 | Aislamiento | IDs/evidencia ajenos no acceden ni escriben entre operadores o comercios. | Pendiente sobre los contratos nuevos. |
@@ -137,3 +139,4 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | --- | --- | --- | --- |
 | 1.0 | 02/11/2026 | Decisión de diseño aceptada, impacto identificado y criterios de verificación/retrospectiva pendientes explícitos. | Lucas Ottonello |
 | 1.1 | 02/11/2026 | Criterio de inicio de ejecución: recepción del primer bulto. | Ezequiel Marcenal |
+| 1.2 | 03/11/2026 | Sección 4.3: riesgo de bultos entregados sin aplicar por la atomicidad por visita; sección 4.4: la atomicidad queda especificada en el ADR-0004, versión 1.4. | Ezequiel Marcenal |

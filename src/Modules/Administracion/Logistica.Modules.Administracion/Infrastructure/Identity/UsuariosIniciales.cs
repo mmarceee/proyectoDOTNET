@@ -1,6 +1,8 @@
 using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Logistica.Modules.Administracion.Infrastructure.Identity;
 
@@ -8,10 +10,28 @@ namespace Logistica.Modules.Administracion.Infrastructure.Identity;
 // entrar como cada operador y como Tienda Demo. Corren al iniciar, después de DatosIniciales; son idempotentes.
 // Usuario no tiene filtro de inquilino (sección 2.4): el operador o el comercio se asignan acá, explícitos.
 internal sealed class UsuariosIniciales(
-    UserManager<Usuario> usuarios, RoleManager<IdentityRole<Guid>> roles, VinculoRepartidor vinculos)
+    UserManager<Usuario> usuarios, RoleManager<IdentityRole<Guid>> roles, VinculoRepartidor vinculos,
+    IConfiguration configuracion, IHostEnvironment entorno)
 {
-    // Sólo para la demostración y las pruebas. Cumple la política de contraseñas por defecto de Identity.
+    // Sólo para el desarrollo y las pruebas. Cumple la política de contraseñas por defecto de Identity.
     public const string ContrasenaDemo = "Demo-2026!";
+
+    private readonly string _contrasena = ContrasenaInicial(configuracion, entorno);
+
+    // El repositorio es público: en producción la contraseña de los usuarios de demostración sale de Demo:Contrasena, un
+    // secreto que genera Terraform, y sin él la API no arranca. Fuera de producción, ContrasenaDemo si no se configura otra.
+    // Sólo vale para los usuarios que todavía no existen: el seed no cambia contraseñas.
+    internal static string ContrasenaInicial(IConfiguration configuracion, IHostEnvironment entorno)
+    {
+        if (configuracion["Demo:Contrasena"] is { Length: > 0 } contrasena)
+        {
+            return contrasena;
+        }
+
+        return entorno.IsProduction()
+            ? throw new InvalidOperationException("En producción, configurá Demo:Contrasena (Demo__Contrasena) para los usuarios de demostración.")
+            : ContrasenaDemo;
+    }
 
     public async Task SembrarAsync()
     {
@@ -52,7 +72,7 @@ internal sealed class UsuariosIniciales(
             return existente;
         }
 
-        Verificar(await usuarios.CreateAsync(usuario, ContrasenaDemo), usuario.Email!);
+        Verificar(await usuarios.CreateAsync(usuario, _contrasena), usuario.Email!);
         Verificar(await usuarios.AddToRoleAsync(usuario, perfil.ToString()), usuario.Email!);
         return usuario;
     }

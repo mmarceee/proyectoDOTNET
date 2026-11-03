@@ -798,7 +798,7 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Finalidad** | Bajar la suite completa de unos 25 minutos, que frenaba cada caso de uso, sin perder el aislamiento por clase ni la cobertura. |
 | **Cómo se trabajó** | La IA midió la corrida con los tiempos de los TRX: 12,7 minutos de pruebas en serie y 10,3 de huecos entre clases (74 arranques de unos 8 s: contenedor, migraciones de siete esquemas, datos iniciales y API). A pedido del responsable revisó antes que ninguna prueba dependiera del orden o de estado compartido: no hay estáticos mutables ni configuración global; los oyentes de trazas y métricas filtran por su traza o su caché; los contenedores propios publican puertos al azar; las cuentas fijas se limitan a datos de la propia prueba. |
 | **Decisiones** | Un solo PostgreSQL para la suite y una base por clase clonada de una plantilla ya migrada y sembrada; las clonaciones van de a una, porque PostgreSQL no copia una plantilla en uso, y `max_connections` sube a 300 por los pools de las API en paralelo. Las clases corren en paralelo hasta cuatro a la vez, el número de núcleos de los runners de GitHub; las pruebas de una clase siguen en serie. Las siete clases con contenedores propios y esperas de 30 a 45 s corren solas, en una colección sin paralelismo. `RabbitMqFixture` espera el mensaje "Server startup complete" en lugar del puerto: el puerto abre antes de que el broker esté listo, y eso causó el fallo intermitente de `TrazasMensajeriaTests` con la máquina cargada. El script acepta un filtro sin cobertura para el trabajo diario y guarda los paquetes de NuGet en un volumen. Se mantienen el límite de 4 GiB de heap por proceso y el catálogo estático vacío de la entrada 3.44. |
-| **Verificación** | Corrida completa en Docker: 963 pruebas (365 unitarias, 56 de arquitectura y 542 de integración), todas pasan, cobertura del 95,4 %, en 8 min 29 s en total (integración en 7 min 4 s, antes 17,5 a 23 min). Con filtro, las 66 pruebas de Depósito, compilación incluida, en 2 minutos. El CI todavía no corrió con estos cambios. |
+| **Verificación** | Corrida completa en Docker: 963 pruebas (365 unitarias, 56 de arquitectura y 542 de integración), todas pasan, cobertura del 95,4 %, en 8 min 29 s en total (integración en 7 min 4 s, antes 17,5 a 23 min). Con filtro, las 66 pruebas de Depósito, compilación incluida, en 2 minutos. En el CI del 03/11, el paso de pruebas bajó de 8 min 46 s (última corrida de main, 02/11) a 4 min 49 s, y `build-and-test` completo tardó 6 minutos. |
 
 ## **3.54 CU-80 · Gestionar las claves de API**
 
@@ -860,6 +860,32 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Una especificación duplicada a mano y una consola que sólo filtre claves de producción en el navegador. La validación en el servidor devuelve 403 incluso al invocar directamente las rutas de la consola. |
 | **Verificación** | `DocumentacionApiTests` comprueba acceso anónimo, alcance del OpenAPI, esquema de la clave, ejemplo de alta, listado y detalle y rechazo de producción. Auditoría conjunta de CU-80 a CU-83 en Release: 82 pruebas de integración y 56 de arquitectura aprobadas. El opcional 7.4 sigue abierto por el progreso por bulto de CU-82. |
 
+## **3.58 Entorno productivo en DigitalOcean**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | `infra/terraform` (proveedores, variables, recursos, salidas, ejemplo de variables y README), job `deploy` de `.github/workflows/ci.yml`, `ConexionesObligatorias`, `ClavesProteccionDbContext` y su migración, `Program.cs` de la API y el Worker, `UsuariosIniciales`, `docker-compose.yml`, `.env.example`, `ConfiguracionProduccionTests`, `ClavesProteccionTests`, `ArmarRutaTests`, `README.md` y la propuesta de stack (secciones 6 y 7). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Preparar el hito del 5/11: Terraform para App Platform con la API y el Worker, PostgreSQL y Valkey administrados y CloudAMQP; despliegue continuo desde `main`, y configuración que impida caer por accidente en la caché en memoria. |
+| **Cómo se trabajó** | La IA revisó el arranque de la API y el Worker, los Dockerfile, Docker Compose y la letra (6.12 a 6.14 y escenarios de la defensa). Propuso las decisiones abiertas con una recomendación cada una; el responsable descartó la observabilidad en producción, porque el tablero ya se mostró en el entorno local, y aceptó el resto. Los atributos de los proveedores de Terraform se verificaron en su documentación, y los precios en las páginas de DigitalOcean. |
+| **Decisiones** | En Production la API y el Worker no arrancan sin PostgreSQL, Valkey ni RabbitMQ. Las claves de Data Protection van a PostgreSQL y no a Valkey, porque la caché puede perderse y las sesiones no; sin eso, cada despliegue cerraba todas las sesiones e invalidaba las invitaciones. La contraseña de demostración sale de `Demo__Contrasena` en producción (el repositorio es público) y la genera Terraform, igual que las claves del seguimiento y de los avisos. Encabezados del proxy con `ASPNETCORE_FORWARDEDHEADERS_ENABLED`, sin código. TLS obligatorio y pool limitado en PostgreSQL. App Platform no despliega con cada push: lo pide el CI después de las pruebas. Estado de Terraform local, región Nueva York, CloudAMQP gratuito y PostgreSQL y Valkey accesibles sólo desde la aplicación. Se descartó el Aspire Dashboard remoto. |
+| **Verificación** | Suite completa en Docker: 368 unitarias y 56 de arquitectura pasan. De las 543 de integración falló una, `La_excepcion_de_desarrollo_no_habilita_acceso_en_produccion`, que arranca la API en Production sin Valkey ni RabbitMQ: es la regla nueva funcionando, y la prueba ahora pasa las conexiones y la contraseña. Se volvieron a correr su clase y las nuevas, y pasan (24 de integración y 3 unitarias). `terraform validate` y `terraform fmt` pasan con Terraform 1.9. Con Docker Compose, una sesión abierta en el Backoffice siguió válida después de reiniciar la API y con un contenedor nuevo. Falta el primer `terraform apply`, que necesita las cuentas de DigitalOcean, CloudAMQP y Brevo. |
+
+## **3.59 ADR-0004 · Conflictos por bulto y atomicidad por visita**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | `ADR-0004-resolucion-de-conflictos-de-sincronizacion.md` (v1.4: secciones 2.11, 3.10, 4.2, 5, 6 y 7) y `ADR-0007-adaptacion-a-entrega-parcial.md` (v1.2: secciones 4.3 y 4.4). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Pasar al ADR-0004 la política de conflictos de la entrega parcial (RF 32) que el responsable decidió el 02/11, sobre la propuesta de Lucas. |
+| **Cómo se trabajó** | El responsable fijó la decisión: la visita de un envío se aplica completa o se rechaza completa, y los otros envíos siguen. La IA redactó la sección, enumeró los conflictos por bulto a partir de las vías de cambio de la sección 1.2 y de la decisión cerrada, y señaló que RF 32 no exige que el conflicto de un bulto deje aplicar los demás, así que la elección debía justificarse como interpretación. |
+| **Decisiones** | Se mantienen los cuatro resultados (sin "aplicada en parte") y la respuesta suma un diagnóstico por bulto, con todos los bultos evaluados. Conflictos: extraviado, en depósito, ya resuelto y fuera de la ruta. Inválidas: bulto ajeno, repetido, sin resultado, entrega parcial no admitida y evidencia incompleta. Una visita rechazada no consume intentos. El riesgo de bultos realmente entregados sin aplicar queda en el ADR-0004 (4.2) y en el ADR-0007 (4.3), con la prueba 10 y dos decisiones a revisar. La sección 2.11 queda propuesta hasta que la apruebe el equipo. |
+| **Verificación** | Revisión de coherencia con la decisión cerrada (sección 4) y el ADR-0007 (secciones 2.2 y 4.4). No hay código: la entrada se completa al implementar la visita por bulto. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -900,3 +926,5 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.34 | 03/11/2026 | Entrada de CU-33, consultar la cuenta corriente y las liquidaciones. | Ezequiel Marcenal |
 | 0.35 | 03/11/2026 | Entrada de la suite de pruebas más rápida. | Ezequiel Marcenal |
 | 0.36 | 03/11/2026 | Entradas de CU-80 a CU-83, auditoría de ADR y carpetas, ajustes de autenticación y OpenAPI, y registro del pendiente de entrega parcial en CU-82. | Lucas Ottonello |
+| 0.37 | 03/11/2026 | Entrada del entorno productivo en DigitalOcean (3.58). | Ezequiel Marcenal |
+| 0.38 | 03/11/2026 | Entrada del ADR-0004 con los conflictos por bulto (3.59). | Ezequiel Marcenal |

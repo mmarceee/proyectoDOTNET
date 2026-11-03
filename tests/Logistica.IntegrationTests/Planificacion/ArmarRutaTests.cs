@@ -467,7 +467,8 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
     [Fact]
     public async Task La_excepcion_de_desarrollo_no_habilita_acceso_en_produccion()
     {
-        using var host = factory.WithWebHostBuilder(b => b.UseEnvironment("Production").UseSetting("Planificacion:HabilitarDesarrolloSinIdentity", "true"));
+        using var host = factory.WithWebHostBuilder(b => b.ComoProduccion()
+            .UseSetting("Planificacion:HabilitarDesarrolloSinIdentity", "true"));
         using var client = host.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/planificacion/recursos?fecha=2035-01-01")).StatusCode);
     }
