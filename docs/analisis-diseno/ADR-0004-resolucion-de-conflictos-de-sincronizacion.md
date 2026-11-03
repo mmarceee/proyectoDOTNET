@@ -2,7 +2,7 @@
 
 > **Evolución por entrega parcial · 02/11/2026:** el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) y la [decisión cerrada](decisiones-entrega-parcial.md) extienden esta política con resultados por bulto y atomicidad por visita de un envío. Se conservan OperacionId, transacción y evidencia de rechazos. **La política por bulto (RF 32) está en la sección 2.11**, con su alternativa descartada (3.10), su riesgo (4.2) y sus pruebas (5, puntos 10 a 13). Las secciones 2.1 a 2.10 siguen describiendo el contrato por envío, vigente hasta que se implemente el nuevo; el tratamiento de las operaciones antiguas guardadas en la PWA se define al implementarlo (pendiente 5 de la decisión).
 
-| Estado | Aceptado — aprobado por el equipo el 15/10/2026. La sección 2.11 (entrega parcial, versión 1.4 del 03/11) queda propuesta hasta que el equipo la apruebe |
+| Estado | Aceptado — aprobado por el equipo el 15/10/2026; la sección 2.11 (entrega parcial), el 03/11/2026 |
 | :---- | :---- |
 | **Fecha** | 12 de octubre de 2026 |
 | **Autor** | Ezequiel Marcenal |
@@ -343,3 +343,4 @@ Con la entrega parcial (sección 2.11):
 | 1.2 | 15/10/2026 | Sección 7: el lado del servidor y la autenticación del repartidor quedan implementados. | Ezequiel Marcenal |
 | 1.3 | 16/10/2026 | Sección 2.9: la correlación está implementada. Cada operación es una actividad de la fuente `Logistica.Ejecucion` cuyo padre es el `CorrelacionId` del dispositivo; el request de la sincronización queda como vínculo, y el evento del outbox guarda esa traza. | Ezequiel Marcenal |
 | 1.4 | 03/11/2026 | Entrega parcial (RF 32): sección 2.11 con la atomicidad por visita de un envío, los conflictos por bulto con su motivo y la justificación de la interpretación; alternativa 3.10; riesgo de bultos entregados sin aplicar (4.2); pruebas 10 a 13 (5); dos decisiones a revisar (6) y el plan (7). Decisión del responsable del 02/11, sobre la propuesta de Lucas. | Ezequiel Marcenal |
+| 1.5 | 03/11/2026 | Sección 2.11 aprobada por el equipo (Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes), junto con la tabla de transiciones por bulto. | Ezequiel Marcenal |
