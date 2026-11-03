@@ -110,3 +110,15 @@ internal static class PostgresCompartido
         await comando.ExecuteNonQueryAsync();
     }
 }
+
+// Una API en Production para las pruebas que verifican su comportamiento en ese ambiente. En Production la API exige
+// Valkey, RabbitMQ y la contraseña de demostración para arrancar (ConexionesObligatorias y UsuariosIniciales).
+// Direcciones sin servidor alcanzan: la caché y el publicador del outbox toleran que no respondan.
+internal static class EntornoProduccion
+{
+    public static IWebHostBuilder ComoProduccion(this IWebHostBuilder builder) => builder
+        .UseEnvironment("Production")
+        .UseSetting("ConnectionStrings:Valkey", "127.0.0.1:1")
+        .UseSetting("ConnectionStrings:RabbitMQ", "amqp://127.0.0.1:1/")
+        .UseSetting("Demo:Contrasena", "Produccion-2026!");
+}

@@ -1,8 +1,8 @@
 # **ADR-0004 · Resolución de conflictos de sincronización**
 
-> **Evolución por entrega parcial · 02/11/2026:** el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) y la [decisión cerrada](decisiones-entrega-parcial.md) extienden esta política con resultados por bulto y atomicidad por visita de un envío. Se conservan OperacionId, transacción y evidencia de rechazos. Las secciones originales siguen describiendo el contrato anterior; su adaptación y el tratamiento de operaciones antiguas deben completarse antes de activar el contrato nuevo.
+> **Evolución por entrega parcial · 02/11/2026:** el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) y la [decisión cerrada](decisiones-entrega-parcial.md) extienden esta política con resultados por bulto y atomicidad por visita de un envío. Se conservan OperacionId, transacción y evidencia de rechazos. **La política por bulto (RF 32) está en la sección 2.11**, con su alternativa descartada (3.10), su riesgo (4.2) y sus pruebas (5, puntos 10 a 13). Las secciones 2.1 a 2.10 siguen describiendo el contrato por envío, vigente hasta que se implemente el nuevo; el tratamiento de las operaciones antiguas guardadas en la PWA se define al implementarlo (pendiente 5 de la decisión).
 
-| Estado | Aceptado — aprobado por el equipo el 15/10/2026 |
+| Estado | Aceptado — aprobado por el equipo el 15/10/2026. La sección 2.11 (entrega parcial, versión 1.4 del 03/11) queda propuesta hasta que el equipo la apruebe |
 | :---- | :---- |
 | **Fecha** | 12 de octubre de 2026 |
 | **Autor** | Ezequiel Marcenal |
@@ -168,6 +168,42 @@ Lo implementa Lucas Ottonello en CU-50 a CU-52. Este registro fija lo que el ser
 | Cola local, cifrado y disparadores de la sincronización | `Logistica.Repartidor.Pwa` |
 | DTO de la operación y de la respuesta | `Logistica.Http.Contracts`, compartidos con la PWA |
 
+## **2.11 Entrega parcial: conflictos por bulto y atomicidad por visita (RF 32)**
+
+Con la entrega parcial, un envío tiene varios bultos y cada uno lleva su estado; el envío deriva su resumen de ellos ([decisión cerrada](decisiones-entrega-parcial.md), secciones 2 y 4; ADR-0007, sección 2.1). La entrega y el intento fallido dejan de ser operaciones sobre el envío y pasan a ser **una visita**: la operación del repartidor sobre un envío dentro de una parada, con el resultado de cada bulto de su alcance (entregado o no entregado con su motivo) y la evidencia, que referencia los bultos entregados. Una parada con varios envíos genera una visita por envío.
+
+**La unidad de aplicación es la visita de un envío: se aplica completa o se rechaza completa.** Si un bulto no se puede aplicar, no se aplica ningún bulto de esa visita:
+
+•  La operación termina en **Conflicto** o **Inválida**, igual que hoy (sección 2.4): no se agrega un resultado "aplicada en parte". La respuesta lleva, además del motivo, **el diagnóstico por bulto**: cada bulto rechazado con su motivo. El servidor evalúa todos los bultos antes de decidir, así el diagnóstico queda completo y no sólo con el primer error.  
+•  La visita rechazada se guarda completa en `operaciones_dispositivo`, con su evidencia y el diagnóstico, y no cambia ningún bulto, el resumen del envío ni el Outbox. No consume intentos: los intentos se cuentan por bulto y sólo con un intento aplicado (decisión cerrada, sección 5). Queda pendiente de revisión en el tablero, como cualquier conflicto (sección 2.5).  
+•  Las visitas de **otros envíos** de la misma parada y del lote siguen su curso: cada una es su propia operación y su propia transacción (sección 2.6). Las operaciones posteriores sobre el mismo envío se rechazan como `DependeDeOperacionRechazada`, igual que hoy.  
+•  Si la visita se aplica, en la misma transacción se confirman las transiciones de sus bultos, la evidencia, el resumen recalculado una sola vez, el registro de la operación y las filas del Outbox (ADR-0007, sección 2.2).
+
+Conflictos e invalideces por bulto. Las comprobaciones de la sección 2.3 se mantienen; las de transición pasan a hacerse sobre cada bulto:
+
+| Situación del bulto | Motivo | Resultado de la visita |
+| :---- | :---- | :---- |
+| Declarado *Extraviado* mientras el repartidor estaba sin conexión (T16, del envío o del bulto) | `BultoExtraviado` | Conflicto. El bulto sigue *Extraviado* |
+| Reintegrado al depósito antes de sincronizar (rendición anticipada, T8) | `BultoEnDeposito` | Conflicto |
+| Ya tiene un resultado aplicado por otra operación (entregado, devuelto o en devolución) | `BultoYaResuelto` | Conflicto. Vale la primera que llegó al servidor |
+| Pertenece al envío pero no viaja en esta ruta (no se cargó, o se cargó en otra) | `BultoFueraDeRuta` | Conflicto |
+| No pertenece al envío de la visita | `BultoAjenoAlEnvio` | Inválida: la PWA sólo ofrece los bultos del envío |
+| Aparece dos veces en la misma visita | `BultoRepetido` | Inválida |
+| La visita no da resultado a un bulto de su alcance (en tránsito en la ruta) | `BultoSinResultado` | Inválida |
+| Entrega una parte de los bultos y la versión de reglas del envío no admite entrega parcial (RF 33) | `EntregaParcialNoAdmitida` | Inválida: la PWA lo impide con las reglas descargadas |
+| La firma o la evidencia no referencian los bultos entregados, o falta un motivo de no entrega | `EvidenciaIncompleta` | Inválida |
+
+Los conflictos de pertenencia a la ruta (`RutaNoAsignada`) y de orden (`DependeDeOperacionRechazada`) siguen siendo del envío. Los motivos se miden por separado (sección 2.9).
+
+**Por qué la visita y no el bulto.** RF 32 pide que la política de conflictos contemple los bultos, y esta sección lo hace: cada conflicto se detecta, se informa y se conserva por bulto. RF 32 **no exige** que el conflicto de un bulto deje aplicar los demás de la misma visita: tomar la visita como unidad es una **interpretación del equipo**, que se justifica así:
+
+1\.  **Respeta las reglas del operador.** En un operador que no admite entrega parcial, aplicar sólo los bultos válidos produciría justamente una entrega parcial que sus reglas prohíben (RF 33).  
+2\.  **La evidencia es de la visita.** La firma, la foto y el nombre del receptor cubren un conjunto de bultos. Aplicar una parte dejaría una prueba de entrega que menciona bultos que el servidor no registró como entregados.  
+3\.  **El caso mixto es angosto.** Para que una visita tenga bultos válidos y bultos en conflicto, el servidor tiene que haber cambiado un bulto del envío mientras el repartidor estaba sin señal: un extravío individual (pendiente 4 de la decisión) o una rendición anticipada. En el caso común, el del robo de la sección 1.1, todos los bultos del envío cambian juntos y la visita entera es un conflicto con cualquier criterio.  
+4\.  **No cambia el contrato.** Se conservan los cuatro resultados, una transacción por operación y la PWA no necesita mostrar una visita "aplicada en parte".
+
+El costo de esta interpretación está en la sección 4.2.
+
 # **3\. Alternativas consideradas**
 
 ## **3.1 Gana la última escritura**
@@ -214,6 +250,12 @@ La PWA enviaría el estado final de cada envío.
 
 **Motivo de descarte:** resuelven la edición concurrente de los mismos datos por varios usuarios. Acá cada parada la resuelve un solo repartidor y el servidor tiene reglas de negocio que no se pueden fusionar automáticamente. Agregarían complejidad sin resolver un problema que tengamos.
 
+## **3.10 Aplicar cada bulto por separado dentro de la visita**
+
+Se aplicarían los bultos válidos de la visita y se rechazarían sólo los que están en conflicto.
+
+**Motivo de descarte:** en un operador que no admite entrega parcial produciría una entrega parcial que sus reglas prohíben, dejaría evidencia que menciona bultos no aplicados y obligaría a un quinto resultado, "aplicada en parte", con su manejo en la PWA y en el tablero. Su ventaja, que un bulto realmente entregado no quede sin aplicar, se compensa con la revisión del conflicto (secciones 2.11 y 4.2). Puede reconsiderarse si el extravío individual se vuelve frecuente.
+
 # **4\. Consecuencias**
 
 ## **4.1 Positivas**
@@ -227,6 +269,7 @@ La PWA enviaría el estado final de cada envío.
 ## **4.2 Negativas y riesgos**
 
 •  En un conflicto, el estado del servidor puede quedar distinto de lo que pasó en la calle hasta que el despachador lo revise. En el caso del robo, el envío queda *Extraviado* aunque se haya entregado, y hoy no hay una transición para corregirlo.  
+•  **Con la atomicidad por visita (sección 2.11), bultos realmente entregados pueden quedar sin aplicarse.** Si en una visita un bulto está en conflicto, los otros bultos entregados en esa misma visita tampoco se aplican: siguen *EnTransito* en el servidor aunque el destinatario los tenga, el resumen del envío no los cuenta y el comercio no recibe su aviso. La visita queda guardada con su firma y el diagnóstico de cada bulto, y el despachador la ve en el tablero; pero hoy no hay una operación para aplicar después los bultos válidos de una visita rechazada, así que quedan en manos de la revisión y de la rendición (CU-55). Es el precio de la interpretación de RF 32 de la sección 2.11; su frecuencia depende de cuánto se use el extravío individual.  
 •  La base64 agranda un tercio la firma y la foto en la red.  
 •  La PWA tiene que mantener la cola local, el orden y los reintentos: es la parte más delicada del trabajo de Lucas para el 22/10.  
 •  `operaciones_dispositivo` crece con cada operación; necesita una política de retención (sección 6).  
@@ -255,6 +298,16 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 
 9\.  Un repartidor no puede sincronizar operaciones de una ruta que no es suya, ni de otro operador.
 
+Con la entrega parcial (sección 2.11):
+
+10\.  **Bultos entregados que no se aplican.** Un envío de tres bultos en tránsito; mientras el repartidor está sin conexión, uno se declara *Extraviado*. La visita sincronizada entrega los tres: termina en conflicto con `BultoExtraviado` para ese bulto; los otros dos siguen *EnTransito*, el resumen no cambia, no se escribe nada en el Outbox y la visita queda guardada con la firma y el diagnóstico de los tres bultos. En el mismo lote, la visita de otro envío de la misma parada se aplica.
+
+11\.  Una visita que entrega una parte de los bultos en un operador que no admite entrega parcial es inválida (`EntregaParcialNoAdmitida`), y en uno que la admite se aplica y deja el envío *Entregado parcialmente*.
+
+12\.  Una visita con un bulto ajeno al envío, repetido o sin resultado es inválida, con el motivo de cada bulto.
+
+13\.  Reenviar una visita rechazada devuelve el mismo resultado y el mismo diagnóstico, sin aplicar nada ni consumir intentos.
+
 **Demostración del escenario 3** (letra, sección 9.3): con la PWA sin conexión, el repartidor registra una entrega. Desde el Backoffice, el despachador declara extraviado ese envío (CU-21). Al recuperar la conexión, la PWA muestra la entrega rechazada con el motivo, el envío sigue *Extraviado* y el conflicto aparece en el tablero con la firma registrada.
 
 # **6\. Decisiones a revisar**
@@ -266,6 +319,8 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 | Tamaño del lote e intervalo de la PWA | 20 operaciones, 5 MB, 30 s | Lucas, al medir |
 | Tolerancia del reloj adelantado | 2 minutos | Ezequiel, al medir |
 | Retención de `operaciones_dispositivo` | 30 días las aplicadas; los conflictos hasta revisarse | Ezequiel, antes del despliegue del 5/11 |
+| Aplicar después los bultos válidos de una visita rechazada (riesgo de la sección 4.2) | No se permite; el conflicto se revisa y los bultos se resuelven en la rendición | El equipo, si el extravío individual se incorpora (pendiente 4 de la decisión) |
+| Unidad de aplicación de la visita (sección 2.11) | La visita completa de un envío | El equipo, si la revisión de conflictos muestra muchos bultos entregados sin aplicar |
 
 # **7\. Plan de implementación**
 
@@ -275,6 +330,7 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 | 22/10 | Cola local cifrada, disparadores, lotes y pantalla de rechazos en la PWA | Lucas |
 | 22/10 | Autenticación del repartidor. **Hecho el 15/10** (claim `repartidor_id`). | Cristian |
 | 29/10 | Conflictos en el tablero en tiempo real (CU-66) | Cristian |
+| Entrega parcial | Visita con resultados por bulto, conflictos de la sección 2.11 y pruebas 10 a 13, junto con el estado por bulto de Envíos (ADR-0007, sección 2.4) | Ezequiel (servidor), Lucas (PWA) y Cristian (Envíos) |
 
 # **8\. Historial de versiones**
 
@@ -286,3 +342,4 @@ La decisión se considera verificada cuando existan pruebas automatizadas que de
 | 1.1 | 15/10/2026 | Sección 2.7: la hora del dispositivo se guarda como el mismo instante en UTC. | Ezequiel Marcenal |
 | 1.2 | 15/10/2026 | Sección 7: el lado del servidor y la autenticación del repartidor quedan implementados. | Ezequiel Marcenal |
 | 1.3 | 16/10/2026 | Sección 2.9: la correlación está implementada. Cada operación es una actividad de la fuente `Logistica.Ejecucion` cuyo padre es el `CorrelacionId` del dispositivo; el request de la sincronización queda como vínculo, y el evento del outbox guarda esa traza. | Ezequiel Marcenal |
+| 1.4 | 03/11/2026 | Entrega parcial (RF 32): sección 2.11 con la atomicidad por visita de un envío, los conflictos por bulto con su motivo y la justificación de la interpretación; alternativa 3.10; riesgo de bultos entregados sin aplicar (4.2); pruebas 10 a 13 (5); dos decisiones a revisar (6) y el plan (7). Decisión del responsable del 02/11, sobre la propuesta de Lucas. | Ezequiel Marcenal |

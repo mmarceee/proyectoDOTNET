@@ -133,7 +133,7 @@ public sealed class CrearEnvioApiTests(PostgresApiFactory factory) : IClassFixtu
     [Fact]
     public async Task Diferencia_errores_de_validacion_cobertura_y_tarifa()
     {
-        using var api = Api(b => b.UseEnvironment("Production"));
+        using var api = Api(b => b.ComoProduccion());
         using var portal = await PortalAsync(api);
         using var client = Integracion(api, (await CrearClaveAsync(portal, "Prueba")).Secreto);
         var request = Solicitud();

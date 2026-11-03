@@ -873,6 +873,19 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Decisiones** | En Production la API y el Worker no arrancan sin PostgreSQL, Valkey ni RabbitMQ. Las claves de Data Protection van a PostgreSQL y no a Valkey, porque la caché puede perderse y las sesiones no; sin eso, cada despliegue cerraba todas las sesiones e invalidaba las invitaciones. La contraseña de demostración sale de `Demo__Contrasena` en producción (el repositorio es público) y la genera Terraform, igual que las claves del seguimiento y de los avisos. Encabezados del proxy con `ASPNETCORE_FORWARDEDHEADERS_ENABLED`, sin código. TLS obligatorio y pool limitado en PostgreSQL. App Platform no despliega con cada push: lo pide el CI después de las pruebas. Estado de Terraform local, región Nueva York, CloudAMQP gratuito y PostgreSQL y Valkey accesibles sólo desde la aplicación. Se descartó el Aspire Dashboard remoto. |
 | **Verificación** | Suite completa en Docker: 368 unitarias y 56 de arquitectura pasan. De las 543 de integración falló una, `La_excepcion_de_desarrollo_no_habilita_acceso_en_produccion`, que arranca la API en Production sin Valkey ni RabbitMQ: es la regla nueva funcionando, y la prueba ahora pasa las conexiones y la contraseña. Se volvieron a correr su clase y las nuevas, y pasan (24 de integración y 3 unitarias). `terraform validate` y `terraform fmt` pasan con Terraform 1.9. Con Docker Compose, una sesión abierta en el Backoffice siguió válida después de reiniciar la API y con un contenedor nuevo. Falta el primer `terraform apply`, que necesita las cuentas de DigitalOcean, CloudAMQP y Brevo. |
 
+## **3.59 ADR-0004 · Conflictos por bulto y atomicidad por visita**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | `ADR-0004-resolucion-de-conflictos-de-sincronizacion.md` (v1.4: secciones 2.11, 3.10, 4.2, 5, 6 y 7) y `ADR-0007-adaptacion-a-entrega-parcial.md` (v1.2: secciones 4.3 y 4.4). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Pasar al ADR-0004 la política de conflictos de la entrega parcial (RF 32) que el responsable decidió el 02/11, sobre la propuesta de Lucas. |
+| **Cómo se trabajó** | El responsable fijó la decisión: la visita de un envío se aplica completa o se rechaza completa, y los otros envíos siguen. La IA redactó la sección, enumeró los conflictos por bulto a partir de las vías de cambio de la sección 1.2 y de la decisión cerrada, y señaló que RF 32 no exige que el conflicto de un bulto deje aplicar los demás, así que la elección debía justificarse como interpretación. |
+| **Decisiones** | Se mantienen los cuatro resultados (sin "aplicada en parte") y la respuesta suma un diagnóstico por bulto, con todos los bultos evaluados. Conflictos: extraviado, en depósito, ya resuelto y fuera de la ruta. Inválidas: bulto ajeno, repetido, sin resultado, entrega parcial no admitida y evidencia incompleta. Una visita rechazada no consume intentos. El riesgo de bultos realmente entregados sin aplicar queda en el ADR-0004 (4.2) y en el ADR-0007 (4.3), con la prueba 10 y dos decisiones a revisar. La sección 2.11 queda propuesta hasta que la apruebe el equipo. |
+| **Verificación** | Revisión de coherencia con la decisión cerrada (sección 4) y el ADR-0007 (secciones 2.2 y 4.4). No hay código: la entrada se completa al implementar la visita por bulto. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -914,3 +927,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.35 | 03/11/2026 | Entrada de la suite de pruebas más rápida. | Ezequiel Marcenal |
 | 0.36 | 03/11/2026 | Entradas de CU-80 a CU-83, auditoría de ADR y carpetas, ajustes de autenticación y OpenAPI, y registro del pendiente de entrega parcial en CU-82. | Lucas Ottonello |
 | 0.37 | 03/11/2026 | Entrada del entorno productivo en DigitalOcean (3.58). | Ezequiel Marcenal |
+| 0.38 | 03/11/2026 | Entrada del ADR-0004 con los conflictos por bulto (3.59). | Ezequiel Marcenal |
