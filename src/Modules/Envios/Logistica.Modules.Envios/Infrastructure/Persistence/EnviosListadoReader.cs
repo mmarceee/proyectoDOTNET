@@ -26,14 +26,14 @@ internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoRe
 
         if (query.FechaDesde is { } desde)
         {
-            var inicio = InicioDelDiaUtc(desde);
+            var inicio = FechasConsultaEnvios.InicioDelDiaUtc(desde);
 
             consulta = consulta.Where(e => e.CreadoEn >= inicio);
         }
 
         if (query.FechaHasta is { } hasta && hasta < DateOnly.MaxValue)
         {
-            var finExclusivo = InicioDelDiaUtc(hasta.AddDays(1));
+            var finExclusivo = FechasConsultaEnvios.InicioDelDiaUtc(hasta.AddDays(1));
 
             consulta = consulta.Where(e => e.CreadoEn < finExclusivo);
         }
@@ -88,16 +88,4 @@ internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoRe
             total);
     }
 
-    private static DateTimeOffset InicioDelDiaUtc(DateOnly fecha)
-    {
-        var zona = TimeZoneInfo.FindSystemTimeZoneById("America/Montevideo");
-
-        var medianoche = fecha.ToDateTime(
-            TimeOnly.MinValue,
-            DateTimeKind.Unspecified);
-
-        var utc = TimeZoneInfo.ConvertTimeToUtc(medianoche, zona);
-
-        return new DateTimeOffset(utc);
-    }
 }

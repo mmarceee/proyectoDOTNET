@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -10,6 +11,14 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<Guid[]>(
+                name: "BultoIds",
+                schema: "envios",
+                table: "IntentosEntrega",
+                type: "uuid[]",
+                nullable: false,
+                defaultValue: new Guid[0]);
+
             migrationBuilder.AddColumn<int>(
                 name: "BultosEntregados",
                 schema: "envios",
@@ -97,6 +106,12 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                 WHERE c."EnvioId" = e."Id";
                 """);
 
+            // Intentos existentes: hasta ahora cada intento era del envío entero, así que corresponde a todos sus bultos.
+            migrationBuilder.Sql("""
+                UPDATE envios."IntentosEntrega" AS i
+                SET "BultoIds" = ARRAY(SELECT b."Id" FROM envios."Bultos" AS b WHERE b."EnvioId" = i."EnvioId" ORDER BY b."Codigo")
+                """);
+
             migrationBuilder.CreateIndex(
                 name: "IX_Envios_OperadorId_Resumen",
                 schema: "envios",
@@ -111,6 +126,11 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                 name: "IX_Envios_OperadorId_Resumen",
                 schema: "envios",
                 table: "Envios");
+
+            migrationBuilder.DropColumn(
+                name: "BultoIds",
+                schema: "envios",
+                table: "IntentosEntrega");
 
             migrationBuilder.DropColumn(
                 name: "BultosEntregados",

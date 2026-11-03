@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <!-- Trazas distribuidas hacia Aspire Dashboard (letra, sección 6.12). -->
     <PackageReference Include="Npgsql.OpenTelemetry" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
@@ -31,7 +32,8 @@
     </PackageReference>
   </ItemGroup>
 
-  <PropertyGroup>
-  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="ApiPublica/Documentacion/*.html;ApiPublica/Documentacion/*.js;ApiPublica/Documentacion/*.css" />
+  </ItemGroup>
 
 </Project>

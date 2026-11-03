@@ -5,7 +5,7 @@ namespace Logistica.Modules.Envios.Contracts.Events;
 // El nombre y el correo del destinatario son datos del alta para notificarle los cambios (CU-62). Campos opcionales:
 // agregarlos no cambia la versión (ADR-0003, sección 2.3).
 public sealed record EnvioAdmitido(Guid EnvioId, string Numero, DateTimeOffset OcurridoEn,
-    string? NombreDestinatario = null, string? EmailDestinatario = null)
+    string? NombreDestinatario = null, string? EmailDestinatario = null, bool EsPrueba = false)
 {
     public const string Tipo = "EnvioAdmitido.v1";
 }

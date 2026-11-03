@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EnviosDbContext))]
-    [Migration("20261103211952_BultosDeCadaIntento")]
-    partial class BultosDeCadaIntento
+    [Migration("20261103214759_EntregaParcialBultos")]
+    partial class EntregaParcialBultos
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -207,6 +207,11 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("EsPrueba")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Estado")
                         .IsRequired()
                         .HasColumnType("text");
@@ -323,7 +328,7 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OperadorId", "Resumen");
 
-                    b.HasIndex("OperadorId", "ComercioId", "ReferenciaComercio")
+                    b.HasIndex("OperadorId", "ComercioId", "EsPrueba", "ReferenciaComercio")
                         .IsUnique()
                         .HasDatabaseName("UX_Envios_ReferenciaComercio");
 

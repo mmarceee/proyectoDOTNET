@@ -22,8 +22,9 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
     public async Task<AltaEnvio> CrearOObtenerAsync(CrearEnvioCommand command, CancellationToken ct)
     {
         var (operadorId, comercioId) = Inquilino();
+        ValidarDatos(command);
         var referencia = Envio.NormalizarReferencia(command.ReferenciaComercio);
-        if (referencia is not null && await envios.ObtenerPorReferenciaAsync(comercioId, referencia, ct) is { } existente)
+        if (referencia is not null && await envios.ObtenerPorReferenciaAsync(comercioId, referencia, command.EsPrueba, ct) is { } existente)
             return new AltaEnvio(existente, Creado: false);
 
         var cotizacion = await CotizarAsync(command, ct);
@@ -42,7 +43,8 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             versionTarifario: cotizacion.VersionTarifario,
             versionReglasId: cotizacion.VersionReglasId,
             modalidad: command.Modalidad,
-            referenciaComercio: referencia);
+            referenciaComercio: referencia,
+            esPrueba: command.EsPrueba);
         envio.DefinirPlanificacion(cotizacion.ZonaId, null, null);
 
         try
@@ -53,7 +55,7 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
                 envios.Agregar(envio);
                 // T1 también llega a Seguimiento: es el único evento con el comercio en el sobre (CU-64).
                 eventos.Registrar(EnvioAdmitido.Tipo, new EnvioAdmitido(envio.Id, envio.Numero, envio.CreadoEn,
-                    envio.Destinatario.Nombre, envio.Destinatario.Email), envio.CreadoEn);
+                    envio.Destinatario.Nombre, envio.EsPrueba ? null : envio.Destinatario.Email, envio.EsPrueba), envio.CreadoEn);
                 await envios.GuardarCambiosAsync(ct);
             }, ct);
         }
@@ -61,7 +63,7 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
         {
             // A4: otra importación creó el mismo envío entre la consulta y el guardado. El índice único evitó el
             // duplicado y la transacción se revirtió entera, evento incluido.
-            return new AltaEnvio(await envios.ObtenerPorReferenciaAsync(comercioId, referencia!, ct)
+            return new AltaEnvio(await envios.ObtenerPorReferenciaAsync(comercioId, referencia!, command.EsPrueba, ct)
                 ?? throw new InvalidOperationException("El índice rechazó la referencia, pero el envío no aparece."), Creado: false);
         }
 
@@ -73,31 +75,33 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
         CrearEnvioCommand command, CancellationToken ct)
     {
         var (_, comercioId) = Inquilino();
+        ValidarDatos(command);
         var referencia = Envio.NormalizarReferencia(command.ReferenciaComercio);
-        if (referencia is not null && await envios.ObtenerPorReferenciaAsync(comercioId, referencia, ct) is { } existente)
+        if (referencia is not null && await envios.ObtenerPorReferenciaAsync(comercioId, referencia, command.EsPrueba, ct) is { } existente)
             return (existente, null);
         return (null, await CotizarAsync(command, ct));
     }
 
-    // Las reglas, la zona y la tarifa de cada bulto, con las mismas validaciones del alta.
-    private async Task<CotizacionEnvio> CotizarAsync(CrearEnvioCommand command, CancellationToken ct)
+    private static void ValidarDatos(CrearEnvioCommand command)
     {
         if (!Enum.IsDefined(command.Modalidad))
             throw new DomainException("Elegí una modalidad válida: Estándar o Urgente.");
-
-        // El envío guarda la versión de reglas que rige al admitirlo: las entregas y los intentos se juzgan con ella,
-        // aunque después se publique otra (letra 6.6). Sin reglas vigentes no se admiten envíos.
-        var reglas = await administracion.ReglasDeEntregaVigentesAsync(ct)
-            ?? throw new DomainException("El operador no tiene reglas operativas vigentes: todavía no puede admitir envíos.");
 
         if (command.Bultos.Count == 0)
             throw new DomainException("Un envío debe tener al menos un bulto.");
         if (command.Bultos.Any(b => b.PesoKg <= 0 || b.LargoCm <= 0 || b.AnchoCm <= 0 || b.AltoCm <= 0))
             throw new DomainException("El peso y las medidas del bulto deben ser mayores a cero.");
+    }
+
+    private async Task<CotizacionEnvio> CotizarAsync(CrearEnvioCommand command, CancellationToken ct)
+    {
+        // La versión vigente se conserva para las visitas e intentos posteriores (letra 6.6).
+        var reglas = await administracion.ReglasDeEntregaVigentesAsync(ct)
+            ?? throw new DomainException("El operador no tiene reglas operativas vigentes: todavía no puede admitir envíos.");
 
         var recursos = await administracion.ConsultarRecursosPlanificacionAsync(DateOnly.FromDateTime(reloj.GetUtcNow().UtcDateTime), ct);
         var zona = recursos.Zonas.SingleOrDefault(z => z.CodigosPostales.Contains(command.Direccion.CodigoPostal))
-            ?? throw new DomainException("El operador no cubre el código postal de la dirección.");
+            ?? throw new EnvioNoCotizableException("El operador no cubre el código postal de la dirección.");
 
         var bultos = new List<DatosBulto>();
         DatosVersionTarifario? versionTarifario = null;
@@ -108,7 +112,7 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             catch (OverflowException) { throw new DomainException($"Las medidas del bulto {bultos.Count + 1} son demasiado grandes."); }
 
             var tarifa = await administracion.CalcularTarifaAsync(zona.Id, command.Modalidad, bulto.PesoKg, volumenM3, ct)
-                ?? throw new DomainException($"El bulto {bultos.Count + 1} no tiene una tarifa aplicable en el cuadro tarifario vigente.");
+                ?? throw new EnvioNoCotizableException($"El bulto {bultos.Count + 1} no tiene una tarifa aplicable en el cuadro tarifario vigente.");
             if (versionTarifario is not null && versionTarifario.Id != tarifa.VersionTarifarioId)
                 throw new DomainException("El cuadro tarifario cambió durante el alta. Volvé a confirmar el envío.");
             versionTarifario = new DatosVersionTarifario(tarifa.VersionTarifarioId, tarifa.VersionTarifarioNumero);

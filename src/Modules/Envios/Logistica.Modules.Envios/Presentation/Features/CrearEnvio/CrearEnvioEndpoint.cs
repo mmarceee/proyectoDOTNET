@@ -22,6 +22,13 @@ internal static class CrearEnvioEndpoint
     private static async Task<Created<CrearEnvioResponse>> CrearAsync(
         CrearEnvioRequest request, CrearEnvioHandler handler, CancellationToken ct)
     {
+        var envio = await handler.HandleAsync(AComando(request, OrigenEvento.PortalComercio), ct);
+        return TypedResults.Created($"/api/envios/{envio.Id}", new CrearEnvioResponse(envio.Id, envio.Numero));
+    }
+
+    internal static CrearEnvioCommand AComando(CrearEnvioRequest request, OrigenEvento origen,
+        string? referenciaComercio = null, bool esPrueba = false)
+    {
         var d = request.Destinatario;
         var dir = request.Direccion;
         var modalidad = request.Modalidad switch
@@ -31,15 +38,10 @@ internal static class CrearEnvioEndpoint
             _ => throw new DomainException("Elegí una modalidad válida: Estándar o Urgente."),
         };
 
-        var command = new CrearEnvioCommand(
+        return new CrearEnvioCommand(
             new Destinatario(d.Nombre, d.Telefono, d.Email, d.Documento),
             new Direccion(dir.Calle, dir.Numero, dir.Localidad, dir.Departamento, dir.CodigoPostal, dir.Referencia),
             request.Bultos.Select(b => new BultoACrear(b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
-            OrigenEvento.PortalComercio,
-            modalidad);
-
-        var envio = await handler.HandleAsync(command, ct);
-
-        return TypedResults.Created($"/api/envios/{envio.Id}", new CrearEnvioResponse(envio.Id, envio.Numero));
+            origen, modalidad, referenciaComercio, esPrueba);
     }
 }

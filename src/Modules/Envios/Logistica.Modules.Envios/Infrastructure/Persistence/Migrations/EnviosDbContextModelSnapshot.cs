@@ -204,6 +204,11 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("EsPrueba")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Estado")
                         .IsRequired()
                         .HasColumnType("text");
@@ -320,7 +325,7 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OperadorId", "Resumen");
 
-                    b.HasIndex("OperadorId", "ComercioId", "ReferenciaComercio")
+                    b.HasIndex("OperadorId", "ComercioId", "EsPrueba", "ReferenciaComercio")
                         .IsUnique()
                         .HasDatabaseName("UX_Envios_ReferenciaComercio");
 

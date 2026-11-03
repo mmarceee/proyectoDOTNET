@@ -15,6 +15,7 @@ internal sealed class AdministracionDbContext(DbContextOptions<AdministracionDbC
     public DbSet<LogoOperador> Logos => Set<LogoOperador>();
     public DbSet<Comercio> Comercios => Set<Comercio>();
     public DbSet<RelacionComercial> RelacionesComerciales => Set<RelacionComercial>();
+    public DbSet<ClaveApi> ClavesApi => Set<ClaveApi>();
     public DbSet<Domain.Planificacion.Repartidor> Repartidores => Set<Domain.Planificacion.Repartidor>();
     public DbSet<Domain.Planificacion.Vehiculo> Vehiculos => Set<Domain.Planificacion.Vehiculo>();
     public DbSet<Domain.Planificacion.Zona> Zonas => Set<Domain.Planificacion.Zona>();
