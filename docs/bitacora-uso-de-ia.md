@@ -787,6 +787,19 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | La descarga en PDF: el nivel básico pide poder descargarla, y el CSV se abre en cualquier planilla. Un detalle del envío en el Portal desde cada línea: el Portal todavía no tiene esa página. |
 | **Verificación** | Un caso unitario del CSV (BOM, separadores, coma decimal y totales) y 2 pruebas de integración (borradores ocultos, emisión que suma al saldo, detalle con la fecha en días del operador, descarga, pago que descuenta del saldo; el mismo comercio con otro operador no la ve y el personal del operador recibe 403). Corrida completa en Docker: 963 pruebas .NET (365 unitarias, 56 de arquitectura y 542 de integración), todas pasan; cobertura de líneas del 95,4 %. Las páginas se probaron en el navegador con `docker compose`: listado, detalle y descarga. |
 
+## **3.53 Suite de pruebas más rápida**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | `PostgresApiFactory` (PostgreSQL compartido y `PostgresCompartido`), `ConfiguracionPruebas.cs` (paralelismo y colección `ContenedoresPropios`), las siete clases con contenedores propios, `RabbitMqFixture`, `scripts/test-en-docker.sh`, `README.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Bajar la suite completa de unos 25 minutos, que frenaba cada caso de uso, sin perder el aislamiento por clase ni la cobertura. |
+| **Cómo se trabajó** | La IA midió la corrida con los tiempos de los TRX: 12,7 minutos de pruebas en serie y 10,3 de huecos entre clases (74 arranques de unos 8 s: contenedor, migraciones de siete esquemas, datos iniciales y API). A pedido del responsable revisó antes que ninguna prueba dependiera del orden o de estado compartido: no hay estáticos mutables ni configuración global; los oyentes de trazas y métricas filtran por su traza o su caché; los contenedores propios publican puertos al azar; las cuentas fijas se limitan a datos de la propia prueba. |
+| **Decisiones** | Un solo PostgreSQL para la suite y una base por clase clonada de una plantilla ya migrada y sembrada; las clonaciones van de a una, porque PostgreSQL no copia una plantilla en uso, y `max_connections` sube a 300 por los pools de las API en paralelo. Las clases corren en paralelo hasta cuatro a la vez, el número de núcleos de los runners de GitHub; las pruebas de una clase siguen en serie. Las siete clases con contenedores propios y esperas de 30 a 45 s corren solas, en una colección sin paralelismo. `RabbitMqFixture` espera el mensaje "Server startup complete" en lugar del puerto: el puerto abre antes de que el broker esté listo, y eso causó el fallo intermitente de `TrazasMensajeriaTests` con la máquina cargada. El script acepta un filtro sin cobertura para el trabajo diario y guarda los paquetes de NuGet en un volumen. Se mantienen el límite de 4 GiB de heap por proceso y el catálogo estático vacío de la entrada 3.44. |
+| **Verificación** | Corrida completa en Docker: 963 pruebas (365 unitarias, 56 de arquitectura y 542 de integración), todas pasan, cobertura del 95,4 %, en 8 min 29 s en total (integración en 7 min 4 s, antes 17,5 a 23 min). Con filtro, las 66 pruebas de Depósito, compilación incluida, en 2 minutos. El CI todavía no corrió con estos cambios. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -825,3 +838,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.32 | 03/11/2026 | Entrada de CU-32, generar la liquidación de un comercio. | Ezequiel Marcenal |
 | 0.33 | 03/11/2026 | CU-32: eliminación del borrador (A4). | Ezequiel Marcenal |
 | 0.34 | 03/11/2026 | Entrada de CU-33, consultar la cuenta corriente y las liquidaciones. | Ezequiel Marcenal |
+| 0.35 | 03/11/2026 | Entrada de la suite de pruebas más rápida. | Ezequiel Marcenal |
