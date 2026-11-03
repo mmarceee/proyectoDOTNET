@@ -19,6 +19,11 @@ internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoRe
             consulta = consulta.Where(e => e.Estado == estado);
         }
 
+        if (query.Resumen is { } resumen)
+        {
+            consulta = consulta.Where(e => e.Resumen == resumen);
+        }
+
         if (query.FechaDesde is { } desde)
         {
             var inicio = InicioDelDiaUtc(desde);
@@ -69,7 +74,11 @@ internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoRe
                 e.Estado.ToString(),
                 e.CreadoEn,
                 e.MontoTarifa,
-                e.Modalidad.ToString()))
+                e.Modalidad.ToString(),
+                e.Resumen.ToString(),
+                e.Terminado,
+                e.BultosEntregados,
+                e.Bultos.Count))
             .ToListAsync(ct);
 
         return new ConsultarEnviosResult(

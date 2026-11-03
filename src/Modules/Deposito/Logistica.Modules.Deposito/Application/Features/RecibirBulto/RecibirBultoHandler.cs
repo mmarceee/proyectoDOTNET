@@ -4,8 +4,8 @@ using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Deposito.Application.Features.RecibirBulto;
 
-// CU-30, versión mínima: registra la recepción de un bulto y, cuando llegaron todos los del envío,
-// le pide a Envíos que aplique T2. Depósito nunca toca las tablas de Envíos: usa su contrato.
+// CU-30, versión mínima: registra la recepción de un bulto y le pide a Envíos que aplique T2 a ese bulto (RF 31);
+// cuando llegaron todos, el envío queda EnDeposito. Depósito nunca toca las tablas de Envíos: usa su contrato.
 internal sealed class RecibirBultoHandler(
     IEnviosModuleApi envios,
     IRecepcionRepository recepciones,
@@ -57,18 +57,14 @@ internal sealed class RecibirBultoHandler(
         recepciones.Agregar(recepcion);
         recibidos.Add(bulto.BultoId);
 
-        var envioCompleto = envio.Bultos.All(b => recibidos.Contains(b.BultoId));
+        var envioCompleto = false;
 
-        // La recepción (Depósito) y la transición T2 (Envíos) se guardan juntas o ninguna
-        // (ADR-0001, addendum 3; CU-30, requerimiento especial 3).
+        // La recepción (Depósito) y la transición T2 del bulto (Envíos) se guardan juntas o ninguna
+        // (ADR-0001, addendum 3; CU-30, requerimiento especial 3). Con RF 31 cada bulto escaneado cambia de estado.
         await unidadDeTrabajo.EjecutarAsync(async () =>
         {
             await recepciones.GuardarCambiosAsync(ct);
-
-            if (envioCompleto)
-            {
-                await envios.RecibirEnDepositoAsync(envio.EnvioId, responsableId: null, ct);
-            }
+            envioCompleto = await envios.RecibirBultoAsync(envio.EnvioId, bulto.BultoId, responsableId: null, ct);
         }, ct);
 
         return new RecepcionRegistrada(

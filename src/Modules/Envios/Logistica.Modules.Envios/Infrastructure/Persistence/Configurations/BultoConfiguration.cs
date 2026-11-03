@@ -12,5 +12,8 @@ internal sealed class BultoConfiguration : IEntityTypeConfiguration<Bulto>
 
         // El código es lo que se escanea en el depósito: único dentro de cada operador (CU-30).
         builder.HasIndex(b => new { b.OperadorId, b.Codigo }).IsUnique();
+
+        // RF 31: el estado operativo del bulto, como texto, igual que el del envío.
+        builder.Property(b => b.Estado).HasConversion<string>();
     }
 }

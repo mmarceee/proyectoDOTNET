@@ -8,4 +8,9 @@ internal sealed record EnvioListadoDto(
     string Estado,
     DateTimeOffset CreadoEn,
     decimal MontoTarifa,
-    string Modalidad = "Estandar");
+    string Modalidad = "Estandar",
+    // RF 31: el resumen derivado de los bultos, si ya terminó y el contador entregados / total.
+    string Resumen = "Creado",
+    bool Terminado = false,
+    int BultosEntregados = 0,
+    int TotalBultos = 0);
