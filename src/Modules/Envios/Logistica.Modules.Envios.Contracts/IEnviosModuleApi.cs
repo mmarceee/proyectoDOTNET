@@ -22,11 +22,12 @@ public interface IEnviosModuleApi
     // T4. Planificación comprueba pertenencia y estado de la ruta dentro de la transacción compartida.
     Task DesasignarDeRutaAsync(Guid rutaId, Guid envioId, Guid? responsableId, CancellationToken ct);
 
-    // CU-17 (T6) y CU-18 (T7 con T9 o T10), desde la sincronización de la PWA (CU-52). No lanzan por reglas de negocio:
-    // devuelven el resultado para que Ejecución aplique la política de conflictos (ADR-0004). Guardan con la unidad de
-    // trabajo en curso, junto con el registro de la operación.
-    Task<RegistroEnCalle> RegistrarEntregaAsync(EntregaARegistrar entrega, CancellationToken ct);
-    Task<RegistroEnCalle> RegistrarIntentoFallidoAsync(IntentoFallidoARegistrar intento, CancellationToken ct);
+    // CU-17 y CU-18 por bulto (RF 31 y 32), desde la sincronización de la PWA (CU-52; ADR-0004, sección 2.11). Ejecución
+    // consulta los bultos del envío para clasificar cada uno antes de registrar la visita. El registro no lanza por
+    // reglas de negocio: devuelve el resultado para que Ejecución aplique la política de conflictos. Guarda con la unidad
+    // de trabajo en curso, junto con el registro de la operación.
+    Task<EnvioParaVisita?> ConsultarParaVisitaAsync(Guid envioId, CancellationToken ct);
+    Task<RegistroEnCalle> RegistrarVisitaAsync(VisitaARegistrar visita, CancellationToken ct);
 
     // CU-04: ¿algún envío sin terminar tiene una de estas franjas comprometida en esa fecha o después? Administración
     // lo pregunta antes de reemplazar una franja, para no cambiar un horario prometido sin aviso.

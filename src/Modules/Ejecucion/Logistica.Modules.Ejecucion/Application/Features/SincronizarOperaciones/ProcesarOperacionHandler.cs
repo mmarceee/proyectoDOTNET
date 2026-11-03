@@ -13,7 +13,7 @@ using Logistica.Modules.Ejecucion.Contracts.Events;
 namespace Logistica.Modules.Ejecucion.Application.Features.SincronizarOperaciones;
 
 // Una operación de la PWA (ADR-0004): idempotencia, hora, pertenencia, validez y transición, en ese orden. El servidor
-// decide con la máquina de estados del envío; lo que no se puede aplicar se guarda completo, sin aplicarse.
+// decide con la máquina de estados de cada bulto; lo que no se puede aplicar se guarda completo, sin aplicarse.
 internal sealed class ProcesarOperacionHandler(
     IOperacionRepository operaciones,
     IEnviosModuleApi envios,
@@ -28,6 +28,7 @@ internal sealed class ProcesarOperacionHandler(
     Features.ReportarPosicion.ReportarPosicionHandler posiciones,
     IIntegrationEventPublisher eventos)
 {
+    public const string TipoVisita = "RegistrarVisita";
     public const string TipoEntrega = "RegistrarEntrega";
     public const string TipoIntentoFallido = "RegistrarIntentoFallido";
 
@@ -48,7 +49,8 @@ internal sealed class ProcesarOperacionHandler(
                     ? new(command.Operacion.OperacionId, Resultados.Conflicto, "RutaNoAsignada")
                     : existente.Resultado == ResultadoOperacion.Aplicada
                         ? new(command.Operacion.OperacionId, Resultados.YaAplicada)
-                        : new(command.Operacion.OperacionId, Nombre(existente.Resultado), existente.Motivo, existente.Detalle);
+                        : new(command.Operacion.OperacionId, Nombre(existente.Resultado), existente.Motivo, existente.Detalle,
+                            existente.Bultos is null ? null : JsonSerializer.Deserialize<List<BultoRechazadoResponse>>(existente.Bultos));
                 return;
             }
             resultado = await ProcesarAsync(command, ct);
@@ -78,18 +80,19 @@ internal sealed class ProcesarOperacionHandler(
 
         if (op.Tipo == "IniciarRendicion") return await rendir.HandleAsync(command, datos, ct);
         if (op.Tipo == "ReportarPosicion") return await posiciones.HandleAsync(command, datos, ct);
-        if (op.Tipo is "ConfirmarCarga" or TipoEntrega or TipoIntentoFallido
+        if (op.Tipo is "ConfirmarCarga" or TipoVisita or TipoEntrega or TipoIntentoFallido
             && await rendiciones.ObtenerAsync(op.RutaId, ct) is { } rendicion)
             return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto,
                 rendicion.RepartidorId == command.RepartidorId ? "RutaEnRendicion" : "RutaNoAsignada", null, ct);
         if (op.Tipo == "ConfirmarCarga") return await cargas.HandleAsync(command, datos, ct);
 
-        if (op.Tipo is not (TipoEntrega or TipoIntentoFallido))
+        if (op.Tipo is not (TipoVisita or TipoEntrega or TipoIntentoFallido))
         {
             return await RechazarAsync(op, datos, ResultadoOperacion.Invalida, "TipoNoSoportado", op.Tipo, ct);
         }
 
         if (op.EnvioId is not Guid envioId || op.Latitud is not decimal latitud || op.Longitud is not decimal longitud
+            || (op.Tipo == TipoVisita && op.Visita is not { Bultos.Count: > 0 })
             || (op.Tipo == TipoEntrega && op.Entrega is null) || (op.Tipo == TipoIntentoFallido && op.IntentoFallido is null))
         {
             return await RechazarAsync(op, datos, ResultadoOperacion.Invalida, "DatosIncompletos",
@@ -103,15 +106,28 @@ internal sealed class ProcesarOperacionHandler(
         }
 
         RegistroEnCalle? registro = null;
+        Diagnostico diagnostico = Diagnostico.SinRechazo;
         try
         {
-            // Pasos 2 a 4, y el registro de la operación, en una sola transacción: se aplican juntos o ninguno.
+            // La clasificación de cada bulto, la visita y el registro de la operación, en una sola transacción: se
+            // aplican juntos o ninguno (sección 2.11).
             await unidadDeTrabajo.EjecutarAsync(async () =>
             {
-                registro = op.Tipo == TipoEntrega
-                    ? await envios.RegistrarEntregaAsync(Entrega(op, envioId, latitud, longitud, datos, command.UsuarioId), ct)
-                    : await envios.RegistrarIntentoFallidoAsync(Intento(op, envioId, latitud, longitud, datos, command.UsuarioId), ct);
+                if (await envios.ConsultarParaVisitaAsync(envioId, ct) is not { } envio)
+                {
+                    registro = new(ResultadoRegistro.EnvioNoEncontrado);
+                    return;
+                }
 
+                var visita = Visita(op, envio);
+                diagnostico = DiagnosticoVisita.Evaluar(visita.Bultos, envio);
+                if (diagnostico.Rechazo is not null)
+                {
+                    return;
+                }
+
+                registro = await envios.RegistrarVisitaAsync(Registro(op, visita, envio, envioId, latitud, longitud, datos,
+                    command.UsuarioId), ct);
                 if (registro.Resultado == ResultadoRegistro.Aplicado)
                 {
                     operaciones.Agregar(OperacionDispositivo.Aplicada(op.OperacionId, datos));
@@ -125,37 +141,78 @@ internal sealed class ProcesarOperacionHandler(
             return await RechazarAsync(op, datos, ResultadoOperacion.Invalida, "ArchivoInvalido", null, ct);
         }
 
+        if (diagnostico.Rechazo is ResultadoOperacion rechazo)
+        {
+            // El detalle resume el diagnóstico para el tablero del despachador; la visita lo recibe también bulto por bulto.
+            var detalle = diagnostico.Bultos.Count == 0 ? null
+                : string.Join("; ", diagnostico.Bultos.Select(b => $"{b.CodigoBulto}: {b.Motivo}"));
+            return await RechazarAsync(op, datos, rechazo, Motivo(op, diagnostico.Motivo!), detalle, ct,
+                op.Tipo == TipoVisita ? diagnostico.Bultos : null);
+        }
+
         return registro!.Resultado switch
         {
             ResultadoRegistro.Aplicado => new(op.OperacionId, Resultados.Aplicada),
+            // Otro proceso cambió el envío entre la clasificación y el registro: un conflicto más.
             ResultadoRegistro.Conflicto => await RechazarAsync(op, datos, ResultadoOperacion.Conflicto,
-                MotivoDeConflicto(registro.EstadoActual), registro.EstadoActual, ct),
+                Motivo(op, "EstadoIncompatible"), registro.EstadoActual, ct),
             ResultadoRegistro.Invalido => await RechazarAsync(op, datos, ResultadoOperacion.Invalida,
-                "PruebaInvalida", registro.Detalle, ct),
+                Motivo(op, "EvidenciaIncompleta"), registro.Detalle, ct),
             _ => await RechazarAsync(op, datos, ResultadoOperacion.Invalida, "EnvioNoEncontrado", null, ct),
         };
     }
 
-    // Sección 2.5: se guarda la operación completa, con su evidencia, y no se aplica.
+    // Sección 2.5: se guarda la operación completa, con su evidencia, y no se aplica. En una visita, también el
+    // diagnóstico de cada bulto (sección 2.11).
     private async Task<ResultadoOperacionResponse> RechazarAsync(OperacionDispositivoRequest op, DatosOperacion datos,
-        ResultadoOperacion resultado, string motivo, string? detalle, CancellationToken ct)
+        ResultadoOperacion resultado, string motivo, string? detalle, CancellationToken ct,
+        IReadOnlyList<BultoRechazadoResponse>? bultos = null)
     {
         operaciones.Agregar(OperacionDispositivo.Rechazada(op.OperacionId, datos, resultado, motivo, detalle,
-            JsonSerializer.Serialize(op)));
+            JsonSerializer.Serialize(op), bultos is null ? null : JsonSerializer.Serialize(bultos)));
         await operaciones.GuardarCambiosAsync(ct);
 
-        return new(op.OperacionId, Nombre(resultado), motivo, detalle);
+        return new(op.OperacionId, Nombre(resultado), motivo, detalle, bultos);
     }
 
-    // Sección 2.4: el estado del servidor dice por qué la operación ya no se puede aplicar.
-    private static string MotivoDeConflicto(string? estadoActual)
+    // Una entrega o un intento fallido anteriores a la entrega parcial valían para todos los bultos del envío: se
+    // traducen a una visita con el mismo resultado para cada uno (sección 2.11). Si algún bulto ya no está en tránsito,
+    // la visita se clasifica como cualquier otra, sin inventar un resultado.
+    private static VisitaRequest Visita(OperacionDispositivoRequest op, EnvioParaVisita envio)
     {
-        return estadoActual switch
+        if (op.Tipo == TipoVisita)
         {
-            "Extraviado" => "EnvioExtraviado",
-            "EnDeposito" => "EnvioEnDeposito",
-            "Entregado" or "NoEntregado" or "Reprogramado" or "EnDevolucion" or "Devuelto" => "EnvioYaResuelto",
-            _ => "EstadoIncompatible",
+            return op.Visita!;
+        }
+
+        if (op.Tipo == TipoEntrega)
+        {
+            var entrega = op.Entrega!;
+            return new VisitaRequest(envio.Bultos.Select(b => new ResultadoBultoRequest(b.Codigo)).ToList(), entrega.Firma,
+                entrega.Foto, entrega.NombreReceptor, entrega.DocumentoReceptor);
+        }
+
+        var intento = op.IntentoFallido!;
+        return new VisitaRequest(envio.Bultos.Select(b => new ResultadoBultoRequest(b.Codigo, intento.MotivoId)).ToList(),
+            Foto: intento.Foto, Observaciones: intento.Observaciones);
+    }
+
+    // La PWA anterior a la entrega parcial conoce los motivos por envío: sus operaciones los conservan (sección 2.4).
+    private static string Motivo(OperacionDispositivoRequest op, string motivo)
+    {
+        if (op.Tipo == TipoVisita)
+        {
+            return motivo;
+        }
+
+        return motivo switch
+        {
+            "BultoExtraviado" => "EnvioExtraviado",
+            "BultoEnDeposito" => "EnvioEnDeposito",
+            "BultoYaResuelto" => "EnvioYaResuelto",
+            "EvidenciaIncompleta" => "PruebaInvalida",
+            "BultoFueraDeRuta" => "EstadoIncompatible",
+            _ => motivo,
         };
     }
 
@@ -173,20 +230,15 @@ internal sealed class ProcesarOperacionHandler(
             op.EnvioId, adelantada ? recibidoEn : op.OcurridoEn, recibidoEn, adelantada);
     }
 
-    private static EntregaARegistrar Entrega(OperacionDispositivoRequest op, Guid envioId, decimal latitud, decimal longitud,
-        DatosOperacion datos, Guid? usuarioId)
+    // La visita ya clasificada: cada código de bulto es de este envío.
+    private static VisitaARegistrar Registro(OperacionDispositivoRequest op, VisitaRequest visita, EnvioParaVisita envio,
+        Guid envioId, decimal latitud, decimal longitud, DatosOperacion datos, Guid? usuarioId)
     {
-        var entrega = op.Entrega!;
-        return new EntregaARegistrar(envioId, datos.OcurridoEn, latitud, longitud, Archivo(entrega.Firma),
-            entrega.Foto is null ? null : Archivo(entrega.Foto), entrega.NombreReceptor, entrega.DocumentoReceptor, usuarioId);
-    }
-
-    private static IntentoFallidoARegistrar Intento(OperacionDispositivoRequest op, Guid envioId, decimal latitud,
-        decimal longitud, DatosOperacion datos, Guid? usuarioId)
-    {
-        var intento = op.IntentoFallido!;
-        return new IntentoFallidoARegistrar(envioId, datos.OcurridoEn, latitud, longitud, intento.MotivoId,
-            intento.Foto is null ? null : Archivo(intento.Foto), intento.Observaciones, usuarioId);
+        var porCodigo = envio.Bultos.ToDictionary(b => b.Codigo, b => b.BultoId, StringComparer.OrdinalIgnoreCase);
+        return new VisitaARegistrar(envioId, datos.OcurridoEn, latitud, longitud,
+            visita.Bultos.Select(b => new ResultadoBultoARegistrar(porCodigo[b.CodigoBulto.Trim()], b.MotivoId)).ToList(),
+            visita.Firma is null ? null : Archivo(visita.Firma), visita.Foto is null ? null : Archivo(visita.Foto),
+            visita.NombreReceptor, visita.DocumentoReceptor, visita.Observaciones, usuarioId);
     }
 
     private static ArchivoRecibido Archivo(ArchivoRequest archivo)

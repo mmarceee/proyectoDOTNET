@@ -41,6 +41,10 @@ internal sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         builder.ComplexProperty(e => e.Direccion);
 
         builder.HasMany(e => e.Bultos).WithOne().HasForeignKey(b => b.EnvioId);
+        // Los bultos se cargan siempre con su envío (RF 31): el envío mueve a los bultos que lo acompañan y recalcula su
+        // resumen a partir de ellos. Un envío cargado sin bultos los dejaría atrás (un extravío, una cancelación) y
+        // calcularía el resumen sobre una lista vacía, con Terminado en true.
+        builder.Navigation(e => e.Bultos).AutoInclude();
         builder.HasMany(e => e.Eventos).WithOne().HasForeignKey(ev => ev.EnvioId);
         builder.HasMany(e => e.Intentos).WithOne().HasForeignKey(i => i.EnvioId);
 

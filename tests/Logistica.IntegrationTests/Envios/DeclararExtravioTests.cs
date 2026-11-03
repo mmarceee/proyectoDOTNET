@@ -30,6 +30,10 @@ public class DeclararExtravioTests(PostgresApiFactory factory) : IClassFixture<P
         Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
         Assert.Equal($"/backoffice/envios/{envio.Numero}", respuesta.Headers.Location?.OriginalString);
         Assert.Equal("Extraviado", await EstadoAsync(envio.Id));
+        // RF 31: el extravío del envío entero lleva a sus bultos, y el resumen no queda como si estuviera terminado sin
+        // haberse cargado los bultos (EnvioConfiguration los incluye siempre).
+        Assert.Equal(0L, await ConsultarAsync<long>(
+            """SELECT count(*) FROM envios."Bultos" WHERE "EnvioId" = @id AND "Estado" <> 'Extraviado'""", envio.Id));
         Assert.Equal("Robo de la camioneta", await ConsultarAsync<string>(
             """SELECT "Detalle" FROM envios."EventosEnvio" WHERE "EnvioId" = @id AND "EstadoNuevo" = 'Extraviado'""", envio.Id));
         Assert.Equal("Robo de la camioneta", await ConsultarAsync<string>(

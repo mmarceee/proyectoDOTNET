@@ -5,4 +5,10 @@ public sealed record SincronizacionResponse(IReadOnlyList<ResultadoOperacionResp
 
 // Resultado: "Aplicada", "YaAplicada", "Conflicto" o "Invalida". Motivo: código del conflicto o de la invalidez
 // (por ejemplo, "EnvioExtraviado" o "TipoNoSoportado"). La PWA borra de su cola las Aplicada y YaAplicada.
-public sealed record ResultadoOperacionResponse(Guid OperacionId, string Resultado, string? Motivo = null, string? Detalle = null);
+// Bultos: en una visita rechazada, el diagnóstico de cada bulto con su motivo (ADR-0004, sección 2.11).
+public sealed record ResultadoOperacionResponse(Guid OperacionId, string Resultado, string? Motivo = null, string? Detalle = null,
+    IReadOnlyList<BultoRechazadoResponse>? Bultos = null);
+
+// Un bulto rechazado de una visita: "BultoExtraviado", "BultoEnDeposito", "BultoYaResuelto", "BultoFueraDeRuta",
+// "BultoAjenoAlEnvio", "BultoRepetido" o "BultoSinResultado".
+public sealed record BultoRechazadoResponse(string CodigoBulto, string Motivo);

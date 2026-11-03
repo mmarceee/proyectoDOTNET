@@ -25,7 +25,9 @@ internal sealed class RendicionRepository(EjecucionDbContext db) : IRendicionRep
         // No traer firmas, fotos ni el payload rechazado para preparar la rendición.
         var ops = await db.Operaciones.AsNoTracking().Where(o => o.RutaId == rutaId)
             .Select(o => new OperacionRuta(o.Id, o.RepartidorId, o.EnvioId, o.Tipo, o.Resultado, o.Revisada)).ToListAsync(ct);
-        return new(bultos.ToHashSet(), ops.Where(o => o.Resultado == ResultadoOperacion.Aplicada && o.Tipo == "RegistrarIntentoFallido"
+        // Una visita aplicada cuenta como intento: si el envío quedó Reprogramado o EnDevolucion, tuvo bultos sin entregar.
+        return new(bultos.ToHashSet(), ops.Where(o => o.Resultado == ResultadoOperacion.Aplicada
+                && o.Tipo is "RegistrarIntentoFallido" or "RegistrarVisita"
                 && o.EnvioId != null).Select(o => o.EnvioId!.Value).ToHashSet(), ops);
     }
     public async Task<bool> TieneActividadRegistradaAsync(Guid rutaId, CancellationToken ct)
