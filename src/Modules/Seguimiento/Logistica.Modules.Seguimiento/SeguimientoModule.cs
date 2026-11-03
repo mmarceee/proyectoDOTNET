@@ -18,6 +18,7 @@ using Logistica.Modules.Seguimiento.Infrastructure.Security;
 using Logistica.Modules.Seguimiento.Infrastructure.Http;
 using Logistica.Modules.Seguimiento.Application.Features.EntregarAvisos;
 using Logistica.Modules.Seguimiento.Application.Features.NotificarDestinatario;
+using Logistica.Modules.Seguimiento.Application.Features.EnviarInvitacion;
 using Logistica.Modules.Seguimiento.Application.HechosEnvio;
 using Logistica.Modules.Seguimiento.Domain.Notificaciones;
 using Logistica.Modules.Seguimiento.Infrastructure.Correo;
@@ -129,6 +130,11 @@ public static class SeguimientoModule
         }
         services.AddKeyedScoped<IConsumidorIntegracion, ActualizarIdentidadOperador>(ActualizarIdentidadOperador.Cola);
         services.AddSingleton(new SuscripcionIntegracion(ActualizarIdentidadOperador.Cola, IdentidadVisualActualizada.Tipo));
+
+        // CU-02, paso 7: el correo de invitación con el enlace para definir la contraseña.
+        services.AddScoped<EnviarInvitacionHandler>();
+        services.AddKeyedScoped<IConsumidorIntegracion, EnviarInvitacion>(EnviarInvitacion.Cola);
+        services.AddSingleton(new SuscripcionIntegracion(EnviarInvitacion.Cola, UsuarioInvitado.Tipo));
 
         services.AddKeyedScoped<IConsumidorIntegracion, NotificarRutaDespachada>(NotificarRutaDespachada.Cola);
         services.AddSingleton(new SuscripcionIntegracion(NotificarRutaDespachada.Cola, RutaDespachada.Tipo));
