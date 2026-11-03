@@ -458,7 +458,7 @@ Produccion, Prueba
 
 * relacionComercialId: Guid
 
-* referenciaComercio: string (identificador propio del comercio; único dentro de una misma RelacionComercial — sostiene la idempotencia de la importación masiva, RF 7\)
+* referenciaComercio: string (opcional, hasta 50 caracteres; identificador propio del comercio, sin espacios en los extremos y distinguiendo mayúsculas. Único dentro de una misma RelacionComercial, implementado como índice sobre operadorId, comercioId y referenciaComercio — sostiene la idempotencia de la importación masiva, RF 7, CU-11, y del alta por API, CU-81\)
 
 * numero: string (único por operador: índice único {operadorId, numero} — ADR-0002; CU-10)
 
@@ -1230,6 +1230,10 @@ Los agregados no se llaman entre sí directamente: la capa de aplicación (no el
 
 * generadaEn: DateTimeOffset
 
+* emitidaEn: DateTimeOffset (opcional)
+
+* pagadaEn: DateTimeOffset (opcional)
+
 **Métodos**
 
 * emitir(): void — Borrador → Emitida (CU-32)
@@ -1245,6 +1249,10 @@ Los agregados no se llaman entre sí directamente: la capa de aplicación (no el
 * liquidacionId: Guid
 
 * envioId: Guid (único: un envío aparece en una sola liquidación — CU-32, A2)
+
+* numeroEnvio: string (para que el comercio reconozca la línea — CU-33)
+
+* fecha: DateTimeOffset (cuando el envío llegó a Entregado o Devuelto)
 
 * concepto: string
 
@@ -1264,7 +1272,9 @@ Borrador, Emitida, Pagada
 
 * Devolucion ya está completamente definida en la sección de Envíos, bultos y ciclo de vida, junto al resto del ciclo de vida del envío, y no se repite acá.
 
-* Depósito y liquidaciones mantiene su propia copia de los envíos liquidables, alimentada por los eventos EnvioEntregado y EnvioDevuelto; no consulta las tablas de Envíos (CU-32).
+* Depósito y liquidaciones no consulta las tablas de Envíos: al generar la liquidación pide los envíos liquidables del período al contrato de Envíos (`IEnviosModuleApi.ListarLiquidablesAsync`), con la tarifa de su admisión (CU-32). Reemplaza la copia propia alimentada por los eventos EnvioEntregado y EnvioDevuelto: esos eventos no traen la tarifa, los consumidores de RabbitMQ sólo corren en el Worker y la definición de envío liquidable cambia con la entrega parcial (RF 31 a 36), así que conviene que la conserve Envíos (03/11/2026, Ezequiel Marcenal).
+
+* La liquidación guarda operadorId y comercioId, como el resto de las clases del comercio, en lugar de relacionComercialId.
 
 # **Relaciones del modelo completo**
 
@@ -1356,6 +1366,8 @@ Puntos del modelo que dependen de una decisión del equipo (o, en algún caso, d
 * Usuario y ClaveApi frente al filtro de inquilino: Usuario (Identity) no tiene filtro y la búsqueda de ClaveApi por hash es el único acceso que lo ignora (ADR-0002 v2.1, secciones 2.4 y 4).
 
 * Zona y FranjaHoraria (18/10/2026, Cristian Reyes y Lucas Ottonello): FranjaHoraria es una entidad propia asociada a Zona por zonaId, no una parte de su composición, porque Planificación y CU-19 ya la consultan y reemplazan por separado. Las reglas que comparan franjas entre sí (superposición, CU-04 A3) usan FranjaHoraria.seSuperponeCon y las coordina el caso de uso. La reprogramación por lote de la ampliación de CU-04 queda pendiente; mientras tanto, el reemplazo se bloquea si hay envíos comprometidos (sección de Zona y FranjaHoraria).
+
+* Referencia del comercio (03/11/2026, Ezequiel Marcenal): el índice único es (operadorId, comercioId, referenciaComercio), que identifica la relación comercial sin agregarle al envío un relacionComercialId. Los envíos sin referencia no chocan entre sí, porque PostgreSQL considera distintos los NULL de un índice único. La propuesta de API pública sugiere sumar el ambiente de pruebas a esa unicidad; se agrega al implementar CU-81.
 
 **Abiertos**
 

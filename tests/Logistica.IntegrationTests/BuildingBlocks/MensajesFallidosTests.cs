@@ -18,6 +18,7 @@ namespace Logistica.IntegrationTests.BuildingBlocks;
 
 // CU-09 y ADR-0003, sección 2.6: el registrador vacía logistica.fallidos en mensajes_fallidos, con el inquilino del sobre,
 // y el administrador reintenta (mismo MessageId, en su cola de origen) o descarta (con motivo).
+[Collection(ContenedoresPropios.Nombre)]
 public sealed class MensajesFallidosTests(PostgresApiFactory factory, RabbitMqFixture rabbit)
     : IClassFixture<PostgresApiFactory>, IClassFixture<RabbitMqFixture>
 {

@@ -11,4 +11,6 @@ internal sealed class DepositoDbContext(DbContextOptions<DepositoDbContext> opti
     public const string Schema = "deposito";
 
     public DbSet<RecepcionDeposito> Recepciones => Set<RecepcionDeposito>();
+    public DbSet<Domain.Liquidaciones.Liquidacion> Liquidaciones => Set<Domain.Liquidaciones.Liquidacion>();
+    public DbSet<Domain.Liquidaciones.LineaLiquidacion> LineasLiquidacion => Set<Domain.Liquidaciones.LineaLiquidacion>();
 }

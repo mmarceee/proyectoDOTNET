@@ -10,6 +10,7 @@ namespace Logistica.IntegrationTests.BuildingBlocks;
 // La garantía del addendum 3 del ADR-0001: cuando un caso de uso escribe en dos módulos, se guardan
 // los dos cambios o ninguno. Dos instancias de DbContext hacen de "dos módulos" sobre la misma unidad
 // de trabajo, contra un PostgreSQL real.
+[Collection(ContenedoresPropios.Nombre)]
 public sealed class UnidadDeTrabajoTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17.6").Build();

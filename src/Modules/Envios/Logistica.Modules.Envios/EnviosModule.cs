@@ -40,6 +40,8 @@ public static class EnviosModule
         services.AddScoped<IArchivoEvidenciaReader, ArchivoEvidenciaReader>();
         services.AddScoped<ConsultarEvidenciaHandler>();
         services.AddScoped<CrearEnvioHandler>();
+        services.AddScoped<Application.Features.ImportarEnvios.ImportarEnviosHandler>();
+        services.AddScoped<Application.Features.ImportarEnvios.IAmbitoPorEnvio, Infrastructure.AmbitoPorEnvio>();
         services.AddScoped<CancelarEnvioHandler>();
         services.AddScoped<ReprogramarEnvioHandler>();
         services.AddScoped<DeclararExtravioHandler>();
@@ -61,6 +63,7 @@ public static class EnviosModule
         var group = endpoints.MapGroup("/api/envios").WithTags("Envios");
 
         CrearEnvioEndpoint.Map(group);
+        Presentation.Features.ImportarEnvios.ImportarEnviosEndpoint.Map(group);
         CancelarEnvioEndpoint.Map(group);
         ReprogramarEnvioEndpoint.Map(group);
         IniciarDevolucionEndpoint.Map(group);

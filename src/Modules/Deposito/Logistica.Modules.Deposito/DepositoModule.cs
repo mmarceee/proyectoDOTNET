@@ -32,6 +32,13 @@ public static class DepositoModule
         // CU-31: confirmar la devolución al comercio.
         services.AddScoped<Application.Features.ConfirmarDevolucion.ConfirmarDevolucionHandler>();
 
+        // CU-32: generar la liquidación de un comercio.
+        services.AddScoped<Domain.Liquidaciones.ILiquidacionRepository, LiquidacionRepository>();
+        services.AddScoped<Application.Features.GenerarLiquidacion.GenerarLiquidacionHandler>();
+
+        // CU-33: la cuenta corriente del comercio.
+        services.AddScoped<Application.Features.ConsultarCuentaCorriente.ConsultarCuentaCorrienteHandler>();
+
         return services;
     }
 
@@ -40,6 +47,7 @@ public static class DepositoModule
         var group = endpoints.MapGroup("/api/deposito").WithTags("Deposito");
 
         RecibirBultoEndpoint.Map(group);
+        Presentation.Features.ConsultarCuentaCorriente.ConsultarCuentaCorrienteEndpoint.Map(endpoints);
 
         return endpoints;
     }

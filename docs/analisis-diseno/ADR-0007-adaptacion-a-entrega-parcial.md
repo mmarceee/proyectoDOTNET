@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptado como decisión de diseño. Implementación y evaluación retrospectiva pendientes.** |
-| Versión y fecha | 1.0 · 02/11/2026 |
+| Versión y fecha | 1.1 · 02/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | `586f630` (CU-42) |
@@ -30,7 +30,7 @@ Se mantiene Envio como raíz coordinadora con bultos identificables. Los estados
 
 El resumen no gobierna recepción, carga, asignación o devolución. Cada operación valida los bultos afectados y recalcula el envío una sola vez, al final. Un cierre parcial conserva Entregado parcialmente; Terminado distingue si queda trabajo. Un cierre sin entregas se muestra como Finalizado sin entrega con desglose, sin introducir un quinto estado persistido del resumen.
 
-La tabla de transiciones de bulto y la del resumen deben seguir siendo declarativas y verificables. No se omiten controles para hacer pasar combinaciones nuevas ni se fuerzan estados artificiales del envío para conservar T1 a T19 sin revisión. Un intento fallido de revisita no borra entregas anteriores. El criterio de inicio de ejecución y su evidencia por bulto debe explicitarse para evitar que un reintegro haga volver el resumen a Creado.
+La tabla de transiciones de bulto y la del resumen deben seguir siendo declarativas y verificables. No se omiten controles para hacer pasar combinaciones nuevas ni se fuerzan estados artificiales del envío para conservar T1 a T19 sin revisión. Un intento fallido de revisita no borra entregas anteriores. La ejecución se inicia con la recepción del primer bulto; ningún reintegro ni cancelación posterior hace volver el resumen a Creado.
 
 ### 2.2 Comunicación, atomicidad y sincronización
 
@@ -99,7 +99,7 @@ El cierre resumido no reemplaza la custodia física, la rendición ni el cierre 
 
 Se deben actualizar [modelo de dominio](modelo-de-dominio.md), [tabla de transiciones](tabla-de-transiciones-de-estados.md), [casos de uso](casos-de-uso.md), ADR-0004, ADR-0006, contratos de avisos y manuales de prueba. Los vínculos añadidos ahora señalan la decisión nueva; no convierten automáticamente sus tablas históricas en el diseño ya implementado.
 
-Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de entrega parcial](decisiones-entrega-parcial.md): matriz completa/inicio de ejecución, custodia y carga incompleta, exclusividad, extravío individual, migración y compatibilidad, avisos, progreso y contrato monetario. Este ADR no los presenta como resueltos por omisión.
+Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de entrega parcial](decisiones-entrega-parcial.md): matriz completa, custodia y carga incompleta, exclusividad, extravío individual, migración y compatibilidad, avisos, progreso y contrato monetario. Este ADR no los presenta como resueltos por omisión.
 
 ### 4.4 Criterios de verificación antes de cerrar la implementación
 
@@ -136,3 +136,4 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | Versión | Fecha | Cambio | Responsable |
 | --- | --- | --- | --- |
 | 1.0 | 02/11/2026 | Decisión de diseño aceptada, impacto identificado y criterios de verificación/retrospectiva pendientes explícitos. | Lucas Ottonello |
+| 1.1 | 02/11/2026 | Criterio de inicio de ejecución: recepción del primer bulto. | Ezequiel Marcenal |

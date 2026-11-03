@@ -1,6 +1,7 @@
 using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
 
@@ -79,9 +80,38 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             .OrderBy(e => e.Numero).ToListAsync(ct);
     }
 
-    public Task GuardarCambiosAsync(CancellationToken ct)
+    public async Task GuardarCambiosAsync(CancellationToken ct)
     {
-        return db.SaveChangesAsync(ct);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: Configurations.EnvioConfiguration.IndiceReferencia })
+        { throw new ReferenciaRepetidaException(); }
+    }
+
+    public async Task<IReadOnlyList<EnvioCerrado>> ListarCerradosAsync(Guid comercioId, DateTimeOffset desde,
+        DateTimeOffset hasta, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        // El instante en que llegó al estado final sale de su historial: el evento de esa transición (T6 o T15).
+        var cerrados = await db.Envios.AsNoTracking()
+            .Where(e => e.ComercioId == comercioId && (e.Estado == EstadoEnvio.Entregado || e.Estado == EstadoEnvio.Devuelto))
+            .Select(e => new
+            {
+                e.Id, e.Numero, e.Estado, e.MontoTarifa,
+                LlegoEn = e.Eventos.Where(ev => ev.EstadoNuevo == e.Estado).Max(ev => (DateTimeOffset?)ev.OcurridoEn),
+            })
+            .Where(e => e.LlegoEn >= desde && e.LlegoEn < hasta)
+            .OrderBy(e => e.LlegoEn)
+            .ToListAsync(ct);
+        return cerrados.Select(e => new EnvioCerrado(e.Id, e.Numero, e.Estado, e.LlegoEn!.Value, e.MontoTarifa)).ToList();
+    }
+
+    public async Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, CancellationToken ct)
+    {
+        // Tras un guardado rechazado por el índice (CU-11, A4), el contexto se desengancha de la transacción revertida.
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Envios.AsNoTracking()
+            .SingleOrDefaultAsync(e => e.ComercioId == comercioId && e.ReferenciaComercio == referencia, ct);
     }
 
     public async Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct)

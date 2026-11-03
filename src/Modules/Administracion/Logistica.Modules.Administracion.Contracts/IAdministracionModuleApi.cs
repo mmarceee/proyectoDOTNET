@@ -34,4 +34,7 @@ public interface IAdministracionModuleApi
     // CU-07 para CU-60: la marca del operador del inquilino actual (el del token, en el seguimiento público). null si no
     // hay inquilino.
     Task<MarcaOperador?> MarcaDelOperadorAsync(CancellationToken ct);
+
+    // CU-32: los comercios con relación con el operador de la sesión, activa o suspendida, ordenados por razón social.
+    Task<IReadOnlyList<ComercioRelacionado>> ConsultarComerciosAsync(CancellationToken ct);
 }

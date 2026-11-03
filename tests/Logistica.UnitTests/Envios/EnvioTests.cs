@@ -136,4 +136,33 @@ public class EnvioTests
         Assert.Throws<TransicionInvalidaException>(() =>
             envio.Transicionar(EstadoEnvio.Cancelado, OrigenEvento.PortalComercio, responsableId: null, Ahora));
     }
+
+    private static Envio CrearConReferencia(string? referencia) =>
+        Envio.Crear(OperadorId, ComercioId, "ENV-1", new Destinatario("Ana Pérez", "099123456"),
+            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "11300"), [UnBulto],
+            OrigenEvento.PortalComercio, responsableId: null, Ahora, referenciaComercio: referencia);
+
+    [Fact]
+    public void La_referencia_del_comercio_se_guarda_sin_espacios_en_los_extremos_y_respeta_mayusculas()
+    {
+        Assert.Equal("Ped-1001", CrearConReferencia("  Ped-1001 ").ReferenciaComercio);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Una_referencia_en_blanco_equivale_a_no_tenerla(string? referencia)
+    {
+        Assert.Null(CrearConReferencia(referencia).ReferenciaComercio);
+    }
+
+    [Fact]
+    public void Una_referencia_de_mas_de_50_caracteres_se_rechaza()
+    {
+        Assert.Equal("PED", CrearConReferencia("PED").ReferenciaComercio);
+        Assert.Equal(50, CrearConReferencia(new string('A', 50)).ReferenciaComercio!.Length);
+        var error = Assert.Throws<DomainException>(() => CrearConReferencia(new string('A', 51)));
+        Assert.Contains("50 caracteres", error.Message);
+    }
 }

@@ -32,6 +32,7 @@ namespace Logistica.IntegrationTests.Seguimiento;
 
 // CU-64: preparación y entrega de los avisos a los comercios. Cada prueba usa su propio operador y comercio, así las
 // suscripciones de una no reciben los hechos de otra aunque compartan la base.
+[Collection(ContenedoresPropios.Nombre)]
 public sealed class EntregarAvisosTests(PostgresApiFactory factory, RabbitMqFixture rabbit)
     : IClassFixture<PostgresApiFactory>, IClassFixture<RabbitMqFixture>
 {

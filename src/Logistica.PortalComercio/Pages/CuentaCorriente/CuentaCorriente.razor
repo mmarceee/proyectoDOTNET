@@ -1,0 +1,180 @@
+@page "/cuenta-corriente"
+@page "/cuenta-corriente/{Id:guid}"
+@using System.Globalization
+@using System.Net
+@using System.Text.Json
+@using Logistica.Http.Contracts.Deposito
+@inject HttpClient Http
+@inject NavigationManager Navegacion
+
+<PageTitle>Cuenta corriente</PageTitle>
+
+@* CU-33: el comercio ve sus liquidaciones con el operador de la sesión. Los borradores no llegan: los filtra la API. *@
+@if (Id is not null)
+{
+    <p><a href="cuenta-corriente">Volver a la cuenta corriente</a></p>
+}
+<h1>@(_detalle is null ? "Cuenta corriente" : "Liquidación")</h1>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger" role="alert">
+        @_error
+        @if (_elegirOperador)
+        {
+            <a class="alert-link ms-1" href="/cuenta/operador?ReturnUrl=%2Fportal%2Fcuenta-corriente">Elegir operador</a>
+        }
+    </div>
+}
+else if (_cargando)
+{
+    <p class="text-body-secondary">Cargando...</p>
+}
+else if (_detalle is not null)
+{
+    var liquidacion = _detalle.Liquidacion;
+    <p class="text-body-secondary">
+        Del @Dia(liquidacion.PeriodoDesde) al @Dia(liquidacion.PeriodoHasta) ·
+        <span class="badge @Estilo(liquidacion.Estado)">@liquidacion.Estado</span>
+    </p>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Envío</th>
+                    <th scope="col">Fecha</th>
+                    <th scope="col">Concepto</th>
+                    <th scope="col" class="text-end">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var linea in _detalle.Lineas)
+                {
+                    <tr>
+                        <td>@linea.NumeroEnvio</td>
+                        <td>@Dia(linea.Fecha)</td>
+                        <td>@linea.Concepto</td>
+                        <td class="text-end">@Monto(linea.Monto)</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr><th colspan="3">Total bruto</th><td class="text-end">@Monto(liquidacion.TotalBruto)</td></tr>
+                <tr><th colspan="3">Ajustes</th><td class="text-end">@Monto(liquidacion.TotalAjustes)</td></tr>
+                <tr><th colspan="3">Total neto</th><td class="text-end"><strong>@Monto(liquidacion.TotalNeto)</strong></td></tr>
+            </tfoot>
+        </table>
+    </div>
+
+    @* Paso 5. Ruta absoluta: la API está en /api, fuera de la base /portal/. *@
+    <a class="btn btn-outline-primary" href="/api/cuenta-corriente/liquidaciones/@liquidacion.Id/archivo" download>
+        Descargar (CSV)
+    </a>
+}
+else if (_cuenta is not null)
+{
+    <div class="card mb-4" style="max-width: 22rem;">
+        <div class="card-body">
+            <p class="card-subtitle text-body-secondary small mb-1">Saldo pendiente</p>
+            <p class="card-title h3 mb-1">@Monto(_cuenta.SaldoPendiente)</p>
+            <p class="card-text small text-body-secondary">Lo emitido que todavía no se pagó.</p>
+        </div>
+    </div>
+
+    @if (_cuenta.Liquidaciones.Count == 0)
+    {
+        @* A1 *@
+        <p>Todavía no tenés liquidaciones con este operador.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th scope="col">Período</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col" class="text-end">Total bruto</th>
+                        <th scope="col" class="text-end">Ajustes</th>
+                        <th scope="col" class="text-end">Total neto</th>
+                        <th scope="col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var liquidacion in _cuenta.Liquidaciones)
+                    {
+                        <tr>
+                            <td>@Dia(liquidacion.PeriodoDesde) al @Dia(liquidacion.PeriodoHasta)</td>
+                            <td><span class="badge @Estilo(liquidacion.Estado)">@liquidacion.Estado</span></td>
+                            <td class="text-end">@Monto(liquidacion.TotalBruto)</td>
+                            <td class="text-end">@Monto(liquidacion.TotalAjustes)</td>
+                            <td class="text-end">@Monto(liquidacion.TotalNeto)</td>
+                            <td class="text-end"><a href="cuenta-corriente/@liquidacion.Id">Ver detalle</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private CuentaCorrienteResponse? _cuenta;
+    private LiquidacionDetalleResponse? _detalle;
+    private string? _error;
+    private bool _elegirOperador;
+    private bool _cargando;
+
+    // Se recarga al pasar del listado al detalle y al volver, porque Blazor reutiliza el componente.
+    protected override async Task OnParametersSetAsync()
+    {
+        _cargando = true;
+        _error = null;
+        _elegirOperador = false;
+        _cuenta = null;
+        _detalle = null;
+        try
+        {
+            using var respuesta = await Http.GetAsync(Id is { } id
+                ? $"/api/cuenta-corriente/liquidaciones/{id}"
+                : "/api/cuenta-corriente");
+            if (respuesta.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                Navegacion.NavigateTo("/portal/ingresar", forceLoad: true);
+                return;
+            }
+            if (!respuesta.IsSuccessStatusCode)
+            {
+                _elegirOperador = respuesta.StatusCode == HttpStatusCode.Forbidden;
+                _error = respuesta.StatusCode switch
+                {
+                    HttpStatusCode.Forbidden => "No tenés acceso con la sesión actual. Verificá el operador seleccionado.",
+                    HttpStatusCode.NotFound => "La liquidación no existe o todavía no fue emitida.",
+                    _ => "No se pudo cargar la cuenta corriente. Intentá de nuevo.",
+                };
+                return;
+            }
+            if (Id is null)
+                _cuenta = await respuesta.Content.ReadFromJsonAsync<CuentaCorrienteResponse>() ?? throw new JsonException();
+            else
+                _detalle = await respuesta.Content.ReadFromJsonAsync<LiquidacionDetalleResponse>() ?? throw new JsonException();
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException)
+        {
+            _error = "No se pudo conectar con el servidor. Intentá de nuevo.";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private static string Dia(DateOnly dia) => dia.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+
+    private static string Monto(decimal monto) => monto.ToString("N2");
+
+    private static string Estilo(string estado) => estado == "Pagada" ? "text-bg-success" : "text-bg-warning";
+}
