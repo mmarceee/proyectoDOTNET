@@ -12,5 +12,7 @@ internal sealed class IntentoEntregaConfiguration : IEntityTypeConfiguration<Int
         builder.HasIndex(i => new { i.EnvioId, i.NumeroIntento }).IsUnique();
         builder.Property(i => i.Resultado).HasConversion<string>();
         builder.OwnsOne(i => i.Evidencia);
+        // RF 31: los bultos de cada resultado, como arreglo uuid[] de PostgreSQL.
+        builder.PrimitiveCollection(i => i.BultoIds);
     }
 }

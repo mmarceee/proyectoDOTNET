@@ -6,7 +6,7 @@ using MimeKit;
 
 namespace Logistica.Modules.Seguimiento.Infrastructure.Correo;
 
-// El correo al destinatario con la marca del operador (CU-62, paso 4): texto plano y HTML con estilos en línea, que es
+// El correo con la marca del operador: al destinatario (CU-62, paso 4) y la invitación a un usuario (CU-02, paso 7): texto plano y HTML con estilos en línea, que es
 // lo que respetan los clientes de correo. Todo dato variable se codifica antes de entrar al HTML.
 internal static partial class PlantillaCorreo
 {
@@ -39,7 +39,7 @@ internal static partial class PlantillaCorreo
         var texto = new StringBuilder()
             .AppendLine(m.Titulo).AppendLine()
             .AppendLine(Saludo(m)).AppendLine(m.Texto).AppendLine()
-            .AppendLine("Seguí tu envío en:").AppendLine(m.Enlace).AppendLine()
+            .AppendLine(m.PresentaEnlace).AppendLine(m.Enlace).AppendLine()
             .AppendLine(m.Marca.Nombre);
         if (Contacto(m.Marca) is { Length: > 0 } contacto) texto.AppendLine(contacto);
         return texto.ToString();
@@ -59,7 +59,7 @@ internal static partial class PlantillaCorreo
             <h1 style="margin:0 0 16px;font-size:20px">{C(m.Titulo)}</h1>
             <p style="margin:0 0 8px">{C(Saludo(m))}</p>
             <p style="margin:0 0 24px;line-height:1.5">{C(m.Texto)}</p>
-            <p style="margin:0 0 24px"><a href="{C(m.Enlace)}" style="background:{color};color:#ffffff;padding:12px 20px;text-decoration:none;border-radius:4px;display:inline-block">Seguir mi envío</a></p>
+            <p style="margin:0 0 24px"><a href="{C(m.Enlace)}" style="background:{color};color:#ffffff;padding:12px 20px;text-decoration:none;border-radius:4px;display:inline-block">{C(m.Boton)}</a></p>
             <p style="margin:0;font-size:12px;color:#52606d">Si el botón no funciona, copiá esta dirección en el navegador:<br>{C(m.Enlace)}</p>
             </td></tr>
             <tr><td style="padding:16px 24px;font-size:12px;color:#52606d;border-top:1px solid #e4e7eb">{C(m.Marca.Nombre)}{(contacto.Length > 0 ? " · " + C(contacto) : "")}</td></tr>

@@ -9,4 +9,6 @@ internal sealed record ConsultarEnviosQuery(
     DateOnly? FechaDesde = null,
     DateOnly? FechaHasta = null,
     string? Texto = null,
-    Guid? ComercioId = null);
+    Guid? ComercioId = null,
+    // RF 31: filtro por el resumen del envío (CU-13 y CU-82).
+    ResumenEnvio? Resumen = null);

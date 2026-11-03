@@ -27,6 +27,8 @@ internal sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         builder.Property(e => e.EsPrueba).HasDefaultValue(false);
 
         builder.Property(e => e.Estado).HasConversion<string>();
+        // RF 31: el resumen derivado de los bultos se guarda para filtrar sin reconstruirlo.
+        builder.Property(e => e.Resumen).HasConversion<string>();
         builder.Property(e => e.Modalidad).HasConversion<string>().HasDefaultValue(Modalidad.Estandar);
 
         // Concurrencia optimista sobre xmin, la versión de fila de PostgreSQL: si dos operaciones
@@ -45,5 +47,6 @@ internal sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         // Índices para el listado y los filtros de CU-13.
         builder.HasIndex(e => new { e.OperadorId, e.CreadoEn });
         builder.HasIndex(e => new { e.OperadorId, e.Estado });
+        builder.HasIndex(e => new { e.OperadorId, e.Resumen });
     }
 }

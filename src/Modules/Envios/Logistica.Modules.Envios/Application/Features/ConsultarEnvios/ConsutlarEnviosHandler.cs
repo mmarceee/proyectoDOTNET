@@ -27,6 +27,13 @@ internal sealed class ConsultarEnviosHandler(IEnviosListadoReader reader)
                 "El estado indicado no es válido.");
         }
 
+        if (query.Resumen is { } resumen && !Enum.IsDefined(resumen))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(query.Resumen),
+                "El resumen indicado no es válido.");
+        }
+
         if (query.FechaDesde is { } desde && query.FechaHasta is { } hasta && desde > hasta)
         {
             throw new ArgumentException(

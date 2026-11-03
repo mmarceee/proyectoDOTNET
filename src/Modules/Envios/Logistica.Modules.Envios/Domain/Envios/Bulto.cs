@@ -13,6 +13,11 @@ internal sealed class Bulto : Entity, IOperadorOwned, IComercioOwned
     public decimal AnchoCm { get; private set; }
     public decimal AltoCm { get; private set; }
     public decimal MontoTarifa { get; private set; }
+    // Estado operativo del bulto (RF 31). Usa los mismos estados y la misma TablaTransiciones que el envío: las
+    // transiciones T1 a T19 se aplican a cada bulto (tabla-de-transiciones-de-estados.md, entrega parcial).
+    public EstadoEnvio Estado { get; private set; }
+    // Intentos reales fallidos de este bulto (T7). Cargar, reasignar o reintegrar no los consume (RF 33).
+    public int IntentosFallidos { get; private set; }
 
     private Bulto() { } // para EF Core
 
@@ -38,5 +43,22 @@ internal sealed class Bulto : Entity, IOperadorOwned, IComercioOwned
         AnchoCm = datos.AnchoCm;
         AltoCm = datos.AltoCm;
         MontoTarifa = datos.MontoTarifa;
+        Estado = EstadoEnvio.Admitido; // T1
+    }
+
+    // Sólo lo llama Envio, que después recalcula su resumen. Un par que no está en la tabla se rechaza.
+    internal void Transicionar(EstadoEnvio nuevo)
+    {
+        if (!TablaTransiciones.Permite(Estado, nuevo))
+        {
+            throw new TransicionInvalidaException(Estado, nuevo);
+        }
+
+        if (nuevo == EstadoEnvio.NoEntregado)
+        {
+            IntentosFallidos++;
+        }
+
+        Estado = nuevo;
     }
 }

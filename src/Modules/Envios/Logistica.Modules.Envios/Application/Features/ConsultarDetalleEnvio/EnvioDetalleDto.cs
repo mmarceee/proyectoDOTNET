@@ -14,4 +14,8 @@ internal sealed record EnvioDetalleDto(
     IReadOnlyList<IntentoEntregaDetalleDto> Intentos,
     IReadOnlyList<IncidenciaDetalleDto> Incidencias,
     DevolucionDetalleDto? Devolucion,
-    string Modalidad = "Estandar");
+    string Modalidad = "Estandar",
+    // RF 31: el resumen derivado de los bultos, si ya terminó y cuántos bultos se entregaron (el total es Bultos.Count).
+    string Resumen = "Creado",
+    bool Terminado = false,
+    int BultosEntregados = 0);
