@@ -1,0 +1,205 @@
+@page "/envios/importar"
+@using System.Text.Json
+@using Logistica.Http.Contracts.Envios
+@inject HttpClient Http
+
+<PageTitle>Importar envíos</PageTitle>
+
+<h1>Importar envíos</h1>
+
+@* CU-11: el archivo se valida en el servidor; acá sólo se elige, se muestra la vista previa y se confirma. *@
+@if (_error is not null)
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+
+@if (_resultado is null || _vistaPrevia)
+{
+    <p>
+        Subí un archivo CSV en UTF-8 con un bulto por fila; las filas con la misma referencia forman un envío.
+        Hasta @MaximoFilas filas. <a href="plantilla-importacion-envios.csv" download>Descargar la plantilla</a>.
+    </p>
+    <p class="text-body-secondary">
+        Si volvés a importar el mismo archivo, los envíos que ya existen no se crean de nuevo.
+    </p>
+
+    @* El InputFile, transparente, cubre toda la zona: el navegador lo abre con un clic y también recibe el archivo
+       que se suelta encima. Los eventos de arrastre sólo cambian el aspecto. *@
+    <div class="zona-archivo mb-3 @(_arrastrando ? "arrastrando" : "") @(_enviando ? "deshabilitada" : "")"
+         @ondragenter="() => _arrastrando = true" @ondragleave="() => _arrastrando = false"
+         @ondrop="() => _arrastrando = false">
+        <InputFile id="archivo" accept=".csv,text/csv" OnChange="ElegirAsync" disabled="@_enviando"
+                   aria-label="Archivo CSV" />
+        <p class="mb-1 fw-semibold">
+            @(_enviando ? "Procesando el archivo..." : "Arrastrá el archivo CSV acá o hacé clic para elegirlo")
+        </p>
+        <p class="mb-0 small text-body-secondary">@(_nombreArchivo ?? "Hasta 1 MB.")</p>
+    </div>
+}
+
+@if (_resultado is not null)
+{
+    <h2 class="h5 mt-4">@(_vistaPrevia ? "Vista previa" : "Resultado")</h2>
+    <p>
+        @foreach (var grupo in _resultado.Envios.GroupBy(e => e.Resultado))
+        {
+            <span class="badge @Estilo(grupo.Key) me-2">@Texto(grupo.Key): @grupo.Count()</span>
+        }
+    </p>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Filas</th>
+                    <th scope="col">Referencia</th>
+                    <th scope="col">Resultado</th>
+                    <th scope="col">Envío</th>
+                    <th scope="col" class="text-end">Tarifa</th>
+                    <th scope="col">Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var envio in _resultado.Envios)
+                {
+                    <tr>
+                        <td>@string.Join(", ", envio.Filas)</td>
+                        <td>@envio.Referencia</td>
+                        <td><span class="badge @Estilo(envio.Resultado)">@Texto(envio.Resultado)</span></td>
+                        <td>@envio.Numero</td>
+                        <td class="text-end">@envio.Tarifa?.ToString("N2")</td>
+                        <td>@envio.Detalle</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_vistaPrevia)
+    {
+        @if (_resultado.PuedeConfirmar)
+        {
+            <button type="button" class="btn btn-primary me-2" disabled="@_enviando" @onclick="ConfirmarAsync">
+                @(_enviando ? "Importando..." : "Confirmar la importación")
+            </button>
+        }
+        else
+        {
+            <p class="text-body-secondary">No hay envíos nuevos para crear. Corregí el archivo y volvé a elegirlo.</p>
+        }
+        <button type="button" class="btn btn-outline-secondary" disabled="@_enviando" @onclick="Cancelar">Cancelar</button>
+    }
+    else
+    {
+        <button type="button" class="btn btn-primary" @onclick="Cancelar">Importar otro archivo</button>
+    }
+}
+
+@code {
+    private const int MaximoFilas = 1000;
+    private const long MaximoBytes = 1024 * 1024;
+
+    private byte[]? _archivo;
+    private ImportarEnviosResponse? _resultado;
+    private bool _vistaPrevia;
+    private string? _error;
+    private bool _enviando;
+    private bool _arrastrando;
+    private string? _nombreArchivo;
+
+    private async Task ElegirAsync(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        _resultado = null;
+        _archivo = null;
+        _nombreArchivo = e.File.Name;
+        // Al arrastrar, el navegador no aplica el filtro "accept" del selector.
+        if (!e.File.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            _error = "El archivo tiene que ser un CSV (.csv).";
+            return;
+        }
+
+        if (e.File.Size > MaximoBytes)
+        {
+            _error = "El archivo supera 1 MB. Dividilo en varios archivos.";
+            return;
+        }
+
+        using var memoria = new MemoryStream();
+        await e.File.OpenReadStream(MaximoBytes).CopyToAsync(memoria);
+        _archivo = memoria.ToArray();
+        await EnviarAsync("/api/envios/importacion/vista-previa", vistaPrevia: true);
+    }
+
+    private Task ConfirmarAsync() => EnviarAsync("/api/envios/importacion", vistaPrevia: false);
+
+    // A6: cancelar no crea ningún envío; la vista previa no guardó nada.
+    private void Cancelar()
+    {
+        _archivo = null;
+        _nombreArchivo = null;
+        _resultado = null;
+        _error = null;
+    }
+
+    private async Task EnviarAsync(string ruta, bool vistaPrevia)
+    {
+        _enviando = true;
+        _error = null;
+        try
+        {
+            // Ruta absoluta: la API está en /api, fuera de la base /portal/ del Portal.
+            var response = await Http.PostAsJsonAsync(ruta, new ImportarEnviosRequest(_archivo!));
+            if (response.IsSuccessStatusCode)
+            {
+                _resultado = await response.Content.ReadFromJsonAsync<ImportarEnviosResponse>();
+                _vistaPrevia = vistaPrevia;
+            }
+            else
+            {
+                _resultado = null;
+                _error = await LeerMotivoAsync(response) ?? "No se pudo procesar el archivo. Intentá de nuevo.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No se pudo conectar con el servidor. Intentá de nuevo.";
+        }
+        finally
+        {
+            _enviando = false;
+        }
+    }
+
+    // Un archivo rechazado entero (A1) trae un ProblemDetails con el motivo en "detail".
+    private static async Task<string?> LeerMotivoAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            return (await response.Content.ReadFromJsonAsync<Problema>())?.Detail;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string Texto(string resultado) => resultado switch
+    {
+        "ACrear" => "A crear",
+        "Creado" => "Creado",
+        "YaExistente" => "Ya existía",
+        _ => "Con errores",
+    };
+
+    private static string Estilo(string resultado) => resultado switch
+    {
+        "ACrear" => "text-bg-primary",
+        "Creado" => "text-bg-success",
+        "YaExistente" => "text-bg-secondary",
+        _ => "text-bg-danger",
+    };
+
+    private sealed record Problema(string? Title, string? Detail);
+}

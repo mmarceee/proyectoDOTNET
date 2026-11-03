@@ -1,6 +1,7 @@
 using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Logistica.Modules.Envios.Infrastructure.Persistence;
 
@@ -79,9 +80,20 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
             .OrderBy(e => e.Numero).ToListAsync(ct);
     }
 
-    public Task GuardarCambiosAsync(CancellationToken ct)
+    public async Task GuardarCambiosAsync(CancellationToken ct)
     {
-        return db.SaveChangesAsync(ct);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: Configurations.EnvioConfiguration.IndiceReferencia })
+        { throw new ReferenciaRepetidaException(); }
+    }
+
+    public async Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, CancellationToken ct)
+    {
+        // Tras un guardado rechazado por el índice (CU-11, A4), el contexto se desengancha de la transacción revertida.
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Envios.AsNoTracking()
+            .SingleOrDefaultAsync(e => e.ComercioId == comercioId && e.ReferenciaComercio == referencia, ct);
     }
 
     public async Task<IReadOnlyList<Envio>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct)

@@ -220,6 +220,10 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OperadorId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ReferenciaComercio")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTimeOffset?>("ReintentoDesde")
                         .HasColumnType("timestamp with time zone");
 
@@ -296,6 +300,10 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OperadorId", "Numero")
                         .IsUnique();
+
+                    b.HasIndex("OperadorId", "ComercioId", "ReferenciaComercio")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Envios_ReferenciaComercio");
 
                     b.ToTable("Envios", "envios");
                 });

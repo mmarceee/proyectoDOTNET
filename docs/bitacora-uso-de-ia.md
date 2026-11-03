@@ -745,6 +745,20 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Alternativas y límites** | Se registraron alternativas descartadas y consecuencias. Se distingue decisión aceptada de implementación pendiente: las pruebas de CU-42 no se presentan como validación de parcial. La retrospectiva exigida por el docente queda preparada para completar con commits y evidencia después de implementar. No se atribuyen aprobaciones individuales adicionales a los compañeros. |
 | **Verificación** | Revisión documental, enlaces relativos y consistencia de nombres, referencias y estados de avance. Esta tarea modifica documentación, no código; no se ejecutaron pruebas nuevas de negocio. |
 
+## **3.50 Importar envíos desde un archivo (CU-11)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | Envíos: `Envio.ReferenciaComercio` y `Envio.NormalizarReferencia`, `ReferenciaRepetidaException`, el índice único y su migración, `EnvioRepository`, `CrearEnvioHandler` (cotización separada y alta idempotente), `ImportarEnviosHandler`, `IAmbitoPorEnvio` y `AmbitoPorEnvio`, `LectorArchivoEnvios` y `ImportarEnviosEndpoint`. Contratos HTTP `ImportarEnviosRequest`. Portal: página `/envios/importar`, menú y plantilla CSV. Pruebas: `EnvioTests`, `ImportarEnviosTests` unitarias y de integración. Documentos: casos de uso y modelo de dominio. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-11 en nivel mínimo con la idempotencia completa que exige RF 7: reimportar un archivo, completo o en parte, no duplica envíos. |
+| **Cómo se trabajó** | La IA propuso un plan en siete pasos para que el responsable escribiera el código; el responsable le pidió que hiciera el caso de uso completo. La IA relevó CU-10, el patrón de ámbito por operación de CU-52 y la propuesta de API pública de Lucas (CU-81 necesita la misma referencia), y escribió el código, las pruebas y la documentación. |
+| **Decisiones** | Índice único sobre (operador, comercio, referencia) en lugar de un `RelacionComercialId` en el envío; los NULL del alta individual no chocan. La referencia se recorta, distingue mayúsculas y tiene hasta 50 caracteres. La cotización de CU-10 se separó para que la vista previa la reutilice sin crear el envío ni consumir un número. Cada envío corre en un ámbito de DI propio (como CU-52), porque un guardado fallido dejaría sus cambios en el DbContext. Ante dos importaciones simultáneas (A4), el índice rechaza la segunda y esta informa el envío existente. El archivo viaja en base64 dentro del JSON y la vista previa no se guarda: confirmar lo vuelve a enviar. CSV leído con `TextFieldParser` de .NET, separado por punto y coma o coma. |
+| **Descartado** | La descarga del informe por fila: se muestra en pantalla, que alcanza para el nivel mínimo. Sumar el ambiente de pruebas a la unicidad: lo agrega CU-81 cuando exista `EsPrueba`. |
+| **Verificación** | 22 casos unitarios (referencia del envío, lectura del archivo y armado de cada envío) y 6 pruebas de integración (vista previa y confirmación, reimportación completa y ampliada, errores por envío, A1, A2 y dos importaciones simultáneas). Corrida completa en Docker: 950 pruebas .NET (357 unitarias, 56 de arquitectura y 537 de integración), todas pasan; cobertura de líneas del 95,2 %. Después se agregó arrastrar y soltar el archivo, sin JavaScript (el `InputFile` transparente cubre la zona), y la página se probó en el navegador con `docker compose`: vista previa de un CSV y rechazo de un archivo que no es CSV. El arrastre real con el mouse no se pudo automatizar. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -779,3 +793,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.28 | 27/10/2026 | Entrada de CU-31, confirmar la devolución al comercio. | Ezequiel Marcenal |
 | 0.29 | 02/11/2026 | CU-42: implementación asistida, revisión de arquitectura y ADR, decisiones y límites, resultados de pruebas y ajuste de Editar solicitado por Lucas. | Lucas Ottonello |
 | 0.30 | 02/11/2026 | Decisión cerrada de entrega parcial, ADR-0007 y referencias a la evolución de los documentos existentes. | Lucas Ottonello |
+| 0.31 | 03/11/2026 | Entrada de CU-11, importar envíos desde un archivo. | Ezequiel Marcenal |

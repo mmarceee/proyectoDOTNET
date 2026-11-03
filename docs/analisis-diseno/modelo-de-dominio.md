@@ -458,7 +458,7 @@ Produccion, Prueba
 
 * relacionComercialId: Guid
 
-* referenciaComercio: string (identificador propio del comercio; único dentro de una misma RelacionComercial — sostiene la idempotencia de la importación masiva, RF 7\)
+* referenciaComercio: string (opcional, hasta 50 caracteres; identificador propio del comercio, sin espacios en los extremos y distinguiendo mayúsculas. Único dentro de una misma RelacionComercial, implementado como índice sobre operadorId, comercioId y referenciaComercio — sostiene la idempotencia de la importación masiva, RF 7, CU-11, y del alta por API, CU-81\)
 
 * numero: string (único por operador: índice único {operadorId, numero} — ADR-0002; CU-10)
 
@@ -1356,6 +1356,8 @@ Puntos del modelo que dependen de una decisión del equipo (o, en algún caso, d
 * Usuario y ClaveApi frente al filtro de inquilino: Usuario (Identity) no tiene filtro y la búsqueda de ClaveApi por hash es el único acceso que lo ignora (ADR-0002 v2.1, secciones 2.4 y 4).
 
 * Zona y FranjaHoraria (18/10/2026, Cristian Reyes y Lucas Ottonello): FranjaHoraria es una entidad propia asociada a Zona por zonaId, no una parte de su composición, porque Planificación y CU-19 ya la consultan y reemplazan por separado. Las reglas que comparan franjas entre sí (superposición, CU-04 A3) usan FranjaHoraria.seSuperponeCon y las coordina el caso de uso. La reprogramación por lote de la ampliación de CU-04 queda pendiente; mientras tanto, el reemplazo se bloquea si hay envíos comprometidos (sección de Zona y FranjaHoraria).
+
+* Referencia del comercio (03/11/2026, Ezequiel Marcenal): el índice único es (operadorId, comercioId, referenciaComercio), que identifica la relación comercial sin agregarle al envío un relacionComercialId. Los envíos sin referencia no chocan entre sí, porque PostgreSQL considera distintos los NULL de un índice único. La propuesta de API pública sugiere sumar el ambiente de pruebas a esa unicidad; se agrega al implementar CU-81.
 
 **Abiertos**
 
