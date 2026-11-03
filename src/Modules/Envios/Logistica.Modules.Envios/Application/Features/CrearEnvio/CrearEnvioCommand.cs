@@ -12,7 +12,8 @@ internal sealed record CrearEnvioCommand(
     IReadOnlyList<BultoACrear> Bultos,
     OrigenEvento Origen,
     Modalidad Modalidad = Modalidad.Estandar,
-    string? ReferenciaComercio = null);
+    string? ReferenciaComercio = null,
+    bool EsPrueba = false);
 
 // Peso y medidas de un bulto. La tarifa no viene del cliente: la calcula el sistema.
 internal sealed record BultoACrear(decimal PesoKg, decimal LargoCm, decimal AnchoCm, decimal AltoCm);

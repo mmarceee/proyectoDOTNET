@@ -29,6 +29,7 @@ internal static class LectorHechosEnvio
             {
                 NombreDestinatario = Texto("NombreDestinatario"),
                 EmailDestinatario = Texto("EmailDestinatario"),
+                EsPrueba = raiz.TryGetProperty("EsPrueba", out var prueba) && prueba.ValueKind == JsonValueKind.True,
             },
             EnvioAsignadoARuta.Tipo => Hecho("AsignadoARuta"),
             EnvioDesasignadoDeRuta.Tipo => Hecho("EnDeposito"),

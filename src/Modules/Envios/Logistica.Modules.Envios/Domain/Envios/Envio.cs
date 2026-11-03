@@ -33,6 +33,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // El identificador que le da el comercio (CU-11): es único por operador y comercio, así que reimportar un archivo
     // no duplica envíos (RF 7). Opcional, porque el alta individual de CU-10 no lo pide.
     public string? ReferenciaComercio { get; private set; }
+    public bool EsPrueba { get; private set; }
 
     public const int LargoMaximoReferencia = 50;
 
@@ -62,7 +63,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public static Envio Crear(Guid operadorId, Guid comercioId, string numero, Destinatario destinatario,
         Direccion direccion, IReadOnlyList<DatosBulto> bultos, OrigenEvento origen, Guid? responsableId,
         DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null, Guid? versionReglasId = null,
-        Modalidad modalidad = Modalidad.Estandar, string? referenciaComercio = null)
+        Modalidad modalidad = Modalidad.Estandar, string? referenciaComercio = null, bool esPrueba = false)
     {
         if (string.IsNullOrWhiteSpace(numero))
         {
@@ -101,6 +102,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             VersionTarifarioNumero = versionTarifario?.Numero,
             VersionReglasId = versionReglasId,
             ReferenciaComercio = NormalizarReferencia(referenciaComercio),
+            EsPrueba = esPrueba,
         };
 
         foreach (var datos in bultos)

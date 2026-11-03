@@ -23,6 +23,7 @@ internal sealed class NotificarDestinatario(SeguimientoDbContext db, NotificarDe
     public async Task ProcesarAsync(MensajeIntegracion mensaje, CancellationToken ct)
     {
         var hecho = LectorHechosEnvio.Leer(mensaje);
+        if (hecho.EsPrueba) return;
         var consumidor = Cola(mensaje.Tipo);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (!await db.Inbox.AnyAsync(m => m.MessageId == mensaje.Id && m.Consumidor == consumidor, ct))

@@ -62,6 +62,62 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "administracion");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Comercios.ClaveApi", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Prefijo")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("RelacionComercialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RevocadaEn")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset?>("UltimoUsoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Hash")
+                        .IsUnique();
+
+                    b.HasIndex("RelacionComercialId");
+
+                    b.HasIndex("OperadorId", "ComercioId", "CreadaEn");
+
+                    b.ToTable("ClavesApi", "administracion");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Comercios.Comercio", b =>
                 {
                     b.Property<Guid>("Id")
@@ -597,6 +653,15 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("VersionesTarifario", "administracion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Comercios.ClaveApi", b =>
+                {
+                    b.HasOne("Logistica.Modules.Administracion.Domain.Comercios.RelacionComercial", null)
+                        .WithMany()
+                        .HasForeignKey("RelacionComercialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Comercios.RelacionComercial", b =>
