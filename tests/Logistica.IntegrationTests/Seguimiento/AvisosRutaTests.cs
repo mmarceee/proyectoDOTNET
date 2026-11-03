@@ -28,16 +28,19 @@ using RabbitMQ.Client;
 
 namespace Logistica.IntegrationTests.Seguimiento;
 
+// RabbitMQ abre el puerto antes de terminar de arrancar: esperar sólo el puerto dejaba conexiones sin "connection.start"
+// con la máquina cargada. Se espera el mensaje con que el broker avisa que está listo.
 public sealed class RabbitMqFixture : IAsyncLifetime
 {
     private readonly IContainer broker = new ContainerBuilder("rabbitmq:4.1-management")
         .WithPortBinding(5672, true)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(5672)).Build();
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete")).Build();
     public string ConnectionString => $"amqp://guest:guest@{broker.Hostname}:{broker.GetMappedPublicPort(5672)}/";
     public Task InitializeAsync() => broker.StartAsync();
     public Task DisposeAsync() => broker.DisposeAsync().AsTask();
 }
 
+[Collection(ContenedoresPropios.Nombre)]
 public class AvisosRutaTests(PostgresApiFactory factory, RabbitMqFixture rabbit)
     : IClassFixture<PostgresApiFactory>, IClassFixture<RabbitMqFixture>
 {

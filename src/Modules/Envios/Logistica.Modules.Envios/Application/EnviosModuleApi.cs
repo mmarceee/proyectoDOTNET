@@ -14,6 +14,14 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
     IIntegrationEventPublisher eventos, ConsultarEnviosHandler listado,
     Features.ReprogramarPorDestinatario.ReprogramarPorDestinatarioHandler reprogramar) : IEnviosModuleApi
 {
+    public async Task<IReadOnlyList<EnvioLiquidable>> ListarLiquidablesAsync(Guid comercioId, DateTimeOffset desde,
+        DateTimeOffset hasta, CancellationToken ct)
+    {
+        var cerrados = await envios.ListarCerradosAsync(comercioId, desde, hasta, ct);
+        return cerrados.Select(c => new EnvioLiquidable(c.EnvioId, c.Numero, c.Estado.ToString(), c.LlegoEn, c.MontoTarifa))
+            .ToArray();
+    }
+
     // CU-61: el seguimiento público pide las opciones y la reprogramación por este contrato.
     public Task<IReadOnlyList<OpcionReprogramacion>?> OpcionesReprogramacionAsync(Guid envioId, CancellationToken ct)
         => reprogramar.OpcionesAsync(envioId, ct);

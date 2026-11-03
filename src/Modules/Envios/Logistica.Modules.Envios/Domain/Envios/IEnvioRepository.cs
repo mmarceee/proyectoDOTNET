@@ -12,6 +12,13 @@ internal interface IEnvioRepository
 
     Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct);
 
+    // CU-32: los envíos del comercio que llegaron a Entregado o Devuelto en [desde, hasta), sólo para leer.
+    Task<IReadOnlyList<EnvioCerrado>> ListarCerradosAsync(Guid comercioId, DateTimeOffset desde, DateTimeOffset hasta,
+        CancellationToken ct);
+
+    // CU-11: el envío del comercio con esa referencia, sólo para leer.
+    Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, CancellationToken ct);
+
     // CU-31: el envío con sus bultos, dentro de la transacción en curso.
     Task<Envio?> ObtenerConBultosAsync(Guid id, CancellationToken ct);
 
@@ -67,5 +74,6 @@ internal interface IEnvioRepository
     // CU-66: los envíos de esas rutas y los pendientes de entrega con fecha hasta "hasta", sin seguimiento de cambios.
     Task<IReadOnlyList<Envio>> ListarParaTableroAsync(IReadOnlyCollection<Guid> ids, DateOnly hasta, CancellationToken ct);
 
+    // Lanza ReferenciaRepetidaException si el índice único rechaza la referencia del comercio (CU-11, A4).
     Task GuardarCambiosAsync(CancellationToken ct);
 }

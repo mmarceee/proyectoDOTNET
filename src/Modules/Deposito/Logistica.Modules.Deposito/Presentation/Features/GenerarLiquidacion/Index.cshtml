@@ -1,0 +1,79 @@
+@page "/backoffice/liquidaciones"
+@model Logistica.Modules.Deposito.Presentation.Features.GenerarLiquidacion.IndexModel
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Liquidaciones";
+}
+
+<h1 class="mb-4">Liquidaciones</h1>
+<p class="text-muted">
+    Se cobran los envíos que llegaron a Entregado o Devuelto en el período, por la tarifa con que se admitieron.
+    Un envío aparece en una sola liquidación.
+</p>
+
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" asp-validation-summary="All" role="alert"></div>
+}
+
+<form method="post" class="row g-3 align-items-end mb-5">
+    <div class="col-md-5">
+        <label class="form-label" for="comercio">Comercio</label>
+        <select id="comercio" name="ComercioId" class="form-select" required>
+            <option value="">Elegí un comercio</option>
+            @foreach (var comercio in Model.Comercios)
+            {
+                <option value="@comercio.ComercioId" selected="@(comercio.ComercioId == Model.ComercioId)">@comercio.RazonSocial</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="desde">Desde</label>
+        <input id="desde" name="Desde" type="date" class="form-control" value="@Model.Desde.ToString("yyyy-MM-dd")" required />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="hasta">Hasta</label>
+        <input id="hasta" name="Hasta" type="date" class="form-control" value="@Model.Hasta.ToString("yyyy-MM-dd")" required />
+    </div>
+    <div class="col-md-1">
+        <button type="submit" class="btn btn-primary">Generar</button>
+    </div>
+</form>
+
+@if (Model.Liquidaciones.Count == 0)
+{
+    <p class="text-muted">Todavía no hay liquidaciones.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Comercio</th>
+                    <th scope="col">Período</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col" class="text-end">Total</th>
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var liquidacion in Model.Liquidaciones)
+                {
+                    <tr>
+                        <td>@Model.NombreComercio(liquidacion.ComercioId)</td>
+                        <td class="text-nowrap">@liquidacion.PeriodoDesde.ToString("dd/MM/yyyy") al @liquidacion.PeriodoHasta.ToString("dd/MM/yyyy")</td>
+                        <td>@liquidacion.Estado</td>
+                        <td class="text-end">@liquidacion.TotalNeto.ToString("N2")</td>
+                        <td><a href="/backoffice/liquidaciones/@liquidacion.Id" class="btn btn-sm btn-outline-primary">Ver</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

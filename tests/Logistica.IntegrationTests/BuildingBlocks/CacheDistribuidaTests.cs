@@ -25,6 +25,7 @@ public sealed class ValkeyFixture : IAsyncLifetime
 
 // La caché distribuida (letra: "caché en funcionamiento con su métrica de aciertos"): aciertos y fallos, aislamiento
 // por operador, invalidación, y que una caché caída no corte el request.
+[Collection(ContenedoresPropios.Nombre)]
 public sealed class CacheDistribuidaTests(ValkeyFixture valkey) : IClassFixture<ValkeyFixture>
 {
     private static readonly Guid OperadorA = Guid.Parse("11111111-1111-1111-1111-111111111111");

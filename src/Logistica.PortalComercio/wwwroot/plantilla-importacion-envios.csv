@@ -1,0 +1,4 @@
+Referencia;Nombre;Telefono;Email;Documento;Calle;NumeroPuerta;Localidad;Departamento;CodigoPostal;ReferenciaDireccion;Modalidad;PesoKg;LargoCm;AnchoCm;AltoCm
+PED-1001;Ana Pérez;099123456;ana@example.com;;Av. Italia;1234;Montevideo;Montevideo;11300;Portón verde;Estándar;2,5;30;20;10
+PED-1001;Ana Pérez;099123456;ana@example.com;;Av. Italia;1234;Montevideo;Montevideo;11300;Portón verde;Estándar;1;20;20;10
+PED-1002;Juan Rodríguez;098765432;;;18 de Julio;1500;Montevideo;Montevideo;11200;;Urgente;4;40;30;20

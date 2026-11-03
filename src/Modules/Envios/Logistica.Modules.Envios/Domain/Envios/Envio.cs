@@ -30,6 +30,11 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public DateOnly? FechaEntregaProgramada { get; private set; }
     // Después de un intento fallido reprogramado (T9): no se vuelve a intentar antes de esta hora (CU-18).
     public DateTimeOffset? ReintentoDesde { get; private set; }
+    // El identificador que le da el comercio (CU-11): es único por operador y comercio, así que reimportar un archivo
+    // no duplica envíos (RF 7). Opcional, porque el alta individual de CU-10 no lo pide.
+    public string? ReferenciaComercio { get; private set; }
+
+    public const int LargoMaximoReferencia = 50;
 
     // CU-04: los estados en que el envío todavía tiene una entrega por delante, así que su franja es un horario
     // prometido. Entregado, EnDevolucion, Devuelto, Extraviado y Cancelado ya no esperan una entrega.
@@ -57,7 +62,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public static Envio Crear(Guid operadorId, Guid comercioId, string numero, Destinatario destinatario,
         Direccion direccion, IReadOnlyList<DatosBulto> bultos, OrigenEvento origen, Guid? responsableId,
         DateTimeOffset ahora, DatosVersionTarifario? versionTarifario = null, Guid? versionReglasId = null,
-        Modalidad modalidad = Modalidad.Estandar)
+        Modalidad modalidad = Modalidad.Estandar, string? referenciaComercio = null)
     {
         if (string.IsNullOrWhiteSpace(numero))
         {
@@ -95,6 +100,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             VersionTarifarioId = versionTarifario?.Id,
             VersionTarifarioNumero = versionTarifario?.Numero,
             VersionReglasId = versionReglasId,
+            ReferenciaComercio = NormalizarReferencia(referenciaComercio),
         };
 
         foreach (var datos in bultos)
@@ -106,6 +112,18 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         envio._eventos.Add(new EventoEnvio(envio, null, EstadoEnvio.Admitido, ahora, origen, responsableId));
 
         return envio;
+    }
+
+    // Sin espacios en los extremos, para que " A-1" y "A-1" no sean dos envíos; en blanco equivale a no tenerla.
+    // Distingue mayúsculas y minúsculas: es el identificador del comercio, tal como lo escribe.
+    public static string? NormalizarReferencia(string? referencia)
+    {
+        if (string.IsNullOrWhiteSpace(referencia))
+            return null;
+        var normalizada = referencia.Trim();
+        if (normalizada.Length > LargoMaximoReferencia)
+            throw new DomainException($"La referencia del comercio no puede superar los {LargoMaximoReferencia} caracteres.");
+        return normalizada;
     }
 
     // Único punto que cambia el estado (RF 11) y registra el EventoEnvio (RF 12).

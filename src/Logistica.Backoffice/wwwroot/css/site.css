@@ -174,3 +174,74 @@ main h1 {
     grid-column: 1;
   }
 }
+
+/* Backoffice: barra superior angosta, menú lateral por grupos y tarjetas de Inicio. El color del operador (CU-07)
+   llega en --operador-primario; sin operador en la sesión se usa el azul por defecto. */
+
+.barra-backoffice .cuenta-usuario {
+  padding: 0;
+}
+
+/* Fondo claro: el ícono oscuro se ve sobre cualquier color del operador. */
+.barra-backoffice .navbar-toggler {
+  background-color: rgba(255, 255, 255, .85);
+}
+
+.backoffice-cuerpo {
+  display: flex;
+}
+
+.backoffice-contenido {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-top: 1rem;
+}
+
+@media (min-width: 992px) {
+  .backoffice-menu {
+    flex: 0 0 15rem;
+    min-height: calc(100vh - 4rem);
+    padding: 1rem .75rem;
+    border-right: 1px solid var(--bs-border-color);
+    background-color: var(--bs-tertiary-bg) !important;
+  }
+}
+
+.backoffice-menu .nav-link {
+  color: var(--bs-body-color);
+  padding: .35rem .75rem;
+  border-radius: .375rem;
+}
+
+.backoffice-menu .nav-link:hover {
+  background-color: var(--bs-secondary-bg);
+}
+
+.backoffice-menu .nav-link.active {
+  color: var(--operador-primario, #1b6ec2);
+  background-color: var(--bs-secondary-bg);
+  box-shadow: inset 3px 0 0 var(--operador-primario, #1b6ec2);
+  font-weight: 600;
+}
+
+.backoffice-menu-grupo {
+  margin: 1rem .75rem .25rem;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
+.tarjeta-seccion {
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.tarjeta-seccion:hover, .tarjeta-seccion:focus-within {
+  border-color: var(--operador-primario, #1b6ec2);
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .08);
+}
+
+.tarjeta-seccion .card-title a {
+  color: var(--operador-primario, #1b6ec2);
+}

@@ -80,4 +80,9 @@ public interface IEnviosModuleApi
     // CU-61, pasos 3 a 5 (T18, T19 o nuevo intento). false si el envío no existe o es de otro operador; una regla rota
     // (A1, A2, A3) lanza DomainException.
     Task<bool> ReprogramarPorDestinatarioAsync(Guid envioId, DateOnly fecha, Guid franjaId, CancellationToken ct);
+
+    // CU-32: los envíos del comercio que llegaron a Entregado o Devuelto entre desde (inclusive) y hasta (exclusive), con
+    // la tarifa con que se admitieron. Los cancelados y extraviados no se cobran. El operador lo pone el filtro "Tenant".
+    Task<IReadOnlyList<EnvioLiquidable>> ListarLiquidablesAsync(Guid comercioId, DateTimeOffset desde, DateTimeOffset hasta,
+        CancellationToken ct);
 }

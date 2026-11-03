@@ -7,16 +7,81 @@ namespace Logistica.Modules.Envios.Application.Features.CrearEnvio;
 
 // CU-10: resuelve la cobertura y tarifa cada bulto con el cuadro vigente de Administración.
 // La modalidad elegida en el Portal determina las reglas y los ajustes aplicables.
+// CU-11 reutiliza el mismo caso de uso para cada envío del archivo: la cotización para la vista previa y el alta
+// idempotente por la referencia del comercio para confirmar.
 internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant tenant, TimeProvider reloj,
     IRelacionComercialActiva relacion, IUnidadDeTrabajo unidad, IAdministracionModuleApi administracion,
     IIntegrationEventPublisher eventos)
 {
     public async Task<Envio> HandleAsync(CrearEnvioCommand command, CancellationToken ct)
     {
-        var operadorId = tenant.OperadorId
-            ?? throw new InvalidOperationException("La sesión no tiene un operador.");
-        var comercioId = tenant.ComercioId
-            ?? throw new InvalidOperationException("La sesión no tiene un comercio.");
+        return (await CrearOObtenerAsync(command, ct)).Envio;
+    }
+
+    // Con referencia del comercio, repetir el alta devuelve el envío existente sin crear otro (RF 7; CU-11, A3).
+    public async Task<AltaEnvio> CrearOObtenerAsync(CrearEnvioCommand command, CancellationToken ct)
+    {
+        var (operadorId, comercioId) = Inquilino();
+        var referencia = Envio.NormalizarReferencia(command.ReferenciaComercio);
+        if (referencia is not null && await envios.ObtenerPorReferenciaAsync(comercioId, referencia, ct) is { } existente)
+            return new AltaEnvio(existente, Creado: false);
+
+        var cotizacion = await CotizarAsync(command, ct);
+        var numero = await envios.SiguienteNumeroAsync(ct);
+
+        var envio = Envio.Crear(
+            operadorId,
+            comercioId,
+            numero,
+            command.Destinatario,
+            command.Direccion,
+            cotizacion.Bultos,
+            command.Origen,
+            responsableId: null,
+            reloj.GetUtcNow(),
+            versionTarifario: cotizacion.VersionTarifario,
+            versionReglasId: cotizacion.VersionReglasId,
+            modalidad: command.Modalidad,
+            referenciaComercio: referencia);
+        envio.DefinirPlanificacion(cotizacion.ZonaId, null, null);
+
+        try
+        {
+            await unidad.EjecutarAsync(async () =>
+            {
+                await relacion.ExigirAsync(comercioId, ct);
+                envios.Agregar(envio);
+                // T1 también llega a Seguimiento: es el único evento con el comercio en el sobre (CU-64).
+                eventos.Registrar(EnvioAdmitido.Tipo, new EnvioAdmitido(envio.Id, envio.Numero, envio.CreadoEn,
+                    envio.Destinatario.Nombre, envio.Destinatario.Email), envio.CreadoEn);
+                await envios.GuardarCambiosAsync(ct);
+            }, ct);
+        }
+        catch (ReferenciaRepetidaException)
+        {
+            // A4: otra importación creó el mismo envío entre la consulta y el guardado. El índice único evitó el
+            // duplicado y la transacción se revirtió entera, evento incluido.
+            return new AltaEnvio(await envios.ObtenerPorReferenciaAsync(comercioId, referencia!, ct)
+                ?? throw new InvalidOperationException("El índice rechazó la referencia, pero el envío no aparece."), Creado: false);
+        }
+
+        return new AltaEnvio(envio, Creado: true);
+    }
+
+    // CU-11, vista previa: el envío que ya existe con esa referencia o, si no hay, lo que costaría. No guarda nada.
+    public async Task<(Envio? Existente, CotizacionEnvio? Cotizacion)> PrevisualizarAsync(
+        CrearEnvioCommand command, CancellationToken ct)
+    {
+        var (_, comercioId) = Inquilino();
+        var referencia = Envio.NormalizarReferencia(command.ReferenciaComercio);
+        if (referencia is not null && await envios.ObtenerPorReferenciaAsync(comercioId, referencia, ct) is { } existente)
+            return (existente, null);
+        return (null, await CotizarAsync(command, ct));
+    }
+
+    // Las reglas, la zona y la tarifa de cada bulto, con las mismas validaciones del alta.
+    private async Task<CotizacionEnvio> CotizarAsync(CrearEnvioCommand command, CancellationToken ct)
+    {
         if (!Enum.IsDefined(command.Modalidad))
             throw new DomainException("Elegí una modalidad válida: Estándar o Urgente.");
 
@@ -50,33 +115,15 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             bultos.Add(new DatosBulto(bulto.PesoKg, bulto.LargoCm, bulto.AnchoCm, bulto.AltoCm, tarifa.Monto));
         }
 
-        var numero = await envios.SiguienteNumeroAsync(ct);
+        return new CotizacionEnvio(zona.Id, reglas.VersionId, versionTarifario, bultos);
+    }
 
-        var envio = Envio.Crear(
-            operadorId,
-            comercioId,
-            numero,
-            command.Destinatario,
-            command.Direccion,
-            bultos,
-            command.Origen,
-            responsableId: null,
-            reloj.GetUtcNow(),
-            versionTarifario: versionTarifario,
-            versionReglasId: reglas.VersionId,
-            modalidad: command.Modalidad);
-        envio.DefinirPlanificacion(zona.Id, null, null);
-
-        await unidad.EjecutarAsync(async () =>
-        {
-            await relacion.ExigirAsync(comercioId, ct);
-            envios.Agregar(envio);
-            // T1 también llega a Seguimiento: es el único evento con el comercio en el sobre (CU-64).
-            eventos.Registrar(EnvioAdmitido.Tipo, new EnvioAdmitido(envio.Id, envio.Numero, envio.CreadoEn,
-                envio.Destinatario.Nombre, envio.Destinatario.Email), envio.CreadoEn);
-            await envios.GuardarCambiosAsync(ct);
-        }, ct);
-
-        return envio;
+    private (Guid OperadorId, Guid ComercioId) Inquilino()
+    {
+        var operadorId = tenant.OperadorId
+            ?? throw new InvalidOperationException("La sesión no tiene un operador.");
+        var comercioId = tenant.ComercioId
+            ?? throw new InvalidOperationException("La sesión no tiene un comercio.");
+        return (operadorId, comercioId);
     }
 }

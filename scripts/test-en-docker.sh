@@ -1,23 +1,29 @@
 #!/usr/bin/env bash
 # Compila y ejecuta todas las pruebas dentro de un contenedor Linux con el SDK de .NET 10,
 # igual que el pipeline de CI. Útil cuando Smart App Control de Windows bloquea los DLL compilados.
-# Uso: ./scripts/test-en-docker.sh   (en Windows, desde Git Bash)
+# Uso: ./scripts/test-en-docker.sh            todas las pruebas, con el reporte de cobertura
+#      ./scripts/test-en-docker.sh Deposito   sólo las pruebas cuyo nombre completo contiene "Deposito", sin cobertura
+# (en Windows, desde Git Bash)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 repo="$(pwd -W 2>/dev/null || pwd)"
+filtro="${1:-}"
 
 # Las pruebas de integración usan Testcontainers: el contenedor de pruebas recibe el socket de Docker
 # para levantar PostgreSQL como contenedor hermano, y lo alcanza por el puerto publicado en el host.
 # El reporte de cobertura (dominio y aplicación, ver coverage.runsettings) queda en ./coverage/index.html.
+# Los paquetes de NuGet quedan en un volumen, así las corridas siguientes no los vuelven a descargar.
 MSYS_NO_PATHCONV=1 docker run --rm \
   -v "${repo}:/repo:ro" \
   -v "${repo}/coverage:/salida" \
   -v "${repo}/TestResults:/resultados" \
+  -v logistica-nuget:/root/.nuget/packages \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --add-host host.docker.internal:host-gateway \
   -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+  -e FILTRO="$filtro" \
   mcr.microsoft.com/dotnet/sdk:10.0 bash -c '
   set -e
   mkdir /w
@@ -28,6 +34,12 @@ MSYS_NO_PATHCONV=1 docker run --rm \
   dotnet restore Logistica.slnx
   dotnet build Logistica.slnx --no-restore -c Release
   dotnet build-server shutdown
+  if [ -n "$FILTRO" ]; then
+    # Un subconjunto, para el trabajo diario: sin cobertura, que con pocas pruebas no dice nada.
+    dotnet test Logistica.slnx --no-build -c Release --filter "FullyQualifiedName~$FILTRO" \
+      --logger trx --results-directory "$resultados"
+    exit 0
+  fi
   dotnet test Logistica.slnx --no-build -c Release \
     --settings coverage.runsettings --collect "XPlat Code Coverage" \
     --logger trx \

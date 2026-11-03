@@ -64,8 +64,18 @@ bash scripts/test-en-docker.sh
 
 El script también genera el reporte de cobertura de las capas de dominio y aplicación en `coverage/index.html` (configuración en `coverage.runsettings`). En el CI, el resumen aparece en la página de cada ejecución y el reporte completo se descarga como el artefacto `reporte-cobertura`.
 
-Las clases de integración se ejecutan de a una para limitar los contenedores y hosts de API
-simultáneos. Con `coverage.runsettings`, cada proceso de pruebas tiene un límite de heap administrado de 4 GiB para
+Para el trabajo diario, el script acepta un filtro y corre sólo las pruebas cuyo nombre completo lo contiene, sin
+cobertura (por ejemplo, las de Depósito en unos 2 minutos):
+
+```bash
+bash scripts/test-en-docker.sh Deposito
+```
+
+Las pruebas de integración usan un solo PostgreSQL para toda la suite: `PostgresApiFactory` migra y siembra una base
+plantilla una vez y cada clase recibe su propia base clonada (`CREATE DATABASE … TEMPLATE`). Las clases corren en
+paralelo, hasta cuatro a la vez (`ConfiguracionPruebas.cs`); las que levantan contenedores propios (RabbitMQ, Valkey,
+Mailpit o un PostgreSQL aparte) están en la colección `ContenedoresPropios` y corren solas, después de las demás.
+Con `coverage.runsettings`, cada proceso de pruebas tiene un límite de heap administrado de 4 GiB para
 que el recolector libere memoria antes de agotar el runner; no es un límite de memoria de la aplicación desplegada.
 El límite usa [`DOTNET_GCHeapHardLimit`](https://learn.microsoft.com/dotnet/core/runtime-config/garbage-collector#heap-hard-limit)
 en el entorno del testhost configurado por VSTest.

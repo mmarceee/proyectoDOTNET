@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptada: decisión funcional cerrada. Implementación pendiente.** |
-| Versión y fecha | 1.0 · 02/11/2026 |
+| Versión y fecha | 1.1 · 02/11/2026 |
 | Responsable del registro | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas en este intercambio. No registra firmas ni aprobaciones individuales adicionales. |
@@ -13,7 +13,7 @@
 
 **Los estados operativos pertenecen a los bultos. El envío conserva un resumen derivado: Creado, En operación, Entregado parcialmente o Entregado. Además indica si está Terminado y muestra el desglose de sus bultos.**
 
-«En operación» reemplaza al nombre propuesto «En tránsito» para el resumen del envío: permite representar también reintentos, reintegros y devoluciones sin afirmar que los bultos estén viajando. «En tránsito» sigue siendo un estado operativo preciso del bulto.
+«En operación» reemplaza al nombre propuesto «En tránsito» para el resumen del envío: permite representar también recepción incompleta, preparación, reintentos, reintegros y devoluciones sin afirmar que los bultos estén viajando. «En tránsito» sigue siendo un estado operativo preciso del bulto.
 
 «Entregado parcialmente» puede ser una situación abierta o el resultado definitivo. Si los bultos restantes se devuelven o se extravían, no se convierte el envío en Entregado.
 
@@ -36,25 +36,31 @@ El esquema lógico acordado es:
 | --- | --- |
 | Todos entregados | Entregado; Terminado = sí; N/N entregados. |
 | Alguno entregado y menos que el total | Entregado parcialmente; Terminado depende de los restantes. |
-| Ninguno entregado y ejecución todavía no iniciada | Creado; si está terminado sin entrega, se presenta el resultado final en lugar de mostrar sólo «Creado». |
-| Ninguno entregado y ejecución iniciada | En operación; si está terminado sin entrega, se presenta el resultado final en lugar de mostrar sólo «En operación». |
+| Ningún bulto recibido | Creado; si está terminado sin entrega, se presenta el resultado final en lugar de mostrar sólo «Creado». |
+| Al menos un bulto recibido, ninguno entregado | En operación; si está terminado sin entrega, se presenta el resultado final en lugar de mostrar sólo «En operación». |
 
 **La presentación de un cierre sin entrega es «Finalizado sin entrega» más el desglose, no un quinto estado persistido.** Un envío con todos sus bultos devueltos no se presenta como una operación activa ni como entregado.
 
-La distinción exacta entre preparación e inicio de ejecución debe concretarse en la matriz técnica con evidencia propia de los bultos. Sus estados actuales pueden coincidir antes y después de una salida, por ejemplo EnDeposito tras un reintegro. No se debe retroceder de En operación a Creado por esa ambigüedad: hace falta fijar el hecho de inicio o la evidencia de su ciclo operativo que usará la derivación. Esta precisión está pendiente y no reabre los cuatro nombres acordados.
+**La ejecución se inicia con la recepción en depósito del primer bulto.** Crear el envío en el portal no la inicia: lo deja en Creado. Dentro de En operación, el desglose distingue recepción incompleta, preparación, tránsito, reintento o devolución.
+
+La derivación no necesita un dato adicional de inicio: un bulto en un estado distinto de Admitido o Cancelado ya fue recibido, y ninguna transición vuelve a Admitido, de modo que un reintegro no devuelve el envío a Creado. Cancelado no indica si el bulto se había recibido; por eso el recálculo nunca baja de En operación a Creado.
+
+Como el resumen cambia con el primer bulto, cada escaneo de recepción actualiza el estado de su bulto y recalcula el envío. La condición de recibir un bulto se valida contra ese bulto, no contra el resumen.
 
 ## 3. Ejemplos de aceptación del acuerdo
 
 | Bultos | Resumen | Terminado | Presentación esperada |
 | --- | --- | --- | --- |
-| Tres admitidos, sin iniciar ejecución | Creado | No | Creado · 0 de 3 entregados. |
+| Tres admitidos, ninguno recibido | Creado | No | Creado · 0 de 3 entregados. |
+| Uno en depósito y dos admitidos | En operación | No | En operación · 0 de 3 entregados; recepción incompleta. |
 | Dos en tránsito y uno pendiente de entrega | En operación | No | En operación · 0 de 3 entregados; detalle de cada bulto. |
 | Dos entregados y uno reprogramado | Entregado parcialmente | No | Entregado parcialmente · 2 de 3 entregados · En curso. |
 | Dos entregados y uno devuelto | Entregado parcialmente | Sí | Entregado parcialmente · 2 de 3 entregados · Finalizado; 1 devuelto. |
 | Uno entregado y dos extraviados | Entregado parcialmente | Sí | Entregado parcialmente · 1 de 3 entregados · Finalizado; 2 extraviados. |
 | Tres entregados | Entregado | Sí | Entregado · 3 de 3 entregados · Finalizado. |
-| Dos devueltos y uno extraviado | Sin entrega; resumen según su ciclo de ejecución | Sí | Finalizado sin entrega · 0 de 3 entregados · 2 devueltos y 1 extraviado. |
-| Todos cancelados antes de iniciar ejecución | Creado, con cierre por cancelación | Sí | Finalizado sin entrega · Cancelado · 0 de N entregados. |
+| Dos devueltos y uno extraviado | En operación | Sí | Finalizado sin entrega · 0 de 3 entregados · 2 devueltos y 1 extraviado. |
+| Todos cancelados antes de recibir ningún bulto | Creado, con cierre por cancelación | Sí | Finalizado sin entrega · Cancelado · 0 de N entregados. |
+| Todos cancelados después de recibir alguno | En operación, con cierre por cancelación | Sí | Finalizado sin entrega · Cancelado · 0 de N entregados. |
 
 «En curso» en esta tabla es un texto de presentación para Terminado = falso; no agrega un estado de envío ni reemplaza EstadoRuta.EnCurso.
 
@@ -83,7 +89,7 @@ La estructura monetaria, moneda, redondeo, clave de unicidad del cargo y contrat
 
 La decisión funcional anterior está cerrada. **No equivale a declarar terminada la especificación técnica de RF 31 a 36.** Falta:
 
-1. Tabla completa y verificable de transiciones por bulto y de cambios del resumen del envío, guardas y criterio de inicio de ejecución. Definir los pares que son inalcanzables y los hechos de visita que no cambian el resumen.
+1. Tabla completa y verificable de transiciones por bulto y de cambios del resumen del envío, y sus guardas. Definir los pares que son inalcanzables y los hechos de visita que no cambian el resumen.
 2. Contratos de resultados por bulto, escaneo, faltantes no escaneables y evidencia por motivo. Política de carga incompleta para operadores que sí admiten parcial; custodia física, rendición y disponibilidad de faltantes.
 3. Exclusividad de asignación activa por bulto y liberación de reservas: decidir cuándo un pendiente puede entrar en otra ruta sin asignarlo simultáneamente a dos. CU-42 ordena las visitas resultantes y no decide esta pertenencia.
 4. Confirmación del alcance de extravío individual y de sus autorizaciones. El resumen ya contempla bultos extraviados, pero la operación que los declara debe especificarse.
@@ -103,3 +109,4 @@ Este documento reemplaza las propuestas anteriores de derivar el envío con todo
 | Versión | Fecha | Cambio | Responsable |
 | --- | --- | --- | --- |
 | 1.0 | 02/11/2026 | Registro de la decisión cerrada y separación de pendientes técnicos. | Lucas Ottonello |
+| 1.1 | 02/11/2026 | La ejecución se inicia con la recepción del primer bulto; se actualizan el esquema, los ejemplos y el pendiente 1. | Ezequiel Marcenal |

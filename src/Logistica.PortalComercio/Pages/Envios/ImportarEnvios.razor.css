@@ -1,0 +1,32 @@
+/* Zona para elegir o soltar el CSV (CU-11). El input queda encima, transparente, para recibir el clic y el archivo. */
+.zona-archivo {
+    position: relative;
+    padding: 2rem 1rem;
+    border: 2px dashed var(--bs-border-color);
+    border-radius: .5rem;
+    background-color: var(--bs-tertiary-bg);
+    text-align: center;
+    transition: border-color .15s, background-color .15s;
+}
+
+.zona-archivo:hover, .zona-archivo:focus-within, .zona-archivo.arrastrando {
+    border-color: var(--operador-primario, var(--bs-primary));
+    background-color: var(--bs-secondary-bg);
+}
+
+.zona-archivo ::deep input[type=file] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.zona-archivo.deshabilitada {
+    opacity: .6;
+}
+
+.zona-archivo.deshabilitada ::deep input[type=file] {
+    cursor: wait;
+}

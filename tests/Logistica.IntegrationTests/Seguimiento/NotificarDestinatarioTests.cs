@@ -41,6 +41,7 @@ public sealed class MailpitFixture : IAsyncLifetime
 }
 
 // CU-62: notificaciones al destinatario. Cada prueba usa su propio operador y comercio, así no se mezclan sus datos.
+[Collection(ContenedoresPropios.Nombre)]
 public sealed class NotificarDestinatarioTests(PostgresApiFactory factory, RabbitMqFixture rabbit, MailpitFixture mailpit)
     : IClassFixture<PostgresApiFactory>, IClassFixture<RabbitMqFixture>, IClassFixture<MailpitFixture>
 {

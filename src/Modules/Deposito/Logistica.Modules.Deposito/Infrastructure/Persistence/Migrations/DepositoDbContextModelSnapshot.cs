@@ -18,7 +18,7 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("deposito")
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -59,6 +59,100 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
                         .HasFilter("\"PublicadoEn\" IS NULL");
 
                     b.ToTable("outbox_messages", "deposito");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Deposito.Domain.Liquidaciones.LineaLiquidacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Concepto")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("Fecha")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("LiquidacionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Monto")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("NumeroEnvio")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvioId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_LineasLiquidacion_EnvioId");
+
+                    b.HasIndex("LiquidacionId");
+
+                    b.ToTable("LineasLiquidacion", "deposito");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Deposito.Domain.Liquidaciones.Liquidacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("EmitidaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("GeneradaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PagadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("PeriodoDesde")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("PeriodoHasta")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("TotalAjustes")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalBruto")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalNeto")
+                        .HasColumnType("numeric");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "ComercioId", "GeneradaEn");
+
+                    b.ToTable("Liquidaciones", "deposito");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Deposito.Domain.Recepciones.RecepcionDeposito", b =>
@@ -105,6 +199,20 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
                     b.HasIndex("OperadorId", "EnvioId");
 
                     b.ToTable("Recepciones", "deposito");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Deposito.Domain.Liquidaciones.LineaLiquidacion", b =>
+                {
+                    b.HasOne("Logistica.Modules.Deposito.Domain.Liquidaciones.Liquidacion", null)
+                        .WithMany("Lineas")
+                        .HasForeignKey("LiquidacionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Deposito.Domain.Liquidaciones.Liquidacion", b =>
+                {
+                    b.Navigation("Lineas");
                 });
 #pragma warning restore 612, 618
         }
