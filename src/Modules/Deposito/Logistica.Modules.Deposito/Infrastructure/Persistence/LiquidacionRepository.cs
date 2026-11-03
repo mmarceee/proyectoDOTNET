@@ -20,6 +20,14 @@ internal sealed class LiquidacionRepository(DepositoDbContext db) : ILiquidacion
         return await db.Liquidaciones.AsNoTracking().OrderByDescending(l => l.GeneradaEn).ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Liquidacion>> ListarEmitidasAsync(Guid comercioId, CancellationToken ct)
+    {
+        return await db.Liquidaciones.AsNoTracking()
+            .Where(l => l.ComercioId == comercioId && l.Estado != EstadoLiquidacion.Borrador)
+            .OrderByDescending(l => l.PeriodoHasta).ThenByDescending(l => l.GeneradaEn)
+            .ToListAsync(ct);
+    }
+
     public Task<Liquidacion?> ObtenerAsync(Guid id, CancellationToken ct)
     {
         return db.Liquidaciones.Include(l => l.Lineas).SingleOrDefaultAsync(l => l.Id == id, ct);

@@ -773,6 +773,20 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Publicar `LiquidacionEmitida`: no tiene consumidor ni aviso definido. Los ajustes, que quedan en cero porque el requerimiento 2 cobra sólo la tarifa de admisión. La generación desde el cierre diario: corresponde a CU-70. |
 | **Verificación** | 6 casos unitarios del agregado y 2 pruebas de integración (generación con entregados, devueltos, cancelados, otro mes y la última hora del período en la zona del operador; regeneración sin duplicados; emisión y pago; aislamiento entre operadores y perfil). Las de integración llevan el envío a su estado final por SQL, sin recorrer la ruta. Corrida completa en Docker: 958 pruebas .NET (363 unitarias, 56 de arquitectura y 539 de integración), todas pasan; cobertura de líneas del 95,4 %. No se probaron las páginas en un navegador ni con `docker compose`. Con A4: un caso unitario y una prueba de integración más (borrado del borrador, regeneración con el mismo envío, rechazo sobre una emitida y 404 para otro operador); corrida completa en Docker con 960 pruebas (364 unitarias, 56 de arquitectura y 540 de integración), todas pasan, cobertura del 95,4 %. El botón se vio en el navegador sobre un borrador creado en la base local. |
 
+## **3.52 Consultar la cuenta corriente y las liquidaciones (CU-33)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | Depósito: `ConsultarCuentaCorrienteHandler`, `ListarEmitidasAsync` en `ILiquidacionRepository` y `LiquidacionRepository`, `ConsultarCuentaCorrienteEndpoint` (consulta, detalle y CSV). Contratos HTTP `CuentaCorrienteResponse`. Portal: página `/cuenta-corriente`, menú e inicio. Pruebas: `ArchivoLiquidacionTests` y `ConsultarCuentaCorrienteTests`. Documentos: casos de uso. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-33 en nivel básico: el comercio consulta su saldo pendiente, sus liquidaciones emitidas y pagadas, el detalle por envío y lo descarga. |
+| **Cómo se trabajó** | El responsable pidió terminar el caso de uso antes de seguir con el despliegue. La IA relevó la ficha, el patrón de las páginas del Portal y de los endpoints con la política del comercio, y escribió el código, las pruebas y la documentación. |
+| **Decisiones** | El saldo pendiente es la suma del total neto de las liquidaciones emitidas; las pagadas se listan pero no suman. Una liquidación ajena o en borrador responde 404 sin distinguir el motivo (ADR-0002). La fecha de cada línea se muestra en días del operador, como el período de CU-32. El handler, además del filtro "Tenant", compara el comercio de la sesión. La descarga es un CSV con punto y coma, coma decimal y BOM, y el Portal la ofrece como un enlace común: la cookie viaja sola y no hace falta JavaScript. |
+| **Descartado** | La descarga en PDF: el nivel básico pide poder descargarla, y el CSV se abre en cualquier planilla. Un detalle del envío en el Portal desde cada línea: el Portal todavía no tiene esa página. |
+| **Verificación** | Un caso unitario del CSV (BOM, separadores, coma decimal y totales) y 2 pruebas de integración (borradores ocultos, emisión que suma al saldo, detalle con la fecha en días del operador, descarga, pago que descuenta del saldo; el mismo comercio con otro operador no la ve y el personal del operador recibe 403). Corrida completa en Docker: 963 pruebas .NET (365 unitarias, 56 de arquitectura y 542 de integración), todas pasan; cobertura de líneas del 95,4 %. Las páginas se probaron en el navegador con `docker compose`: listado, detalle y descarga. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -810,3 +824,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.31 | 03/11/2026 | Entrada de CU-11, importar envíos desde un archivo. | Ezequiel Marcenal |
 | 0.32 | 03/11/2026 | Entrada de CU-32, generar la liquidación de un comercio. | Ezequiel Marcenal |
 | 0.33 | 03/11/2026 | CU-32: eliminación del borrador (A4). | Ezequiel Marcenal |
+| 0.34 | 03/11/2026 | Entrada de CU-33, consultar la cuenta corriente y las liquidaciones. | Ezequiel Marcenal |

@@ -392,7 +392,8 @@ Se detalla como **CU-81** en la sección 2.7 (API pública para comercios).
 | **Actores** | **Principal:** usuario del comercio, desde el Portal del comercio. |
 | **Flujo de evento principal** | 1. El usuario elige **Cuenta corriente**.<br>2. El sistema muestra el saldo pendiente y la lista de liquidaciones con período, estado y totales.<br>3. El usuario abre una liquidación.<br>4. El sistema muestra sus líneas: número de envío, fecha, concepto y monto.<br>5. El usuario puede descargar la liquidación. |
 | **Flujos alternativos** | **A1 · Sin liquidaciones (paso 2).** El sistema lo informa. |
-| **Requerimientos especiales** | 1. El comercio ve sólo sus liquidaciones con el operador seleccionado; las liquidaciones en *Borrador* no se muestran. |
+| **Requerimientos especiales** | 1. El comercio ve sólo sus liquidaciones con el operador seleccionado; las liquidaciones en *Borrador* no se muestran. Una liquidación ajena o en borrador responde 404, sin distinguir el motivo.<br>2. **Saldo pendiente:** la suma del total neto de las liquidaciones *Emitidas*; las *Pagadas* siguen en la lista, pero no suman.<br>3. La fecha de cada línea es el día, en la zona horaria del operador, en que el envío llegó a *Entregado* o *Devuelto*. |
+| **Implementación** | Nivel básico (03/11/2026). Portal del comercio, `/portal/cuenta-corriente` y `/portal/cuenta-corriente/{id}`, sobre `GET /api/cuenta-corriente` y `GET /api/cuenta-corriente/liquidaciones/{id}`, con la política del comercio. La descarga del paso 5 es un CSV (`/archivo`) con punto y coma, coma decimal y BOM, para abrirlo en una planilla en español; no hay PDF. |
 
 ## **2.4 Planificación de rutas**
 
@@ -851,3 +852,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 1.5 | 03/11/2026 | CU-11: implementación en nivel mínimo; índice único por operador, comercio y referencia, y formato del archivo. | Ezequiel Marcenal |
 | 1.6 | 03/11/2026 | CU-32: implementación en nivel básico; los envíos liquidables se piden al contrato de Envíos y el período usa la zona horaria del operador. | Ezequiel Marcenal |
 | 1.7 | 03/11/2026 | CU-32: A4, eliminar una liquidación en borrador. | Ezequiel Marcenal |
+| 1.8 | 03/11/2026 | CU-33: implementación en nivel básico; saldo pendiente, fecha de las líneas y descarga en CSV. | Ezequiel Marcenal |

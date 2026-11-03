@@ -8,6 +8,9 @@ internal interface ILiquidacionRepository
 
     Task<IReadOnlyList<Liquidacion>> ListarAsync(CancellationToken ct);
 
+    // CU-33: las emitidas y pagadas del comercio, sin los borradores, de la más reciente a la más vieja.
+    Task<IReadOnlyList<Liquidacion>> ListarEmitidasAsync(Guid comercioId, CancellationToken ct);
+
     // Con sus líneas.
     Task<Liquidacion?> ObtenerAsync(Guid id, CancellationToken ct);
 

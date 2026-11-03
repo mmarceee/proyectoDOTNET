@@ -18,6 +18,7 @@ namespace Logistica.IntegrationTests.BuildingBlocks;
 
 // ADR-0003, sección 2.9: una operación se sigue en una sola traza desde el request de la API, pasando por la
 // publicación del outbox en RabbitMQ, hasta el consumidor del Worker.
+[Collection(ContenedoresPropios.Nombre)]
 public sealed class TrazasMensajeriaTests(PostgresApiFactory factory, RabbitMqFixture rabbit)
     : IClassFixture<PostgresApiFactory>, IClassFixture<RabbitMqFixture>
 {
