@@ -9,103 +9,84 @@
     @* La marca del operador de la sesión (CU-07): va última para pisar los colores por defecto. *@
     <link rel="stylesheet" href="/cuenta/estilo.css" />
 </head>
+@{
+    var muestraMenu = SeccionesBackoffice.MuestraMenu(User);
+    var rutaActual = Context.Request.Path;
+}
 <body>
     <header>
-        <nav class="navbar navbar-expand-xxl navbar-light bg-white border-bottom box-shadow mb-3" aria-label="Navegación principal">
-            <div class="container">
-                <a class="navbar-brand d-flex align-items-center gap-2" href="/backoffice">
+        <nav class="navbar navbar-light bg-white border-bottom box-shadow barra-backoffice" aria-label="Barra superior">
+            <div class="container-fluid flex-nowrap gap-2">
+                @if (muestraMenu)
+                {
+                    <button class="navbar-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu-backoffice"
+                            aria-controls="menu-backoffice" aria-label="Mostrar el menú">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                }
+                <a class="navbar-brand d-flex align-items-center gap-2 me-auto" href="/backoffice">
                     @if (User.Identity?.IsAuthenticated == true)
                     {
                         <img src="/cuenta/logo" alt="" height="28" onerror="this.remove()" />
                     }
                     Backoffice
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation" aria-controls="main-navigation"
-                        aria-expanded="false" aria-label="Mostrar navegación">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div id="main-navigation" class="navbar-collapse collapse justify-content-between">
-                    @if (User.Identity?.IsAuthenticated == true && !User.IsInRole("UsuarioComercio")
-                        && (User.IsInRole("Administrador") || User.IsInRole("Despachador") || User.IsInRole("OperarioDeposito")))
-                    {
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" href="/backoffice">Inicio</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" href="/backoffice/envios">Envíos</a>
-                        </li>
-                        @* CU-66: los mismos perfiles que la página; el operario de depósito no lo ve (y si entra a mano, 403). *@
-                        @if (User.IsInRole("Administrador") || User.IsInRole("Despachador"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/tablero">Tablero</a>
-                            </li>
-                        }
-                        @if (User.IsInRole("OperarioDeposito"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/deposito/recepcion">Recepción</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/rendiciones">Rendiciones</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/devoluciones">Devoluciones</a>
-                            </li>
-                        }
-                        @if (User.IsInRole("Despachador"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/rutas">Rutas</a>
-                            </li>
-                        }
-                        @if (User.IsInRole("Administrador"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/comercios">Comercios</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/usuarios">Usuarios</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/zonas">Zonas</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/flota">Flota</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/tarifario">Tarifario</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/reglas">Reglas</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/identidad-visual">Identidad visual</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" href="/backoffice/mensajes-fallidos">Mensajes fallidos</a>
-                            </li>
-                        }
-                    </ul>
-                    }
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <div class="cuenta-usuario d-flex flex-wrap align-items-center gap-2">
-                            <span class="navbar-text">@User.Identity.Name</span>
-                            <form method="post" action="/cuenta/salir" asp-antiforgery="true" class="m-0">
-                                <button type="submit" class="btn btn-outline-secondary btn-sm btn-logout">Cerrar sesión</button>
-                            </form>
-                        </div>
-                    }
-                </div>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <div class="cuenta-usuario d-flex align-items-center gap-2">
+                        <span class="navbar-text d-none d-sm-inline">@User.Identity.Name</span>
+                        <form method="post" action="/cuenta/salir" asp-antiforgery="true" class="m-0">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm btn-logout">Cerrar sesión</button>
+                        </form>
+                    </div>
+                }
             </div>
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
+    <div class="backoffice-cuerpo">
+        @if (muestraMenu)
+        {
+            @* En pantallas grandes, una columna fija; en las chicas, un panel que se abre con el botón de la barra. *@
+            <aside id="menu-backoffice" class="offcanvas-lg offcanvas-start backoffice-menu" tabindex="-1"
+                   aria-labelledby="menu-backoffice-titulo">
+                <div class="offcanvas-header">
+                    <h2 id="menu-backoffice-titulo" class="offcanvas-title h6 mb-0">Menú</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#menu-backoffice"
+                            aria-label="Cerrar el menú"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <nav class="w-100" aria-label="Navegación principal">
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link @(rutaActual == "/backoffice" ? "active" : "")" href="/backoffice"
+                                   aria-current="@(rutaActual == "/backoffice" ? "page" : null)">Inicio</a>
+                            </li>
+                        </ul>
+                        @foreach (var grupo in SeccionesBackoffice.Visibles(User))
+                        {
+                            <p class="backoffice-menu-grupo">@grupo.Key</p>
+                            <ul class="nav flex-column">
+                                @foreach (var seccion in grupo)
+                                {
+                                    var actual = SeccionesBackoffice.EsActual(seccion.Ruta, rutaActual);
+                                    <li class="nav-item">
+                                        <a class="nav-link @(actual ? "active" : "")" href="@seccion.Ruta"
+                                           aria-current="@(actual ? "page" : null)">@seccion.Titulo</a>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </nav>
+                </div>
+            </aside>
+        }
+        <div class="backoffice-contenido">
+            <div class="container-xl">
+                <main role="main" class="pb-3">
+                    @RenderBody()
+                </main>
+            </div>
+        </div>
     </div>
 
     <footer class="border-top footer text-muted">

@@ -5,4 +5,30 @@
 }
 
 <h1 class="display-6">Backoffice</h1>
-<p class="text-center">Panel de trabajo del operador logístico. Elegí una de las opciones disponibles para tu perfil.</p>
+<p class="text-center text-body-secondary">Panel de trabajo del operador logístico. Elegí una de las opciones disponibles para tu perfil.</p>
+
+@* Las mismas secciones que el menú lateral, filtradas por perfil. *@
+@if (SeccionesBackoffice.MuestraMenu(User))
+{
+    @foreach (var grupo in SeccionesBackoffice.Visibles(User))
+    {
+        <section class="mt-4">
+            <h2 class="h5 mb-3">@grupo.Key</h2>
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-3 g-3">
+                @foreach (var seccion in grupo)
+                {
+                    <div class="col">
+                        <div class="card h-100 tarjeta-seccion">
+                            <div class="card-body">
+                                <h3 class="h6 card-title mb-1">
+                                    <a class="stretched-link text-decoration-none" href="@seccion.Ruta">@seccion.Titulo</a>
+                                </h3>
+                                <p class="card-text small text-body-secondary mb-0">@seccion.Descripcion</p>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+}
