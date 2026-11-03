@@ -106,6 +106,9 @@ namespace Logistica.Modules.Ejecucion.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Bultos")
+                        .HasColumnType("text");
+
                     b.Property<string>("Contenido")
                         .HasColumnType("text");
 
