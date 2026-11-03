@@ -54,10 +54,10 @@ TABLA DE TRANSICIONES:
 
 | Dato | Valor |
 | :---- | :---- |
-| Versión y fecha | 1.0 · 03/11/2026 |
+| Versión y fecha | 1.1 · 03/11/2026 |
 | Responsable | Cristian Reyes |
 | Base | [Decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) (secciones 2 a 5, pendiente 1 de la sección 6) y [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md), sección 2.1 |
-| Estado | Propuesta para revisión del equipo. Implementación pendiente |
+| Estado | Aprobada por el equipo el 03/11/2026. Implementada en `Bulto.Transicionar` y `Envio.RegistrarVisita` |
 
 ### 1. Idea central
 
@@ -112,9 +112,9 @@ El envío guarda su resumen (para consultar y filtrar sin reconstruirlo) y nadie
 - **Presentación de un cierre sin entrega:** si Terminado es verdadero y no hay entregas, se muestra «Finalizado sin entrega» con el desglose. No es un quinto valor del resumen.
 - **Hechos que no cambian el resumen:** pasar de 1/3 a 2/3 entregados mantiene Entregado parcialmente; una revisita fallida después de una entrega parcial también. Igual deben invalidar el seguimiento y actualizar el tablero (pendiente 7 de la decisión).
 
-### 4. Pares inalcanzables y consulta abierta
+### 4. Pares inalcanzables
 
-- La sección 3 de la decisión incluye el ejemplo «Todos cancelados después de recibir alguno». Con T17 como está, no puede ocurrir: un bulto recibido ya no se cancela. **Se propone mantener T17 y tratar ese ejemplo como inalcanzable**; queda a confirmar por el equipo.
+- La sección 3 de la decisión incluye el ejemplo «Todos cancelados después de recibir alguno». Con T17 como está, no puede ocurrir: un bulto recibido ya no se cancela. **El equipo aprobó el 03/11/2026 mantener T17 y tratar ese ejemplo como inalcanzable.**
 - NoEntregado no se observa al terminar una operación: T7 siempre va seguida de T9 o T10 en la misma transacción.
 
 ### 5. Ejemplos de aceptación
@@ -124,3 +124,4 @@ Los diez ejemplos de la sección 3 de la decisión son las pruebas de aceptació
 | Versión | Fecha | Cambio | Responsable |
 | :---- | :---- | :---- | :---- |
 | 1.0 | 03/11/2026 | Transiciones por bulto, cálculo del resumen, terminales declarados y consulta sobre la cancelación después de recibir | Cristian Reyes |
+| 1.1 | 03/11/2026 | Aprobada por el equipo, con la consulta de la sección 4 resuelta: se mantiene T17 y el ejemplo de cancelación después de recibir es inalcanzable | Ezequiel Marcenal |

@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptado como decisión de diseño. Implementación y evaluación retrospectiva pendientes.** |
-| Versión y fecha | 1.2 · 03/11/2026 |
+| Versión y fecha | 1.3 · 03/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | `586f630` (CU-42) |
@@ -101,7 +101,7 @@ El cierre resumido no reemplaza la custodia física, la rendición ni el cierre 
 
 Se deben actualizar [modelo de dominio](modelo-de-dominio.md), [tabla de transiciones](tabla-de-transiciones-de-estados.md), [casos de uso](casos-de-uso.md), ADR-0004, ADR-0006, contratos de avisos y manuales de prueba. Los vínculos añadidos ahora señalan la decisión nueva; no convierten automáticamente sus tablas históricas en el diseño ya implementado.
 
-Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de entrega parcial](decisiones-entrega-parcial.md): matriz completa, custodia y carga incompleta, exclusividad, extravío individual, migración y compatibilidad, avisos, progreso y contrato monetario. Este ADR no los presenta como resueltos por omisión.
+Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de entrega parcial](decisiones-entrega-parcial.md): custodia y carga incompleta, exclusividad, avisos, progreso y contrato monetario. Este ADR no los presenta como resueltos por omisión. El 03/11/2026 se resolvieron allí la matriz por bulto (pendiente 1), el alcance del extravío para el 12/11 (pendiente 4) y la migración con la traducción de las operaciones antiguas (pendiente 5).
 
 ### 4.4 Criterios de verificación antes de cerrar la implementación
 
@@ -112,7 +112,7 @@ Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de 
 | Reenvío idempotente | Un OperacionId repetido no duplica evidencia, intentos, eventos ni cargos; el consumidor no duplica avisos. | Pendiente para parcial. |
 | Rutas y depósito | Sólo pendientes elegibles se reasignan; no hay doble reserva activa por bulto; recepción y rendición preservan custodia y estados. | Pendiente. |
 | Aislamiento | IDs/evidencia ajenos no acceden ni escriben entre operadores o comercios. | Pendiente sobre los contratos nuevos. |
-| Migración/formatos antiguos | Historial preservado y operaciones pendientes tratadas sin inventar resultados ambiguos. | Pendiente. |
+| Migración/formatos antiguos | Historial preservado y operaciones pendientes tratadas sin inventar resultados ambiguos. | Migración `EntregaParcialBultos` y traducción de las operaciones antiguas a visita, con sus pruebas (`VisitaPorBultoTests`, 03/11). Falta la PWA nueva. |
 | Compatibilidad y caché | Receptor v1 compatible, v2 recibe resultados por bulto; pasar de 1/3 a 2/3 actualiza seguimiento aunque el resumen no cambie. | Pendiente. |
 | Escenario docente | Tres bultos: dos entregados offline, uno con motivo; sincronizar, comprobar backoffice/público/aviso y reenviar sin duplicados. | Pendiente, objetivo 12/11. |
 
@@ -140,3 +140,4 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | 1.0 | 02/11/2026 | Decisión de diseño aceptada, impacto identificado y criterios de verificación/retrospectiva pendientes explícitos. | Lucas Ottonello |
 | 1.1 | 02/11/2026 | Criterio de inicio de ejecución: recepción del primer bulto. | Ezequiel Marcenal |
 | 1.2 | 03/11/2026 | Sección 4.3: riesgo de bultos entregados sin aplicar por la atomicidad por visita; sección 4.4: la atomicidad queda especificada en el ADR-0004, versión 1.4. | Ezequiel Marcenal |
+| 1.3 | 03/11/2026 | Sección 4.3: pendientes 1, 4 y 5 de la decisión resueltos; sección 4.4: estado de la migración y de los formatos antiguos. | Ezequiel Marcenal |
