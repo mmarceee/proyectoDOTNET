@@ -7,6 +7,7 @@ using Logistica.BuildingBlocks.Infrastructure.Configuracion;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.BuildingBlocks.Infrastructure.Messaging.Fallidos;
+using Logistica.BuildingBlocks.Infrastructure.Observabilidad;
 using Logistica.Modules.Administracion;
 using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Deposito;
@@ -30,9 +31,10 @@ builder.Services.AddHealthChecks();
 
 // Trazas distribuidas (letra, sección 6.12): cada request, sus consultas a PostgreSQL y las fuentes propias de los
 // módulos, como la sincronización de la PWA (ADR-0004, sección 2.9), y la publicación del outbox, que el Worker
-// continúa (ADR-0003, sección 2.9). Métricas, por ahora sólo las de la caché (aciertos, fallos y errores); el resto y
-// los logs llegan con el hito del 5/11. Se exportan por OTLP a Aspire Dashboard cuando OTEL_EXPORTER_OTLP_ENDPOINT
-// está configurado (docker-compose.yml).
+// continúa (ADR-0003, sección 2.9). Métricas del tablero técnico: latencia media, p95 y p99 y tasa de errores
+// (MetricasHttp, más las de ASP.NET Core), sincronizaciones pendientes (Ejecución), relación de aciertos de la caché y
+// profundidad de la cola de fallidos (MetricasMensajeria). Se exportan por OTLP a Aspire Dashboard cuando
+// OTEL_EXPORTER_OTLP_ENDPOINT está configurado (docker-compose.yml y Terraform).
 var exportarOtlp = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(recurso => recurso.AddService("logistica-api"))
@@ -49,8 +51,8 @@ builder.Services.AddOpenTelemetry()
     })
     .WithMetrics(metricas =>
     {
-        metricas.AddMeter(MetricasCache.Medidor);
-        metricas.AddMeter(EjecucionModule.FuenteDeTrazas);
+        metricas.AddAspNetCoreInstrumentation()
+            .AddMeter(MetricasHttp.Medidor, MetricasCache.Medidor, MetricasMensajeria.Medidor, EjecucionModule.FuenteDeTrazas);
 
         if (exportarOtlp)
         {
@@ -163,6 +165,9 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     }
     await app.Services.SembrarDatosInicialesAsync();
 }
+
+// Primero de la cadena, para medir la solicitud completa con su código de respuesta final (MetricasHttp).
+app.UseMetricasHttp();
 
 // En Development las Minimal APIs lanzan BadHttpRequestException ante un body inválido, en lugar de
 // responder 400. Se respeta su código para que no termine en un 500.

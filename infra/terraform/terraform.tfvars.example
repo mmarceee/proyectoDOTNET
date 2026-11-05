@@ -1,16 +1,14 @@
-# Copiar como produccion.tfvars (excluido de Git) y completar. Uso: terraform apply -var-file=produccion.tfvars
-# Para otro ambiente, otro archivo con otro "entorno".
+# Copiar como produccion.tfvars (excluido de Git) y completar. Uso: terraform apply "-var-file=produccion.tfvars"
+# (en PowerShell, con comillas). Para otro ambiente, otro archivo con otro "entorno".
 
 entorno = "produccion"
 
 # Azure for Students: az account show --query id -o tsv
 azure_subscription_id = ""
 
-# Si la suscripción de estudiante no permite São Paulo (RequestDisallowedByAzure), probar con "eastus".
-# ubicacion = "brazilsouth"
-
-# CloudAMQP: panel de la cuenta → API access.
-cloudamqp_apikey = ""
+# Región: por defecto chilecentral. La suscripción de estudiante sólo permite algunas:
+#   az policy assignment list --query "[].parameters.listOfAllowedLocations.value"
+# ubicacion = "chilecentral"
 
 # Correo (opcional). Sin cuenta de Brevo queda smtp://localhost:25 y los correos van a mensajes fallidos.
 # smtp             = "smtp://usuario:clave@smtp-relay.brevo.com:587"
@@ -22,3 +20,6 @@ cloudamqp_apikey = ""
 
 # Opcional: IP propia para conectarse a PostgreSQL con psql.
 # ip_administracion = "203.0.113.10"
+
+# Aspire Dashboard en Azure (tablero de observabilidad). false lo borra para ahorrar crédito.
+# observabilidad = true

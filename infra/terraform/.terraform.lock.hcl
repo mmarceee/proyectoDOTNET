@@ -1,21 +1,6 @@
 # This file is maintained automatically by "terraform init".
 # Manual edits may be lost in future updates.
 
-provider "registry.terraform.io/cloudamqp/cloudamqp" {
-  version     = "1.52.0"
-  constraints = "~> 1.0"
-  hashes = [
-    "h1:6xsaOKTRrHyg6H3nrseaP6JiAORXpORDyk6m9zVlApo=",
-    "h1:Dzg55afzmJAVpDv03SMeqa/TRxm0CvPObgLKkL+sE68=",
-    "zh:6b5846513ef64da278457d362076f806d50bd1b3a5d46a41a1b463639a3eaebb",
-    "zh:72b3d7cc9f6e83161102c07bbec36b62a6b415976c7d39e9992ebf42b33ceef5",
-    "zh:7f6804cb75bc13680ed995dbb19f67bb1fcba90802090838ff8249f07099a69b",
-    "zh:b92c647f51cf80a3d46612a9502fea0d79c20bcffa0521d12e90191c2a562ca7",
-    "zh:c0cbd0256ed36cdd039b41398e6c9f40dd6353268cb3480e175a439da148351c",
-    "zh:feca738a6f9ed11f4fd90dcb2855cc86faf375b644ed88ac0b14e981815134a6",
-  ]
-}
-
 provider "registry.terraform.io/hashicorp/azurerm" {
   version     = "4.81.0"
   constraints = "~> 4.0"

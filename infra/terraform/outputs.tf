@@ -18,3 +18,14 @@ output "contrasena_demo" {
   value       = random_password.demo.result
   sensitive   = true
 }
+
+output "url_observabilidad" {
+  description = "Dirección de Aspire Dashboard, o null si observabilidad = false."
+  value       = var.observabilidad ? local.url_aspire : null
+}
+
+output "acceso_observabilidad" {
+  description = "Enlace que inicia sesión en Aspire Dashboard con el token. Se ve con: terraform output -raw acceso_observabilidad"
+  value       = var.observabilidad ? "${local.url_aspire}/login?t=${random_password.aspire_token.result}" : null
+  sensitive   = true
+}

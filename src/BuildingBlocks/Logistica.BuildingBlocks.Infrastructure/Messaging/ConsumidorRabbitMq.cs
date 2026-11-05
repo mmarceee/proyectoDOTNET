@@ -27,6 +27,7 @@ public sealed class ConsumidorRabbitMq(IServiceScopeFactory ambitos, IConfigurat
                     foreach (var s in suscripciones)
                     {
                         var entrega = await canal.BasicGetAsync(s.Cola, autoAck: false, stoppingToken);
+                        MetricasMensajeria.Leida(s.Cola, entrega?.MessageCount ?? 0);
                         if (entrega is null) continue;
                         await ProcesarEntregaAsync(canal, s, entrega, stoppingToken);
                         procesados++;

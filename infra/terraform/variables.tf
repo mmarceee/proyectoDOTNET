@@ -13,27 +13,15 @@ variable "azure_subscription_id" {
 }
 
 variable "ubicacion" {
-  description = "Región de Azure. São Paulo es la más cercana a Montevideo; si la suscripción de estudiante no la permite, usar eastus."
+  description = "Región de Azure. La suscripción de Azure for Students sólo permite algunas (az policy assignment list --query \"[].parameters.listOfAllowedLocations.value\"); de ellas, Chile Central es la más cercana a Montevideo."
   type        = string
-  default     = "brazilsouth"
+  default     = "chilecentral"
 }
 
 variable "ubicacion_postgres" {
   description = "Región de PostgreSQL. Vacía, la misma que el resto; algunas suscripciones de estudiante no ofrecen PostgreSQL en todas las regiones."
   type        = string
   default     = ""
-}
-
-variable "cloudamqp_apikey" {
-  description = "Clave de la API de CloudAMQP (API access del panel de la cuenta)."
-  type        = string
-  sensitive   = true
-}
-
-variable "region_rabbitmq" {
-  description = "Región de CloudAMQP, la más cercana a la de Azure."
-  type        = string
-  default     = "amazon-web-services::sa-east-1"
 }
 
 variable "imagen_api" {
@@ -78,4 +66,10 @@ variable "ip_administracion" {
   description = "IP que además de Azure puede conectarse a PostgreSQL (por ejemplo, para psql). Vacía por defecto."
   type        = string
   default     = ""
+}
+
+variable "observabilidad" {
+  description = "Crea Aspire Dashboard y envía la telemetría de la API y el Worker. false lo borra cuando no hace falta mostrarlo (ahorra crédito)."
+  type        = bool
+  default     = true
 }
