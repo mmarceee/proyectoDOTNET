@@ -67,3 +67,9 @@ variable "ip_administracion" {
   type        = string
   default     = ""
 }
+
+variable "observabilidad" {
+  description = "Crea Aspire Dashboard y envía la telemetría de la API y el Worker. false lo borra cuando no hace falta mostrarlo (ahorra crédito)."
+  type        = bool
+  default     = true
+}

@@ -196,7 +196,7 @@ Container Apps administrará el enrutamiento público y HTTPS con certificado pr
 
 * ~~Alojamiento definitivo de RabbitMQ en producción.~~ Resuelto el 05/11: contenedor en Container Apps. CloudAMQP, elegido el 03/11, se descartó por el límite de 150 colas de su plan gratuito.  
 * ~~Contratación de Valkey y PostgreSQL administrados.~~ Resuelto el 05/11 (antes, el 03/11 con DigitalOcean): PostgreSQL Flexible Server B1ms y Valkey como contenedor en Container Apps, en Chile Central, la región permitida más cercana a Montevideo. El ambiente consume el crédito de Azure for Students y se destruye cuando no se usa (costo estimado en el README de `infra/terraform`).  
-* ~~Despliegue y protección del Aspire Dashboard en el ambiente remoto.~~ Resuelto el 03/11: no se despliega. El tablero de observabilidad se demostró en el entorno local; la instrumentación queda en el código y se activa en producción configurando `OTEL_EXPORTER_OTLP_ENDPOINT`.  
+* ~~Despliegue y protección del Aspire Dashboard en el ambiente remoto.~~ Resuelto el 05/11 (el 03/11 se había decidido no desplegarlo): Container App propia con un proxy Caddy delante, porque Container Apps expone un solo puerto y el panel y el receptor OTLP usan dos. El panel pide un token y el receptor una clave, que genera Terraform; la variable `observabilidad` lo apaga para ahorrar crédito. Detalle en el README de `infra/terraform`.  
 * ~~Datos de demostración en producción.~~ Resuelto el 03/11: se cargan los mismos operadores y usuarios que en desarrollo, con una contraseña que genera Terraform, porque el repositorio es público.  
 * ~~Estado de Terraform.~~ Resuelto el 03/11: local y fuera de Git, porque guarda secretos; lo administra el responsable del despliegue.  
 * ~~Biblioteca cliente de RabbitMQ.~~ Propuesta en el ADR-0003: RabbitMQ.Client.  
@@ -237,3 +237,4 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | 1.4 | 15/10/2026 | ADR-0004 aceptado. |
 | 1.5 | 03/11/2026 | Despliegue: el CI despliega en App Platform después de las pruebas (sección 6) y se cierran las decisiones operativas de RabbitMQ, PostgreSQL y Valkey, observabilidad, datos de demostración y estado de Terraform (sección 7). |
 | 1.6 | 05/11/2026 | Cambio de proveedor: Azure Container Apps y PostgreSQL Flexible Server con Azure for Students en lugar de DigitalOcean, que retiró el crédito de estudiante; alternativas descartadas (secciones 2, 4, 6 y 7). Región Chile Central y RabbitMQ en un contenedor, por el límite de colas de CloudAMQP. |
+| 1.7 | 05/11/2026 | Aspire Dashboard desplegado en Azure, protegido con token y clave OTLP (sección 7). |

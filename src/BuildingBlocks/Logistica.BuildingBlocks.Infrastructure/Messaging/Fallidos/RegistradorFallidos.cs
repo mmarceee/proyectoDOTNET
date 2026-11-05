@@ -49,6 +49,7 @@ public sealed class RegistradorFallidos(IServiceScopeFactory ambitos, IConfigura
     public async Task<bool> RegistrarSiguienteAsync(IChannel canal, CancellationToken ct)
     {
         var entrega = await canal.BasicGetAsync(RabbitMqTransport.Fallidos, autoAck: false, ct);
+        MetricasMensajeria.Leida(RabbitMqTransport.Fallidos, entrega?.MessageCount ?? 0);
         if (entrega is null) return false;
 
         MensajeIntegracion mensaje;

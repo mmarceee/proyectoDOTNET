@@ -10,6 +10,7 @@ locals {
   nombre_worker   = "${local.nombre}-worker"
   nombre_valkey   = "${local.nombre}-valkey"
   nombre_rabbitmq = "${local.nombre}-rabbitmq"
+  nombre_aspire   = "${local.nombre}-aspire"
   perfil_trabajo  = "Consumption"
 }
 
@@ -51,6 +52,17 @@ resource "random_password" "postgres" {
 # Usuario de RabbitMQ. Sin caracteres especiales: va dentro de la URL amqp://usuario:contraseña@...
 resource "random_password" "rabbitmq" {
   length  = 24
+  special = false
+}
+
+# Aspire Dashboard: el token para entrar al panel y la clave con que la API y el Worker envían la telemetría.
+resource "random_password" "aspire_token" {
+  length  = 24
+  special = false
+}
+
+resource "random_password" "aspire_otlp" {
+  length  = 32
   special = false
 }
 
@@ -184,12 +196,12 @@ locals {
 
   secretos_registro = local.usa_registro ? { "ghcr-token" = var.ghcr_token } : {}
 
-  secretos_api = merge(local.secretos_comunes, local.secretos_registro, {
+  secretos_api = merge(local.secretos_comunes, local.secretos_registro, local.secretos_otlp, {
     "conexion-postgres" = "${local.postgres};Maximum Pool Size=12"
     "contrasena-demo"   = random_password.demo.result
   })
 
-  secretos_worker = merge(local.secretos_comunes, local.secretos_registro, {
+  secretos_worker = merge(local.secretos_comunes, local.secretos_registro, local.secretos_otlp, {
     "conexion-postgres" = "${local.postgres};Maximum Pool Size=6"
   })
 
@@ -223,6 +235,37 @@ locals {
   variables_logs = {
     "Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command" = "Warning"
   }
+
+  # Telemetría hacia Aspire Dashboard por OTLP sobre HTTPS, con la clave en un encabezado. Sin observabilidad, la API
+  # y el Worker no exportan nada (Program.cs mira OTEL_EXPORTER_OTLP_ENDPOINT).
+  url_aspire = "https://${local.nombre_aspire}.${azurerm_container_app_environment.this.default_domain}"
+
+  secretos_otlp = var.observabilidad ? { "otlp-encabezados" = "x-otlp-api-key=${random_password.aspire_otlp.result}" } : {}
+
+  variables_otlp = var.observabilidad ? {
+    "OTEL_EXPORTER_OTLP_ENDPOINT" = local.url_aspire
+    "OTEL_EXPORTER_OTLP_PROTOCOL" = "http/protobuf"
+    "OTEL_METRIC_EXPORT_INTERVAL" = "10000"
+  } : {}
+
+  variables_secretas_otlp = var.observabilidad ? { "OTEL_EXPORTER_OTLP_HEADERS" = "otlp-encabezados" } : {}
+
+  # Proxy delante del panel: Container Apps expone un solo puerto, y Aspire Dashboard atiende el panel y la telemetría
+  # en puertos distintos. /v1/* (OTLP sobre HTTP) va al receptor; el resto, al panel.
+  caddyfile = <<-EOT
+    {
+      admin off
+      auto_https off
+    }
+    :8080 {
+      handle /v1/* {
+        reverse_proxy localhost:18890
+      }
+      handle {
+        reverse_proxy localhost:18888
+      }
+    }
+  EOT
 }
 
 # --- Aplicaciones -----------------------------------------------------------------------------------------------
@@ -364,7 +407,7 @@ resource "azurerm_container_app" "api" {
       memory = "1Gi"
 
       dynamic "env" {
-        for_each = merge(local.variables_api, local.variables_logs)
+        for_each = merge(local.variables_api, local.variables_logs, local.variables_otlp)
         content {
           name  = env.key
           value = env.value
@@ -372,7 +415,7 @@ resource "azurerm_container_app" "api" {
       }
 
       dynamic "env" {
-        for_each = merge(local.variables_secretas_comunes, { "Demo__Contrasena" = "contrasena-demo" })
+        for_each = merge(local.variables_secretas_comunes, local.variables_secretas_otlp, { "Demo__Contrasena" = "contrasena-demo" })
         content {
           name        = env.key
           secret_name = env.value
@@ -433,7 +476,7 @@ resource "azurerm_container_app" "worker" {
       memory = "0.5Gi"
 
       dynamic "env" {
-        for_each = merge(local.variables_worker, local.variables_logs)
+        for_each = merge(local.variables_worker, local.variables_logs, local.variables_otlp)
         content {
           name  = env.key
           value = env.value
@@ -441,7 +484,7 @@ resource "azurerm_container_app" "worker" {
       }
 
       dynamic "env" {
-        for_each = local.variables_secretas_comunes
+        for_each = merge(local.variables_secretas_comunes, local.variables_secretas_otlp)
         content {
           name        = env.key
           secret_name = env.value
@@ -455,5 +498,97 @@ resource "azurerm_container_app" "worker" {
 
   lifecycle {
     ignore_changes = [template[0].container[0].image]
+  }
+}
+
+# --- Observabilidad -----------------------------------------------------------------------------------------------
+# Aspire Dashboard (propuesta de stack, sección 3.7; letra, sección 6.12): recibe las trazas y métricas de la API y el
+# Worker y muestra el tablero técnico. Guarda la telemetría en memoria: un reinicio la vacía, y la API y el Worker la
+# vuelven a llenar en segundos. Entrada pública con HTTPS: el panel pide el token (terraform output -raw
+# acceso_observabilidad) y el receptor exige la clave OTLP. Con observabilidad = false no se crea.
+resource "azurerm_container_app" "aspire" {
+  count                        = var.observabilidad ? 1 : 0
+  name                         = local.nombre_aspire
+  resource_group_name          = azurerm_resource_group.this.name
+  container_app_environment_id = azurerm_container_app_environment.this.id
+  revision_mode                = "Single"
+  workload_profile_name        = local.perfil_trabajo
+
+  secret {
+    name  = "token-panel"
+    value = random_password.aspire_token.result
+  }
+
+  secret {
+    name  = "clave-otlp"
+    value = random_password.aspire_otlp.result
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 8080
+    transport        = "auto"
+
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }
+
+  template {
+    min_replicas = 1
+    max_replicas = 1
+
+    container {
+      name   = "aspire-dashboard"
+      image  = "mcr.microsoft.com/dotnet/aspire-dashboard:9.5"
+      cpu    = 0.5
+      memory = "1Gi"
+
+      env {
+        name  = "ASPNETCORE_URLS"
+        value = "http://+:18888"
+      }
+
+      env {
+        name  = "DOTNET_DASHBOARD_OTLP_HTTP_ENDPOINT_URL"
+        value = "http://+:18890"
+      }
+
+      env {
+        name  = "Dashboard__Frontend__AuthMode"
+        value = "BrowserToken"
+      }
+
+      env {
+        name        = "Dashboard__Frontend__BrowserToken"
+        secret_name = "token-panel"
+      }
+
+      env {
+        name  = "Dashboard__Otlp__AuthMode"
+        value = "ApiKey"
+      }
+
+      env {
+        name        = "Dashboard__Otlp__PrimaryApiKey"
+        secret_name = "clave-otlp"
+      }
+    }
+
+    # El proxy comparte la red del contenedor del panel (localhost) y es lo único que recibe la entrada.
+    container {
+      name    = "proxy"
+      image   = "docker.io/library/caddy:2"
+      cpu     = 0.25
+      memory  = "0.5Gi"
+      command = ["sh", "-c"]
+      args    = ["printf '%s' \"$CADDYFILE\" > /tmp/Caddyfile && exec caddy run --config /tmp/Caddyfile --adapter caddyfile"]
+
+      env {
+        name  = "CADDYFILE"
+        value = local.caddyfile
+      }
+    }
   }
 }

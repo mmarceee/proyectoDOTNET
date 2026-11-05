@@ -10,6 +10,7 @@ tarjeta) (propuesta de stack, sección 6; letra, sección 6.14):
 | Valkey | Container App con la imagen de Valkey, sólo dentro del entorno | 0,25 vCPU y 0,5 GiB, sin persistencia |
 | RabbitMQ | Container App con la imagen de RabbitMQ, sólo dentro del entorno | 0,5 vCPU y 1 GiB, sin persistencia |
 | PostgreSQL 16 | Azure Database for PostgreSQL Flexible Server | B1ms (1 vCPU, 2 GiB, 32 GB) |
+| Aspire Dashboard (tablero de observabilidad) | Container App con el panel y un proxy Caddy, entrada pública con HTTPS | 0,75 vCPU y 1,5 GiB, telemetría en memoria |
 | Logs de los contenedores | Log Analytics | 30 días |
 
 **Por qué RabbitMQ no es CloudAMQP:** el plan gratuito de CloudAMQP admite 150 colas por instancia. Cada suscripción
@@ -28,6 +29,7 @@ RabbitMQ. Por eso no pueden apagarse por falta de tráfico. El costo depende de 
 | | Estimación |
 | --- | --- |
 | Container Apps, la mayor parte del tiempo sin tráfico | ≈ 30 a 35 USD por mes |
+| Aspire Dashboard, siempre recibiendo telemetría | ≈ 40 USD por mes más; se apaga con `observabilidad = false` |
 | Container Apps, siempre con tráfico (peor caso) | ≈ 110 USD por mes |
 | PostgreSQL B1ms | Gratis 12 meses si la cuenta incluye los servicios gratuitos; si no, ≈ 13 USD por mes |
 | Log Analytics | Dentro de los 5 GB gratuitos por mes |
@@ -142,8 +144,39 @@ Terraform no vuelve a tocar la imagen de las Container Apps (`ignore_changes`): 
   un nuevo despliegue no cierra las sesiones ni invalida las invitaciones pendientes.
 - PostgreSQL exige TLS (`SSL Mode=Require`); el pool queda en 12 conexiones para la API y 6 para el Worker.
 - Una sola réplica de la API: el equipo de tres está eximido de las dos instancias balanceadas.
-- Sin observabilidad en producción: el tablero de Aspire se muestra en el entorno local. La instrumentación sigue en el
-  código y se activa con `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- La API y el Worker envían trazas y métricas a Aspire Dashboard por OTLP sobre HTTPS, con una clave
+  (`OTEL_EXPORTER_OTLP_*`). Sin `observabilidad`, no exportan nada.
+
+## Tablero de observabilidad
+
+Aspire Dashboard corre en su propia Container App. Para entrar:
+
+```bash
+terraform output -raw acceso_observabilidad
+```
+
+El enlace inicia sesión con el token del panel (también sirve `terraform output url_observabilidad` y pegar el token).
+Las métricas del tablero técnico (letra, sección 6.12) están en *Metrics*, por recurso:
+
+| Pide la letra | Métrica | Recurso |
+| --- | --- | --- |
+| Tiempo medio de respuesta | `logistica.http.latencia.media` | logistica-api |
+| Percentiles 95 y 99 | `logistica.http.latencia.p95` y `logistica.http.latencia.p99` (también `http.server.request.duration`) | logistica-api |
+| Tasa de errores | `logistica.http.tasa_errores` | logistica-api |
+| Profundidad de la cola | `logistica.mensajeria.profundidad_cola` (por cola) y `logistica.mensajeria.profundidad_total` | logistica-worker |
+| Sincronizaciones pendientes | `logistica.sincronizacion.pendientes` | logistica-api |
+| Avisos a comercios fallidos | `logistica.avisos.fallidos` y `logistica.avisos.intentos_fallidos` | logistica-worker |
+| Relación de aciertos de la caché | `logistica.cache.relacion_aciertos` (por caché), más los contadores | logistica-api |
+
+Latencias y errores son de los últimos cinco minutos. El identificador de correlación se ve en *Traces*: una operación
+de la PWA sigue de la API al Worker por la cabecera `traceparent` del mensaje.
+
+- **Por qué un proxy:** Container Apps expone un solo puerto por aplicación, y Aspire Dashboard atiende el panel y el
+  receptor OTLP en puertos distintos (no pueden compartir uno). Caddy, en la misma aplicación, envía `/v1/*` al receptor
+  y el resto al panel.
+- La telemetría vive en memoria: si el panel se reinicia, empieza vacío y se llena con lo que llega.
+- **Apagarlo para ahorrar crédito:** `terraform apply "-var-file=produccion.tfvars" -var observabilidad=false` borra el
+  panel y reinicia la API y el Worker sin exportar; con `true` vuelve.
 
 ## Historia
 
@@ -151,4 +184,5 @@ El primer diseño (03/11/2026) usaba DigitalOcean App Platform con el crédito d
 ese beneficio el 01/08/2026, así que el 05/11/2026 el ambiente pasó a Azure for Students, con la misma forma: dos
 componentes administrados con HTTPS, PostgreSQL administrado y Valkey. São Paulo no está entre las regiones permitidas
 de la suscripción de estudiante, así que quedó en Chile Central. RabbitMQ empezó en CloudAMQP y pasó el mismo día a una
-Container App por el límite de colas del plan gratuito.
+Container App por el límite de colas del plan gratuito. El tablero de observabilidad, que primero se mostraba sólo en el
+entorno local, se agregó también el 05/11 con las métricas que faltaban para el tablero técnico.
