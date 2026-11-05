@@ -702,3 +702,26 @@ test('CU-54 la rendición toma como entregado en la calle lo registrado en este 
     assert.equal(rendicion.bultos[0].requiereDeclaracion, false);
     assert.equal(rendicion.dependencias.length, 1);
 });
+test('CU-54 una entrega registrada después de abrir la rendición actualiza el borrador sin confirmar', async () => {
+    const token = await store.activar(sesion()), h = hoja54('NoIntentado');
+    await store.guardar(h, token);
+    let r = await store.abrirRendicion(h.rutaId);
+    r = await store.declararBulto(h.rutaId, r.revision, id(15), true, null);
+    r = await store.observarRendicion(h.rutaId, r.revision, 'Observación general');
+    await store.registrarEntrega(h.rutaId, h.paradas[0].envios[0].id, { firma:FIRMA, ...AQUI });
+    r = await store.abrirRendicion(h.rutaId);
+    assert.equal(r.bultos[0].situacion, 'EntregadoEnCalle');
+    assert.equal(r.bultos[0].requiereDeclaracion, false);
+    assert.equal(r.bultos[0].devuelve, false);
+    assert.equal(r.observaciones, 'Observación general');
+    assert.equal((await store.confirmarRendicion(h.rutaId, r.revision)).resultado, 'Pendiente');
+});
+test('CU-54 reabrir la rendición conserva lo declarado en los bultos que no cambiaron', async () => {
+    const token = await store.activar(sesion()), h = hoja54('NoIntentado');
+    await store.guardar(h, token);
+    let r = await store.abrirRendicion(h.rutaId);
+    r = await store.declararBulto(h.rutaId, r.revision, id(15), false, 'Se rompió');
+    r = await store.abrirRendicion(h.rutaId);
+    assert.equal(r.bultos[0].devuelve, false);
+    assert.equal(r.bultos[0].observacion, 'Se rompió');
+});
