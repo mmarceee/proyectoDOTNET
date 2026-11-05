@@ -93,6 +93,79 @@ public sealed class ConsultarEnviosApiTests(PostgresApiFactory factory) : IClass
     }
 
     [Fact]
+    public async Task La_primera_recepcion_se_filtra_como_en_operacion_y_distingue_los_estados_de_los_bultos()
+    {
+        var acceso = await PrepararAccesoAsync(Operador);
+        var envio = await AgregarEnvioAsync(acceso, InicioDia, "PED-recepcion",
+            preparar: e => e.RecibirBulto(e.Bultos[0].Id, null, InicioDia.AddMinutes(1)));
+        Assert.Equal(EstadoEnvio.Admitido, envio.Estado);
+        using var cliente = Cliente(acceso.Produccion);
+
+        var pagina = (await cliente.GetFromJsonAsync<PaginaEnviosApiResponse>($"{Ruta}?estado=EnOperacion"))!;
+        var resumen = Assert.Single(pagina.Envios);
+        Assert.Equal((envio.Numero, "EnOperacion", false, 0, 2),
+            (resumen.Numero, resumen.Estado, resumen.Terminado, resumen.Entregados, resumen.TotalBultos));
+        var creados = (await cliente.GetFromJsonAsync<PaginaEnviosApiResponse>($"{Ruta}?estado=Creado"))!;
+        Assert.Equal(0, creados.Total);
+
+        var detalle = (await cliente.GetFromJsonAsync<DetalleEnvioApiResponse>($"{Ruta}/{envio.Numero}"))!;
+        Assert.Equal(resumen, detalle.Envio);
+        Assert.Equal("EnDeposito", Assert.Single(detalle.Bultos, b => b.Codigo == envio.Bultos[0].Codigo).Estado);
+        Assert.Equal("Admitido", Assert.Single(detalle.Bultos, b => b.Codigo == envio.Bultos[1].Codigo).Estado);
+    }
+
+    [Fact]
+    public async Task El_listado_y_detalle_reflejan_dos_de_tres_entregados_antes_y_despues_de_la_devolucion()
+    {
+        var acceso = await PrepararAccesoAsync(Operador);
+        var visita = InicioDia.AddHours(1);
+        var envio = await AgregarEnvioAsync(acceso, InicioDia, "PED-parcial", cantidadBultos: 3, preparar: e =>
+        {
+            e.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, InicioDia.AddMinutes(1));
+            e.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, InicioDia.AddMinutes(2));
+            e.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, InicioDia.AddMinutes(3));
+            var motivo = new MotivoNoEntrega(Guid.NewGuid(), "AUSENTE", reprogramable: true, exigeEvidencia: false);
+            var lugar = new Ubicacion(-34.9m, -56.16m);
+            var firma = new PruebaEntrega(Guid.NewGuid(), null, null, null, lugar, visita);
+            var reglas = new ReglasEntrega(exigeFoto: false, exigeNombreYDocumento: false, maxIntentos: 3,
+                TimeSpan.FromHours(24), devolverTrasIntentosAgotados: true, admiteEntregaParcial: true);
+            e.RegistrarVisita([new(e.Bultos[0].Id), new(e.Bultos[1].Id), new(e.Bultos[2].Id, motivo)],
+                firma, null, null, lugar, reglas, null, visita);
+        });
+        var codigoPendiente = envio.Bultos[2].Codigo;
+        using var cliente = Cliente(acceso.Produccion);
+
+        await VerificarParcialAsync(false, "Reprogramado", new(1, 0, 0, 0));
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        await using var db = ActivatorUtilities.CreateInstance<EnviosDbContext>(
+            scope.ServiceProvider, new InquilinoFijo(acceso.OperadorId, acceso.ComercioId));
+        var persistido = await db.Envios.SingleAsync(e => e.Id == envio.Id);
+        persistido.IniciarDevolucion("Venció el plazo", OrigenEvento.Backoffice, null, visita.AddDays(1));
+        persistido.Transicionar(EstadoEnvio.Devuelto, OrigenEvento.Backoffice, null, visita.AddDays(2));
+        await db.SaveChangesAsync();
+
+        await VerificarParcialAsync(true, "Devuelto", new(0, 1, 0, 0));
+
+        async Task VerificarParcialAsync(bool terminado, string estadoTercerBulto, ResultadosBultosApiResponse resultados)
+        {
+            var pagina = (await cliente.GetFromJsonAsync<PaginaEnviosApiResponse>(
+                $"{Ruta}?estado=EntregadoParcialmente&referenciaComercio=PED-parcial"))!;
+            Assert.Equal(1, pagina.Total);
+            var resumen = Assert.Single(pagina.Envios);
+            Assert.Equal((envio.Numero, "EntregadoParcialmente", terminado, 2, 3),
+                (resumen.Numero, resumen.Estado, resumen.Terminado, resumen.Entregados, resumen.TotalBultos));
+            Assert.Equal(resultados, resumen.Resultados);
+
+            var detalle = (await cliente.GetFromJsonAsync<DetalleEnvioApiResponse>($"{Ruta}/{envio.Numero}"))!;
+            Assert.Equal(resumen, detalle.Envio);
+            Assert.Equal(3, detalle.Bultos.Count);
+            Assert.Equal(estadoTercerBulto, Assert.Single(detalle.Bultos, b => b.Codigo == codigoPendiente).Estado);
+            Assert.All(detalle.Bultos.Where(b => b.Codigo != codigoPendiente), b => Assert.Equal("Entregado", b.Estado));
+        }
+    }
+
+    [Fact]
     public async Task Solo_lee_la_relacion_y_el_ambiente_de_la_clave()
     {
         var propia = await PrepararAccesoAsync(Operador);
@@ -197,7 +270,8 @@ public sealed class ConsultarEnviosApiTests(PostgresApiFactory factory) : IClass
     }
 
     private async Task<Envio> AgregarEnvioAsync(Acceso acceso, DateTimeOffset fecha, string referencia,
-        EstadoEnvio estado = EstadoEnvio.Admitido, bool esPrueba = false)
+        EstadoEnvio estado = EstadoEnvio.Admitido, bool esPrueba = false,
+        int cantidadBultos = 2, Action<Envio>? preparar = null)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         await using var db = ActivatorUtilities.CreateInstance<EnviosDbContext>(
@@ -205,7 +279,7 @@ public sealed class ConsultarEnviosApiTests(PostgresApiFactory factory) : IClass
         var envio = Envio.Crear(acceso.OperadorId, acceso.ComercioId, $"ENV-{Guid.NewGuid():N}",
             new Destinatario("Ana Pérez", "099123456", "ana@example.test"),
             new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "11300"),
-            [new(2, 30, 20, 10, 150), new(2, 30, 20, 10, 150)], OrigenEvento.Api, null,
+            Enumerable.Repeat(new DatosBulto(2, 30, 20, 10, 150), cantidadBultos).ToArray(), OrigenEvento.Api, null,
             fecha, referenciaComercio: referencia, esPrueba: esPrueba);
         var pasos = estado switch
         {
@@ -219,6 +293,7 @@ public sealed class ConsultarEnviosApiTests(PostgresApiFactory factory) : IClass
             fecha = fecha.AddMinutes(1);
             envio.Transicionar(paso, OrigenEvento.Backoffice, Guid.NewGuid(), fecha, detalle: "nota-interna");
         }
+        preparar?.Invoke(envio);
         db.Envios.Add(envio);
         await db.SaveChangesAsync();
         return envio;

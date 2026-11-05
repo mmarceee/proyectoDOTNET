@@ -34,6 +34,11 @@ internal sealed class ConsultarEnviosHandler(IEnviosListadoReader reader)
                 "El resumen indicado no es válido.");
         }
 
+        if (query.Modalidad is { } modalidad && !Enum.IsDefined(modalidad))
+        {
+            throw new ArgumentOutOfRangeException(nameof(query.Modalidad), "La modalidad indicada no es válida.");
+        }
+
         if (query.FechaDesde is { } desde && query.FechaHasta is { } hasta && desde > hasta)
         {
             throw new ArgumentException(

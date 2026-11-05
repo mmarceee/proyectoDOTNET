@@ -5,15 +5,25 @@
 }
 .navbar-brand {
     color: #fff;
-    white-space: nowrap;
-    min-width: 0;
-    max-width: calc(100% - 5rem);
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    margin: 0;
+    font-weight: 600;
 }
-.navbar-collapse {
-    align-items: center;
-    gap: 1rem;
+.navbar > .portal-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 1rem;
+}
+.navbar-toggler {
+    grid-column: 2;
+    grid-row: 1;
+}
+.navbar-collapse,
+.navbar-nav {
+    grid-column: 1 / -1;
+}
+.navbar-nav {
+    gap: .25rem;
 }
 .navbar-nav ::deep .nav-link {
     color: rgba(255, 255, 255, .85);
@@ -48,21 +58,42 @@
     align-items: center;
     gap: .5rem;
 }
-.cuenta-usuario {
+.cuenta-usuario,
+.acciones-cuenta {
     flex-wrap: wrap;
-    justify-content: flex-end;
 }
 .cuenta-usuario .navbar-text {
     color: rgba(255, 255, 255, .9);
     overflow-wrap: anywhere;
 }
-.acciones-cuenta {
-    flex-wrap: wrap;
-}
 .acciones-cuenta a {
     white-space: nowrap;
 }
-@media (max-width: 1399.98px) {
+@media (max-width: 991.98px) {
     .navbar-collapse { padding-top: .75rem; }
-    .cuenta-usuario { justify-content: flex-start; padding: .75rem 0 .25rem; }
+    .cuenta-usuario {
+        margin-top: .5rem;
+        padding: .5rem 0 .25rem;
+        border-top: 1px solid rgba(255, 255, 255, .25);
+    }
+}
+@media (min-width: 992px) {
+    .navbar.navbar-expand-lg .navbar-collapse {
+        display: contents !important;
+    }
+    .navbar-brand { grid-row: 1; }
+    .cuenta-usuario {
+        grid-column: 2;
+        grid-row: 1;
+        justify-content: flex-end;
+        min-width: 0;
+    }
+    .navbar-nav {
+        grid-row: 2;
+        flex-wrap: wrap;
+        margin-top: .5rem;
+        padding-top: .5rem;
+        border-top: 1px solid rgba(255, 255, 255, .25);
+    }
+    .navbar-nav ::deep .nav-link { white-space: nowrap; }
 }

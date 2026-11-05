@@ -67,6 +67,7 @@ public static class EnviosModule
         var group = endpoints.MapGroup("/api/envios").WithTags("Envios");
 
         CrearEnvioEndpoint.Map(group);
+        Presentation.Features.ConsultarEnvios.EnviosPortalEndpoints.Map(group);
         Presentation.Features.ImportarEnvios.ImportarEnviosEndpoint.Map(group);
         CancelarEnvioEndpoint.Map(group);
         ReprogramarEnvioEndpoint.Map(group);

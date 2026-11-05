@@ -20,7 +20,7 @@ internal static class ConsultarEnviosApiEndpoints
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
         version.MapGet("/envios/{numero}", ObtenerAsync).WithName("ObtenerEnvio" + sufijo)
             .WithSummary("Consultar un envío y su historial")
-            .WithDescription("Devuelve el resumen, los códigos de bulto y el historial cronológico. El progreso se basa en los resultados registrados por el modelo actual de Envíos.")
+            .WithDescription("Devuelve el resumen y el progreso de entrega, el código y estado de cada bulto y el historial cronológico del envío.")
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
     }

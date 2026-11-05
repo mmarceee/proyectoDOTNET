@@ -11,4 +11,6 @@ internal sealed record ConsultarEnviosQuery(
     string? Texto = null,
     Guid? ComercioId = null,
     // RF 31: filtro por el resumen del envío (CU-13 y CU-82).
-    ResumenEnvio? Resumen = null);
+    ResumenEnvio? Resumen = null,
+    Guid? ZonaId = null,
+    Logistica.Modules.Administracion.Contracts.Modalidad? Modalidad = null);
