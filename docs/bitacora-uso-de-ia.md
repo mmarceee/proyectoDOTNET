@@ -884,6 +884,7 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Finalidad** | Pasar al ADR-0004 la política de conflictos de la entrega parcial (RF 32) que el responsable decidió el 02/11, sobre la propuesta de Lucas. |
 | **Cómo se trabajó** | El responsable fijó la decisión: la visita de un envío se aplica completa o se rechaza completa, y los otros envíos siguen. La IA redactó la sección, enumeró los conflictos por bulto a partir de las vías de cambio de la sección 1.2 y de la decisión cerrada, y señaló que RF 32 no exige que el conflicto de un bulto deje aplicar los demás, así que la elección debía justificarse como interpretación. |
 | **Decisiones** | Se mantienen los cuatro resultados (sin "aplicada en parte") y la respuesta suma un diagnóstico por bulto, con todos los bultos evaluados. Conflictos: extraviado, en depósito, ya resuelto y fuera de la ruta. Inválidas: bulto ajeno, repetido, sin resultado, entrega parcial no admitida y evidencia incompleta. Una visita rechazada no consume intentos. El riesgo de bultos realmente entregados sin aplicar queda en el ADR-0004 (4.2) y en el ADR-0007 (4.3), con la prueba 10 y dos decisiones a revisar. El equipo aprobó la sección 2.11 el 03/11, junto con la tabla de transiciones por bulto (ADR-0004 v1.5). |
+| **Verificación** | Revisión de coherencia con la decisión cerrada (sección 4) y el ADR-0007 (secciones 2.2 y 4.4). No hay código: la entrada se completa al implementar la visita por bulto. |
 
 ## **3.60 Visita por bulto en la sincronización (RF 32, CU-52)**
 
@@ -897,7 +898,19 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Cómo se trabajó** | La IA revisó el dominio de Cristian y vio que rechaza todos los casos con la misma excepción, sin decir qué bulto falla. A pedido del responsable, la clasificación quedó en Ejecución: compara cada bulto de la visita con su estado actual, que expone el contrato de Envíos, y el dominio queda como última barrera. Al preparar las pruebas detectó un defecto: los bultos no se cargaban con el envío, así que un extravío, una cancelación o una reprogramación no los movían, y el resumen se calculaba sobre una lista vacía, con `Terminado` en true. |
 | **Decisiones** | Los bultos se incluyen siempre al cargar un envío (`AutoInclude`), en lugar de revisar cada consulta. La invalidez prevalece sobre el conflicto, y el diagnóstico lista todos los bultos y queda guardado para responder igual a un reenvío. Las operaciones viejas se traducen a una visita con todos los bultos y conservan los motivos por envío que conoce la PWA. Avisos v1: `EnvioEntregado` sólo si se entregaron todos los bultos; si no, `IntentoFallidoRegistrado`. Una visita aplicada cuenta como intento para la rendición. Un bulto devuelto mientras otros se reprograman todavía no inicia su devolución (pendiente 2). |
 | **Verificación** | Suite completa en Docker: 1.031 pruebas (407 unitarias, 56 de arquitectura y 568 de integración), todas pasan, con cobertura del 95 %. `VisitaPorBultoTests` cubre la visita aplicada y las pruebas 10 a 13 del ADR-0004 (la prueba 11 con la regla publicada, que no admite entrega parcial; el caso que la admite, en `DiagnosticoVisitaTests`) y las dos traducciones. `DeclararExtravioTests` comprueba que el extravío mueve los bultos. Falta la PWA (Lucas). |
-| **Verificación** | Revisión de coherencia con la decisión cerrada (sección 4) y el ADR-0007 (secciones 2.2 y 4.4). No hay código: la entrada se completa al implementar la visita por bulto. |
+
+## **3.61 Cambio del entorno productivo a Azure**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 05/11/2026 |
+| **Archivos** | `infra/terraform` (proveedores, variables, recursos, salidas, ejemplo de variables, README y bloqueo de proveedores), jobs `docker-images` y `deploy` de `.github/workflows/ci.yml`, `README.md` y la propuesta de stack (v1.6). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Reemplazar DigitalOcean App Platform el mismo día del hito, porque DigitalOcean retiró el crédito de estudiante y el equipo decidió no pagar el ambiente. |
+| **Cómo se trabajó** | El responsable pidió alternativas gratuitas. La IA buscó las condiciones actuales y descartó Vercel y Netlify (no ejecutan .NET como proceso permanente, ni el worker, ni SignalR) y el plan gratuito de Render (sin workers, apaga la API sin tráfico y borra la base a los 30 días). Propuso una VM gratuita de Oracle con Docker Compose y Azure Container Apps con Azure for Students. El responsable prefirió una nube administrada, como la planeada, y verificó su cuenta de estudiante. |
+| **Decisiones** | API, Worker y Valkey como Container Apps con una réplica siempre encendida, porque el outbox, SignalR y el consumidor no admiten apagarse por falta de tráfico. Valkey como contenedor, porque la caché administrada de Azure no tiene plan gratuito; por eso el entorno usa una red propia, que Container Apps exige para exponerlo por TCP. PostgreSQL Flexible Server B1ms y CloudAMQP gratuito. Las imágenes van a GitHub Container Registry: el CI publica la etiqueta del commit, la promueve a `latest` si pasan las pruebas y actualiza las Container Apps con una entidad de servicio (`AZURE_CREDENTIALS`); Terraform no toca la imagen después de crearlas. El código de producción ya hecho (conexiones obligatorias, claves de sesión en PostgreSQL, contraseña de demostración y encabezados del proxy) no cambió. |
+| **Verificación** | `terraform validate` y `terraform fmt` pasan con Terraform 1.9 y el proveedor azurerm 4.81; actionlint no encuentra errores en el workflow. Falta el primer `terraform apply` con la cuenta de Azure for Students y la de CloudAMQP; las estimaciones de costo del README no están verificadas para la suscripción de estudiante. |
 
 # **4\. Historial de versiones**
 
@@ -942,3 +955,4 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.37 | 03/11/2026 | Entrada del entorno productivo en DigitalOcean (3.58). | Ezequiel Marcenal |
 | 0.38 | 03/11/2026 | Entrada del ADR-0004 con los conflictos por bulto (3.59). | Ezequiel Marcenal |
 | 0.39 | 03/11/2026 | Entrada de la visita por bulto en la sincronización (3.60). | Ezequiel Marcenal |
+| 0.40 | 05/11/2026 | Entrada del cambio del entorno productivo a Azure (3.61) y corrección de la tabla de la entrada 3.59. | Ezequiel Marcenal |

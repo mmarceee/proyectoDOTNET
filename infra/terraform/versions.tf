@@ -1,14 +1,14 @@
-# Proveedores del entorno productivo: DigitalOcean (App Platform, PostgreSQL y Valkey administrados), CloudAMQP
-# (RabbitMQ) y random (claves y contraseña generadas). El estado queda local, en terraform.tfstate, fuera de Git:
-# guarda secretos (README de esta carpeta).
+# Proveedores del entorno productivo: Azure (Container Apps y PostgreSQL Flexible Server, con el crédito de Azure for
+# Students), CloudAMQP (RabbitMQ) y random (claves y contraseñas generadas). El estado queda local, en
+# terraform.tfstate, fuera de Git: guarda secretos (README de esta carpeta).
 
 terraform {
   required_version = ">= 1.6"
 
   required_providers {
-    digitalocean = {
-      source  = "digitalocean/digitalocean"
-      version = "~> 2.0"
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
     }
     cloudamqp = {
       source  = "cloudamqp/cloudamqp"
@@ -21,8 +21,10 @@ terraform {
   }
 }
 
-provider "digitalocean" {
-  token = var.digitalocean_token
+# Se autentica con la sesión de la CLI de Azure (az login).
+provider "azurerm" {
+  features {}
+  subscription_id = var.azure_subscription_id
 }
 
 provider "cloudamqp" {
