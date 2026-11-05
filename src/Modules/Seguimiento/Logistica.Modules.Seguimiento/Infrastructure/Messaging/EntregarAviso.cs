@@ -34,6 +34,7 @@ internal sealed class EntregarAviso(SeguimientoDbContext db, EntregarAvisoHandle
             {
                 // El intento fallido queda registrado; la excepción sigue hacia los reintentos.
                 await tx.CommitAsync(ct);
+                MetricasAvisos.IntentoFallido(reintentosAgotados: ultimo);
                 throw;
             }
             db.Inbox.Add(new() { MessageId = mensaje.Id, Consumidor = Cola, ProcesadoEn = DateTimeOffset.UtcNow });

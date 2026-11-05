@@ -89,8 +89,8 @@ en `TestResults/docker-*`.
 
 ## Despliegue
 
-El entorno productivo (DigitalOcean App Platform con la Api y el Worker, PostgreSQL y Valkey administrados, y RabbitMQ en
-CloudAMQP) se crea y se destruye con Terraform. Cada push a `main` que pasa el CI se despliega solo. Requisitos, comandos,
+El entorno productivo (Azure Container Apps con la Api, el Worker, Valkey y RabbitMQ, y PostgreSQL Flexible Server, en
+Chile Central y con el crédito de Azure for Students) se crea y se destruye con Terraform. Cada push a `main` que pasa el CI se despliega solo. Requisitos, comandos,
 costo y secretos en [`infra/terraform`](infra/terraform/README.md).
 
 ## Rutas

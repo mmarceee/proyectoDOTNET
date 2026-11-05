@@ -130,7 +130,8 @@ else
                     <th scope="col">Localidad</th>
                     <th scope="col">Zona</th>
                     <th scope="col">Modalidad</th>
-                    <th scope="col">Resumen</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Entrega</th>
                     <th scope="col">Fecha de alta</th>
                     <th scope="col">Monto</th>
                     <th scope="col">Acciones</th>
@@ -156,9 +157,11 @@ else
                                 @EstadoEnvioTexto.Modalidad(envio.Modalidad)
                             }
                         </td>
+                        <td><span class="badge @EstadoEnvioBadge.Clase(envio.Estado)">@EstadoEnvioTexto.Mostrar(envio.Estado)</span></td>
+                        @* RF 31: el resumen derivado de los bultos y el contador de entregados. *@
                         <td>
-                            <strong>@EstadoEnvioTexto.Resumen(envio.Resumen, envio.Terminado, envio.BultosEntregados)</strong>
-                            <div>@envio.BultosEntregados de @envio.TotalBultos entregados · @(envio.Terminado ? "Finalizado" : "En curso")</div>
+                            <span class="badge @ResumenEnvioTexto.Clase(envio.Resumen, envio.Terminado, envio.BultosEntregados)">@ResumenEnvioTexto.Mostrar(envio.Resumen, envio.Terminado, envio.BultosEntregados)</span>
+                            <div class="small text-body-secondary text-nowrap">@ResumenEnvioTexto.Detalle(envio.Resumen, envio.Terminado, envio.BultosEntregados, envio.TotalBultos)</div>
                         </td>
                         <td>@envio.CreadoEn.ToString("dd/MM/yyyy HH:mm")</td>
                         <td>@envio.MontoTarifa.ToString("0.00")</td>

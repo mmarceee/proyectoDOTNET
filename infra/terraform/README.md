@@ -1,40 +1,70 @@
 # Entorno productivo con Terraform
 
-Crea el ambiente completo en DigitalOcean y CloudAMQP (propuesta de stack, sección 6; letra, sección 6.14):
+Crea el ambiente completo en Azure, región Chile Central, con el crédito de **Azure for Students** (100 USD, sin
+tarjeta) (propuesta de stack, sección 6; letra, sección 6.14):
 
-| Recurso | Servicio | Tamaño por defecto | Costo mensual aproximado |
-| --- | --- | --- | --- |
-| API (Backoffice, Portal, seguimiento y PWA) | App Platform, servicio web con HTTPS | `apps-s-1vcpu-1gb`, 1 instancia | 12 USD |
-| Worker | App Platform, worker | `apps-s-1vcpu-0.5gb`, 1 instancia | 5 USD |
-| PostgreSQL 17 | Managed Database | `db-s-1vcpu-1gb`, 1 nodo | 15,15 USD |
-| Valkey 8 | Managed Caching | `db-s-1vcpu-1gb`, 1 nodo | 15 USD |
-| RabbitMQ | CloudAMQP, plan `lemur` (compartido) | — | gratis |
-| **Total** | | | **≈ 47 USD (≈ 0,065 USD por hora)** |
+| Recurso | Servicio | Tamaño |
+| --- | --- | --- |
+| API (Backoffice, Portal, seguimiento y PWA) | Container App con entrada pública y HTTPS | 0,5 vCPU y 1 GiB, 1 réplica |
+| Worker | Container App sin entrada | 0,25 vCPU y 0,5 GiB, 1 réplica |
+| Valkey | Container App con la imagen de Valkey, sólo dentro del entorno | 0,25 vCPU y 0,5 GiB, sin persistencia |
+| RabbitMQ | Container App con la imagen de RabbitMQ, sólo dentro del entorno | 0,5 vCPU y 1 GiB, sin persistencia |
+| PostgreSQL 16 | Azure Database for PostgreSQL Flexible Server | B1ms (1 vCPU, 2 GiB, 32 GB) |
+| Aspire Dashboard (tablero de observabilidad) | Container App con el panel y un proxy Caddy, entrada pública con HTTPS | 0,75 vCPU y 1,5 GiB, telemetría en memoria |
+| Logs de los contenedores | Log Analytics | 30 días |
 
-Precios de las páginas de DigitalOcean del 03/11/2026. DigitalOcean cobra por hora, así que destruir el ambiente cuando no se
-usa deja de generar costo. El costo real se ve en el panel del proyecto `logistica-produccion` y en *Billing*.
+**Por qué RabbitMQ no es CloudAMQP:** el plan gratuito de CloudAMQP admite 150 colas por instancia. Cada suscripción
+declara su cola y tres colas de espera para los reintentos (ADR-0003), y el sistema pasa ese límite: el primer
+despliegue del 05/11 no pudo declarar las colas. RabbitMQ corre entonces dentro del entorno, sin disco persistente: si
+el contenedor se reinicia, se pierden los mensajes que estén en las colas en ese momento. Los eventos que todavía no se
+publicaron no se pierden, porque siguen en el outbox de PostgreSQL.
 
-**Crédito de cuenta nueva.** Las cuentas nuevas reciben 200 USD de crédito por 60 días (condiciones a confirmar en
-*Billing* al crear la cuenta: piden tarjeta o PayPal). Este ambiente gasta unos 1,55 USD por día: unos 17 USD hasta la
-defensa del 15/11 y unos 94 USD si queda encendido los 60 días, así que el crédito lo cubre. Se cobra a la tarjeta lo que
-siga corriendo cuando el crédito vence o se agota. Por eso:
+Las imágenes de la API y el Worker las publica el CI en GitHub Container Registry (`ghcr.io/mmarceee/proyectodotnet`).
 
-1. Verificar que el crédito figure en *Billing* antes del primer `apply`.
-2. Configurar una alerta en *Billing → Billing alerts* (por ejemplo, 20 USD).
-3. Ejecutar `terraform destroy` después de la defensa, y si se quiere también entre ensayos.
+## Costo
 
-La evidencia de costo (letra, sección 6.14) es el panel del proyecto con el consumo cubierto por el crédito.
+Las cuatro Container Apps quedan siempre encendidas: la API ejecuta el publicador del outbox y SignalR, y el Worker consume
+RabbitMQ. Por eso no pueden apagarse por falta de tráfico. El costo depende de cuánto trabajen:
+
+| | Estimación |
+| --- | --- |
+| Container Apps, la mayor parte del tiempo sin tráfico | ≈ 30 a 35 USD por mes |
+| Aspire Dashboard, siempre recibiendo telemetría | ≈ 40 USD por mes más; se apaga con `observabilidad = false` |
+| Container Apps, siempre con tráfico (peor caso) | ≈ 110 USD por mes |
+| PostgreSQL B1ms | Gratis 12 meses si la cuenta incluye los servicios gratuitos; si no, ≈ 13 USD por mes |
+| Log Analytics | Dentro de los 5 GB gratuitos por mes |
+
+Son estimaciones con los precios de lista de Azure (no verificadas para la suscripción de estudiante): hasta la defensa del
+15/11 el gasto queda muy por debajo del crédito. **Destruir el ambiente cuando no se usa** deja de consumir crédito; se
+reconstruye con un `apply`. El gasto real se ve en el portal, en *Cost Management* del grupo de recursos
+`logistica-produccion`: esa es la evidencia de costo (letra, sección 6.14).
 
 ## Qué hace falta antes
 
 Lo hace cada integrante en su cuenta; nada de esto va al repositorio.
 
-1. Terraform 1.6 o posterior.
-2. **DigitalOcean:** una cuenta y un token de API con lectura y escritura (*API → Tokens*).
-3. **GitHub:** autorizar la aplicación de GitHub de DigitalOcean sobre el repositorio (*App Platform → Create App →
-   GitHub*, se puede cancelar después de autorizar). Sin eso, App Platform no puede compilar desde `main`.
-4. **CloudAMQP:** una cuenta y su clave de API (*API access*). El plan gratuito admite una instancia por cuenta.
-5. **Brevo:** las credenciales SMTP (*SMTP & API → SMTP*) y un remitente verificado.
+1. **Herramientas:** Terraform 1.6 o posterior y la CLI de Azure.
+   ```bash
+   winget install Hashicorp.Terraform Microsoft.AzureCLI
+   ```
+2. **Azure:** la suscripción de Azure for Students activa. Iniciar sesión y anotar el identificador de la suscripción:
+   ```bash
+   az login
+   az account show --query id -o tsv
+   ```
+3. **Servicios de Azure:** registrar una vez los proveedores que usa el ambiente:
+   ```bash
+   az provider register --namespace Microsoft.App --wait
+   az provider register --namespace Microsoft.OperationalInsights --wait
+   az provider register --namespace Microsoft.DBforPostgreSQL --wait
+   ```
+   Con una cuenta personal (por ejemplo, un gmail), si `az login` no encuentra la suscripción, desactivar el inicio de
+   sesión integrado de Windows con `az config set core.enable_broker_on_windows=false` y volver a iniciar sesión.
+4. **Imágenes:** un push a `main` que pase el CI publica `api:latest` y `worker:latest` en GitHub Container Registry. La
+   primera vez, en GitHub → *Packages*, cambiar la visibilidad de los dos paquetes a **Public** (*Package settings →
+   Change visibility*). Si quedan privados, completar `ghcr_usuario` y `ghcr_token` (un token con `read:packages`).
+5. **Correo (opcional):** las credenciales SMTP de Brevo y un remitente verificado. Sin eso, los correos fallan y quedan en
+   mensajes fallidos; el resto funciona igual.
 6. Copiar `terraform.tfvars.example` como `produccion.tfvars` y completarlo. Ese archivo está excluido de Git.
 
 ## Crear, actualizar y destruir
@@ -48,40 +78,111 @@ terraform apply -var-file=produccion.tfvars
 terraform destroy -var-file=produccion.tfvars
 ```
 
-- `apply` tarda entre 10 y 15 minutos: las bases tardan en crearse y App Platform compila las dos imágenes.
+- `apply` tarda entre 10 y 20 minutos; lo más lento es PostgreSQL.
 - Al iniciar, la API aplica las migraciones y carga los datos de demostración (los dos operadores, Tienda Demo y sus
-  usuarios). La contraseña de esos usuarios la genera Terraform y se ve con `terraform output -raw contrasena_demo`.
+  usuarios). La contraseña de esos usuarios la genera Terraform: `terraform output -raw contrasena_demo`.
 - La dirección pública sale de `terraform output url`.
 - `destroy` borra todo, también los datos. Reconstruir el ambiente es volver a ejecutar `apply` (escenario 7 de la defensa).
+- Si Azure responde `RequestDisallowedByAzure`, la suscripción de estudiante no permite esa región. Las permitidas se
+  ven con `az policy assignment list --query "[].parameters.listOfAllowedLocations.value"`; el 05/11 eran Chile
+  Central, México Central, Canadá Central, North Central US y Sudáfrica Norte.
+- **Cambiar sólo un secreto no reinicia las aplicaciones:** Container Apps crea una revisión nueva cuando cambia la
+  plantilla (imagen o variables), no cuando cambia un secreto, y la revisión en curso conserva el valor anterior. Después
+  de un `apply` que sólo cambia secretos, reiniciar la revisión activa:
+  ```bash
+  az containerapp revision restart -g logistica-produccion -n logistica-produccion-api --revision <revisión>
+  ```
+  (`az containerapp show -g logistica-produccion -n logistica-produccion-api --query properties.latestRevisionName`).
+- En PowerShell, el argumento va entre comillas: `terraform apply "-var-file=produccion.tfvars"`. Sin ellas, PowerShell
+  lo parte en dos en el punto y Terraform responde *Too many command line arguments*.
 
 Otro ambiente (por ejemplo, de prueba) es otro archivo de variables con otro `entorno`: los nombres de los recursos
 cambian y no se pisan. Cada ambiente necesita su propio estado (otra carpeta, o `terraform workspace new prueba`).
 
 ## Despliegue continuo
 
-App Platform no despliega con cada push. Lo pide el job `deploy` del CI (`.github/workflows/ci.yml`) cuando un push a
-`main` pasa las pruebas y compila las imágenes. Necesita el secreto `DIGITALOCEAN_ACCESS_TOKEN` en el repositorio
-(*Settings → Secrets and variables → Actions*). Sin el secreto, o con el ambiente destruido, el job termina sin desplegar.
+En cada push a `main`, el CI (`.github/workflows/ci.yml`):
+
+1. compila y publica las imágenes con la etiqueta del commit (job `docker-images`);
+2. si pasan las pruebas, las promueve a `latest` y actualiza la imagen de las dos Container Apps (job `deploy`).
+
+El paso 2 necesita el secreto `AZURE_CREDENTIALS` en el repositorio (*Settings → Secrets and variables → Actions*), con
+una entidad de servicio limitada al grupo de recursos:
+
+```bash
+az ad sp create-for-rbac --name logistica-ci --role contributor --scopes /subscriptions/<suscripción>/resourceGroups/logistica-produccion --json-auth
+```
+
+Se pega la salida JSON completa como valor del secreto. Sin el secreto, o con el ambiente destruido, el CI sólo promueve
+las imágenes. Si la cuenta de estudiante no permite crear la entidad de servicio, se despliega a mano con la misma orden
+que usa el CI:
+
+```bash
+az containerapp update -g logistica-produccion -n logistica-produccion-api --image ghcr.io/mmarceee/proyectodotnet/api:<commit>
+```
+
+Terraform no vuelve a tocar la imagen de las Container Apps (`ignore_changes`): la maneja el despliegue.
 
 ## Estado y secretos
 
 - El estado (`terraform.tfstate`) queda **local**, en la máquina de quien ejecuta `apply`, y fuera de Git: contiene las
-  contraseñas de las bases y las claves generadas. Conviene guardar una copia en un lugar seguro, porque sin él hay que
-  borrar los recursos desde el panel.
-- Terraform genera las claves del seguimiento público (CU-60), la de cifrado de los avisos (CU-63) y la contraseña de
-  demostración. Van a App Platform como variables de tipo `SECRET`.
-- PostgreSQL y Valkey sólo aceptan conexiones de la aplicación y de las IP de `ips_administracion`.
+  contraseñas y las claves generadas. Conviene guardar una copia en un lugar seguro, porque sin él hay que borrar los
+  recursos desde el portal (borrar el grupo de recursos alcanza).
+- Terraform genera la contraseña de PostgreSQL, las claves del seguimiento público (CU-60) y de cifrado de los avisos
+  (CU-63) y la contraseña de demostración. Van a Container Apps como secretos.
+- PostgreSQL acepta conexiones de los servicios de Azure y de la IP de `ip_administracion`; Valkey sólo es accesible desde
+  dentro del entorno de Container Apps.
 
 ## Qué cambia en producción
 
 - `ASPNETCORE_ENVIRONMENT=Production`: la API y el Worker no arrancan sin PostgreSQL, Valkey ni RabbitMQ
   (`ConexionesObligatorias`), así la caché no cae a la memoria del proceso por un error de configuración. Tampoco arranca
   la API sin `Demo__Contrasena`.
-- `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`: App Platform termina HTTPS y reenvía por HTTP; la API toma el esquema y la
-  IP del cliente de los encabezados `X-Forwarded-*` (redirecciones y límite del seguimiento público por IP).
+- `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`: Container Apps termina HTTPS y reenvía por HTTP; la API toma el esquema y la
+  IP del cliente de los encabezados `X-Forwarded-*`.
 - Las claves de Data Protection, que cifran la cookie de sesión, se guardan en PostgreSQL (`ClavesProteccionDbContext`):
   un nuevo despliegue no cierra las sesiones ni invalida las invitaciones pendientes.
-- PostgreSQL exige TLS (`SSL Mode=Require`) y el pool queda en 12 conexiones para la API y 6 para el Worker, dentro de las
-  22 que admite el nodo más chico.
-- Sin observabilidad en producción: el tablero de Aspire se mostró en el entorno local. La instrumentación sigue en el
-  código y se activa con `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- PostgreSQL exige TLS (`SSL Mode=Require`); el pool queda en 12 conexiones para la API y 6 para el Worker.
+- Una sola réplica de la API: el equipo de tres está eximido de las dos instancias balanceadas.
+- La API y el Worker envían trazas y métricas a Aspire Dashboard por OTLP sobre HTTPS, con una clave
+  (`OTEL_EXPORTER_OTLP_*`). Sin `observabilidad`, no exportan nada.
+
+## Tablero de observabilidad
+
+Aspire Dashboard corre en su propia Container App. Para entrar:
+
+```bash
+terraform output -raw acceso_observabilidad
+```
+
+El enlace inicia sesión con el token del panel (también sirve `terraform output url_observabilidad` y pegar el token).
+Las métricas del tablero técnico (letra, sección 6.12) están en *Metrics*, por recurso:
+
+| Pide la letra | Métrica | Recurso |
+| --- | --- | --- |
+| Tiempo medio de respuesta | `logistica.http.latencia.media` | logistica-api |
+| Percentiles 95 y 99 | `logistica.http.latencia.p95` y `logistica.http.latencia.p99` (también `http.server.request.duration`) | logistica-api |
+| Tasa de errores | `logistica.http.tasa_errores` | logistica-api |
+| Profundidad de la cola | `logistica.mensajeria.profundidad_cola` (por cola) y `logistica.mensajeria.profundidad_total` | logistica-worker |
+| Sincronizaciones pendientes | `logistica.sincronizacion.pendientes` | logistica-api |
+| Avisos a comercios fallidos | `logistica.avisos.fallidos` y `logistica.avisos.intentos_fallidos` | logistica-worker |
+| Relación de aciertos de la caché | `logistica.cache.relacion_aciertos` (por caché), más los contadores | logistica-api |
+
+Latencias y errores son de los últimos cinco minutos. El identificador de correlación se ve en *Traces*: una operación
+de la PWA sigue de la API al Worker por la cabecera `traceparent` del mensaje.
+
+- **Por qué un proxy:** Container Apps expone un solo puerto por aplicación, y Aspire Dashboard atiende el panel y el
+  receptor OTLP en puertos distintos (no pueden compartir uno). Caddy, en la misma aplicación, envía `/v1/*` al receptor
+  y el resto al panel.
+- La telemetría vive en memoria: si el panel se reinicia, empieza vacío y se llena con lo que llega.
+- **Apagarlo para ahorrar crédito:** `terraform apply "-var-file=produccion.tfvars" -var observabilidad=false` borra el
+  panel y reinicia la API y el Worker sin exportar; con `true` vuelve.
+
+## Historia
+
+El primer diseño (03/11/2026) usaba DigitalOcean App Platform con el crédito de estudiante de GitHub. DigitalOcean retiró
+ese beneficio el 01/08/2026, así que el 05/11/2026 el ambiente pasó a Azure for Students, con la misma forma: dos
+componentes administrados con HTTPS, PostgreSQL administrado y Valkey. São Paulo no está entre las regiones permitidas
+de la suscripción de estudiante, así que quedó en Chile Central. RabbitMQ empezó en CloudAMQP y pasó el mismo día a una
+Container App por el límite de colas del plan gratuito. El tablero de observabilidad, que primero se mostraba sólo en el
+entorno local, se agregó también el 05/11 con las métricas que faltaban para el tablero técnico.

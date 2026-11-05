@@ -890,6 +890,7 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Finalidad** | Pasar al ADR-0004 la política de conflictos de la entrega parcial (RF 32) que el responsable decidió el 02/11, sobre la propuesta de Lucas. |
 | **Cómo se trabajó** | El responsable fijó la decisión: la visita de un envío se aplica completa o se rechaza completa, y los otros envíos siguen. La IA redactó la sección, enumeró los conflictos por bulto a partir de las vías de cambio de la sección 1.2 y de la decisión cerrada, y señaló que RF 32 no exige que el conflicto de un bulto deje aplicar los demás, así que la elección debía justificarse como interpretación. |
 | **Decisiones** | Se mantienen los cuatro resultados (sin "aplicada en parte") y la respuesta suma un diagnóstico por bulto, con todos los bultos evaluados. Conflictos: extraviado, en depósito, ya resuelto y fuera de la ruta. Inválidas: bulto ajeno, repetido, sin resultado, entrega parcial no admitida y evidencia incompleta. Una visita rechazada no consume intentos. El riesgo de bultos realmente entregados sin aplicar queda en el ADR-0004 (4.2) y en el ADR-0007 (4.3), con la prueba 10 y dos decisiones a revisar. El equipo aprobó la sección 2.11 el 03/11, junto con la tabla de transiciones por bulto (ADR-0004 v1.5). |
+| **Verificación** | Revisión de coherencia con la decisión cerrada (sección 4) y el ADR-0007 (secciones 2.2 y 4.4). No hay código: la entrada se completa al implementar la visita por bulto. |
 
 ## **3.60 Visita por bulto en la sincronización (RF 32, CU-52)**
 
@@ -903,7 +904,32 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Cómo se trabajó** | La IA revisó el dominio de Cristian y vio que rechaza todos los casos con la misma excepción, sin decir qué bulto falla. A pedido del responsable, la clasificación quedó en Ejecución: compara cada bulto de la visita con su estado actual, que expone el contrato de Envíos, y el dominio queda como última barrera. Al preparar las pruebas detectó un defecto: los bultos no se cargaban con el envío, así que un extravío, una cancelación o una reprogramación no los movían, y el resumen se calculaba sobre una lista vacía, con `Terminado` en true. |
 | **Decisiones** | Los bultos se incluyen siempre al cargar un envío (`AutoInclude`), en lugar de revisar cada consulta. La invalidez prevalece sobre el conflicto, y el diagnóstico lista todos los bultos y queda guardado para responder igual a un reenvío. Las operaciones viejas se traducen a una visita con todos los bultos y conservan los motivos por envío que conoce la PWA. Avisos v1: `EnvioEntregado` sólo si se entregaron todos los bultos; si no, `IntentoFallidoRegistrado`. Una visita aplicada cuenta como intento para la rendición. Un bulto devuelto mientras otros se reprograman todavía no inicia su devolución (pendiente 2). |
 | **Verificación** | Suite completa en Docker: 1.031 pruebas (407 unitarias, 56 de arquitectura y 568 de integración), todas pasan, con cobertura del 95 %. `VisitaPorBultoTests` cubre la visita aplicada y las pruebas 10 a 13 del ADR-0004 (la prueba 11 con la regla publicada, que no admite entrega parcial; el caso que la admite, en `DiagnosticoVisitaTests`) y las dos traducciones. `DeclararExtravioTests` comprueba que el extravío mueve los bultos. Falta la PWA (Lucas). |
-| **Verificación** | Revisión de coherencia con la decisión cerrada (sección 4) y el ADR-0007 (secciones 2.2 y 4.4). No hay código: la entrada se completa al implementar la visita por bulto. |
+
+## **3.61 Cambio del entorno productivo a Azure**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 05/11/2026 |
+| **Archivos** | `infra/terraform` (proveedores, variables, recursos, salidas, ejemplo de variables, README y bloqueo de proveedores), jobs `docker-images` y `deploy` de `.github/workflows/ci.yml`, `README.md` y la propuesta de stack (v1.6). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Reemplazar DigitalOcean App Platform el mismo día del hito, porque DigitalOcean retiró el crédito de estudiante y el equipo decidió no pagar el ambiente. |
+| **Cómo se trabajó** | El responsable pidió alternativas gratuitas. La IA buscó las condiciones actuales y descartó Vercel y Netlify (no ejecutan .NET como proceso permanente, ni el worker, ni SignalR) y el plan gratuito de Render (sin workers, apaga la API sin tráfico y borra la base a los 30 días). Propuso una VM gratuita de Oracle con Docker Compose y Azure Container Apps con Azure for Students. El responsable prefirió una nube administrada, como la planeada, y verificó su cuenta de estudiante. |
+| **Decisiones** | API, Worker y Valkey como Container Apps con una réplica siempre encendida, porque el outbox, SignalR y el consumidor no admiten apagarse por falta de tráfico. Valkey como contenedor, porque la caché administrada de Azure no tiene plan gratuito; por eso el entorno usa una red propia, que Container Apps exige para exponerlo por TCP. PostgreSQL Flexible Server B1ms y CloudAMQP gratuito. Las imágenes van a GitHub Container Registry: el CI publica la etiqueta del commit, la promueve a `latest` si pasan las pruebas y actualiza las Container Apps con una entidad de servicio (`AZURE_CREDENTIALS`); Terraform no toca la imagen después de crearlas. El código de producción ya hecho (conexiones obligatorias, claves de sesión en PostgreSQL, contraseña de demostración y encabezados del proxy) no cambió. |
+| **Verificación** | `terraform validate` y `terraform fmt` pasan con Terraform 1.9 y el proveedor azurerm 4.81; actionlint no encuentra errores en el workflow. En el primer `apply`, el responsable ejecutó Terraform con su cuenta y la IA leyó los errores y los logs con su sesión de Azure. Hubo cuatro problemas: `az login` no encontraba la suscripción hasta desactivar el inicio de sesión integrado de Windows; PowerShell partía el argumento `-var-file`; el argumento vacío de Valkey llegaba como null; y São Paulo no estaba entre las regiones permitidas, así que el ambiente quedó en Chile Central. Con eso, la API respondió por HTTPS (`/health` en Healthy e ingreso en 200). Los logs mostraron que CloudAMQP rechazaba las colas por el límite de 150 del plan gratuito, y RabbitMQ pasó a una Container App sin persistencia (decisión del responsable). Las estimaciones de costo del README no están verificadas para la suscripción de estudiante. |
+
+## **3.62 Tablero de observabilidad en producción**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 05/11/2026 |
+| **Archivos** | `BuildingBlocks/.../Observabilidad` (`VentanaLatencias`, `MetricasHttp`), `MetricasMensajeria`, `MetricasCache`, `MetricasAvisos` y `EntregarAviso` (Seguimiento), `Program.cs` de la API y el Worker, `VentanaLatenciasTests`, `infra/terraform` (Aspire Dashboard, variable `observabilidad` y salidas) y su README, y la propuesta de stack (v1.7). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cumplir el objetivo del hito del 05/11, "el tablero de observabilidad operativo", que el equipo había dejado sólo en el entorno local y al que le faltaban métricas de la letra (sección 6.12). |
+| **Cómo se trabajó** | La IA comparó la lista de la letra con las métricas del código: existían la caché (contadores, sin la relación), las sincronizaciones pendientes y las trazas; faltaban tiempo medio, p95 y p99, tasa de errores, profundidad de la cola, avisos fallidos y la relación de aciertos. Propuso agregarlas y llevar Aspire Dashboard a Azure; el responsable lo pidió para la muestra del día. |
+| **Decisiones** | Latencia media, p95, p99 y tasa de errores de los últimos cinco minutos, calculados en la API y publicados como medidores, porque Aspire Dashboard dibuja los histogramas sólo con los percentiles 50, 90 y 99; se suma además la métrica estándar de ASP.NET Core. La profundidad de cola sale del recuento que devuelve cada `BasicGet`, sin consultas extra a RabbitMQ. Avisos fallidos: intentos rechazados y avisos que agotaron los reintentos. En Azure, el panel va en una Container App con un proxy Caddy, porque Container Apps expone un solo puerto, Aspire Dashboard 9.5 no admite el panel y el receptor OTLP en el mismo puerto (probado: falla al iniciar) y el proveedor azurerm 4.81 no tiene puertos adicionales. El panel pide token y el receptor, clave; la variable `observabilidad` lo apaga para ahorrar crédito. |
+| **Verificación** | El panel detrás del proxy se probó en Docker: el ingreso con token responde, OTLP sin clave da 401 y con clave lo acepta. `dotnet build`, `terraform validate` y `terraform fmt` pasan; en Docker, `VentanaLatenciasTests`, las pruebas de arquitectura y las de la caché. El despliegue en Azure lo ejecuta el responsable. |
 
 # **4\. Historial de versiones**
 
@@ -949,3 +975,5 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.38 | 03/11/2026 | Entrada del ADR-0004 con los conflictos por bulto (3.59). | Ezequiel Marcenal |
 | 0.39 | 05/11/2026 | Integración del resumen persistido y el progreso por bulto en CU-82 (3.56). | Lucas Ottonello |
 | 0.39 | 03/11/2026 | Entrada de la visita por bulto en la sincronización (3.60). | Ezequiel Marcenal |
+| 0.40 | 05/11/2026 | Entrada del cambio del entorno productivo a Azure (3.61) y corrección de la tabla de la entrada 3.59. | Ezequiel Marcenal |
+| 0.41 | 05/11/2026 | Entrada del tablero de observabilidad en producción (3.62). | Ezequiel Marcenal |
