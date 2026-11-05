@@ -44,7 +44,8 @@ internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoRe
 
             consulta = consulta.Where(e =>
                 e.Numero.ToLower().Contains(texto) ||
-                e.Destinatario.Nombre.ToLower().Contains(texto));
+                e.Destinatario.Nombre.ToLower().Contains(texto) ||
+                (e.ReferenciaComercio != null && e.ReferenciaComercio.ToLower().Contains(texto)));
         }
 
         if (query.ComercioId.HasValue)
@@ -54,6 +55,12 @@ internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoRe
             consulta = consulta.Where(e =>
                 e.ComercioId == comercioSeleccionado);
         }
+
+        if (query.ZonaId is { } zonaId)
+            consulta = consulta.Where(e => e.ZonaId == zonaId);
+
+        if (query.Modalidad is { } modalidad)
+            consulta = consulta.Where(e => e.Modalidad == modalidad);
 
         var total = await consulta.CountAsync(ct);
 
@@ -78,7 +85,9 @@ internal sealed class EnviosListadoReader(EnviosDbContext db) : IEnviosListadoRe
                 e.Resumen.ToString(),
                 e.Terminado,
                 e.BultosEntregados,
-                e.Bultos.Count))
+                e.Bultos.Count,
+                e.ReferenciaComercio,
+                e.ZonaId))
             .ToListAsync(ct);
 
         return new ConsultarEnviosResult(

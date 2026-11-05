@@ -4,7 +4,7 @@
 | --- | --- |
 | Fecha | 02/11/2026 |
 | Responsable | Lucas Ottonello |
-| Estado | CU-80, CU-81 y CU-83 implementados. CU-82 tiene listado y detalle. Queda integrar el progreso por bulto del ADR-0007. |
+| Estado | CU-80 a CU-83 implementados. CU-82 incorpora el progreso por bulto del ADR-0007. Queda la demostración conjunta del opcional 7.4. |
 | Base inspeccionada | `337b222` en la revisión inicial. Implementación y auditoría del árbol de trabajo sobre `4e4c7a4` el 03/11/2026. |
 | Objetivo | Opcional 7.4 completo, demostrable el 12/11. No se declara obtenido ningún punto. |
 
@@ -98,12 +98,12 @@ Con una referencia nueva se obtiene 201. Al repetirla se obtiene 200 con el mism
 
 | Parámetro | Comportamiento |
 | --- | --- |
-| `estado` | `Creado`, `EnOperacion`, `EntregadoParcialmente` o `Entregado`. La comparación ignora mayúsculas. |
+| `estado` | Filtra por el resumen persistido: `Creado`, `EnOperacion`, `EntregadoParcialmente` o `Entregado`. La comparación ignora mayúsculas. |
 | `fechaDesde`, `fechaHasta` | Fechas de creación inclusivas en formato `AAAA-MM-DD`, según la hora de Montevideo. |
 | `referenciaComercio` | Coincidencia exacta tras recortar espacios en los extremos. Distingue mayúsculas. |
 | `pagina`, `tamanoPagina` | Por defecto 1 y 20. Tamaño entre 1 y 100. Una página posterior a la última devuelve una lista vacía y conserva el total filtrado. |
 
-`GET /api/v1/envios/{numero}` devuelve el resumen, los códigos de bulto y el historial en orden cronológico. Los eventos incluyen el tipo y la fecha. El detalle devuelve 404 para un número inexistente, ajeno o de otro ambiente. Una clave inválida recibe 401 y una solicitud que excede la cuota recibe 429. Los filtros inválidos reciben 400.
+`GET /api/v1/envios/{numero}` devuelve el resumen, el código y estado de cada bulto y el historial del envío en orden cronológico. Los eventos incluyen el tipo y la fecha. El detalle devuelve 404 para un número inexistente, ajeno o de otro ambiente. Una clave inválida recibe 401 y una solicitud que excede la cuota recibe 429. Los filtros inválidos reciben 400.
 
 Con la misma variable `$clave` del ejemplo de CU-81 se puede consultar el listado y luego abrir un número devuelto en la respuesta.
 
@@ -118,16 +118,9 @@ if ($pagina.envios.Count -gt 0) {
 }
 ```
 
-**Alcance de la primera proyección.** El código actual sigue registrando la admisión, la operación y los resultados terminales por envío. El resumen usa esos hechos y el total real de bultos. El estado de un bulto queda en `null` mientras falte un resultado individual o un resultado terminal del envío completo. Una recepción incompleta sigue el estado Admitido del agregado hasta completar la recepción. La integración con el resumen persistido de ADR-0007 deberá incluir el primer bulto recibido y el progreso de entrega individual.
+El listado y el detalle leen `Envio.Resumen`, `Terminado` y `BultosEntregados`. El total y el desglose de pendientes, devueltos, extraviados y cancelados salen de los bultos. La primera recepción ya aparece como `EnOperacion`. Con dos de tres entregados, el resumen es `EntregadoParcialmente`. Si el tercero queda reprogramado, `terminado` es `false` y hay un pendiente. Si después se devuelve al comercio, `terminado` pasa a `true` y el desglose pasa a un devuelto.
 
-El contrato v1 reserva los valores acordados para integrar el resumen del ADR-0007:
-
-- `estado` usa los valores estables de la tabla de filtros. El filtro `EntregadoParcialmente` devuelve una página vacía hasta que el dominio pueda registrar ese resultado.
-- `terminado`, `entregados`, `totalBultos` y el objeto `resultados`, con pendientes, devueltos, extraviados y cancelados.
-- Detalle por bulto e historial relevante; expresar Finalizado sin entrega mediante el cierre y desglose acordados, sin inventar un quinto estado persistido.
-- De 1/3 a 2/3 entregados debe cambiar la respuesta aunque el resumen siga siendo parcial. Si se cachean consultas, la invalidación debe cubrir ese hecho.
-
-No trasladar directamente el enum histórico al contrato público para cambiarlo después. Acordar la proyección con Cristian, propietario del dominio, y los hechos/historial con Ezequiel. El versionado HTTP `/api/v1` y las versiones v1/v2 de avisos son contratos distintos; coordinar semántica sin confundir sus números.
+El historial de v1 sigue los eventos del envío (`EventoEnvio`). El estado actual de cada bulto se publica en `bultos`, separado del historial y del resumen del envío. El versionado HTTP `/api/v1` y las versiones v1/v2 de avisos son contratos distintos.
 
 ## 7. Limitación de tasa
 
@@ -157,12 +150,8 @@ Para la entrega con una instancia puede usarse contador local, dejando explícit
 
 Además: dos POST simultáneos de la misma referencia crean un solo envío y un solo evento; errores 400/422 diferenciados; cookie sola rechazada en API pública y clave sola rechazada en gestión del Portal.
 
-## 9. Pendiente de integración
+## 9. Integración de CU-82 con RF 31
 
-Cristian comunicó que tiene el dominio por bulto en su PC. Quedan la migración y la publicación en `crisrey`. Los campos previstos en el envío son `Resumen`, `Terminado` y `BultosEntregados`. El total sale de la cantidad de bultos. Cada bulto tiene `Codigo`, `Estado` e `IntentosFallidos`. CU-82 leerá el resumen persistido y filtrará por `Resumen`, con el índice por operador indicado por Cristian.
+RF 31 (PR #71) incorporó el resumen persistido, el índice por operador y resumen y la migración `EntregaParcialBultos`. La migración inicializa los estados de bultos antiguos y conserva las recepciones parciales ya escaneadas. Los envíos entregados antes de la migración conservan el progreso completo.
 
-Se propone compartir la lectura de `ConsultarEnviosHandler` y `ConsultarDetalleEnvioHandler` dentro de Envíos. Para reutilizarla en HTTP debe poder seleccionar el ambiente desde la clave, mantener `Tenant` y admitir la referencia exacta y la paginación de CU-82. La respuesta pública conserva sus DTOs y el historial de `EventoEnvio` hasta que se registren los hechos de visita por bulto. Los campos internos de Backoffice permanecen fuera de la API.
-
-La migración propuesta inicializa los bultos antiguos a partir del estado global y calcula el resumen. Antes de integrarla conviene verificar un envío que sigue Admitido pero ya tiene una recepción parcial registrada. La decisión del ADR-0007 pide conservar esa evidencia cuando exista y reflejar la primera recepción como inicio de operación. Un envío antiguo entregado debe consultarse como Entregado con todos sus bultos entregados. El historial histórico sigue siendo del envío.
-
-Cuando se publique el dominio y la migración se puede verificar la lectura HTTP con datos persistidos, incluido el filtro por EntregadoParcialmente y los contadores. Para demostrar el flujo completo falta la visita por bulto en sincronización. Debe verse el mismo envío con 2 de 3 entregados y un bulto pendiente, y luego con 2 de 3, un devuelto y `terminado: true`. Los escenarios de dominio informados por Cristian quedan por verificar sobre su rama. CU-83 ya funciona con el contrato HTTP actual. El opcional 7.4 queda abierto hasta cerrar la integración y la demostración conjunta.
+CU-82 conserva su lector dentro de Envíos, con `DelAmbiente`, filtro `Tenant`, referencia exacta y paginación. El filtro público `estado` consulta la columna `Resumen`. Las pruebas HTTP usan la API y PostgreSQL para comprobar la primera recepción y la lectura del mismo envío con dos de tres entregados, antes y después de la devolución del tercero. Preparan los cambios a través del agregado de Envíos. La demostración conjunta del opcional 7.4 queda pendiente.

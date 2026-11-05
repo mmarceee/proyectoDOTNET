@@ -14,12 +14,7 @@ internal sealed class EnviosApiReader(EnviosDbContext db, IConsultaConsistente l
             await db.ParticiparEnTransaccionAsync(ct);
             var consulta = db.Envios.DelAmbiente(esPrueba).AsNoTracking();
             if (filtros.Estado is { } estado)
-            {
-                var estados = Enum.GetValues<EstadoEnvio>().Where(e => ProyeccionEnvioApi.ResumenDe(e) == estado).ToArray();
-                if (estados.Length == 0)
-                    return new PaginaEnviosApiResponse(filtros.Pagina, filtros.TamanoPagina, 0, []);
-                consulta = consulta.Where(e => estados.Contains(e.Estado));
-            }
+                consulta = consulta.Where(e => e.Resumen == estado);
             if (filtros.FechaDesde is { } desde)
             {
                 var inicio = FechasConsultaEnvios.InicioDelDiaUtc(desde);
@@ -40,10 +35,19 @@ internal sealed class EnviosApiReader(EnviosDbContext db, IConsultaConsistente l
 
             var filas = await consulta.OrderByDescending(e => e.CreadoEn).ThenByDescending(e => e.Numero)
                 .Skip((int)salto).Take(filtros.TamanoPagina)
-                .Select(e => new { e.Numero, e.ReferenciaComercio, e.CreadoEn, e.MontoTarifa, e.Modalidad, e.Estado, Total = e.Bultos.Count })
+                .Select(e => new
+                {
+                    e.Numero, e.ReferenciaComercio, e.CreadoEn, e.MontoTarifa, e.Modalidad, e.Resumen, e.Terminado,
+                    e.BultosEntregados,
+                    Total = e.Bultos.Count,
+                    Devueltos = e.Bultos.Count(b => b.Estado == EstadoEnvio.Devuelto),
+                    Extraviados = e.Bultos.Count(b => b.Estado == EstadoEnvio.Extraviado),
+                    Cancelados = e.Bultos.Count(b => b.Estado == EstadoEnvio.Cancelado),
+                })
                 .ToListAsync(ct);
             var envios = filas.Select(e => ProyeccionEnvioApi.Resumen(e.Numero, e.ReferenciaComercio, e.CreadoEn,
-                e.MontoTarifa, e.Modalidad, e.Estado, e.Total)).ToArray();
+                e.MontoTarifa, e.Modalidad, e.Resumen, e.Terminado, e.Total, e.BultosEntregados,
+                e.Devueltos, e.Extraviados, e.Cancelados)).ToArray();
 
             return new PaginaEnviosApiResponse(filtros.Pagina, filtros.TamanoPagina, total, envios);
         }, ct);
@@ -59,9 +63,12 @@ internal sealed class EnviosApiReader(EnviosDbContext db, IConsultaConsistente l
             if (envio is null) return null;
 
             var resumen = ProyeccionEnvioApi.Resumen(envio.Numero, envio.ReferenciaComercio, envio.CreadoEn,
-                envio.MontoTarifa, envio.Modalidad, envio.Estado, envio.Bultos.Count);
-            var resultadoBulto = ProyeccionEnvioApi.ResultadoBulto(envio.Estado);
-            var bultos = envio.Bultos.OrderBy(b => b.Codigo).Select(b => new BultoEnvioApiResponse(b.Codigo, resultadoBulto)).ToArray();
+                envio.MontoTarifa, envio.Modalidad, envio.Resumen, envio.Terminado, envio.Bultos.Count, envio.BultosEntregados,
+                envio.Bultos.Count(b => b.Estado == EstadoEnvio.Devuelto),
+                envio.Bultos.Count(b => b.Estado == EstadoEnvio.Extraviado),
+                envio.Bultos.Count(b => b.Estado == EstadoEnvio.Cancelado));
+            var bultos = envio.Bultos.OrderBy(b => b.Codigo)
+                .Select(b => new BultoEnvioApiResponse(b.Codigo, b.Estado.ToString())).ToArray();
             var historial = envio.Eventos.OrderBy(e => e.OcurridoEn).ThenBy(e => e.Id).Select(ProyeccionEnvioApi.Evento).ToArray();
             return new DetalleEnvioApiResponse(resumen, bultos, historial);
         }, ct);

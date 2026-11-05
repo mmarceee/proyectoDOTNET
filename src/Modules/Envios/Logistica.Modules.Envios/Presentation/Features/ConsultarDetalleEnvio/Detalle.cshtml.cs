@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Logistica.Modules.Envios.Domain.Envios;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Globalization;
+using Logistica.Modules.Administracion.Contracts;
 
 namespace Logistica.Modules.Envios.Presentation.Features.ConsultarDetalleEnvio;
 
@@ -27,6 +28,19 @@ internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler) : PageM
     [BindProperty(SupportsGet = true)]
     public string? Texto { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public Guid? ComercioId { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public Guid? ZonaId { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public Modalidad? Modalidad { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public ResumenEnvio? Resumen { get; set; }
+
+
     public EnvioDetalleDto Detalle { get; private set; } = null!;
     public string UrlRecepcion(string codigoBulto) => QueryHelpers.AddQueryString(
         "/backoffice/deposito/recepcion", new Dictionary<string, string?>(ParametrosNavegacion)
@@ -45,6 +59,10 @@ internal sealed class DetalleModel(ConsultarDetalleEnvioHandler handler) : PageM
             [nameof(FechaDesde)] = FechaDesde?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             [nameof(FechaHasta)] = FechaHasta?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             [nameof(Texto)] = string.IsNullOrWhiteSpace(Texto) ? null : Texto,
+            [nameof(ComercioId)] = ComercioId?.ToString(),
+            [nameof(ZonaId)] = ZonaId?.ToString(),
+            [nameof(Modalidad)] = Modalidad?.ToString(),
+            [nameof(Resumen)] = Resumen?.ToString(),
         };
 
     public async Task<IActionResult> OnGetAsync(string numero, CancellationToken ct)

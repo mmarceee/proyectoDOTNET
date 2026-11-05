@@ -759,7 +759,7 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Actores** | **Principal:** sistema del comercio. |
 | **Flujo de evento principal** | 1. El sistema del comercio envía `GET /api/v1/envios` con filtros (estado, fechas, referencia) y paginación, o `GET /api/v1/envios/{numero}` para un envío.<br>2. El sistema valida la clave.<br>3. El sistema responde con la página de envíos, o con el envío y su historial de eventos. |
 | **Flujos alternativos** | **A1 · Envío inexistente o de otro comercio (paso 3).** Responde **404**.<br><br>**A2 · Clave inválida o límite superado (paso 2).** Igual que en CU-81 (A1 y A2). |
-| **Requerimientos especiales** | 1. Mismas reglas de aislamiento que CU-13: la clave determina qué envíos se ven.<br>2. No expone identificadores internos: los envíos se identifican por su número. |
+| **Requerimientos especiales** | 1. Mismas reglas de aislamiento que CU-13: la clave determina qué envíos se ven.<br>2. No expone identificadores internos: los envíos se identifican por su número.<br>3. El filtro de estado usa el resumen de entrega del [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). El listado y el detalle muestran el progreso y el cierre. El detalle incluye el código y estado de cada bulto. |
 
 ### **CU-83 · Consultar la documentación de la API**
 

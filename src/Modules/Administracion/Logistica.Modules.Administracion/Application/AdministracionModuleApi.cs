@@ -12,7 +12,8 @@ namespace Logistica.Modules.Administracion.Application;
 
 internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lector, IServicioUsuarios usuarios,
     ICurrentTenant tenant, TarifarioVigente tarifario, ReglasVigentes reglas, ConsultarIdentidadVisualHandler identidad,
-    IComerciosRepository comercios, Domain.Operadores.IOperadorRepository operadores)
+    IComerciosRepository comercios, Domain.Operadores.IOperadorRepository operadores,
+    Domain.Planificacion.IZonaRepository zonas)
     : IAdministracionModuleApi
 {
     public async Task<string> ObtenerZonaHorariaActualAsync(CancellationToken ct) =>
@@ -26,6 +27,10 @@ internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lecto
     // CU-32: la misma consulta del listado de comercios (CU-01), sin filtros.
     public async Task<IReadOnlyList<ComercioRelacionado>> ConsultarComerciosAsync(CancellationToken ct) =>
         (await comercios.ListarAsync(null, null, ct)).Select(c => new ComercioRelacionado(c.Id, c.RazonSocial)).ToList();
+
+    public async Task<IReadOnlyList<ZonaPlanificacion>> ConsultarZonasAsync(CancellationToken ct) =>
+        (await zonas.ListarAsync(ct)).OrderBy(z => z.Nombre)
+            .Select(z => new ZonaPlanificacion(z.Id, z.Nombre, z.CodigosPostales)).ToList();
 
     // CU-07 para CU-60: la misma consulta que usan los estilos de cada operador, sin el logo.
     public async Task<MarcaOperador?> MarcaDelOperadorAsync(CancellationToken ct) =>
