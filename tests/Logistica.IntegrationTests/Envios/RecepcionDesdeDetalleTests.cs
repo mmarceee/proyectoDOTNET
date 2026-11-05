@@ -240,6 +240,37 @@ public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : ICl
         Assert.DoesNotContain(">Pendiente</td>", detalle);
     }
 
+    // RF 31: el listado muestra el resumen del envío; recibir el primer bulto inicia la operación (decisiones, sección 2).
+    [Fact]
+    public async Task El_listado_muestra_el_resumen_y_el_contador_al_recibir_cada_bulto()
+    {
+        var client = factory.CreateClient();
+        var envio = await CrearAsync(client);
+        async Task<string> FilaAsync()
+        {
+            var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/backoffice/envios?Texto={envio.Numero}"));
+            return Regex.Match(html, "<tbody>.*</tbody>", RegexOptions.Singleline).Value;
+        }
+
+        var fila = await FilaAsync();
+        Assert.Contains(">Creado</span>", fila);
+        Assert.Contains("0 de 2 entregados", fila);
+
+        (await client.PostAsJsonAsync("/api/deposito/recepciones", new RecibirBultoRequest($"{envio.Numero}-1")))
+            .EnsureSuccessStatusCode();
+        fila = await FilaAsync();
+        Assert.Contains(">En operación</span>", fila);
+        Assert.Contains("0 de 2 entregados", fila);
+        // El estado de compatibilidad cambia recién con el envío completo.
+        Assert.Contains(">Admitido</span>", fila);
+
+        (await client.PostAsJsonAsync("/api/deposito/recepciones", new RecibirBultoRequest($"{envio.Numero}-2")))
+            .EnsureSuccessStatusCode();
+        fila = await FilaAsync();
+        Assert.Contains(">En operación</span>", fila);
+        Assert.Contains(">En depósito</span>", fila);
+    }
+
     [Fact]
     public async Task Un_envio_cancelado_no_ofrece_recepcion_y_codigos_inexistentes_o_ajenos_no_precargan()
     {
