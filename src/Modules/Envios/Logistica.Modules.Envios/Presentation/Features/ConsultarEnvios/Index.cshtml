@@ -82,6 +82,7 @@ else
                     <th scope="col">Destinatario</th>
                     <th scope="col">Localidad</th>
                     <th scope="col">Estado</th>
+                    <th scope="col">Entrega</th>
                     <th scope="col">Fecha de alta</th>
                     <th scope="col">Monto</th>
                     <th scope="col">Acciones</th>
@@ -101,6 +102,11 @@ else
                         <td>@envio.DestinatarioNombre</td>
                         <td>@envio.Localidad</td>
                         <td><span class="badge @EstadoEnvioBadge.Clase(envio.Estado)">@EstadoEnvioTexto.Mostrar(envio.Estado)</span></td>
+                        @* RF 31: el resumen derivado de los bultos y el contador de entregados. *@
+                        <td>
+                            <span class="badge @ResumenEnvioTexto.Clase(envio.Resumen, envio.Terminado, envio.BultosEntregados)">@ResumenEnvioTexto.Mostrar(envio.Resumen, envio.Terminado, envio.BultosEntregados)</span>
+                            <div class="small text-body-secondary text-nowrap">@ResumenEnvioTexto.Detalle(envio.Resumen, envio.Terminado, envio.BultosEntregados, envio.TotalBultos)</div>
+                        </td>
                         <td>@envio.CreadoEn.ToString("dd/MM/yyyy HH:mm")</td>
                         <td>@envio.MontoTarifa.ToString("0.00")</td>
                         <td>
