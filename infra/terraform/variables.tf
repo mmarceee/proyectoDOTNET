@@ -7,10 +7,21 @@ variable "entorno" {
   default     = "produccion"
 }
 
-variable "digitalocean_token" {
-  description = "Token de la API de DigitalOcean, con permisos de lectura y escritura."
+variable "azure_subscription_id" {
+  description = "Identificador de la suscripción de Azure for Students (az account show --query id -o tsv)."
   type        = string
-  sensitive   = true
+}
+
+variable "ubicacion" {
+  description = "Región de Azure. São Paulo es la más cercana a Montevideo; si la suscripción de estudiante no la permite, usar eastus."
+  type        = string
+  default     = "brazilsouth"
+}
+
+variable "ubicacion_postgres" {
+  description = "Región de PostgreSQL. Vacía, la misma que el resto; algunas suscripciones de estudiante no ofrecen PostgreSQL en todas las regiones."
+  type        = string
+  default     = ""
 }
 
 variable "cloudamqp_apikey" {
@@ -19,67 +30,52 @@ variable "cloudamqp_apikey" {
   sensitive   = true
 }
 
-variable "repositorio" {
-  description = "Repositorio de GitHub que App Platform compila, como dueño/nombre."
-  type        = string
-  default     = "mmarceee/proyectoDOTNET"
-}
-
-variable "rama" {
-  description = "Rama que se despliega."
-  type        = string
-  default     = "main"
-}
-
-variable "region_app" {
-  description = "Región de App Platform. No hay región en Sudamérica; Nueva York es la de menor latencia desde Montevideo."
-  type        = string
-  default     = "nyc"
-}
-
-variable "region_datos" {
-  description = "Región de PostgreSQL y Valkey, dentro de la de App Platform."
-  type        = string
-  default     = "nyc3"
-}
-
 variable "region_rabbitmq" {
-  description = "Región de CloudAMQP, la más cercana a Nueva York."
+  description = "Región de CloudAMQP, la más cercana a la de Azure."
   type        = string
-  default     = "amazon-web-services::us-east-1"
+  default     = "amazon-web-services::sa-east-1"
 }
 
-variable "tamano_api" {
-  description = "Tamaño de la instancia de la API en App Platform."
+variable "imagen_api" {
+  description = "Imagen de la API en GitHub Container Registry. El CI publica latest y la etiqueta de cada commit de main."
   type        = string
-  default     = "apps-s-1vcpu-1gb"
+  default     = "ghcr.io/mmarceee/proyectodotnet/api:latest"
 }
 
-variable "tamano_worker" {
-  description = "Tamaño de la instancia del Worker en App Platform."
+variable "imagen_worker" {
+  description = "Imagen del Worker en GitHub Container Registry."
   type        = string
-  default     = "apps-s-1vcpu-0.5gb"
+  default     = "ghcr.io/mmarceee/proyectodotnet/worker:latest"
 }
 
-variable "tamano_base" {
-  description = "Tamaño del nodo de PostgreSQL y del de Valkey (el más chico: 1 vCPU, 1 GB y 25 conexiones en PostgreSQL)."
+variable "ghcr_usuario" {
+  description = "Usuario de GitHub para descargar las imágenes, si los paquetes de GHCR son privados. Vacío si son públicos."
   type        = string
-  default     = "db-s-1vcpu-1gb"
+  default     = ""
+}
+
+variable "ghcr_token" {
+  description = "Token de GitHub con read:packages, si los paquetes de GHCR son privados. Vacío si son públicos."
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "smtp" {
-  description = "Servidor de correo, como smtp://usuario:clave@smtp-relay.brevo.com:587 (credenciales SMTP de Brevo; caracteres especiales codificados como en una URL)."
+  description = "Servidor de correo, como smtp://usuario:clave@smtp-relay.brevo.com:587. Sin cuenta de correo, smtp://localhost:25: los correos fallan y quedan en mensajes fallidos."
   type        = string
+  default     = "smtp://localhost:25"
   sensitive   = true
 }
 
 variable "correo_remitente" {
-  description = "Dirección desde la que salen los correos; tiene que estar verificada en Brevo."
+  description = "Dirección desde la que salen los correos; con Brevo, tiene que estar verificada."
   type        = string
+  default     = "avisos@logistica.local"
 }
 
-variable "ips_administracion" {
-  description = "Direcciones IP que además de la aplicación pueden conectarse a PostgreSQL y Valkey (por ejemplo, para psql). Vacía por defecto."
-  type        = list(string)
-  default     = []
+variable "ip_administracion" {
+  description = "IP que además de Azure puede conectarse a PostgreSQL (por ejemplo, para psql). Vacía por defecto."
+  type        = string
+  default     = ""
 }

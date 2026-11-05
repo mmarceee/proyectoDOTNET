@@ -2,7 +2,7 @@
 
 | Estado | Aceptado |
 | :---- | :---- |
-| **Fecha** | 25 de septiembre de 2026 (actualizado el 3 de noviembre de 2026) |
+| **Fecha** | 25 de septiembre de 2026 (actualizado el 5 de noviembre de 2026) |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Alcance** | Entrega de análisis y diseño del 4 de octubre de 2026 |
 
@@ -39,8 +39,8 @@ La propuesta adopta un stack alineado con los requerimientos obligatorios del la
 | Pruebas | **xUnit, ArchUnitNET, WebApplicationFactory, Testcontainers, Respawn y Playwright** | Pruebas unitarias, de integración, aislamiento y arquitectura. La prueba de arquitectura usa ArchUnitNET, según el ADR-0001, addendum 3. Playwright, para las pruebas de extremo a extremo del requerimiento opcional 7.2. |
 | Contenedores | **Docker Desktop y Docker Compose** | Entorno completo reproducible: servicios de soporte, API y worker. |
 | Integración continua | **GitHub Actions** | Compilación, pruebas y construcción de las imágenes Docker en cada pull request. |
-| Despliegue | **DigitalOcean App Platform** | Despliegue automático desde main de dos servicios: la API, que sirve también el Backoffice y las aplicaciones WebAssembly, y el worker. |
-| Infraestructura como código | **Terraform** | Creación y reconstrucción reproducible de los recursos de DigitalOcean. |
+| Despliegue | **Azure Container Apps** (Azure for Students) | Despliegue automático desde main de dos componentes: la API, que sirve también el Backoffice y las aplicaciones WebAssembly, y el worker. Reemplaza a DigitalOcean App Platform desde el 05/11 (sección 6). |
+| Infraestructura como código | **Terraform** | Creación y reconstrucción reproducible de los recursos de Azure y CloudAMQP. |
 
 # **3 Decisiones principales**
 
@@ -111,20 +111,20 @@ Los logos, las fotos y las firmas de entrega se guardarán en PostgreSQL, en una
 * Docker Desktop con Docker Compose.  
 * Git y acceso al repositorio de GitHub. En Windows, Git Bash para ejecutar los scripts del repositorio.  
 * Un navegador basado en Chromium para probar la PWA, el service worker y el modo sin conexión.  
-* Terraform para planificar y aplicar la infraestructura de DigitalOcean.
+* Terraform y la CLI de Azure para planificar y aplicar la infraestructura.
 
 ## **4.2 Servicios locales**
 
 `docker compose up` levantará el entorno completo: PostgreSQL, Valkey, RabbitMQ con su interfaz administrativa, Aspire Dashboard, Mailpit, la API y el worker. Para depurar la API o el worker desde Visual Studio, se levantarán sólo los servicios de soporte.
 
-El entorno local utilizará los mismos protocolos que producción, aunque los servicios administrados de DigitalOcean se contratarán solamente cuando sea necesario desplegar.
+El entorno local utilizará los mismos protocolos que producción, aunque los servicios de la nube se crearán solamente cuando sea necesario desplegar.
 
 ## **4.3 Configuración y secretos**
 
 * appsettings.json contendrá valores no sensibles y configuraciones predeterminadas.  
 * Los secretos locales se almacenarán en un archivo .env excluido de Git. El script `scripts/configurar-secretos.sh` los carga en dotnet user-secrets, compartidos por la API y el worker.  
 * El repositorio incluirá .env.example sin contraseñas reales.  
-* App Platform suministrará secretos y cadenas de conexión mediante variables protegidas.  
+* Container Apps suministrará secretos y cadenas de conexión mediante secretos de la aplicación, que genera Terraform.  
 * Las versiones de paquetes se centralizarán en Directory.Packages.props y las imágenes Docker utilizarán etiquetas explícitas.
 
 ## **4.4 Puesta en marcha local**
@@ -181,18 +181,21 @@ Cada módulo conserva internamente Domain, Application, Infrastructure y Present
 ```
 Rama de trabajo -> Pull request -> GitHub Actions
 GitHub Actions  -> restore -> build -> test, y construcción de las imágenes de la API y el worker
-Push a main con el CI en verde -> job deploy -> DigitalOcean App Platform compila y despliega la API y el worker
+Push a main -> imágenes de la API y el worker publicadas en GitHub Container Registry con la etiqueta del commit
+CI en verde -> job deploy -> imágenes promovidas a latest y Azure Container Apps actualizado
 Terraform -> creación, actualización y destrucción de la infraestructura
 ```
 
-La rama main permanecerá protegida y solamente recibirá cambios mediante pull requests con verificaciones exitosas. App Platform ejecutará dos componentes: la API, que sirve también el Backoffice y las aplicaciones WebAssembly, y el worker. No despliega con cada push: lo pide el job `deploy` del CI, sólo cuando las pruebas pasan y las imágenes compilan. Terraform (`infra/terraform`) definirá los recursos de DigitalOcean y CloudAMQP, sus variables por ambiente y las operaciones reproducibles de plan, aplicación y destrucción; su README detalla los requisitos, el costo y los secretos.
+La rama main permanecerá protegida y solamente recibirá cambios mediante pull requests con verificaciones exitosas. Azure Container Apps ejecutará la API, que sirve también el Backoffice y las aplicaciones WebAssembly, el worker y Valkey, cada uno con una réplica siempre encendida. PostgreSQL será un servidor administrado (Flexible Server B1ms) y RabbitMQ seguirá en CloudAMQP. El job `deploy` del CI actualiza las aplicaciones sólo cuando las pruebas pasan y las imágenes compilan. Terraform (`infra/terraform`) definirá los recursos de Azure y CloudAMQP, sus variables por ambiente y las operaciones reproducibles de plan, aplicación y destrucción; su README detalla los requisitos, el costo y los secretos.
 
-App Platform administrará el enrutamiento público y HTTPS, por lo que no se incorporará Caddy. El equipo de tres integrantes está eximido del requisito de ejecutar dos instancias balanceadas de la API.
+Container Apps administrará el enrutamiento público y HTTPS con certificado propio, por lo que no se incorporará Caddy. El equipo de tres integrantes está eximido del requisito de ejecutar dos instancias balanceadas de la API.
+
+**Cambio de proveedor (05/11).** El diseño del 03/11 usaba DigitalOcean App Platform con el crédito de estudiante del GitHub Student Developer Pack. DigitalOcean retiró ese beneficio el 01/08/2026, y el equipo decidió no pagar el ambiente. Se descartaron Vercel y Netlify (no ejecutan .NET como proceso permanente, ni el worker, ni SignalR) y el plan gratuito de Render (sin workers, apaga la API sin tráfico y borra la base a los 30 días). Se eligió Azure for Students, 100 USD de crédito sin tarjeta, porque conserva la forma del diseño: componentes administrados con HTTPS y PostgreSQL administrado. La alternativa era una máquina virtual gratuita de Oracle Cloud con Docker Compose, que exige tarjeta y administrar el servidor. La caché administrada de Azure no tiene plan gratuito, así que Valkey corre como un contenedor dentro del entorno: es una caché y perderla no rompe nada (ADR-0006).
 
 # **7 Decisiones operativas pendientes**
 
 * ~~Alojamiento definitivo de RabbitMQ en producción.~~ Resuelto el 03/11: CloudAMQP, plan gratuito `lemur`.  
-* ~~Contratación de DigitalOcean Managed Valkey y PostgreSQL.~~ Resuelto el 03/11: un nodo de cada uno, del tamaño más chico, en Nueva York, la región más cercana a Montevideo. El ambiente completo cuesta unos 47 USD por mes y se destruye cuando no se usa.  
+* ~~Contratación de Valkey y PostgreSQL administrados.~~ Resuelto el 05/11 (antes, el 03/11 con DigitalOcean): PostgreSQL Flexible Server B1ms y Valkey como contenedor en Container Apps, en São Paulo, la región de Azure más cercana a Montevideo. El ambiente consume el crédito de Azure for Students y se destruye cuando no se usa (costo estimado en el README de `infra/terraform`).  
 * ~~Despliegue y protección del Aspire Dashboard en el ambiente remoto.~~ Resuelto el 03/11: no se despliega. El tablero de observabilidad se demostró en el entorno local; la instrumentación queda en el código y se activa en producción configurando `OTEL_EXPORTER_OTLP_ENDPOINT`.  
 * ~~Datos de demostración en producción.~~ Resuelto el 03/11: se cargan los mismos operadores y usuarios que en desarrollo, con una contraseña que genera Terraform, porque el repositorio es público.  
 * ~~Estado de Terraform.~~ Resuelto el 03/11: local y fuera de Git, porque guarda secretos; lo administra el responsable del despliegue.  
@@ -220,7 +223,7 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 * Microsoft Learn. ASP.NET Core, Blazor WebAssembly, Identity, Minimal APIs y pruebas de integración.  
 * Npgsql Documentation. Entity Framework Core Provider for PostgreSQL.  
 * RabbitMQ Documentation. Work Queues y Dead Letter Exchanges.  
-* DigitalOcean Documentation. App Platform, Managed Databases y Terraform Provider.  
+* Microsoft Learn. Azure Container Apps, Azure Database for PostgreSQL Flexible Server y proveedor azurerm de Terraform.  
 * OpenTelemetry y .NET Aspire Documentation.
 
 # **10 Historial de versiones**
@@ -233,3 +236,4 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | 1.3 | 12/10/2026 | Estado de los ADR obligatorios: ADR-0003 aceptado y ADR-0004 (conflictos de sincronización) propuesto. |
 | 1.4 | 15/10/2026 | ADR-0004 aceptado. |
 | 1.5 | 03/11/2026 | Despliegue: el CI despliega en App Platform después de las pruebas (sección 6) y se cierran las decisiones operativas de RabbitMQ, PostgreSQL y Valkey, observabilidad, datos de demostración y estado de Terraform (sección 7). |
+| 1.6 | 05/11/2026 | Cambio de proveedor: Azure Container Apps y PostgreSQL Flexible Server con Azure for Students en lugar de DigitalOcean, que retiró el crédito de estudiante; alternativas descartadas (secciones 2, 4, 6 y 7). |

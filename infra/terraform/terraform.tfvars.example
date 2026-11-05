@@ -1,17 +1,24 @@
 # Copiar como produccion.tfvars (excluido de Git) y completar. Uso: terraform apply -var-file=produccion.tfvars
-# Para otro ambiente, otro archivo con otro "entorno" y, si se quiere, tamaños más chicos.
+# Para otro ambiente, otro archivo con otro "entorno".
 
 entorno = "produccion"
 
-# DigitalOcean: API → Tokens → Generate New Token (lectura y escritura).
-digitalocean_token = ""
+# Azure for Students: az account show --query id -o tsv
+azure_subscription_id = ""
+
+# Si la suscripción de estudiante no permite São Paulo (RequestDisallowedByAzure), probar con "eastus".
+# ubicacion = "brazilsouth"
 
 # CloudAMQP: panel de la cuenta → API access.
 cloudamqp_apikey = ""
 
-# Brevo: SMTP & API → SMTP. Usuario y clave SMTP (no la clave de la API).
-smtp             = "smtp://usuario:clave@smtp-relay.brevo.com:587"
-correo_remitente = "avisos@dominio-verificado-en-brevo"
+# Correo (opcional). Sin cuenta de Brevo queda smtp://localhost:25 y los correos van a mensajes fallidos.
+# smtp             = "smtp://usuario:clave@smtp-relay.brevo.com:587"
+# correo_remitente = "avisos@dominio-verificado-en-brevo"
+
+# Sólo si los paquetes de GHCR quedan privados: usuario de GitHub y token con read:packages.
+# ghcr_usuario = ""
+# ghcr_token   = ""
 
 # Opcional: IP propia para conectarse a PostgreSQL con psql.
-# ips_administracion = ["203.0.113.10"]
+# ip_administracion = "203.0.113.10"
