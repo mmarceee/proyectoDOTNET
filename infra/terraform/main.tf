@@ -1,15 +1,16 @@
 # Entorno productivo (propuesta de stack, sección 6) en Azure, con el crédito de Azure for Students: Container Apps con
-# la API (entrada pública con HTTPS), el Worker y Valkey; PostgreSQL Flexible Server administrado; RabbitMQ en CloudAMQP.
+# la API (entrada pública con HTTPS), el Worker, Valkey y RabbitMQ, y PostgreSQL Flexible Server administrado.
 # Todo se crea con terraform apply y se borra con terraform destroy (letra, sección 6.14).
 
 locals {
-  nombre         = "logistica-${var.entorno}"
-  ubicacion_pg   = var.ubicacion_postgres == "" ? var.ubicacion : var.ubicacion_postgres
-  usa_registro   = nonsensitive(var.ghcr_token != "")
-  nombre_api     = "${local.nombre}-api"
-  nombre_worker  = "${local.nombre}-worker"
-  nombre_valkey  = "${local.nombre}-valkey"
-  perfil_trabajo = "Consumption"
+  nombre          = "logistica-${var.entorno}"
+  ubicacion_pg    = var.ubicacion_postgres == "" ? var.ubicacion : var.ubicacion_postgres
+  usa_registro    = nonsensitive(var.ghcr_token != "")
+  nombre_api      = "${local.nombre}-api"
+  nombre_worker   = "${local.nombre}-worker"
+  nombre_valkey   = "${local.nombre}-valkey"
+  nombre_rabbitmq = "${local.nombre}-rabbitmq"
+  perfil_trabajo  = "Consumption"
 }
 
 resource "azurerm_resource_group" "this" {
@@ -45,6 +46,12 @@ resource "random_password" "demo" {
 resource "random_password" "postgres" {
   length           = 24
   override_special = "-_"
+}
+
+# Usuario de RabbitMQ. Sin caracteres especiales: va dentro de la URL amqp://usuario:contraseña@...
+resource "random_password" "rabbitmq" {
+  length  = 24
+  special = false
 }
 
 # El nombre del servidor de PostgreSQL es único en todo Azure.
@@ -97,16 +104,9 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "administracion" {
   end_ip_address   = var.ip_administracion
 }
 
-resource "cloudamqp_instance" "rabbitmq" {
-  name   = "${local.nombre}-rabbitmq"
-  plan   = "lemur" # gratuito, RabbitMQ compartido
-  region = var.region_rabbitmq
-  tags   = [local.nombre]
-}
-
 # --- Entorno de Container Apps ----------------------------------------------------------------------------------
-# En una red propia: Valkey se expone por TCP sólo dentro del entorno, y Container Apps exige una red propia para
-# eso. La red no tiene costo.
+# En una red propia: Valkey y RabbitMQ se exponen por TCP sólo dentro del entorno, y Container Apps exige una red
+# propia para eso. La red no tiene costo.
 
 resource "azurerm_virtual_network" "this" {
   name                = local.nombre
@@ -176,7 +176,7 @@ locals {
   # Los secretos de Container Apps se nombran en minúsculas y con guiones; las variables de entorno los referencian.
   secretos_comunes = {
     "conexion-valkey"   = "${local.nombre_valkey}:6379"
-    "conexion-rabbitmq" = cloudamqp_instance.rabbitmq.url
+    "conexion-rabbitmq" = "amqp://logistica:${random_password.rabbitmq.result}@${local.nombre_rabbitmq}:5672/"
     "conexion-smtp"     = var.smtp
     "clave-token"       = random_bytes.clave_token.base64
     "clave-avisos"      = random_bytes.clave_cifrado_avisos.base64
@@ -218,6 +218,11 @@ locals {
     "Aplicacion__UrlPublica"         = local.url_publica
     "Seguimiento__Correo__Remitente" = var.correo_remitente
   }
+
+  # Sin el SQL de cada consulta en los logs: el publicador del outbox consulta cada dos segundos y llenaría Log Analytics.
+  variables_logs = {
+    "Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command" = "Warning"
+  }
 }
 
 # --- Aplicaciones -----------------------------------------------------------------------------------------------
@@ -254,7 +259,60 @@ resource "azurerm_container_app" "valkey" {
       image  = "docker.io/valkey/valkey:8"
       cpu    = 0.25
       memory = "0.5Gi"
-      args   = ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "200mb", "--maxmemory-policy", "allkeys-lru"]
+      # Sin "--save": Azure convierte el argumento vacío en null. Las copias que guarde Valkey quedan en el disco del
+      # contenedor, que se pierde al reiniciar, así que igual no persiste.
+      args = ["valkey-server", "--appendonly", "no", "--maxmemory", "200mb", "--maxmemory-policy", "allkeys-lru"]
+    }
+  }
+}
+
+# RabbitMQ con la imagen oficial, sólo dentro del entorno. Reemplaza al plan gratuito de CloudAMQP, que admite 150
+# colas por instancia: cada suscripción declara su cola y tres colas de espera para los reintentos (ADR-0003), y el
+# sistema pasa ese límite. Sin disco persistente: si el contenedor se reinicia, se pierden los mensajes que estén en las
+# colas en ese momento; los eventos todavía no publicados siguen en el outbox de PostgreSQL.
+resource "azurerm_container_app" "rabbitmq" {
+  name                         = local.nombre_rabbitmq
+  resource_group_name          = azurerm_resource_group.this.name
+  container_app_environment_id = azurerm_container_app_environment.this.id
+  revision_mode                = "Single"
+  workload_profile_name        = local.perfil_trabajo
+
+  secret {
+    name  = "contrasena-rabbitmq"
+    value = random_password.rabbitmq.result
+  }
+
+  ingress {
+    external_enabled = false
+    transport        = "tcp"
+    target_port      = 5672
+    exposed_port     = 5672
+
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }
+
+  template {
+    min_replicas = 1
+    max_replicas = 1
+
+    container {
+      name   = "rabbitmq"
+      image  = "docker.io/library/rabbitmq:4"
+      cpu    = 0.5
+      memory = "1Gi"
+
+      env {
+        name  = "RABBITMQ_DEFAULT_USER"
+        value = "logistica"
+      }
+
+      env {
+        name        = "RABBITMQ_DEFAULT_PASS"
+        secret_name = "contrasena-rabbitmq"
+      }
     }
   }
 }
@@ -306,7 +364,7 @@ resource "azurerm_container_app" "api" {
       memory = "1Gi"
 
       dynamic "env" {
-        for_each = local.variables_api
+        for_each = merge(local.variables_api, local.variables_logs)
         content {
           name  = env.key
           value = env.value
@@ -333,7 +391,7 @@ resource "azurerm_container_app" "api" {
     }
   }
 
-  depends_on = [azurerm_container_app.valkey]
+  depends_on = [azurerm_container_app.valkey, azurerm_container_app.rabbitmq]
 
   lifecycle {
     ignore_changes = [template[0].container[0].image]
@@ -375,7 +433,7 @@ resource "azurerm_container_app" "worker" {
       memory = "0.5Gi"
 
       dynamic "env" {
-        for_each = local.variables_worker
+        for_each = merge(local.variables_worker, local.variables_logs)
         content {
           name  = env.key
           value = env.value
