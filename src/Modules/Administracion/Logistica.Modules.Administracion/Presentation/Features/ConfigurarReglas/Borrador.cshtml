@@ -1,5 +1,6 @@
 @page "/backoffice/reglas/borrador"
 @model Logistica.Modules.Administracion.Presentation.Features.ConfigurarReglas.BorradorModel
+@using Logistica.Modules.Administracion.Contracts
 @{
     Layout = "/Pages/Shared/_Layout.cshtml";
     ViewData["Title"] = $"Reglas · borrador {Model.Borrador.Numero}";
@@ -43,6 +44,29 @@
         <div class="form-check form-check-inline"><input asp-for="DevolverTrasIntentosAgotados" class="form-check-input" /><label asp-for="DevolverTrasIntentosAgotados" class="form-check-label">Devolver al agotar los intentos</label></div>
         <div class="form-text">La firma del receptor es siempre obligatoria.</div>
     </div>
+
+    @* RF 33: entrega parcial y bultos pendientes (decisiones-entrega-parcial.md, sección 5). *@
+    <fieldset class="col-12 row g-3 mx-0 px-0">
+        <legend class="h6 mb-0">Entrega parcial</legend>
+        <div class="col-12">
+            <div class="form-check"><input asp-for="AdmiteEntregaParcial" class="form-check-input" /><label asp-for="AdmiteEntregaParcial" class="form-check-label">Admitir la entrega de parte de los bultos de un envío</label></div>
+            <div class="form-text">Sin marcar, en cada visita se entregan todos los bultos o ninguno.</div>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Pendientes" class="form-label">Bultos que no se entregaron</label>
+            <select asp-for="Pendientes" class="form-select">
+                <option value="@PoliticaPendientes.NuevaVisitaSinRecargo">Nueva visita sin recargo</option>
+                <option value="@PoliticaPendientes.NuevaVisitaConRecargo">Nueva visita con recargo</option>
+                <option value="@PoliticaPendientes.Devolver">Devolver al comercio</option>
+            </select>
+            <div class="form-text">La nueva visita depende además del motivo y de los intentos que le queden al bulto.</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <label asp-for="RecargoNuevaVisita" class="form-label">Recargo por nueva visita ($)</label>
+            <input asp-for="RecargoNuevaVisita" class="form-control" inputmode="decimal" />
+            <div class="form-text">Sólo con la nueva visita con recargo.</div>
+        </div>
+    </fieldset>
     <div class="col-12"><button type="submit" class="btn btn-outline-primary">Guardar valores</button></div>
 </form>
 

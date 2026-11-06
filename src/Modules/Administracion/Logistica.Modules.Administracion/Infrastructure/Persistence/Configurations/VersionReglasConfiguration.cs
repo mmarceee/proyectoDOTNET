@@ -27,6 +27,10 @@ internal sealed class VersionReglasConfiguration : IEntityTypeConfiguration<Vers
         builder.ComplexProperty(v => v.PruebaExigida);
         builder.ComplexProperty(v => v.PoliticaDevolucion);
 
+        // RF 33: también columnas de la misma tabla; la política se guarda como texto, como los demás enums.
+        builder.ComplexProperty(v => v.EntregaParcial, parcial =>
+            parcial.Property(p => p.Pendientes).HasConversion<string>());
+
         // Los plazos por modalidad (dos filas a lo sumo) se guardan como JSON en una columna. La lista se reemplaza entera
         // al modificar, así que comparar por contenido alcanza para que EF detecte el cambio.
         builder.Ignore(v => v.Plazos);

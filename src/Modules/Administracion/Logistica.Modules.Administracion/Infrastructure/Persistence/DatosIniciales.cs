@@ -37,10 +37,14 @@ internal sealed class DatosIniciales(IServiceProvider servicios, TimeProvider re
 
         // CU-06. Demo: 3 intentos cada 24 h, sólo la firma. Este: 2 intentos cada 48 h y foto, nombre y documento
         // obligatorios. Los máximos de paradas son los mismos que las reglas de planificación de Lucas (20 y 8).
+        // RF 33: ninguno admite la entrega parcial, como toda versión publicada antes del cambio (decisión del 03/11); se
+        // prende publicando una versión nueva desde CU-06. Demo vuelve a visitar sin recargo y Este cobra $150.
         await SembrarReglasAsync(OperadorDemoId, new DatosReglas(3, 24, new PruebaExigida(false, false),
-            new PoliticaDevolucion(true, 5), [new(Modalidad.Estandar, 72), new(Modalidad.Urgente, 24)], 24, 20), ct);
+            new PoliticaDevolucion(true, 5), [new(Modalidad.Estandar, 72), new(Modalidad.Urgente, 24)], 24, 20,
+            ReglasEntregaParcial.ComoAntes), ct);
         await SembrarReglasAsync(OperadorEsteId, new DatosReglas(2, 48, new PruebaExigida(true, true),
-            new PoliticaDevolucion(true, 3), [new(Modalidad.Estandar, 96), new(Modalidad.Urgente, 48)], 48, 8), ct);
+            new PoliticaDevolucion(true, 3), [new(Modalidad.Estandar, 96), new(Modalidad.Urgente, 48)], 48, 8,
+            new ReglasEntregaParcial(false, PoliticaPendientes.NuevaVisitaConRecargo, 150)), ct);
     }
 
     // El comercio es global y trabaja con los dos operadores (letra, §3.3): se crea una sola vez.

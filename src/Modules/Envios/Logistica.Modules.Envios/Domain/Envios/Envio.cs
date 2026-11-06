@@ -286,12 +286,13 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         var fallidos = _intentos.Count(i => i.Resultado == ResultadoIntento.Fallido);
         var agotados = fallidos >= reglas.MaxIntentos;
 
-        // Un motivo no reprogramable devuelve siempre; los intentos agotados, sólo si la política lo dice.
-        if (!motivo.Reprogramable || (agotados && reglas.DevolverTrasIntentosAgotados))
+        // Un motivo no reprogramable devuelve siempre; la política de pendientes Devolver también (RF 33); los intentos
+        // agotados, sólo si la política de devolución lo dice.
+        if (reglas.DebeDevolver(motivo, fallidos))
         {
-            var causa = motivo.Reprogramable
-                ? $"Se agotaron los {reglas.MaxIntentos} intentos."
-                : $"El motivo {motivo.Codigo} no admite reprogramar.";
+            var causa = !motivo.Reprogramable ? $"El motivo {motivo.Codigo} no admite reprogramar."
+                : reglas.Pendientes == PoliticaPendientes.Devolver ? "La política del operador devuelve los bultos pendientes."
+                : $"Se agotaron los {reglas.MaxIntentos} intentos.";
             Transicionar(EstadoEnvio.EnDevolucion, OrigenEvento.Sistema, null, ocurridoEn, detalle: causa);
         }
         else
@@ -352,10 +353,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             foreach (var bulto in bultos)
             {
                 bulto.Transicionar(EstadoEnvio.NoEntregado);
-                // Intentos por bulto (RF 33): un motivo no reprogramable devuelve siempre; los intentos agotados, sólo si
-                // la política lo dice.
-                var agotados = bulto.IntentosFallidos >= reglas.MaxIntentos;
-                var devolver = !motivo.Reprogramable || (agotados && reglas.DevolverTrasIntentosAgotados);
+                // Intentos por bulto (RF 33): la misma regla que el intento del envío entero (ReglasEntrega.DebeDevolver).
+                var devolver = reglas.DebeDevolver(motivo, bulto.IntentosFallidos);
                 bulto.Transicionar(devolver ? EstadoEnvio.EnDevolucion : EstadoEnvio.Reprogramado);
                 if (!devolver) reprogramados++;
             }

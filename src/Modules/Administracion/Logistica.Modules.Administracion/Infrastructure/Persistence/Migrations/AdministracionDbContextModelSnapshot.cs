@@ -19,7 +19,7 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("administracion")
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -507,6 +507,21 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("Plazos");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "EntregaParcial", "Logistica.Modules.Administracion.Domain.Reglas.VersionReglas.EntregaParcial#ReglasEntregaParcial", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<bool>("AdmiteEntregaParcial")
+                                .HasColumnType("boolean");
+
+                            b1.Property<string>("Pendientes")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<decimal>("RecargoNuevaVisita")
+                                .HasColumnType("numeric");
+                        });
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "PoliticaDevolucion", "Logistica.Modules.Administracion.Domain.Reglas.VersionReglas.PoliticaDevolucion#PoliticaDevolucion", b1 =>
                         {
