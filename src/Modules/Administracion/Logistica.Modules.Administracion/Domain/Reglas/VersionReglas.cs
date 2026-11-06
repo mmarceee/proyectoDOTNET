@@ -24,6 +24,7 @@ internal sealed class VersionReglas : Entity, IOperadorOwned
     public IReadOnlyList<PlazoModalidad> Plazos => _plazos;
     public int AnticipacionReprogramacionHoras { get; private set; }
     public int MaxParadasPorRuta { get; private set; }
+    public ReglasEntregaParcial EntregaParcial { get; private set; } = ReglasEntregaParcial.ComoAntes;
     public IReadOnlyList<MotivoNoEntrega> Motivos => _motivos;
 
     private VersionReglas() { } // para EF Core
@@ -48,7 +49,7 @@ internal sealed class VersionReglas : Entity, IOperadorOwned
 
     // Los valores actuales, para copiarlos a un borrador nuevo o mostrarlos en el formulario.
     public DatosReglas Valores() => new(MaxIntentos, PlazoEntreIntentosHoras, PruebaExigida, PoliticaDevolucion,
-        _plazos.ToList(), AnticipacionReprogramacionHoras, MaxParadasPorRuta);
+        _plazos.ToList(), AnticipacionReprogramacionHoras, MaxParadasPorRuta, EntregaParcial);
 
     // CU-06, paso 4: se guardan tal cual; se validan al publicar (A1).
     public void Modificar(DatosReglas valores)
@@ -61,6 +62,7 @@ internal sealed class VersionReglas : Entity, IOperadorOwned
         _plazos = valores.Plazos.ToList();
         AnticipacionReprogramacionHoras = valores.AnticipacionReprogramacionHoras;
         MaxParadasPorRuta = valores.MaxParadasPorRuta;
+        EntregaParcial = valores.EntregaParcial ?? ReglasEntregaParcial.ComoAntes;
     }
 
     public MotivoNoEntrega AgregarMotivo(DatosMotivo datos)
@@ -86,6 +88,21 @@ internal sealed class VersionReglas : Entity, IOperadorOwned
         if (PoliticaDevolucion.PlazoDevolucionDias <= 0) errores.Add("El plazo de devolución tiene que ser mayor que cero.");
         if (AnticipacionReprogramacionHoras <= 0) errores.Add("La anticipación para reprogramar tiene que ser mayor que cero.");
         if (MaxParadasPorRuta < 1) errores.Add("El máximo de paradas por ruta tiene que ser al menos 1.");
+
+        // RF 33: el recargo existe sólo con la política que lo cobra, y entonces tiene que ser mayor que cero.
+        var parcial = EntregaParcial;
+        if (!Enum.IsDefined(parcial.Pendientes))
+        {
+            errores.Add("La política para los bultos pendientes no es válida.");
+        }
+        else if (parcial.Pendientes == PoliticaPendientes.NuevaVisitaConRecargo && parcial.RecargoNuevaVisita <= 0)
+        {
+            errores.Add("El recargo de la nueva visita tiene que ser mayor que cero.");
+        }
+        else if (parcial.Pendientes != PoliticaPendientes.NuevaVisitaConRecargo && parcial.RecargoNuevaVisita != 0)
+        {
+            errores.Add("Sólo se indica un recargo con la política de nueva visita con recargo.");
+        }
 
         foreach (var modalidad in Enum.GetValues<Modalidad>())
         {

@@ -1,3 +1,4 @@
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.SharedKernel;
 
@@ -14,9 +15,10 @@ public class VisitaPorBultoTests
     private static readonly MotivoNoEntrega Ausente = new(Guid.NewGuid(), "AUSENTE", reprogramable: true, exigeEvidencia: false);
     private static readonly MotivoNoEntrega Rechazado = new(Guid.NewGuid(), "RECHAZADO", reprogramable: false, exigeEvidencia: false);
 
-    private static ReglasEntrega Reglas(bool parcial = true, int maxIntentos = 3) =>
+    private static ReglasEntrega Reglas(bool parcial = true, int maxIntentos = 3,
+        PoliticaPendientes pendientes = PoliticaPendientes.NuevaVisitaSinRecargo) =>
         new(exigeFoto: false, exigeNombreYDocumento: false, maxIntentos, TimeSpan.FromHours(24),
-            devolverTrasIntentosAgotados: true, admiteEntregaParcial: parcial);
+            devolverTrasIntentosAgotados: true, admiteEntregaParcial: parcial, pendientes: pendientes);
 
     [Fact]
     public void Dos_de_tres_entregados_y_uno_ausente_queda_entregado_parcialmente_y_en_curso()
@@ -118,6 +120,36 @@ public class VisitaPorBultoTests
             Reglas(), null, Ahora));
         Assert.Throws<DomainException>(() => envio.RegistrarVisita([new(b[0].Id), new(Guid.NewGuid())], Firma, null, null,
             Lugar, Reglas(), null, Ahora));
+    }
+
+    // RF 33: con la política Devolver, el bulto pendiente va a devolución aunque el motivo sea reprogramable y le queden
+    // intentos. Las entregas de la misma visita se mantienen.
+    [Fact]
+    public void Con_la_politica_devolver_el_pendiente_va_a_devolucion_aunque_le_queden_intentos()
+    {
+        var envio = EnvioEnTransito(3);
+        var b = envio.Bultos;
+
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id), new(b[2].Id, Ausente)], Firma, null, null, Lugar,
+            Reglas(pendientes: PoliticaPendientes.Devolver), null, Ahora);
+
+        Assert.Equal((EstadoEnvio.EnDevolucion, 1), (b[2].Estado, b[2].IntentosFallidos));
+        Assert.Equal((EstadoEnvio.EnDevolucion, ResumenEnvio.EntregadoParcialmente, 2),
+            (envio.Estado, envio.Resumen, envio.BultosEntregados));
+        Assert.Null(envio.ReintentoDesde);
+    }
+
+    // RF 33: con recargo, el pendiente vuelve a visitarse igual que sin recargo (el cobro se registra en otra etapa).
+    [Fact]
+    public void Con_la_politica_de_recargo_el_pendiente_queda_reprogramado()
+    {
+        var envio = EnvioEnTransito(2);
+        var b = envio.Bultos;
+
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id, Ausente)], Firma, null, null, Lugar,
+            Reglas(pendientes: PoliticaPendientes.NuevaVisitaConRecargo), null, Ahora);
+
+        Assert.Equal(EstadoEnvio.Reprogramado, b[1].Estado);
     }
 
     [Fact]

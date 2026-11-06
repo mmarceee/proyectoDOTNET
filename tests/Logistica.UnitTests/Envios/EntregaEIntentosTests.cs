@@ -1,3 +1,4 @@
+using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.SharedKernel;
 
@@ -192,6 +193,20 @@ public class EntregaEIntentosTests
         envio.RegistrarIntentoFallido(Rechazado, null, null, EnLaPuerta, sinDevolucion, null, EnLaCalle);
 
         Assert.Equal(EstadoEnvio.EnDevolucion, envio.Estado);
+    }
+
+    // RF 33: la política de pendientes Devolver también vale para el intento fallido del envío entero.
+    [Fact]
+    public void Con_la_politica_devolver_un_motivo_reprogramable_va_a_devolucion_en_el_primer_intento()
+    {
+        var envio = EnTransito();
+        var devolver = new ReglasEntrega(false, false, maxIntentos: 3, TimeSpan.FromHours(24),
+            pendientes: PoliticaPendientes.Devolver);
+
+        envio.RegistrarIntentoFallido(Ausente, null, null, EnLaPuerta, devolver, null, EnLaCalle);
+
+        Assert.Equal(EstadoEnvio.EnDevolucion, envio.Estado);
+        Assert.Contains(envio.Eventos, e => e.Detalle == "La política del operador devuelve los bultos pendientes.");
     }
 
     [Fact]

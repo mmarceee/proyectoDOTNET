@@ -1,6 +1,7 @@
 using Logistica.Modules.Administracion.Application.Features.ConfigurarReglas;
 using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Administracion.Domain.Reglas;
+using Logistica.Modules.Administracion.Presentation.Features.ConfigurarTarifario;
 using Logistica.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -29,6 +30,11 @@ internal sealed class BorradorModel(
     [BindProperty] public int AnticipacionReprogramacionHoras { get; set; }
     [BindProperty] public int MaxParadasPorRuta { get; set; }
 
+    // RF 33. El recargo llega como texto, como los montos del tarifario: acepta "150,50" o "150.50".
+    [BindProperty] public bool AdmiteEntregaParcial { get; set; }
+    [BindProperty] public PoliticaPendientes Pendientes { get; set; }
+    [BindProperty] public string? RecargoNuevaVisita { get; set; }
+
     // Un motivo nuevo.
     [BindProperty] public string? Codigo { get; set; }
     [BindProperty] public string? Descripcion { get; set; }
@@ -45,11 +51,20 @@ internal sealed class BorradorModel(
 
     public Task<IActionResult> OnPostValoresAsync(CancellationToken ct)
     {
-        var valores = new DatosReglas(MaxIntentos, PlazoEntreIntentosHoras, new PruebaExigida(ExigeFoto, ExigeNombreYDocumento),
-            new PoliticaDevolucion(DevolverTrasIntentosAgotados, PlazoDevolucionDias),
-            [new PlazoModalidad(Modalidad.Estandar, PlazoEstandarHoras), new PlazoModalidad(Modalidad.Urgente, PlazoUrgenteHoras)],
-            AnticipacionReprogramacionHoras, MaxParadasPorRuta);
-        return EjecutarAsync(async () => await gestionar.GuardarValoresAsync(valores, ct) ? "Se guardaron los valores." : null, ct);
+        // Adentro de la acción: un recargo que no es un número se muestra como cualquier otra regla rota.
+        return EjecutarAsync(async () =>
+        {
+            // Vacío vale 0: es lo que corresponde a las políticas sin recargo.
+            var recargo = string.IsNullOrWhiteSpace(RecargoNuevaVisita)
+                ? 0
+                : TextosTarifario.Decimal(RecargoNuevaVisita, "el recargo de la nueva visita");
+            var valores = new DatosReglas(MaxIntentos, PlazoEntreIntentosHoras, new PruebaExigida(ExigeFoto, ExigeNombreYDocumento),
+                new PoliticaDevolucion(DevolverTrasIntentosAgotados, PlazoDevolucionDias),
+                [new PlazoModalidad(Modalidad.Estandar, PlazoEstandarHoras), new PlazoModalidad(Modalidad.Urgente, PlazoUrgenteHoras)],
+                AnticipacionReprogramacionHoras, MaxParadasPorRuta,
+                new ReglasEntregaParcial(AdmiteEntregaParcial, Pendientes, recargo));
+            return await gestionar.GuardarValoresAsync(valores, ct) ? "Se guardaron los valores." : null;
+        }, ct);
     }
 
     public Task<IActionResult> OnPostMotivoAsync(CancellationToken ct)
@@ -121,6 +136,10 @@ internal sealed class BorradorModel(
         PlazoUrgenteHoras = v.Plazos.FirstOrDefault(p => p.Modalidad == Modalidad.Urgente)?.PlazoHoras ?? 0;
         AnticipacionReprogramacionHoras = v.AnticipacionReprogramacionHoras;
         MaxParadasPorRuta = v.MaxParadasPorRuta;
+        var parcial = v.EntregaParcial ?? ReglasEntregaParcial.ComoAntes;
+        AdmiteEntregaParcial = parcial.AdmiteEntregaParcial;
+        Pendientes = parcial.Pendientes;
+        RecargoNuevaVisita = TextosTarifario.Numero(parcial.RecargoNuevaVisita);
         return Page();
     }
 }
