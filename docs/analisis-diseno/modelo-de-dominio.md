@@ -360,6 +360,8 @@ La [especificación técnica de CU-40](cu-40/especificacion-tecnica-cu-40.md), s
 
 * maxParadasPorRuta: int (RF 14)
 
+* entregaParcial: ReglasEntregaParcial (RF 33)
+
 **Métodos**
 
 * publicar(desde: DateTimeOffset): void
@@ -389,6 +391,20 @@ La [especificación técnica de CU-40](cu-40/especificacion-tecnica-cu-40.md), s
 * devolverTrasIntentosAgotados: bool
 
 * plazoDevolucionDias: int
+
+**ReglasEntregaParcial**
+
+*sin id propio — parte de VersionReglas (RF 33; decisiones-entrega-parcial.md, sección 5)*
+
+**Atributos**
+
+* admiteEntregaParcial: bool (falso: en cada visita se entregan todos los bultos o ninguno; vale falso en las versiones publicadas antes del cambio)
+
+* pendientes: PoliticaPendientes (NuevaVisitaSinRecargo, NuevaVisitaConRecargo o Devolver: qué pasa con un bulto no entregado)
+
+* recargoNuevaVisita: decimal (monto fijo; mayor que cero sólo con NuevaVisitaConRecargo, cero con las otras)
+
+*Con Devolver, un bulto no entregado pasa a devolución (T10) aunque le queden intentos. Con las otras dos sigue la regla de siempre: el motivo y los intentos deciden entre T9 y T10. El registro del recargo y su liquidación quedan pendientes (CU-32).*
 
 **PlazoModalidad**
 
@@ -1301,6 +1317,7 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | VersionReglas | 1 | composición | 1..\* | PlazoModalidad |
 | VersionReglas | 1 | composición | 1 | PruebaExigida |
 | VersionReglas | 1 | composición | 1 | PoliticaDevolucion |
+| VersionReglas | 1 | composición | 1 | ReglasEntregaParcial |
 | RelacionComercial | 1 | asociación | 0..\* | Envio |
 | Envio | 1 | composición | 1..\* | Bulto |
 | Envio | 1 | composición | 1 | Destinatario |
