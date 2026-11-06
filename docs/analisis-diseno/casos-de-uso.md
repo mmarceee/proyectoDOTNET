@@ -798,9 +798,10 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Pre-Condición** | 1. Ocurrió un cambio de estado o se ejecuta el cierre diario (CU-70). |
 | **Post-Condición** | Los indicadores del período quedan actualizados en la tabla de lectura de Seguimiento. |
 | **Actores** | **Principal:** sistema (Worker). |
-| **Flujo de evento principal** | 1. El sistema recibe un evento de entrega o de intento fallido, o el cierre diario.<br>2. Determina si la entrega fue dentro de la ventana comprometida, según el plazo de la modalidad en la versión de reglas del envío.<br>3. Actualiza los contadores de la zona, el repartidor y el comercio, y los de motivos de no entrega. |
+| **Flujo de evento principal** | 1. El sistema recibe un evento de entrega o de intento fallido, o el cierre diario.<br>2. Determina si la entrega fue dentro de la ventana comprometida, según el plazo de la modalidad en la versión de reglas del envío.<br>3. Registra el hecho en la tabla de lectura, con la zona, el repartidor, el comercio y, si el intento falló, el motivo de no entrega. Los reportes (CU-72) agrupan esos registros por período y por dimensión. |
 | **Flujos alternativos** | **A1 · Evento repetido (paso 1).** No se cuenta dos veces (idempotencia). |
 | **Requerimientos especiales** | 1. Los indicadores se mantienen en la tabla de lectura de Seguimiento; no se calculan sobre las tablas transaccionales en cada consulta. |
+| **Implementación** | Nivel básico (06/11/2026). El consumidor `RegistrarCumplimiento` del Worker (colas `seguimiento.indicadores.<tipo>`, con inbox) escribe una fila de `seguimiento.registros_cumplimiento` por cada `EnvioEntregado` e `IntentoFallidoRegistrado`; los contadores salen de agrupar esas filas, no de mantener totales. `EnvioAdmitido` trae dos campos opcionales: la zona y `EntregaComprometidaHasta`, que es el alta más el plazo de la modalidad en la versión de reglas vigente. La copia del envío en Seguimiento los guarda. La entrega es a tiempo si ocurrió hasta ese momento. Los envíos admitidos antes de este cambio no tienen ventana y no cuentan en el porcentaje. Los envíos de prueba no cuentan. La zona es la del alta. El repartidor se registra sólo en las entregas, porque el intento fallido no lo trae. El recálculo del cierre diario queda para CU-70. |
 
 ### **CU-72 · Consultar reportes de gestión**
 
@@ -855,3 +856,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 1.7 | 03/11/2026 | CU-32: A4, eliminar una liquidación en borrador. | Ezequiel Marcenal |
 | 1.8 | 03/11/2026 | CU-33: implementación en nivel básico; saldo pendiente, fecha de las líneas y descarga en CSV. | Ezequiel Marcenal |
 | 1.9 | 03/11/2026 | CU-52: visita por bulto del lado del servidor (RF 32) y traducción de las operaciones anteriores. | Ezequiel Marcenal |
+| 1.10 | 06/11/2026 | CU-71: implementación en nivel básico; tabla de lectura con un registro por entrega o intento fallido, y ventana comprometida en `EnvioAdmitido`. | Ezequiel Marcenal |

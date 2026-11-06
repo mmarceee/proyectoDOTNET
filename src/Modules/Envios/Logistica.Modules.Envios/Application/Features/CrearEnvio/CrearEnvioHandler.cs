@@ -53,9 +53,11 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             {
                 await relacion.ExigirAsync(comercioId, ct);
                 envios.Agregar(envio);
-                // T1 también llega a Seguimiento: es el único evento con el comercio en el sobre (CU-64).
+                // T1 también llega a Seguimiento: es el único evento con el comercio en el sobre (CU-64), y lleva la zona
+                // y la ventana comprometida para los indicadores de cumplimiento (CU-71).
                 eventos.Registrar(EnvioAdmitido.Tipo, new EnvioAdmitido(envio.Id, envio.Numero, envio.CreadoEn,
-                    envio.Destinatario.Nombre, envio.EsPrueba ? null : envio.Destinatario.Email, envio.EsPrueba), envio.CreadoEn);
+                    envio.Destinatario.Nombre, envio.EsPrueba ? null : envio.Destinatario.Email, envio.EsPrueba,
+                    envio.ZonaId, envio.CreadoEn + cotizacion.PlazoComprometido), envio.CreadoEn);
                 await envios.GuardarCambiosAsync(ct);
             }, ct);
         }
@@ -119,7 +121,8 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             bultos.Add(new DatosBulto(bulto.PesoKg, bulto.LargoCm, bulto.AnchoCm, bulto.AltoCm, tarifa.Monto));
         }
 
-        return new CotizacionEnvio(zona.Id, reglas.VersionId, versionTarifario, bultos);
+        var plazo = reglas.Plazos.SingleOrDefault(p => p.Modalidad == command.Modalidad)?.Plazo;
+        return new CotizacionEnvio(zona.Id, reglas.VersionId, versionTarifario, bultos, plazo);
     }
 
     private (Guid OperadorId, Guid ComercioId) Inquilino()

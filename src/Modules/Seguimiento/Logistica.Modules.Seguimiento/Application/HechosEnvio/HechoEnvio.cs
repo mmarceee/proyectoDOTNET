@@ -5,9 +5,12 @@ namespace Logistica.Modules.Seguimiento.Application.HechosEnvio;
 
 // Un hecho de un envío, leído de un evento de Envíos. Lo usan los avisos al comercio (CU-64) y las notificaciones al
 // destinatario (CU-62). EsAlta: es EnvioAdmitido, el único con el comercio en el sobre y los datos del destinatario.
+// Para los indicadores (CU-71): la zona y la ventana comprometida vienen del alta; el repartidor, de la entrega; el
+// motivo, del intento fallido.
 internal sealed record HechoEnvio(Guid EventoId, Guid EnvioId, string? Numero, string EstadoEnvio, bool IntentoFallido,
     DateTimeOffset FechaEvento, bool EsAlta, string? NombreDestinatario = null, string? EmailDestinatario = null,
-    DateOnly? NuevaFecha = null, bool EsPrueba = false);
+    DateOnly? NuevaFecha = null, bool EsPrueba = false, Guid? ZonaId = null, DateTimeOffset? EntregaComprometidaHasta = null,
+    Guid? ResponsableId = null, string? Motivo = null);
 
 // El alta del envío todavía no llegó: el orden entre colas no está garantizado (ADR-0003, sección 2.4), así que
 // el mensaje se reintenta con la espera creciente hasta que llegue.
@@ -28,7 +31,7 @@ internal sealed class EnviosSeguidos(IEnviosSeguidosRepository envios, ICurrentT
             ?? throw new InvalidDataException("El alta del envío no trae el comercio en el sobre.");
         var envio = EnvioSeguido.Crear(operadorId, comercioId, hecho.EnvioId,
             hecho.Numero ?? throw new InvalidDataException("El alta del envío no trae el número."),
-            hecho.NombreDestinatario, hecho.EmailDestinatario);
+            hecho.NombreDestinatario, hecho.EmailDestinatario, hecho.ZonaId, hecho.EntregaComprometidaHasta, hecho.EsPrueba);
         envios.Agregar(envio);
         return envio;
     }
