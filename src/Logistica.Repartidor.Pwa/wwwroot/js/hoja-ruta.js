@@ -578,14 +578,20 @@ async function baseRendicion(ruta) {
 export async function abrirRendicion(ruta, revisar = false) {
     const s = await activo(), anterior = await borradorRendicion(ruta);
     const iniciada = (await cargar())?.hoja.rendicion?.iniciada;
-    if (anterior && !revisar && (!iniciada || anterior.resultado === 'Aplicada')) return anterior;
+    if (anterior?.operacionId && !revisar && (!iniciada || anterior.resultado === 'Aplicada')) return anterior;
     if (revisar && anterior?.operacionId && anterior.resultado !== 'Rechazada') throw new Error('Esta rendición no admite cambios.');
     const base = await baseRendicion(ruta);
     const recibidas = new Map(base.iniciada?.lineas.map(l => [l.bultoId, l]) ?? []);
+    // Un borrador sin confirmar se recalcula al abrirlo: las entregas e intentos registrados después de abrir la rendición
+    // cambian la situación de los bultos. Lo declarado se conserva sólo en los bultos cuya situación no cambió.
+    const borrador = anterior && !anterior.operacionId ? anterior : null;
+    const previas = new Map(borrador?.bultos.map(b => [b.bultoId, b]) ?? []);
+    const previa = b => previas.get(b.bultoId)?.situacion === b.situacion ? previas.get(b.bultoId) : null;
     const valor = { tipoBorrador:'rendicion', rutaId:ruta, revision:(anterior?.revision ?? 0)+1,
-        bultos:base.bultos.map(b => ({ ...b, devuelve:recibidas.get(b.bultoId)?.declarada ?? (b.requiereDeclaracion ? null : false),
-            observacion:recibidas.get(b.bultoId)?.observacion ?? null })), dependencias:base.dependencias,
-        observaciones:base.iniciada?.observaciones ?? null, operacionId:base.iniciada?.id ?? null,
+        bultos:base.bultos.map(b => ({ ...b,
+            devuelve:recibidas.get(b.bultoId)?.declarada ?? previa(b)?.devuelve ?? (b.requiereDeclaracion ? null : false),
+            observacion:recibidas.get(b.bultoId)?.observacion ?? previa(b)?.observacion ?? null })), dependencias:base.dependencias,
+        observaciones:base.iniciada?.observaciones ?? borrador?.observaciones ?? null, operacionId:base.iniciada?.id ?? null,
         resultado:base.iniciada ? 'Aplicada' : null, detalle:null };
     return escribirBorrador(valor, anterior?.revision ?? 0, s);
 }

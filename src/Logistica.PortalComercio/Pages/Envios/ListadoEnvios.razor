@@ -1,0 +1,207 @@
+@page "/envios"
+@using System.Globalization
+@using Logistica.Http.Contracts.Envios
+@inject HttpClient Http
+
+<PageTitle>Mis envíos</PageTitle>
+
+<h1>Mis envíos</h1>
+
+<form class="d-flex flex-wrap align-items-end gap-3 mb-3" @onsubmit="BuscarAsync" @onsubmit:preventDefault>
+    <div>
+        <label for="buscar-envio" class="form-label">Número, referencia o destinatario</label>
+        <input id="buscar-envio" type="search" class="form-control" @bind="_texto" @bind:event="oninput" />
+    </div>
+    <div>
+        <label for="resumen-envio" class="form-label">Resumen</label>
+        <select id="resumen-envio" class="form-select" @bind="_resumen">
+            <option value="">Todos</option>
+            <option value="Creado">Creado</option>
+            <option value="EnOperacion">En operación</option>
+            <option value="EntregadoParcialmente">Entregado parcialmente</option>
+            <option value="Entregado">Entregado</option>
+        </select>
+    </div>
+    <div>
+        <label for="modalidad-envio" class="form-label">Modalidad</label>
+        <select id="modalidad-envio" class="form-select" @bind="_modalidad">
+            <option value="">Todas</option>
+            <option value="Estandar">Estándar</option>
+            <option value="Urgente">Urgente</option>
+        </select>
+    </div>
+    <div>
+        <label for="zona-envio" class="form-label">Zona</label>
+        <select id="zona-envio" class="form-select" @bind="_zona">
+            <option value="">Todas</option>
+            @foreach (var zona in _zonas)
+            {
+                <option value="@zona.Id">@zona.Nombre</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label for="desde-envio" class="form-label">Fecha desde</label>
+        <InputDate id="desde-envio" class="form-control" @bind-Value="_desde" />
+    </div>
+    <div>
+        <label for="hasta-envio" class="form-label">Fecha hasta</label>
+        <InputDate id="hasta-envio" class="form-control" @bind-Value="_hasta" />
+    </div>
+    <button type="submit" class="btn btn-primary" disabled="@_ocupado">Buscar</button>
+    <button type="button" class="btn btn-outline-secondary" @onclick="LimpiarAsync" disabled="@_ocupado">Limpiar filtros</button>
+</form>
+
+@if (_error is not null)
+{
+    <p class="alert alert-danger" role="alert">@_error</p>
+}
+@if (_ocupado)
+{
+    <p role="status">Cargando…</p>
+}
+@if (_detalle is { } detalle)
+{
+    <section class="card card-body mb-3" aria-label="Detalle del envío">
+        <h2 class="h5">Envío @detalle.Numero</h2>
+        <p>@detalle.Resumen · @detalle.Entregados de @detalle.Bultos.Count entregados · @Cierre(detalle.Terminado)</p>
+        <ul>
+            @foreach (var bulto in detalle.Bultos)
+            {
+                <li>@bulto.Codigo: @bulto.Estado</li>
+            }
+        </ul>
+        <div><button type="button" class="btn btn-outline-secondary" @onclick="CerrarDetalle">Cerrar detalle</button></div>
+    </section>
+}
+@if (_resultado is { } resultado)
+{
+    <p>Total de envíos: @resultado.TotalRegistros</p>
+    @if (resultado.Envios.Count == 0)
+    {
+        <p>No hay envíos para mostrar.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">Número</th><th scope="col">Referencia</th><th scope="col">Destinatario</th>
+                        <th scope="col">Localidad</th><th scope="col">Zona</th><th scope="col">Modalidad</th>
+                        <th scope="col">Resumen</th><th scope="col">Fecha de alta</th><th scope="col">Monto</th>
+                        <th scope="col">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var envio in resultado.Envios)
+                    {
+                        <tr>
+                            <td>@envio.Numero</td><td>@(envio.Referencia ?? "—")</td><td>@envio.Destinatario</td>
+                            <td>@envio.Localidad</td><td>@(envio.Zona ?? "—")</td><td>@envio.Modalidad</td>
+                            <td><strong>@envio.Resumen</strong><div>@envio.Entregados de @envio.TotalBultos entregados · @Cierre(envio.Terminado)</div></td>
+                            <td>@envio.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td><td>@envio.Monto.ToString("0.00")</td>
+                            <td><button type="button" class="btn btn-outline-primary btn-sm" disabled="@_ocupado"
+                                @onclick="() => VerDetalleAsync(envio.Numero)">Ver detalle</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <nav class="d-flex align-items-center gap-3" aria-label="Paginación de envíos">
+            <button type="button" class="btn btn-outline-primary" disabled="@(_ocupado || resultado.Pagina <= 1)"
+                    @onclick="() => CargarAsync(resultado.Pagina - 1)">Anterior</button>
+            <span>Página @resultado.Pagina de @resultado.TotalPaginas</span>
+            <button type="button" class="btn btn-outline-primary" disabled="@(_ocupado || resultado.Pagina >= resultado.TotalPaginas)"
+                    @onclick="() => CargarAsync(resultado.Pagina + 1)">Siguiente</button>
+        </nav>
+    }
+}
+
+@code {
+    private const string Ruta = "/api/envios/portal";
+    private string? _texto, _resumen, _modalidad, _zona, _error;
+    private DateOnly? _desde, _hasta;
+    private bool _ocupado;
+    private PaginaEnviosPortal? _resultado;
+    private DetalleEnvioPortal? _detalle;
+    private IReadOnlyList<ZonaEnviosPortal> _zonas = [];
+    private (string? Texto, string? Resumen, string? Modalidad, string? Zona, DateOnly? Desde, DateOnly? Hasta) _aplicados;
+
+    protected override Task OnInitializedAsync() => BuscarAsync();
+    private static string Cierre(bool terminado) => terminado ? "Finalizado" : "En curso";
+
+    private Task BuscarAsync()
+    {
+        if (_ocupado) return Task.CompletedTask;
+        _detalle = null;
+        if (_desde > _hasta)
+        {
+            _error = "La fecha desde no puede ser posterior a la fecha hasta.";
+            return Task.CompletedTask;
+        }
+        _aplicados = (_texto, _resumen, _modalidad, _zona, _desde, _hasta);
+        return CargarAsync(1);
+    }
+
+    private Task LimpiarAsync()
+    {
+        _texto = _resumen = _modalidad = _zona = null;
+        _desde = _hasta = null;
+        return BuscarAsync();
+    }
+
+    private async Task CargarAsync(int pagina)
+    {
+        var filtros = new Dictionary<string, string?>
+        {
+            ["pagina"] = pagina.ToString(CultureInfo.InvariantCulture),
+            ["texto"] = _aplicados.Texto,
+            ["resumen"] = _aplicados.Resumen,
+            ["modalidad"] = _aplicados.Modalidad,
+            ["zonaId"] = _aplicados.Zona,
+            ["fechaDesde"] = _aplicados.Desde?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["fechaHasta"] = _aplicados.Hasta?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        };
+        var query = string.Join("&", filtros.Where(f => !string.IsNullOrWhiteSpace(f.Value))
+            .Select(f => f.Key + "=" + Uri.EscapeDataString(f.Value!)));
+        _detalle = null;
+        _resultado = null;
+        await ConsultarAsync(async () =>
+        {
+            _resultado = await Http.GetFromJsonAsync<PaginaEnviosPortal>($"{Ruta}?{query}");
+            _zonas = _resultado?.Zonas ?? [];
+        });
+    }
+
+    private async Task VerDetalleAsync(string numero)
+    {
+        _detalle = null;
+        await ConsultarAsync(async () =>
+            _detalle = await Http.GetFromJsonAsync<DetalleEnvioPortal>($"{Ruta}/{Uri.EscapeDataString(numero)}"));
+    }
+
+    private void CerrarDetalle() => _detalle = null;
+
+    private async Task ConsultarAsync(Func<Task> consultar)
+    {
+        _ocupado = true;
+        _error = null;
+        try
+        {
+            await consultar();
+        }
+        catch (HttpRequestException e) when (e.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            _error = "Ingresá al Portal y seleccioná un operador para consultar tus envíos.";
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No se pudieron consultar los envíos. Intentá nuevamente.";
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+}

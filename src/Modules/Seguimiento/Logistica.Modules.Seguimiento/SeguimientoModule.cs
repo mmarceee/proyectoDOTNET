@@ -36,6 +36,9 @@ namespace Logistica.Modules.Seguimiento;
 // Punto de entrada del módulo: lo único público que usa el host (ADR-0001, addendum 2).
 public static class SeguimientoModule
 {
+    // Medidor de los avisos fallidos (MetricasAvisos), que el Worker registra en OpenTelemetry.
+    public const string Medidor = "Logistica.Seguimiento";
+
     public static IServiceCollection AddSeguimientoModule(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddModuleDbContext<SeguimientoDbContext>(configuration.GetConnectionString("Postgres"), SeguimientoDbContext.Schema);

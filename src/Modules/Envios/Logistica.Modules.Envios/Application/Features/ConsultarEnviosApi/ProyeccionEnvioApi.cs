@@ -4,45 +4,13 @@ using Logistica.Modules.Envios.Domain.Envios;
 
 namespace Logistica.Modules.Envios.Application.Features.ConsultarEnviosApi;
 
-internal enum EstadoResumenApi
-{
-    Creado,
-    EnOperacion,
-    EntregadoParcialmente,
-    Entregado,
-}
-
-// Adaptación del modelo actual al vocabulario del ADR-0007. Los resultados actuales son del envío entero.
-// Al persistir estados por bulto, esta proyección y el filtro deben consumir el resumen del dominio.
 internal static class ProyeccionEnvioApi
 {
-    public static EstadoResumenApi ResumenDe(EstadoEnvio estado) => estado switch
-    {
-        EstadoEnvio.Admitido or EstadoEnvio.Cancelado => EstadoResumenApi.Creado,
-        EstadoEnvio.Entregado => EstadoResumenApi.Entregado,
-        _ => EstadoResumenApi.EnOperacion,
-    };
-
-    public static string? ResultadoBulto(EstadoEnvio estado) => estado switch
-    {
-        EstadoEnvio.Entregado => "Entregado",
-        EstadoEnvio.Devuelto => "Devuelto",
-        EstadoEnvio.Extraviado => "Extraviado",
-        EstadoEnvio.Cancelado => "Cancelado",
-        _ => null,
-    };
-
     public static ResumenEnvioApiResponse Resumen(string numero, string? referencia, DateTimeOffset creadoEn,
-        decimal tarifa, Modalidad modalidad, EstadoEnvio estado, int total)
-    {
-        var terminado = ResultadoBulto(estado) is not null;
-        return new(numero, referencia, creadoEn, tarifa, modalidad.ToString(), ResumenDe(estado).ToString(), terminado,
-            total, estado == EstadoEnvio.Entregado ? total : 0,
-            new(terminado ? 0 : total,
-                estado == EstadoEnvio.Devuelto ? total : 0,
-                estado == EstadoEnvio.Extraviado ? total : 0,
-                estado == EstadoEnvio.Cancelado ? total : 0));
-    }
+        decimal tarifa, Modalidad modalidad, ResumenEnvio resumen, bool terminado, int total, int entregados,
+        int devueltos, int extraviados, int cancelados) =>
+        new(numero, referencia, creadoEn, tarifa, modalidad.ToString(), resumen.ToString(), terminado, total, entregados,
+            new(total - entregados - devueltos - extraviados - cancelados, devueltos, extraviados, cancelados));
 
     public static EventoEnvioApiResponse Evento(EventoEnvio evento) => new(
         (evento.EstadoAnterior, evento.EstadoNuevo) switch

@@ -12,6 +12,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // Trazas (ADR-0003, sección 2.9) y métricas de la caché (ADR-0006, sección 2.7): cada mensaje continúa la traza de su
 // publicación en la API, y las invalidaciones del seguimiento cuentan en el mismo tablero que las lecturas de la API.
+// También la profundidad de las colas que consume (MetricasMensajeria) y los avisos fallidos (Seguimiento).
 // Se exportan a Aspire Dashboard cuando OTEL_EXPORTER_OTLP_ENDPOINT está configurado, igual que en la API.
 var exportarOtlp = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 builder.Services.AddOpenTelemetry()
@@ -28,7 +29,7 @@ builder.Services.AddOpenTelemetry()
     })
     .WithMetrics(metricas =>
     {
-        metricas.AddMeter(MetricasCache.Medidor);
+        metricas.AddMeter(MetricasCache.Medidor, MetricasMensajeria.Medidor, SeguimientoModule.Medidor);
 
         if (exportarOtlp)
         {

@@ -12,6 +12,6 @@ public sealed record ResultadosBultosApiResponse(int Pendientes, int Devueltos, 
 public sealed record DetalleEnvioApiResponse(ResumenEnvioApiResponse Envio,
     IReadOnlyList<BultoEnvioApiResponse> Bultos, IReadOnlyList<EventoEnvioApiResponse> Historial);
 
-public sealed record BultoEnvioApiResponse(string Codigo, string? Estado);
+public sealed record BultoEnvioApiResponse(string Codigo, string Estado);
 
 public sealed record EventoEnvioApiResponse(string Tipo, DateTimeOffset OcurridoEn);
