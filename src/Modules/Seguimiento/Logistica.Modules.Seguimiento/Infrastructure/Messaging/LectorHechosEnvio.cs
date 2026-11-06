@@ -45,12 +45,12 @@ internal static class LectorHechosEnvio
             EnvioAsignadoARuta.Tipo => Hecho("AsignadoARuta"),
             EnvioDesasignadoDeRuta.Tipo => Hecho("EnDeposito"),
             EnvioEnTransito.Tipo => Hecho("EnTransito"),
-            EnvioEntregado.Tipo => Hecho("Entregado") with { ResponsableId = Identificador("ResponsableId") },
+            EnvioEntregado.Tipo => Hecho("Entregado") with { RepartidorId = Identificador("RepartidorId") },
             // T7 y, en la misma operación, T9 o T10: el hecho lleva el estado en que quedó el envío.
             IntentoFallidoRegistrado.Tipo => Hecho(
                 Texto("EstadoFinal") is { Length: > 0 } estado
                     ? estado : throw new InvalidDataException("El intento fallido no tiene el estado final."),
-                intentoFallido: true) with { Motivo = Texto("Motivo") },
+                intentoFallido: true) with { Motivo = Texto("Motivo"), RepartidorId = Identificador("RepartidorId") },
             EnvioReprogramado.Tipo => Hecho("Reprogramado") with
             {
                 // System.Text.Json escribe DateOnly como yyyy-MM-dd.

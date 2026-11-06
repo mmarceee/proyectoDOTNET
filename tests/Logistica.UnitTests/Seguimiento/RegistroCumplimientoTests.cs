@@ -52,14 +52,26 @@ public class RegistroCumplimientoTests
     }
 
     [Fact]
-    public void El_intento_fallido_guarda_el_motivo_y_no_cuenta_como_entrega()
+    public void El_intento_fallido_guarda_el_motivo_y_el_repartidor_y_no_cuenta_como_entrega()
     {
-        var registro = RegistroCumplimiento.DeIntentoFallido(Envio(Limite), " Ausente ", Limite);
+        var repartidor = Guid.NewGuid();
+
+        var registro = RegistroCumplimiento.DeIntentoFallido(Envio(Limite), repartidor, " Ausente ", Limite);
 
         Assert.Equal(TipoRegistroCumplimiento.IntentoFallido, registro.Tipo);
-        Assert.Equal("Ausente", registro.Motivo);
+        Assert.Equal(("Ausente", (Guid?)repartidor), (registro.Motivo, registro.RepartidorId));
         Assert.Null(registro.ATiempo);
-        Assert.Throws<DomainException>(() => RegistroCumplimiento.DeIntentoFallido(Envio(Limite), " ", Limite));
+        Assert.Throws<DomainException>(() => RegistroCumplimiento.DeIntentoFallido(Envio(Limite), null, " ", Limite));
+    }
+
+    [Fact]
+    public void El_alta_cuenta_para_el_volumen_con_la_zona_del_envio()
+    {
+        var registro = RegistroCumplimiento.DeAlta(Envio(Limite), Limite);
+
+        Assert.Equal((TipoRegistroCumplimiento.Alta, (Guid?)Zona), (registro.Tipo, registro.ZonaId));
+        Assert.Null(registro.ATiempo);
+        Assert.Null(registro.RepartidorId);
     }
 
     [Fact]
@@ -67,24 +79,27 @@ public class RegistroCumplimientoTests
     {
         var prueba = Envio(Limite, esPrueba: true);
 
+        Assert.Throws<DomainException>(() => RegistroCumplimiento.DeAlta(prueba, Limite));
         Assert.Throws<DomainException>(() => RegistroCumplimiento.DeEntrega(prueba, null, Limite));
-        Assert.Throws<DomainException>(() => RegistroCumplimiento.DeIntentoFallido(prueba, "Ausente", Limite));
+        Assert.Throws<DomainException>(() => RegistroCumplimiento.DeIntentoFallido(prueba, null, "Ausente", Limite));
     }
 
     [Fact]
     public void El_lector_toma_zona_ventana_repartidor_y_motivo_de_los_eventos()
     {
-        var (envioId, repartidor) = (Guid.NewGuid(), Guid.NewGuid());
+        var (envioId, usuario, repartidor) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
         var alta = LectorHechosEnvio.Leer(Mensaje(EnvioAdmitido.Tipo,
             new EnvioAdmitido(envioId, "ENV-71", Limite, ZonaId: Zona, EntregaComprometidaHasta: Limite)));
-        var entrega = LectorHechosEnvio.Leer(Mensaje(EnvioEntregado.Tipo, new EnvioEntregado(envioId, "ENV-71", Limite, repartidor)));
+        var entrega = LectorHechosEnvio.Leer(Mensaje(EnvioEntregado.Tipo,
+            new EnvioEntregado(envioId, "ENV-71", Limite, usuario, repartidor)));
         var fallo = LectorHechosEnvio.Leer(Mensaje(IntentoFallidoRegistrado.Tipo,
-            new IntentoFallidoRegistrado(envioId, "ENV-71", 1, "Ausente", "Reprogramado", Limite, null)));
+            new IntentoFallidoRegistrado(envioId, "ENV-71", 1, "Ausente", "Reprogramado", Limite, null, repartidor)));
 
         Assert.Equal(((Guid?)Zona, (DateTimeOffset?)Limite), (alta.ZonaId, alta.EntregaComprometidaHasta));
-        Assert.Equal(repartidor, entrega.ResponsableId);
-        Assert.Equal("Ausente", fallo.Motivo);
+        // El repartidor de la flota, no el usuario que registró la entrega.
+        Assert.Equal(repartidor, entrega.RepartidorId);
+        Assert.Equal(("Ausente", (Guid?)repartidor), (fallo.Motivo, fallo.RepartidorId));
     }
 
     [Fact]

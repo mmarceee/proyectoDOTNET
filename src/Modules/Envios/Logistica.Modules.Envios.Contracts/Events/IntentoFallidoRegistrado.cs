@@ -1,9 +1,11 @@
 namespace Logistica.Modules.Envios.Contracts.Events;
 
 // Evento de integración (ADR-0003, sección 2.2): un intento de entrega falló (CU-18, T7) y el envío quedó Reprogramado
-// (T9) o EnDevolucion (T10), según EstadoFinal. Lo espera Seguimiento, para avisar al destinatario y al comercio.
+// (T9) o EnDevolucion (T10), según EstadoFinal. Lo espera Seguimiento, para avisar al destinatario y al comercio, y
+// para los indicadores (CU-71), que usan el repartidor de la flota. RepartidorId es opcional: agregarlo no cambia la
+// versión (ADR-0003, sección 2.3).
 public sealed record IntentoFallidoRegistrado(Guid EnvioId, string Numero, int NumeroIntento, string Motivo,
-    string EstadoFinal, DateTimeOffset OcurridoEn, DateTimeOffset? ReintentoDesde)
+    string EstadoFinal, DateTimeOffset OcurridoEn, DateTimeOffset? ReintentoDesde, Guid? RepartidorId = null)
 {
     public const string Tipo = "IntentoFallidoRegistrado.v1";
 }

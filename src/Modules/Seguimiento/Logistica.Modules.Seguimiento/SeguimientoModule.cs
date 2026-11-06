@@ -30,6 +30,7 @@ using Logistica.Modules.Seguimiento.Application.Features.VerTablero;
 using Logistica.Modules.Ejecucion.Contracts.Events;
 using Logistica.Modules.Seguimiento.Presentation.Features.VerTablero;
 using Logistica.Modules.Seguimiento.Application.Features.RecalcularIndicadores;
+using Logistica.Modules.Seguimiento.Application.Features.ConsultarReportes;
 using Logistica.Modules.Seguimiento.Domain.Indicadores;
 using StackExchange.Redis;
 
@@ -126,6 +127,15 @@ public static class SeguimientoModule
             services.AddKeyedScoped<IConsumidorIntegracion, RegistrarCumplimiento>(RegistrarCumplimiento.Cola(tipo));
             services.AddSingleton(new SuscripcionIntegracion(RegistrarCumplimiento.Cola(tipo), tipo));
         }
+
+        // CU-72: con fábrica, como ConsultarTableroHandler, porque los contratos de Administración y Depósito sólo están
+        // en la API.
+        services.AddScoped<IReportesReader, ReportesReader>();
+        services.AddScoped(sp => new ConsultarReportesHandler(
+            sp.GetRequiredService<IReportesReader>(),
+            sp.GetRequiredService<Administracion.Contracts.IAdministracionModuleApi>(),
+            sp.GetRequiredService<Deposito.Contracts.IDepositoModuleApi>(),
+            sp.GetRequiredService<TimeProvider>()));
 
         // CU-62: correo al destinatario con la marca del operador. La dirección pública, el servidor SMTP y la clave
         // del token se validan al usarlos, así la API y el Worker arrancan aunque falten.

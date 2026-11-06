@@ -25,18 +25,22 @@ public sealed class RecalcularIndicadoresTests(PostgresApiFactory factory) : ICl
         await AltaAsync(operador, comercio, tarde, zona, Ahora.AddHours(-1));
 
         // La entrega y el intento fallido los publica el repartidor: el sobre no trae comercio.
-        var entrega = Mensaje(EnvioEntregado.Tipo, new EnvioEntregado(aTiempo, "ENV-71-A", Ahora, repartidor), operador, null);
+        var entrega = Mensaje(EnvioEntregado.Tipo,
+            new EnvioEntregado(aTiempo, "ENV-71-A", Ahora, Guid.NewGuid(), repartidor), operador, null);
         await ProcesarAsync(entrega);
         await ProcesarAsync(entrega);
         await ProcesarAsync(Mensaje(IntentoFallidoRegistrado.Tipo,
-            new IntentoFallidoRegistrado(tarde, "ENV-71-B", 1, "Ausente", "Reprogramado", Ahora, Ahora.AddDays(1)), operador, null));
-        await ProcesarAsync(Mensaje(EnvioEntregado.Tipo, new EnvioEntregado(tarde, "ENV-71-B", Ahora, repartidor), operador, null));
+            new IntentoFallidoRegistrado(tarde, "ENV-71-B", 1, "Ausente", "Reprogramado", Ahora, Ahora.AddDays(1), repartidor),
+            operador, null));
+        await ProcesarAsync(Mensaje(EnvioEntregado.Tipo,
+            new EnvioEntregado(tarde, "ENV-71-B", Ahora, Guid.NewGuid(), repartidor), operador, null));
 
         await using var scope = factory.Services.CreateAsyncScope();
         await using var db = Contexto(scope, operador);
         var registros = await db.RegistrosCumplimiento.AsNoTracking().ToListAsync();
-        Assert.Equal(3, registros.Count);
+        Assert.Equal(5, registros.Count);
         Assert.All(registros, r => Assert.Equal((comercio, (Guid?)zona), (r.ComercioId, r.ZonaId)));
+        Assert.Equal(2, registros.Count(r => r.Tipo == TipoRegistroCumplimiento.Alta));
 
         var entregas = registros.Where(r => r.Tipo == TipoRegistroCumplimiento.Entrega).ToList();
         Assert.Equal(new bool?[] { true }, entregas.Where(r => r.EnvioId == aTiempo).Select(r => r.ATiempo));
@@ -44,7 +48,7 @@ public sealed class RecalcularIndicadoresTests(PostgresApiFactory factory) : ICl
         Assert.All(entregas, r => Assert.Equal(repartidor, r.RepartidorId));
 
         var fallo = Assert.Single(registros, r => r.Tipo == TipoRegistroCumplimiento.IntentoFallido);
-        Assert.Equal((tarde, "Ausente"), (fallo.EnvioId, fallo.Motivo));
+        Assert.Equal((tarde, "Ausente", (Guid?)repartidor), (fallo.EnvioId, fallo.Motivo, fallo.RepartidorId));
     }
 
     [Fact]
