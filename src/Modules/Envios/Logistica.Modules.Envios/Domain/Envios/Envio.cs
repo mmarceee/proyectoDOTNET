@@ -9,6 +9,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     private readonly List<Bulto> _bultos = [];
     private readonly List<EventoEnvio> _eventos = [];
     private readonly List<IntentoEntrega> _intentos = [];
+    private readonly List<RecargoNuevaVisita> _recargos = [];
 
     public Guid OperadorId { get; private set; }
     public Guid ComercioId { get; private set; }
@@ -62,6 +63,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public IReadOnlyList<Bulto> Bultos => _bultos;
     public IReadOnlyList<EventoEnvio> Eventos => _eventos;
     public IReadOnlyList<IntentoEntrega> Intentos => _intentos;
+    // RF 33: los cargos de las visitas adicionales, para la liquidación (CU-32).
+    public IReadOnlyList<RecargoNuevaVisita> Recargos => _recargos;
 
     private Envio() { } // para EF Core
 
@@ -334,6 +337,11 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             ValidarPrueba(prueba, reglas);
         if (fallidos.FirstOrDefault(r => r.Motivo!.ExigeEvidencia && evidencia?.FotoArchivoId is null) is { } sinFoto)
             throw new DomainException($"El motivo {sinFoto.Motivo!.Codigo} exige una foto como evidencia.");
+
+        // RF 33: una visita adicional (el envío ya tuvo otra) se cobra una sola vez, salga bien o mal, si la versión de
+        // reglas del envío lo indica. No se cobra por bulto; un reenvío de la sincronización no llega hasta acá (CU-52).
+        if (_intentos.Count > 0 && reglas.Pendientes == PoliticaPendientes.NuevaVisitaConRecargo)
+            _recargos.Add(new RecargoNuevaVisita(this, reglas.RecargoNuevaVisita, ocurridoEn));
 
         var intentos = new List<IntentoEntrega>();
         if (entregados.Count > 0)

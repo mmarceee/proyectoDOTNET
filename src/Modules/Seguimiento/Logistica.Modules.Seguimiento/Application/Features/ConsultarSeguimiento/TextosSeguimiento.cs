@@ -31,6 +31,21 @@ internal static class TextosSeguimiento
         _ => estado,
     };
 
+    // RF 35: el título de la página. Con parte de los bultos entregados manda el resumen (RF 31): el estado de
+    // compatibilidad del envío dice "Entrega reprogramada" o "En devolución" por los pendientes, y no basta. En los
+    // demás casos, el estado dice más que el resumen ("En camino" en lugar de "En operación").
+    public static string Titulo(string estado, string resumen) =>
+        resumen == "EntregadoParcialmente" ? "Entregado parcialmente" : Estado(estado);
+
+    // RF 35: el avance de la entrega. El contador mide entregas efectivas sobre el total original (decisiones-entrega-
+    // parcial.md, sección 2). Con un solo bulto no se muestra: "1 de 1" no agrega nada al título.
+    public static string? Avance(int entregados, int total) =>
+        total <= 1 ? null : $"{entregados} de {total} bultos entregados";
+
+    // RF 35: cómo se nombra un bulto en la página pública (decisión del equipo del 07/11/2026). Sin el código de la
+    // etiqueta, que es el que se escanea en depósito y en la PWA.
+    public static string NombreBulto(int numero) => $"BTO {numero}";
+
     public static bool PuedeReprogramar(string estado) => Reprogramables.Contains(estado);
 
     // Requerimiento 5 de la ficha, sin estimar tiempos de viaje: con fecha y franja asignadas, esa fecha y franja. Sin

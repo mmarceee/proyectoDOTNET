@@ -18,4 +18,8 @@ internal sealed record EnvioDetalleDto(
     // RF 31: el resumen derivado de los bultos, si ya terminó y cuántos bultos se entregaron (el total es Bultos.Count).
     string Resumen = "Creado",
     bool Terminado = false,
-    int BultosEntregados = 0);
+    int BultosEntregados = 0,
+    // RF 33: los recargos de las visitas adicionales, con el monto registrado al realizarlas.
+    IReadOnlyList<RecargoDetalleDto>? Recargos = null);
+
+internal sealed record RecargoDetalleDto(DateTimeOffset OcurridoEn, decimal Monto);

@@ -161,6 +161,84 @@ public class VisitaPorBultoTests
             Reglas(), null, Ahora));
     }
 
+    // RF 33, recargo de la nueva visita (decisiones-entrega-parcial.md, sección 5): una vez por visita adicional
+    // realizada, aunque falle; nunca en la primera ni por cada bulto.
+    private static ReglasEntrega ConRecargo() =>
+        new(exigeFoto: false, exigeNombreYDocumento: false, maxIntentos: 3, TimeSpan.FromHours(24),
+            admiteEntregaParcial: true, pendientes: PoliticaPendientes.NuevaVisitaConRecargo, recargoNuevaVisita: 150);
+
+    [Fact]
+    public void La_primera_visita_no_tiene_recargo_aunque_la_politica_lo_indique()
+    {
+        var envio = EnvioEnTransito(2);
+        var b = envio.Bultos;
+
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id, Ausente)], Firma, null, null, Lugar, ConRecargo(), null, Ahora);
+
+        Assert.Empty(envio.Recargos);
+    }
+
+    [Fact]
+    public void La_nueva_visita_con_recargo_registra_un_cargo_con_el_monto_de_las_reglas()
+    {
+        var envio = EnvioEnTransito(2);
+        var b = envio.Bultos;
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id, Ausente)], Firma, null, null, Lugar, ConRecargo(), null, Ahora);
+        LlevarAEnTransito(envio, b[1]);
+
+        envio.RegistrarVisita([new(b[1].Id)], Firma, null, null, Lugar, ConRecargo(), null, Ahora.AddDays(1));
+
+        var recargo = Assert.Single(envio.Recargos);
+        Assert.Equal((150m, Ahora.AddDays(1), envio.OperadorId, envio.ComercioId),
+            (recargo.Monto, recargo.OcurridoEn, recargo.OperadorId, recargo.ComercioId));
+    }
+
+    // "Aunque falle": la visita se hizo y se cobra igual.
+    [Fact]
+    public void Una_nueva_visita_fallida_tambien_tiene_recargo()
+    {
+        var envio = EnvioEnTransito(2);
+        var b = envio.Bultos;
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id, Ausente)], Firma, null, null, Lugar, ConRecargo(), null, Ahora);
+        LlevarAEnTransito(envio, b[1]);
+
+        envio.RegistrarVisita([new(b[1].Id, Ausente)], null, null, null, Lugar, ConRecargo(), null, Ahora.AddDays(1));
+
+        Assert.Single(envio.Recargos);
+    }
+
+    [Fact]
+    public void Una_nueva_visita_sin_recargo_no_registra_cargos()
+    {
+        var envio = EnvioEnTransito(2);
+        var b = envio.Bultos;
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id, Ausente)], Firma, null, null, Lugar, Reglas(), null, Ahora);
+        LlevarAEnTransito(envio, b[1]);
+
+        envio.RegistrarVisita([new(b[1].Id)], Firma, null, null, Lugar, Reglas(), null, Ahora.AddDays(1));
+
+        Assert.Empty(envio.Recargos);
+    }
+
+    // No por cada bulto: dos pendientes en la misma visita son un solo cargo; cada visita adicional suma el suyo.
+    [Fact]
+    public void Se_cobra_una_vez_por_visita_y_no_por_cada_bulto()
+    {
+        var envio = EnvioEnTransito(3);
+        var b = envio.Bultos;
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id, Ausente), new(b[2].Id, Ausente)], Firma, null, null, Lugar,
+            ConRecargo(), null, Ahora);
+        LlevarAEnTransito(envio, b[1]);
+
+        envio.RegistrarVisita([new(b[1].Id, Ausente), new(b[2].Id, Ausente)], null, null, null, Lugar, ConRecargo(), null,
+            Ahora.AddDays(1));
+        Assert.Single(envio.Recargos);
+
+        LlevarAEnTransito(envio, b[1]);
+        envio.RegistrarVisita([new(b[1].Id), new(b[2].Id)], Firma, null, null, Lugar, ConRecargo(), null, Ahora.AddDays(2));
+        Assert.Equal(2, envio.Recargos.Count);
+    }
+
     private static Envio EnvioEnTransito(int bultos)
     {
         var envio = Envio.Crear(Guid.NewGuid(), Guid.NewGuid(), "ENV-1", new Destinatario("Ana Pérez", "099123456"),

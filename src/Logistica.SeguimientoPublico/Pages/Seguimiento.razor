@@ -36,6 +36,34 @@ else if (seguimiento is not null)
 
     <p>Hola, <strong>@seguimiento.NombreDePila</strong>. Tu envío <strong>@seguimiento.Numero</strong> va a @seguimiento.Localidad.</p>
 
+    @* RF 35: el avance de la entrega por bulto, sin identificadores internos (sólo "BTO 1", "BTO 2"...).
+       Con un solo bulto el servidor no manda avance y la sección no se muestra. *@
+    @if (seguimiento.Avance is not null && seguimiento.Bultos is { Count: > 0 })
+    {
+        var entregados = seguimiento.Bultos.Count(b => b.Estado == "Entregado");
+        var porcentaje = entregados * 100 / seguimiento.Bultos.Count;
+
+        <section class="card mb-3" aria-labelledby="avance-titulo">
+            <div class="card-body">
+                <h2 id="avance-titulo" class="h6">@seguimiento.Avance</h2>
+                <div class="progress mb-3" role="progressbar" aria-label="Avance de la entrega"
+                     aria-valuenow="@porcentaje" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar" style="width: @porcentaje%; background-color: @seguimiento.Marca.ColorPrimario"></div>
+                </div>
+                <ul class="list-group">
+                    @foreach (var bulto in seguimiento.Bultos)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">@bulto.Nombre</span>
+                            <span class="text-muted">@bulto.Estado</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </section>
+    }
+
+
     @if (seguimiento.VentanaEstimada is not null)
     {
         <div class="alert alert-light border" role="status">

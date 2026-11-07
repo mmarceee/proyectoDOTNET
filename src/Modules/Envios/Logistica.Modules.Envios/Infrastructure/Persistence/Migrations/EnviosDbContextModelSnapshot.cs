@@ -19,7 +19,7 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("envios")
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -421,6 +421,35 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.ToTable("IntentosEntrega", "envios");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Envios.Domain.Envios.RecargoNuevaVisita", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Monto")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset>("OcurridoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvioId");
+
+                    b.HasIndex("OperadorId", "ComercioId", "OcurridoEn");
+
+                    b.ToTable("RecargosNuevaVisita", "envios");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Envios.Domain.Incidencias.Incidencia", b =>
                 {
                     b.Property<Guid>("Id")
@@ -546,6 +575,15 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Navigation("Evidencia");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Envios.Domain.Envios.RecargoNuevaVisita", b =>
+                {
+                    b.HasOne("Logistica.Modules.Envios.Domain.Envios.Envio", null)
+                        .WithMany("Recargos")
+                        .HasForeignKey("EnvioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Logistica.Modules.Envios.Domain.Incidencias.Incidencia", b =>
                 {
                     b.HasOne("Logistica.Modules.Envios.Domain.Envios.Envio", null)
@@ -562,6 +600,8 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Navigation("Eventos");
 
                     b.Navigation("Intentos");
+
+                    b.Navigation("Recargos");
                 });
 #pragma warning restore 612, 618
         }

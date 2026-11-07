@@ -22,6 +22,14 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             .ToArray();
     }
 
+    // RF 33: los recargos tal como se registraron; Envíos no los recalcula.
+    public async Task<IReadOnlyList<RecargoLiquidable>> ListarRecargosAsync(Guid comercioId, DateTimeOffset desde,
+        DateTimeOffset hasta, CancellationToken ct)
+    {
+        var recargos = await envios.ListarRecargosAsync(comercioId, desde, hasta, ct);
+        return recargos.Select(r => new RecargoLiquidable(r.RecargoId, r.EnvioId, r.Numero, r.OcurridoEn, r.Monto)).ToArray();
+    }
+
     // CU-61: el seguimiento público pide las opciones y la reprogramación por este contrato.
     public Task<IReadOnlyList<OpcionReprogramacion>?> OpcionesReprogramacionAsync(Guid envioId, CancellationToken ct)
         => reprogramar.OpcionesAsync(envioId, ct);
@@ -175,7 +183,11 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             envio.Direccion.Localidad, envio.CreadoEn, envio.FechaEntregaProgramada, envio.FranjaHorariaId,
             envio.VersionReglasId,
             envio.Eventos.OrderBy(e => e.OcurridoEn)
-                .Select(e => new EventoSeguimiento(e.EstadoNuevo.ToString(), e.OcurridoEn)).ToList());
+                .Select(e => new EventoSeguimiento(e.EstadoNuevo.ToString(), e.OcurridoEn)).ToList(),
+            envio.Resumen.ToString(), envio.Terminado, envio.BultosEntregados,
+            // En el orden de la etiqueta (ENV-000001-2 antes que ENV-000001-10): la posición es el número del bulto.
+            envio.Bultos.OrderBy(b => b.Codigo.Length).ThenBy(b => b.Codigo, StringComparer.Ordinal)
+                .Select((b, i) => new BultoSeguimiento(i + 1, b.Estado.ToString())).ToList());
     }
 
     public Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct)

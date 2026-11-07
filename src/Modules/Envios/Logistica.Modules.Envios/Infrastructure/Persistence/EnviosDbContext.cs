@@ -14,6 +14,7 @@ internal sealed class EnviosDbContext(DbContextOptions<EnviosDbContext> options,
 
     public DbSet<Envio> Envios => Set<Envio>();
     public DbSet<IntentoEntrega> IntentosEntrega => Set<IntentoEntrega>();
+    public DbSet<RecargoNuevaVisita> RecargosNuevaVisita => Set<RecargoNuevaVisita>();
     public DbSet<Incidencia> Incidencias => Set<Incidencia>();
     public DbSet<Devolucion> Devoluciones => Set<Devolucion>();
     public DbSet<ArchivoEvidencia> ArchivosEvidencia => Set<ArchivoEvidencia>();
