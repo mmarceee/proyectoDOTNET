@@ -37,13 +37,17 @@ internal sealed class ConsultarSeguimientoHandler(
 
         return new SeguimientoPublicoResponse(
             envio.Numero,
-            TextosSeguimiento.Estado(envio.Estado),
+            TextosSeguimiento.Titulo(envio.Estado, envio.Resumen),
             envio.NombreDePila,
             envio.Localidad,
             TextosSeguimiento.Ventana(envio.Estado, envio.FechaEntregaProgramada, franja),
             TextosSeguimiento.PuedeReprogramar(envio.Estado),
             envio.Historial.Select(h => new HitoSeguimientoResponse(TextosSeguimiento.Estado(h.Estado), h.OcurridoEn)).ToList(),
             new MarcaSeguimientoResponse(marca.Nombre, marca.ColorPrimario, marca.ColorSecundario, marca.EmailContacto,
-                marca.TelefonoContacto));
+                marca.TelefonoContacto),
+            // RF 35: el avance y cada bulto con su estado, en las mismas palabras que el historial.
+            TextosSeguimiento.Avance(envio.BultosEntregados, envio.Bultos.Count),
+            envio.Bultos.Select(b => new BultoSeguimientoResponse(TextosSeguimiento.NombreBulto(b.Numero),
+                TextosSeguimiento.Estado(b.Estado))).ToList());
     }
 }

@@ -175,7 +175,11 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             envio.Direccion.Localidad, envio.CreadoEn, envio.FechaEntregaProgramada, envio.FranjaHorariaId,
             envio.VersionReglasId,
             envio.Eventos.OrderBy(e => e.OcurridoEn)
-                .Select(e => new EventoSeguimiento(e.EstadoNuevo.ToString(), e.OcurridoEn)).ToList());
+                .Select(e => new EventoSeguimiento(e.EstadoNuevo.ToString(), e.OcurridoEn)).ToList(),
+            envio.Resumen.ToString(), envio.Terminado, envio.BultosEntregados,
+            // En el orden de la etiqueta (ENV-000001-2 antes que ENV-000001-10): la posición es el número del bulto.
+            envio.Bultos.OrderBy(b => b.Codigo.Length).ThenBy(b => b.Codigo, StringComparer.Ordinal)
+                .Select((b, i) => new BultoSeguimiento(i + 1, b.Estado.ToString())).ToList());
     }
 
     public Task<Guid?> IdPorNumeroAsync(string numero, CancellationToken ct)

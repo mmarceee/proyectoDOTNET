@@ -148,6 +148,61 @@ public class SeguimientoPublicoTests(PostgresApiFactory factory) : IClassFixture
         Assert.Contains("No hay envíos para mostrar.", ajeno);
     }
 
+    // RF 35 de punta a punta: con dos de tres bultos entregados se ve el avance y cada bulto como "BTO N", sin el Id ni
+    // el código de etiqueta de ningún bulto (decisión del equipo del 07/11/2026).
+    [Fact]
+    public async Task Una_entrega_parcial_muestra_el_avance_y_los_bultos_sin_identificadores()
+    {
+        var envio = await EnvioEntregadoParcialmenteAsync(DatosIniciales.OperadorDemoId);
+        using var client = Cliente();
+
+        var respuesta = await client.GetAsync($"/api/seguimiento/{Token(DatosIniciales.OperadorDemoId, envio.Id)}");
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        var cuerpo = await respuesta.Content.ReadAsStringAsync();
+        var seguimiento = await respuesta.Content.ReadFromJsonAsync<SeguimientoPublicoResponse>();
+        Assert.Equal("Entregado parcialmente", seguimiento!.Estado);
+        Assert.Equal("2 de 3 bultos entregados", seguimiento.Avance);
+        Assert.Equal([("BTO 1", "Entregado"), ("BTO 2", "Entregado"), ("BTO 3", "Entrega reprogramada")],
+            seguimiento.Bultos.Select(b => (b.Nombre, b.Estado)));
+        Assert.All(envio.Bultos, b =>
+        {
+            Assert.DoesNotContain(b.Id.ToString(), cuerpo);
+            Assert.DoesNotContain(b.Codigo, cuerpo);
+        });
+    }
+
+    // RF 35: un envío de tres bultos en tránsito; en la visita se entregan dos y el tercero queda ausente, así que se
+    // reprograma (reglas con entrega parcial, RF 33). Se guarda con el operador indicado como inquilino.
+    private async Task<Envio> EnvioEntregadoParcialmenteAsync(Guid operadorId)
+    {
+        factory.CreateClient(); // arranca la API: migraciones y datos iniciales
+        var ahora = DateTimeOffset.UtcNow;
+        var envio = Envio.Crear(operadorId, DatosIniciales.ComercioDemoId, $"ENV-T-{Guid.NewGuid():N}".ToUpperInvariant(),
+            new Destinatario("Ana Pérez", "099123456"),
+            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "11300"),
+            Enumerable.Repeat(new DatosBulto(2, 30, 20, 10, 150), 3).ToList(), OrigenEvento.PortalComercio, null,
+            ahora.AddHours(-3));
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora.AddHours(-2));
+        envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora.AddHours(-2));
+        envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora.AddHours(-1));
+
+        var lugar = new Ubicacion(-34.9m, -56.16m);
+        var ausente = new MotivoNoEntrega(Guid.NewGuid(), "AUSENTE", reprogramable: true, exigeEvidencia: false);
+        var reglas = new ReglasEntrega(exigeFoto: false, exigeNombreYDocumento: false, maxIntentos: 3,
+            TimeSpan.FromHours(24), admiteEntregaParcial: true);
+        var b = envio.Bultos;
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id), new(b[2].Id, ausente)],
+            new PruebaEntrega(Guid.NewGuid(), null, null, null, lugar, ahora), null, null, lugar, reglas, null, ahora);
+
+        using var scope = factory.Services.CreateScope();
+        await using var db = ActivatorUtilities.CreateInstance<EnviosDbContext>(scope.ServiceProvider,
+            new InquilinoFijo(operadorId, null));
+        db.Envios.Add(envio);
+        await db.SaveChangesAsync();
+        return envio;
+    }
+
     private string Token(Guid operadorId, Guid envioId) =>
         factory.Services.GetRequiredService<TokenSeguimiento>().Generar(operadorId, envioId);
 
