@@ -931,6 +931,20 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Decisiones** | Latencia media, p95, p99 y tasa de errores de los últimos cinco minutos, calculados en la API y publicados como medidores, porque Aspire Dashboard dibuja los histogramas sólo con los percentiles 50, 90 y 99; se suma además la métrica estándar de ASP.NET Core. La profundidad de cola sale del recuento que devuelve cada `BasicGet`, sin consultas extra a RabbitMQ. Avisos fallidos: intentos rechazados y avisos que agotaron los reintentos. En Azure, el panel va en una Container App con un proxy Caddy, porque Container Apps expone un solo puerto, Aspire Dashboard 9.5 no admite el panel y el receptor OTLP en el mismo puerto (probado: falla al iniciar) y el proveedor azurerm 4.81 no tiene puertos adicionales. El panel pide token y el receptor, clave; la variable `observabilidad` lo apaga para ahorrar crédito. |
 | **Verificación** | El panel detrás del proxy se probó en Docker: el ingreso con token responde, OTLP sin clave da 401 y con clave lo acepta. `dotnet build`, `terraform validate` y `terraform fmt` pasan; en Docker, `VentanaLatenciasTests`, las pruebas de arquitectura y las de la caché. El despliegue en Azure lo ejecuta el responsable. |
 
+## **3.63 Etiquetas de envío y reimpresión en depósito (CU-15)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Lucas Ottonello |
+| **Fecha** | 07/11/2026 |
+| **¿Se usó IA?** | Sí, Codex. |
+| **Finalidad** | Analizar e implementar CU-15 según documentación y ADR, incorporando la reimpresión desde el Backoffice cuando un envío llega sin etiquetas. |
+| **Cómo se trabajó** | Lucas aportó el contexto de Cristian sobre RF 33/35 y pidió revisar qué existía, qué faltaba y cómo resolverlo. Después autorizó documentar e implementar la ampliación para depósito. Codex revisó la ficha, ADR y código, implementó el generador, endpoints, accesos del Portal/Backoffice, contrato de logo y pruebas. |
+| **Decisiones** | Slice en Envíos con puertos de Application y adaptadores de Infrastructure; QuestPDF y ZXing.Net, Code 128 vectorial, una página de 100 × 150 mm por bulto, nombre del operador si falta logo. Hasta 100 envíos y 200 etiquetas, lote completo o rechazo, códigos y total originales aun con entrega parcial. Reimpresión para operario, administrador y despachador; identificación previa de paquetes. Sin cambios de estado, cargos, eventos ni migraciones. [Alcance y decisión técnica](analisis-diseno/cu-15/README.md). |
+| **Correcciones durante la verificación** | Se corrigió el ajuste horizontal del SVG para códigos largos. Las fuentes generadas de evidencias locales antiguas en TestResults rompían la compilación: se excluyeron de Compile sin borrar archivos. |
+| **Verificación ejecutada** | Solución compilada sin errores ni advertencias; 453 pruebas unitarias, 56 de arquitectura y 15 de integración aprobadas. Siete pruebas del generador también pasan en Linux .NET 10. pypdf y Poppler comprobaron tamaño, cantidad, numeración y disposición; ZXingBrowser de la PWA reconoció tres muestras renderizadas en Chrome headless. El módulo de descarga conservó los bytes del PDF. |
+| **Pendiente** | Aceptación física con impresión a tamaño real, cámara del teléfono y lector del depósito. No se desplegó en Azure ni se afirma que la prueba de hardware esté realizada. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -977,3 +991,4 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.39 | 03/11/2026 | Entrada de la visita por bulto en la sincronización (3.60). | Ezequiel Marcenal |
 | 0.40 | 05/11/2026 | Entrada del cambio del entorno productivo a Azure (3.61) y corrección de la tabla de la entrada 3.59. | Ezequiel Marcenal |
 | 0.41 | 05/11/2026 | Entrada del tablero de observabilidad en producción (3.62). | Ezequiel Marcenal |
+| 0.42 | 07/11/2026 | CU-15: análisis, impresión individual/múltiple en el Portal, reimpresión en depósito, decisión técnica y verificación automatizada/visual (3.63). | Lucas Ottonello |

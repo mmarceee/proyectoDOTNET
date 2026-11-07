@@ -40,6 +40,11 @@ public static class EnviosModule
         services.AddScoped<IEnviosApiReader, EnviosApiReader>();
         services.AddScoped<ConsultarEnviosApiHandler>();
         services.AddScoped<IEnvioDetalleReader, EnvioDetalleReader>();
+        // Uso educativo del laboratorio: licencia Community de QuestPDF (decisión CU-15).
+        QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+        services.AddScoped<Application.Features.ImprimirEtiquetas.IEtiquetasReader, EtiquetasReader>();
+        services.AddScoped<Application.Features.ImprimirEtiquetas.IGeneradorEtiquetas, Infrastructure.Etiquetas.GeneradorEtiquetasPdf>();
+        services.AddScoped<Application.Features.ImprimirEtiquetas.ImprimirEtiquetasHandler>();
         services.AddScoped<ConsultarDetalleEnvioHandler>();
         services.AddScoped<IArchivoEvidenciaReader, ArchivoEvidenciaReader>();
         services.AddScoped<ConsultarEvidenciaHandler>();
@@ -67,6 +72,7 @@ public static class EnviosModule
         var group = endpoints.MapGroup("/api/envios").WithTags("Envios");
 
         CrearEnvioEndpoint.Map(group);
+        Presentation.Features.ImprimirEtiquetas.ImprimirEtiquetasEndpoints.Map(group);
         Presentation.Features.ConsultarEnvios.EnviosPortalEndpoints.Map(group);
         Presentation.Features.ImportarEnvios.ImportarEnviosEndpoint.Map(group);
         CancelarEnvioEndpoint.Map(group);

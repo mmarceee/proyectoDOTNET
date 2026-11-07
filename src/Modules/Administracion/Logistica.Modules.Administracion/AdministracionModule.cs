@@ -136,6 +136,8 @@ public static class AdministracionModule
         {
             opciones.AddPolicy(Politicas.Comercio, p => p.AddRequirements(new PoliticaDePerfil(Perfil.UsuarioComercio, ExigeOperador: true)));
             opciones.AddPolicy(Politicas.OperarioDeposito, p => p.AddRequirements(new PoliticaDePerfil(Perfil.OperarioDeposito)));
+            opciones.AddPolicy(Politicas.ImprimirEtiquetasDeposito, p => p.RequireAuthenticatedUser()
+                .RequireRole(nameof(Perfil.OperarioDeposito), nameof(Perfil.Administrador), nameof(Perfil.Despachador)));
             opciones.AddPolicy(Politicas.Administrador, p => p.AddRequirements(new PoliticaDePerfil(Perfil.Administrador)));
             opciones.AddPolicy(Politicas.Despachador, p => p.AddRequirements(new PoliticaDePerfil(Perfil.Despachador)));
             opciones.AddPolicy(Politicas.Repartidor, p => p.AddRequirements(

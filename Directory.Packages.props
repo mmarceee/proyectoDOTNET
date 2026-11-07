@@ -48,6 +48,11 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Etiquetas PDF (CU-15)">
+    <PackageVersion Include="QuestPDF" Version="2026.9.1" />
+    <PackageVersion Include="ZXing.Net" Version="0.16.11" />
+  </ItemGroup>
+
   <ItemGroup Label="Pruebas">
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />

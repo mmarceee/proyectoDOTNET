@@ -10,6 +10,9 @@ public static class Politicas
     // Recibe bultos en el depósito (CU-30).
     public const string OperarioDeposito = "OperarioDeposito";
 
+    // CU-15: reimpresión desde el detalle del Backoffice.
+    public const string ImprimirEtiquetasDeposito = "ImprimirEtiquetasDeposito";
+
     // Planifica y ajusta las entregas: por ejemplo, reprograma un envío no entregado (CU-19).
     public const string Despachador = "Despachador";
 
