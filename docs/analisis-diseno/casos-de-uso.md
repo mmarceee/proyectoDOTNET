@@ -131,7 +131,7 @@ Cada caso de uso se describe con los campos: caso de uso, descripción, pre-cond
 * El máximo de paradas por ruta se guarda en la versión de reglas, y Planificación lo toma de la versión que rige al confirmar la operación, con el mismo contrato `ObtenerReglasPlanificacionAsync` (acordado con Lucas Ottonello, 19/10/2026). Sigue contando paradas agrupadas, no envíos; el historial de cada ruta conserva la versión y el límite que usó. `VersionReglasPlanificacion` queda sin uso y se retira después.
 * Los motivos se validan contra el catálogo de la versión que guardó el envío; la PWA sigue enviando el Id del motivo. Los catálogos históricos se conservan y el código del motivo se mantiene estable entre versiones.
 
-**Ampliación por RF 33 (05/11/2026, Cristian Reyes).** Cada versión de reglas indica si el operador admite la entrega parcial, qué pasa con los bultos que no se entregaron (nueva visita sin recargo, con recargo o devolución) y el monto del recargo, que tiene que ser mayor que cero sólo con la política con recargo (A1). Las versiones publicadas antes del cambio no admiten la entrega parcial. Cada envío usa los valores de su versión. Quedan para después el cobro del recargo en la liquidación (CU-32) y la validación en la carga.
+**Ampliación por RF 33 (05/11/2026, Cristian Reyes).** Cada versión de reglas indica si el operador admite la entrega parcial, qué pasa con los bultos que no se entregaron (nueva visita sin recargo, con recargo o devolución) y el monto del recargo, que tiene que ser mayor que cero sólo con la política con recargo (A1). Las versiones publicadas antes del cambio no admiten la entrega parcial. Cada envío usa los valores de su versión. Con recargo, cada visita adicional del envío registra el monto una sola vez, aunque falle; la liquidación lo lee por contrato. Quedan para después su cobro en la liquidación (CU-32) y la validación en la carga.
 
 ### **CU-07 · Gestionar la identidad visual**
 
@@ -861,3 +861,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 1.9 | 03/11/2026 | CU-52: visita por bulto del lado del servidor (RF 32) y traducción de las operaciones anteriores. | Ezequiel Marcenal |
 | 2.0 | 05/11/2026 | CU-06: ampliación por RF 33 (entrega parcial, política para los bultos pendientes y recargo de la nueva visita). | Cristian Reyes |
 | 2.1 | 07/11/2026 | CU-60: ampliación por RF 35 (avance de la entrega por bulto); se resume la ampliación de RF 33 en CU-06. | Cristian Reyes |
+| 2.2 | 07/11/2026 | CU-06: registro del recargo de cada visita adicional (RF 33). | Cristian Reyes |

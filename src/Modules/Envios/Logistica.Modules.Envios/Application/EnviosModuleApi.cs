@@ -22,6 +22,14 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             .ToArray();
     }
 
+    // RF 33: los recargos tal como se registraron; Envíos no los recalcula.
+    public async Task<IReadOnlyList<RecargoLiquidable>> ListarRecargosAsync(Guid comercioId, DateTimeOffset desde,
+        DateTimeOffset hasta, CancellationToken ct)
+    {
+        var recargos = await envios.ListarRecargosAsync(comercioId, desde, hasta, ct);
+        return recargos.Select(r => new RecargoLiquidable(r.RecargoId, r.EnvioId, r.Numero, r.OcurridoEn, r.Monto)).ToArray();
+    }
+
     // CU-61: el seguimiento público pide las opciones y la reprogramación por este contrato.
     public Task<IReadOnlyList<OpcionReprogramacion>?> OpcionesReprogramacionAsync(Guid envioId, CancellationToken ct)
         => reprogramar.OpcionesAsync(envioId, ct);

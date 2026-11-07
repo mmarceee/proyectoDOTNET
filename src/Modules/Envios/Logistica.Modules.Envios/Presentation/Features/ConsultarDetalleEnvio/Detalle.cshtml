@@ -46,6 +46,17 @@
             <div class="col-12 col-sm-4"><dt class="text-muted fw-normal">Peso declarado total</dt><dd class="mb-0 fs-5 fw-semibold">@envio.Bultos.Sum(b => b.PesoKg).ToString("0.##") kg</dd></div>
             <div class="col-12 col-sm-4"><dt class="text-muted fw-normal">Tarifa total</dt><dd class="mb-0 fs-5 fw-semibold">@envio.MontoTarifa.ToString("0.00")</dd></div>
         </dl>
+        @* RF 33: un recargo por cada visita adicional, con el monto registrado al realizarla (lo cobra la liquidación). *@
+        @if (envio.Recargos is { Count: > 0 } recargos)
+        {
+            <h3 class="h6 mt-4 mb-2">Recargos por nueva visita</h3>
+            <ul class="list-unstyled mb-0">
+                @foreach (var recargo in recargos)
+                {
+                    <li>@Model.MostrarFecha(recargo.OcurridoEn) · $ @recargo.Monto.ToString("0.00")</li>
+                }
+            </ul>
+        }
     </div>
 </section>
 
