@@ -3,7 +3,7 @@ using Npgsql;
 namespace Logistica.IntegrationTests.Identidad;
 
 // La cookie de sesión se cifra con las claves de Data Protection, que se guardan en PostgreSQL y no en el disco del
-// contenedor: App Platform lo descarta en cada despliegue y todos perderían la sesión (ClavesProteccionDbContext).
+// contenedor: Container Apps lo descarta en cada despliegue y todos perderían la sesión (ClavesProteccionDbContext).
 public class ClavesProteccionTests(PostgresApiFactory factory) : IClassFixture<PostgresApiFactory>
 {
     [Fact]

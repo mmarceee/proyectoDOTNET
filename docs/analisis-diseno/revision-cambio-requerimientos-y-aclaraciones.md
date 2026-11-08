@@ -175,13 +175,13 @@ El reparto es una propuesta basada en las áreas actuales, no una asignación ya
 ## 9. Evidencia pendiente para cerrar la aclaración
 
 - [x] Ejecutar dos APIs completas con PostgreSQL y Valkey compartidos: precalentar la tarifa en ambas, publicar desde una y consultar inmediatamente desde la otra. Usar un tarifario/base de prueba (`TarifarioEntreDosApisTests`, sección 11).
-- [ ] Verificar en Aspire los aciertos, fallos y errores separados por `seguimiento`, `tarifario` y `reglas`.
-- [ ] Interrumpir un Valkey de prueba que estaba activo, consultar seguimiento y calcular tarifa contra la base, recuperarlo y comprobar frescura. No detener servicios compartidos sin coordinar con el equipo.
+- [x] Verificar en Aspire los aciertos, fallos y errores separados por `seguimiento`, `tarifario` y `reglas` (sección 11.1).
+- [ ] Interrumpir un Valkey de prueba que estaba activo, consultar seguimiento y calcular tarifa contra la base, recuperarlo y comprobar frescura. No detener servicios compartidos sin coordinar con el equipo. **Parcial:** la caída y la recuperación están cubiertas por `ValkeyCaidoTests` y por la prueba manual de la sección 11.1; falta comprobar la frescura después de una invalidación fallida, que depende de la duración del puntero.
 - [ ] Probar el instante en que comienza una versión programada con un reloj controlado.
 - [ ] Resolver o acotar explícitamente la carrera de repoblación de caché y el dato viejo tras una invalidación fallida.
 - [x] Incorporar el evento de recepción y registrarlo como evento que invalida seguimiento (resuelto por los cambios integrados desde `main`).
 - [ ] Verificar el recorrido de recepción e invalidación completo a través de Outbox, RabbitMQ y Worker.
-- [ ] Revisar la configuración productiva para impedir una sustitución accidental por memoria local.
+- [x] Revisar la configuración productiva para impedir una sustitución accidental por memoria local (sección 11.1).
 - [ ] Actualizar el ADR-0006 con evidencias, límites reales de latencia y resultados de estos escenarios.
 - [ ] Confirmar que las banderas continúan fuera del conjunto de opcionales elegido o planificarlas con todas las condiciones de la aclaración.
 
@@ -227,3 +227,11 @@ Responsable: Ezequiel Marcenal (pruebas), dentro del trabajo conjunto con Cristi
 **Alcance:** son dos hosts dentro del mismo proceso de pruebas, no dos contenedores. Comparten sólo PostgreSQL y Valkey, que es lo que importa para el escenario; no se ejecutó con dos réplicas en Docker Compose. No cubre la carrera entre lectura y publicación ni la invalidación fallida (sección 3.2), que se acotan con la duración del puntero.
 
 **Resultado:** con `bash scripts/test-en-docker.sh Tarifario`, 6 pruebas de integración aprobadas (las cuatro de `ConfigurarTarifarioTests`, la nueva y `DetalleEnvioAmpliadoTests`). Los ayudantes de la pantalla del tarifario pasaron de `ConfigurarTarifarioTests` a [`PaginaTarifario`](../../tests/Logistica.IntegrationTests/Administracion/PaginaTarifario.cs), compartidos por las dos clases.
+
+### 11.1 Métricas en Aspire, caída manual de Valkey y configuración productiva
+
+**Métricas.** Con `docker compose up` se generó tráfico real: tres cálculos con el simulador del tarifario, tres altas de envío desde el Portal (leen tarifario y reglas) y consultas repetidas a `/api/seguimiento/{token}`, con tokens tomados de los correos de Mailpit. En Aspire Dashboard → Métricas → `logistica-api` → `Logistica.Cache` se vieron `logistica.cache.aciertos` (30) y `logistica.cache.fallos` (6), con la etiqueta `cache` en sus tres valores (`reglas`, `seguimiento`, `tarifario`) para filtrar cada grupo.
+
+**Caída manual.** Con el entorno local, sin servicios compartidos, se detuvo Valkey (`docker compose stop valkey`) y se consultó tres veces el seguimiento: las tres respondieron 200, en 28, 7 y 6 ms, y `logistica.cache.errores` sumó 3 con `cache = seguimiento`. Al volver a levantar Valkey, las consultas siguieron respondiendo sin reiniciar la API. El contador `errores` sólo aparece en Aspire después de la primera falla.
+
+**Configuración productiva.** `ConexionesObligatorias` impide arrancar la API y el Worker en `Production` sin `ConnectionStrings:Valkey` (prueba `ConfiguracionProduccionTests`), y Terraform la define en `main.tf`. Así, la memoria del proceso queda sólo para desarrollo y pruebas. Un Valkey configurado pero caído sigue el camino de la base (`ValkeyCaidoTests` y la prueba manual anterior). En Azure, Valkey corre sin volumen: si se reinicia el contenedor, arranca vacío. En Docker Compose y Testcontainers, en cambio, la imagen guarda su volcado al detenerse, así que en esos entornos un puntero viejo puede sobrevivir a un reinicio hasta que vence.
