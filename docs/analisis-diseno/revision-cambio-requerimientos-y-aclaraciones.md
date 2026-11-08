@@ -40,7 +40,7 @@ En esta tabla, «verificado» se limita al escenario efectivamente ejecutado. «
 
 | Criterio del documento | Implementación encontrada | Evidencia ejecutada y conclusión |
 | --- | --- | --- |
-| Caché distribuido, también para equipos de tres | `AddStackExchangeRedisCache` con Valkey cuando existe cadena de conexión; Compose la configura para API y Worker. No hay un nivel local adicional en ese camino. | Aprobó la prueba con dos proveedores independientes sobre Valkey real. **Verificado a nivel de infraestructura; pendiente la demostración con dos APIs completas.** |
+| Caché distribuido, también para equipos de tres | `AddStackExchangeRedisCache` con Valkey cuando existe cadena de conexión; Compose la configura para API y Worker. No hay un nivel local adicional en ese camino. | Aprobó la prueba con dos proveedores independientes sobre Valkey real. **Verificado a nivel de infraestructura y, desde el 08/11, con dos APIs completas (sección 11).** |
 | Dos casos con distintos perfiles de acceso | Seguimiento: expiración absoluta de 1 minuto. Tarifario: puntero vigente de 10 minutos y versiones de 24 horas. Las reglas usan también caché versionado. | Aprobaron las pruebas de seguimiento, tarifario y reglas. **Implementado; las pruebas de negocio ejecutadas usan caché en memoria.** |
 | Claves separadas por operador | La pieza común construye `{nombre}:{OperadorId}:{clave}`, con prefijo del proveedor `logistica:`. Sin operador lanza `TenantMismatchException`. | Aprobaron aislamiento por operador y rechazo sin tenant. La prueba de aislamiento de la pieza común usa memoria compartida; las funcionales usan PostgreSQL. **Verificado en esos escenarios.** |
 | Invalidar seguimiento al procesar eventos | El Worker registra un consumidor por tipo de evento; fija el tenant del mensaje antes de resolver el consumidor. Este elimina la clave del envío. | Aprobó una prueba que invoca directamente el consumidor. **Verificado el consumidor; esta prueba no recorre Outbox, RabbitMQ y Worker como procesos separados.** |
@@ -48,7 +48,7 @@ En esta tabla, «verificado» se limita al escenario efectivamente ejecutado. «
 | Tarifas versionadas e invalidación al publicar | Se guarda la publicación y después se elimina el puntero `vigente`. Las versiones publicadas no admiten editar reglas. El puntero incluye `ValidoHasta` para próximas vigencias. | Aprobó el recorrido de $150/v1 a $175/v2 y el caso de publicación futura que mantiene la versión anterior. **Verificado con memoria; falta verificar el cruce del instante de vigencia y el recorrido distribuido completo.** |
 | Métricas por caso de uso en el tablero | Contadores `logistica.cache.aciertos`, `fallos` y `errores`, etiqueta `cache`. API y Worker registran el medidor y exportan por OTLP cuando está configurado. | Un `MeterListener` verificó valores de contadores. **Instrumentación comprobada; exportación y consulta en Aspire no verificadas en esta ejecución.** |
 | Continuar contra la base si cae el caché | La pieza común captura errores de caché y ejecuta la función fuente. No revierte publicaciones si falla invalidar. | Aprobaron la caché simulada caída y Valkey inaccesible en `127.0.0.1:1`. **Verificado el fallback de infraestructura; no se detuvo un Valkey activo durante un flujo HTTP contra PostgreSQL.** |
-| Cambio de tarifa visible inmediatamente en otra API | Valkey compartido y borrado del puntero permiten el escenario secuencial. No hay caché local en ese camino. | Se probaron por separado distribución e invalidación funcional. **No se ejecutó el escenario exacto con dos APIs y una publicación HTTP.** |
+| Cambio de tarifa visible inmediatamente en otra API | Valkey compartido y borrado del puntero permiten el escenario secuencial. No hay caché local en ese camino. | Se probaron por separado distribución e invalidación funcional. **Verificado el 08/11 con dos APIs y una publicación HTTP desde el Backoffice (sección 11).** |
 | Decisión fundamentada de expiración e invalidación | El ADR-0006 describe perfiles, claves, TTL, fallback, métricas y carreras conocidas. | **Documentado.** Debe actualizarse con el alcance preciso de esta ejecución y los pendientes, sin presentar pruebas de memoria como demostración distribuida completa. |
 
 ### 3.1 Archivos principales que respaldan el contraste
@@ -174,7 +174,7 @@ El reparto es una propuesta basada en las áreas actuales, no una asignación ya
 
 ## 9. Evidencia pendiente para cerrar la aclaración
 
-- [ ] Ejecutar dos APIs completas con PostgreSQL y Valkey compartidos: precalentar la tarifa en ambas, publicar desde una y consultar inmediatamente desde la otra. Usar un tarifario/base de prueba.
+- [x] Ejecutar dos APIs completas con PostgreSQL y Valkey compartidos: precalentar la tarifa en ambas, publicar desde una y consultar inmediatamente desde la otra. Usar un tarifario/base de prueba (`TarifarioEntreDosApisTests`, sección 11).
 - [ ] Verificar en Aspire los aciertos, fallos y errores separados por `seguimiento`, `tarifario` y `reglas`.
 - [ ] Interrumpir un Valkey de prueba que estaba activo, consultar seguimiento y calcular tarifa contra la base, recuperarlo y comprobar frescura. No detener servicios compartidos sin coordinar con el equipo.
 - [ ] Probar el instante en que comienza una versión programada con un reloj controlado.
@@ -211,3 +211,19 @@ dotnet test tests/Logistica.IntegrationTests/Logistica.IntegrationTests.csproj -
 ```
 
 Evidencia local: `TestResults/revision-aclaraciones/revision-post-main.trx`. No se ejecutaron en esta segunda revisión todas las pruebas de devoluciones, reprogramación pública o mensajes fallidos; sus cambios se inspeccionaron para determinar el impacto en el informe.
+
+## 11. Avance del 08/11/2026: dos APIs con Valkey compartido
+
+Responsable: Ezequiel Marcenal (pruebas), dentro del trabajo conjunto con Cristian Reyes sobre la aclaración de caché.
+
+**Prueba agregada:** [`TarifarioEntreDosApisTests`](../../tests/Logistica.IntegrationTests/Administracion/TarifarioEntreDosApisTests.cs). Levanta dos APIs completas (dos hosts de `WebApplicationFactory`, cada uno con su contenedor de servicios y su conexión a Valkey) sobre la misma base PostgreSQL y el mismo Valkey de Testcontainers. Cada API tiene su propia sesión del administrador de Demo. El recorrido:
+
+1. Las dos calculan con el simulador del tarifario: $150 con la versión 1, que queda en la caché.
+2. Desde la API A se arma un borrador, se cambia Estándar de 0 a 5 kg a $175 y se publica por el Backoffice.
+3. La API B, sin esperas, calcula $175 con la versión 2.
+
+**Comprobación de que la prueba distingue:** con la API B configurada sin Valkey (la memoria de su proceso), la prueba falla en el paso 3: la API B sigue mostrando el precio anterior porque conserva su propio puntero. El cambio se revirtió después de esa corrida. Así, el resultado depende del Valkey compartido y del borrado del puntero al publicar, no de una coincidencia.
+
+**Alcance:** son dos hosts dentro del mismo proceso de pruebas, no dos contenedores. Comparten sólo PostgreSQL y Valkey, que es lo que importa para el escenario; no se ejecutó con dos réplicas en Docker Compose. No cubre la carrera entre lectura y publicación ni la invalidación fallida (sección 3.2), que se acotan con la duración del puntero.
+
+**Resultado:** con `bash scripts/test-en-docker.sh Tarifario`, 6 pruebas de integración aprobadas (las cuatro de `ConfigurarTarifarioTests`, la nueva y `DetalleEnvioAmpliadoTests`). Los ayudantes de la pantalla del tarifario pasaron de `ConfigurarTarifarioTests` a [`PaginaTarifario`](../../tests/Logistica.IntegrationTests/Administracion/PaginaTarifario.cs), compartidos por las dos clases.
