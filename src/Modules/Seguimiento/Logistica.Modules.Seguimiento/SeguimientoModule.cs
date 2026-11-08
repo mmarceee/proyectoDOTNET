@@ -29,6 +29,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Logistica.Modules.Seguimiento.Application.Features.VerTablero;
 using Logistica.Modules.Ejecucion.Contracts.Events;
 using Logistica.Modules.Seguimiento.Presentation.Features.VerTablero;
+using Logistica.Modules.Seguimiento.Application.Features.RecalcularIndicadores;
+using Logistica.Modules.Seguimiento.Application.Features.ConsultarReportes;
+using Logistica.Modules.Seguimiento.Domain.Indicadores;
 using StackExchange.Redis;
 
 namespace Logistica.Modules.Seguimiento;
@@ -86,6 +89,10 @@ public static class SeguimientoModule
             signalR.AddStackExchangeRedis(valkey, opciones =>
             {
                 opciones.Configuration.AbortOnConnectFail = false; // arranca aunque Valkey no esté, como la caché
+                // Con Valkey caído, cada aviso falla enseguida en lugar de esperar 5 s en la cola del cliente: la
+                // sincronización de la PWA, que avisa cada posición, no se demora (pruebas de resiliencia, 7.4).
+                opciones.Configuration.BacklogPolicy = BacklogPolicy.FailFast;
+                opciones.Configuration.AsyncTimeout = 1000;
                 opciones.Configuration.ChannelPrefix = RedisChannel.Literal("logistica-tablero");
             });
         }
@@ -115,6 +122,24 @@ public static class SeguimientoModule
         }
         services.AddKeyedScoped<IConsumidorIntegracion, EntregarAviso>(EntregarAviso.Cola);
         services.AddSingleton(new SuscripcionIntegracion(EntregarAviso.Cola, AvisoPendiente.Tipo));
+
+        // CU-71: la tabla de lectura de los indicadores de cumplimiento; una cola por evento de Envíos.
+        services.AddScoped<IRegistrosCumplimientoRepository, RegistrosCumplimientoRepository>();
+        services.AddScoped<RegistrarCumplimientoHandler>();
+        foreach (var tipo in RegistrarCumplimiento.Tipos)
+        {
+            services.AddKeyedScoped<IConsumidorIntegracion, RegistrarCumplimiento>(RegistrarCumplimiento.Cola(tipo));
+            services.AddSingleton(new SuscripcionIntegracion(RegistrarCumplimiento.Cola(tipo), tipo));
+        }
+
+        // CU-72: con fábrica, como ConsultarTableroHandler, porque los contratos de Administración y Depósito sólo están
+        // en la API.
+        services.AddScoped<IReportesReader, ReportesReader>();
+        services.AddScoped(sp => new ConsultarReportesHandler(
+            sp.GetRequiredService<IReportesReader>(),
+            sp.GetRequiredService<Administracion.Contracts.IAdministracionModuleApi>(),
+            sp.GetRequiredService<Deposito.Contracts.IDepositoModuleApi>(),
+            sp.GetRequiredService<TimeProvider>()));
 
         // CU-62: correo al destinatario con la marca del operador. La dirección pública, el servidor SMTP y la clave
         // del token se validan al usarlos, así la API y el Worker arrancan aunque falten.

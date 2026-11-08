@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptado como decisión de diseño. Implementación y evaluación retrospectiva pendientes.** |
-| Versión y fecha | 1.3 · 03/11/2026 |
+| Versión y fecha | 1.4 · 06/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | `586f630` (CU-42) |
@@ -38,7 +38,7 @@ Los casos de uso continúan como vertical slices en el módulo propietario (ADR-
 
 Una visita pertenece a un envío dentro de una parada y contiene resultados por bulto. Se conserva OperacionId y se extiende ADR-0004 con atomicidad por visita de un envío: resultados, evidencia aplicada, estado derivado, registro de operación y Outbox se confirman juntos o se rechazan juntos. Otros envíos del lote continúan. Un rechazo conserva la evidencia y el diagnóstico; un reenvío devuelve el resultado registrado.
 
-Los cambios que alimentan al Worker, avisos y proyecciones durables se registran por Outbox (ADR-0003). El consumidor mantiene idempotencia. Un cambio de bulto puede generar un evento aunque el resumen del envío no cambie. Los DTOs HTTP se amplían en Http.Contracts; la compatibilidad de operaciones offline antiguas debe especificarse antes de activar el formato nuevo.
+Los cambios que alimentan al Worker, avisos y proyecciones durables se registran por Outbox (ADR-0003). El consumidor mantiene idempotencia. Un cambio de bulto puede generar un evento aunque el resumen del envío no cambie. Los DTOs HTTP se amplían en Http.Contracts; las operaciones offline antiguas se traducen a una visita con el mismo resultado para todos los bultos del envío (ADR-0004, sección 2.11).
 
 ### 2.3 Configuración, aislamiento y compatibilidad
 
@@ -108,7 +108,7 @@ Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de 
 | Evidencia requerida | Qué debe comprobar | Estado al 02/11/2026 |
 | --- | --- | --- |
 | Pruebas de dominio | Tablas declarativas, pares prohibidos, combinaciones alcanzables, resumen, Terminado y ausencia de eventos intermedios ficticios. | Pendiente. |
-| Atomicidad y concurrencia | Fallo de una línea revierte toda la visita; otros envíos continúan; dos operaciones no resuelven dos veces el mismo bulto. | Política y pruebas definidas en el ADR-0004 (sección 2.11 y pruebas 10 a 13, 03/11); implementación pendiente. |
+| Atomicidad y concurrencia | Fallo de una línea revierte toda la visita; otros envíos continúan; dos operaciones no resuelven dos veces el mismo bulto. | Política y pruebas en el ADR-0004 (sección 2.11 y pruebas 10 a 13). Servidor implementado el 03/11: se evalúan todos los bultos antes de aplicar; una visita rechazada no cambia bultos, resumen ni Outbox; la visita de otro envío del lote se aplica, y un bulto ya resuelto es conflicto (`VisitaPorBultoTests` y `DiagnosticoVisitaTests`). Falta la PWA nueva. |
 | Reenvío idempotente | Un OperacionId repetido no duplica evidencia, intentos, eventos ni cargos; el consumidor no duplica avisos. | Pendiente para parcial. |
 | Rutas y depósito | Sólo pendientes elegibles se reasignan; no hay doble reserva activa por bulto; recepción y rendición preservan custodia y estados. | Pendiente. |
 | Aislamiento | IDs/evidencia ajenos no acceden ni escriben entre operadores o comercios. | Pendiente sobre los contratos nuevos. |
@@ -141,3 +141,4 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | 1.1 | 02/11/2026 | Criterio de inicio de ejecución: recepción del primer bulto. | Ezequiel Marcenal |
 | 1.2 | 03/11/2026 | Sección 4.3: riesgo de bultos entregados sin aplicar por la atomicidad por visita; sección 4.4: la atomicidad queda especificada en el ADR-0004, versión 1.4. | Ezequiel Marcenal |
 | 1.3 | 03/11/2026 | Sección 4.3: pendientes 1, 4 y 5 de la decisión resueltos; sección 4.4: estado de la migración y de los formatos antiguos. | Ezequiel Marcenal |
+| 1.4 | 06/11/2026 | Sección 4.4: la atomicidad por visita queda implementada en el servidor, con sus pruebas. Sección 2.2: las operaciones offline antiguas ya están especificadas en el ADR-0004. | Ezequiel Marcenal |

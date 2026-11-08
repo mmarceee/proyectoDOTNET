@@ -11,6 +11,9 @@ internal interface ILiquidacionRepository
     // CU-33: las emitidas y pagadas del comercio, sin los borradores, de la más reciente a la más vieja.
     Task<IReadOnlyList<Liquidacion>> ListarEmitidasAsync(Guid comercioId, CancellationToken ct);
 
+    // CU-72: las emitidas y pagadas cuyo período se superpone con [desde, hasta], con sus líneas.
+    Task<IReadOnlyList<Liquidacion>> ListarEmitidasEnPeriodoAsync(DateOnly desde, DateOnly hasta, CancellationToken ct);
+
     // Con sus líneas.
     Task<Liquidacion?> ObtenerAsync(Guid id, CancellationToken ct);
 

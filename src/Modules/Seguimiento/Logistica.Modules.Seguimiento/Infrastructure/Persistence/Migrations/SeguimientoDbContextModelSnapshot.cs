@@ -18,7 +18,7 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("seguimiento")
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -162,6 +162,12 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
+                    b.Property<DateTimeOffset?>("EntregaComprometidaHasta")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EsPrueba")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("NombreDestinatario")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -172,6 +178,9 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ZonaId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -254,6 +263,48 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.HasIndex("OperadorId", "ComercioId", "Activa");
 
                     b.ToTable("suscripciones_aviso", "seguimiento");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Indicadores.RegistroCumplimiento", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool?>("ATiempo")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Motivo")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("OcurridoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RepartidorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("ZonaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Tipo", "OcurridoEn");
+
+                    b.ToTable("registros_cumplimiento", "seguimiento");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Notificaciones.IdentidadOperador", b =>

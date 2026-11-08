@@ -1,10 +1,9 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Logistica.IntegrationTests;
 
-public class HealthCheckTests(WebApplicationFactory<Program> factory)
-    : IClassFixture<WebApplicationFactory<Program>>
+// /health chequea PostgreSQL (PostgresHealthCheck). La base caída se prueba en Resiliencia/PostgresCaidoTests.
+public class HealthCheckTests(PostgresApiFactory factory) : IClassFixture<PostgresApiFactory>
 {
     [Fact]
     public async Task La_api_responde_en_health()
@@ -14,5 +13,6 @@ public class HealthCheckTests(WebApplicationFactory<Program> factory)
         var response = await client.GetAsync("/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
     }
 }

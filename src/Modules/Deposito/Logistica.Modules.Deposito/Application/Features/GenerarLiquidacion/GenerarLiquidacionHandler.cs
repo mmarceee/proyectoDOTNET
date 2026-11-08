@@ -21,6 +21,26 @@ internal sealed class GenerarLiquidacionHandler(IEnviosModuleApi envios, IAdmini
 
     public Task<Liquidacion?> ObtenerAsync(Guid id, CancellationToken ct) => liquidaciones.ObtenerAsync(id, ct);
 
+    // CU-70, paso 4: la liquidación del período de cada comercio del operador, generada por el cierre diario. Saltea los
+    // comercios sin envíos sin liquidar (A1), así repetirlo no genera otra liquidación con los mismos envíos (A2).
+    public async Task<int> GenerarDelPeriodoAsync(DateOnly desde, DateOnly hasta, CancellationToken ct)
+    {
+        var generadas = 0;
+        foreach (var comercio in await administracion.ConsultarComerciosAsync(ct))
+        {
+            try
+            {
+                await GenerarAsync(new GenerarLiquidacionCommand(comercio.ComercioId, desde, hasta), ct);
+                generadas++;
+            }
+            catch (DomainException)
+            {
+                // A1: el comercio no tiene envíos sin liquidar en el período.
+            }
+        }
+        return generadas;
+    }
+
     public async Task<Liquidacion> GenerarAsync(GenerarLiquidacionCommand command, CancellationToken ct)
     {
         var operadorId = tenant.OperadorId

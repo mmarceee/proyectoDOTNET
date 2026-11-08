@@ -53,6 +53,9 @@ internal interface IEnvioRepository
     // CU-04: los envíos con entrega pendiente en alguna de estas franjas, pero sin fecha propia.
     Task<IReadOnlyList<Guid>> SinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct);
 
+    // CU-70: los envíos Reprogramado con sus eventos, sólo para leer (para saber desde cuándo lo están).
+    Task<IReadOnlyList<Envio>> ListarReprogramadosAsync(CancellationToken ct);
+
     // CU-60: el envío con sus eventos, sólo para leer.
     Task<Envio?> ObtenerConEventosAsync(Guid id, CancellationToken ct);
 

@@ -13,7 +13,8 @@ public sealed record BultoParaVisita(Guid BultoId, string Codigo, string Estado)
 // respalda los bultos entregados; la foto acompaña la entrega o el intento.
 public sealed record VisitaARegistrar(Guid EnvioId, DateTimeOffset OcurridoEn, decimal Latitud, decimal Longitud,
     IReadOnlyList<ResultadoBultoARegistrar> Resultados, ArchivoRecibido? Firma, ArchivoRecibido? Foto,
-    string? NombreReceptor, string? DocumentoReceptor, string? Observaciones, Guid? ResponsableId);
+    string? NombreReceptor, string? DocumentoReceptor, string? Observaciones, Guid? ResponsableId,
+    Guid? RepartidorId = null);
 public sealed record ResultadoBultoARegistrar(Guid BultoId, Guid? MotivoId);
 
 // Cómo terminó el registro en Envíos. Conflicto: el estado actual del envío no admite la operación (ADR-0004,

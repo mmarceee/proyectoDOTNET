@@ -238,7 +238,7 @@ internal sealed class ProcesarOperacionHandler(
         return new VisitaARegistrar(envioId, datos.OcurridoEn, latitud, longitud,
             visita.Bultos.Select(b => new ResultadoBultoARegistrar(porCodigo[b.CodigoBulto.Trim()], b.MotivoId)).ToList(),
             visita.Firma is null ? null : Archivo(visita.Firma), visita.Foto is null ? null : Archivo(visita.Foto),
-            visita.NombreReceptor, visita.DocumentoReceptor, visita.Observaciones, usuarioId);
+            visita.NombreReceptor, visita.DocumentoReceptor, visita.Observaciones, usuarioId, datos.RepartidorId);
     }
 
     private static ArchivoRecibido Archivo(ArchivoRequest archivo)
