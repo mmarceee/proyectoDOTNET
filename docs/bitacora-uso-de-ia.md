@@ -2,8 +2,8 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 3 de noviembre de 2026 (creada el 09/10/2026) |
-| **Autores** | Ezequiel Marcenal y Lucas Ottonello |
+| **Fecha** | 8 de noviembre de 2026 (creada el 09/10/2026) |
+| **Autores** | Ezequiel Marcenal, Lucas Ottonello y Cristian Reyes |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
 
@@ -23,6 +23,7 @@ La letra pide declarar, **por componente relevante del sistema**, si se usó asi
 | :---- | :---- | :---- |
 | Claude Code (modelo Claude Opus 5.5), en la aplicación de escritorio | Ezequiel Marcenal | Revisión de código, explicación de conceptos, planificación de tareas y, cuando se pide expresamente, escritura de código, pruebas y documentación |
 | Codex, aplicación de escritorio | Lucas Ottonello | Explicación y revisión de arquitectura; análisis de casos de uso; escritura y corrección de código, documentación, migraciones y pruebas; verificación en navegador y apoyo para integrar ramas. No se reconstruye el modelo concreto de cada sesión porque no está verificado. |
+| Claude Code (modelo Claude Opus 5.5), en la aplicación de escritorio | Cristian Reyes | Explicación de conceptos y de los documentos (ADR, fichas), planificación por archivo, revisión de lo que escribí y, cuando lo pedí expresamente, escritura de código, pruebas y documentación de estudio |
 
 *(Cada integrante agrega las herramientas que usa.)*
 
@@ -931,6 +932,458 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Decisiones** | Latencia media, p95, p99 y tasa de errores de los últimos cinco minutos, calculados en la API y publicados como medidores, porque Aspire Dashboard dibuja los histogramas sólo con los percentiles 50, 90 y 99; se suma además la métrica estándar de ASP.NET Core. La profundidad de cola sale del recuento que devuelve cada `BasicGet`, sin consultas extra a RabbitMQ. Avisos fallidos: intentos rechazados y avisos que agotaron los reintentos. En Azure, el panel va en una Container App con un proxy Caddy, porque Container Apps expone un solo puerto, Aspire Dashboard 9.5 no admite el panel y el receptor OTLP en el mismo puerto (probado: falla al iniciar) y el proveedor azurerm 4.81 no tiene puertos adicionales. El panel pide token y el receptor, clave; la variable `observabilidad` lo apaga para ahorrar crédito. |
 | **Verificación** | El panel detrás del proxy se probó en Docker: el ingreso con token responde, OTLP sin clave da 401 y con clave lo acepta. `dotnet build`, `terraform validate` y `terraform fmt` pasan; en Docker, `VentanaLatenciasTests`, las pruebas de arquitectura y las de la caché. El despliegue en Azure lo ejecuta el responsable. |
 
+> **Entradas de Cristian Reyes (3.63 a 3.92):** registro retrospectivo, ordenado por fecha, reconstruido con las conversaciones con el asistente, el historial de Git y la documentación de estudio, para revisión del responsable.
+
+## **3.63 Datos iniciales e `ICurrentTenant` provisorio (hito 8/10)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 06/10 al 08/10/2026 |
+| **Archivos** | `SharedKernel/Entity.cs`; `Administracion/Domain/` (Operador, Comercio, RelacionComercial, EstadoRelacion); `AdministracionDbContext.cs`, configuraciones, migración `Inicial`, `DatosIniciales.cs`, `AdministracionModule.cs`; `Api/Program.cs`; pruebas `OperadorTests`, `RelacionComercialTests`, `TenantProvisorioTests`, `DatosInicialesTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Entender ADR-0002 y la guía de la ruta de un caso de uso, y crear el módulo Administración con el operador y el comercio del inquilino provisorio. |
+| **Cómo se trabajó** | Con mi permiso, la IA escribió los archivos del dominio, la persistencia y el seed. Los revisamos de a uno: me explicó cada archivo y yo pregunté hasta entenderlo. `Entity.cs` (constructores `protected`) lo escribí yo. `TenantProvisorioTests` la escribió la IA; `DatosInicialesTests` la pegué yo a partir de su propuesta. |
+| **Aceptado sin modificaciones** | Las entidades y sus reglas, las configuraciones y el seed idempotente. |
+| **Modificado** | Al traer `main`, `ModuleDbContext` había cambiado de firma (recibía la `UnidadDeTrabajo`): adapté `AdministracionDbContext` yo mismo. Decisiones mías: `DeleteBehavior.Restrict` en las FK de `RelacionComercial`, y dejar la prueba de `Comercio` dentro de `RelacionComercialTests` hasta consultarlo con el equipo. |
+| **Descartado** | Crear las relaciones con borrado en cascada (se perderían relaciones al borrar un operador). |
+| **Verificación** | `dotnet test`: 87 pruebas, todas pasan; el log muestra el seed insertando. |
+
+## **3.64 Segundo operador en los datos iniciales**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 10/10/2026 |
+| **Archivos** | `DatosIniciales.cs`, `DatosInicialesTests.cs` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cargar un segundo operador con configuración distinta (monitoreo del 15/10) sin que el interceptor rechace el seed. |
+| **Cómo se trabajó** | La IA analizó el filtro y el interceptor que había hecho Ezequiel, me explicó por qué el seed funcionaba "de casualidad" con un solo operador, y propuso un contexto por operador con `InquilinoFijo` (ADR-0002 §2.8). Con mi permiso escribió los dos archivos. |
+| **Aceptado sin modificaciones** | El patrón de un contexto por operador y las pruebas. |
+| **Modificado** | Decisiones mías: qué hace distinto al segundo operador (zona, franjas, flota y 8 paradas contra 20) y que trabaje con el mismo comercio, para preparar CU-03. |
+| **Descartado** | Cargar sólo el operador y su relación: no mostraba una configuración distinta. |
+| **Verificación** | Suite completa, 179 pruebas, todas pasan. |
+
+## **3.65 CU-16 · Cancelar un envío**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 11/10 y 12/10/2026 |
+| **Archivos** | `CancelarEnvioCommand.cs`, `CancelarEnvioHandler.cs`, `IEnvioRepository.cs`, `EnvioRepository.cs`, `CancelarEnvioRequest.cs`, `CancelarEnvioEndpoint.cs`, `EnviosModule.cs`, `Envios.Contracts/Events/EnvioCancelado.cs`, `CancelarEnvioTests.cs` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Planificar los archivos por capa, entender el repositorio, el Outbox y el endpoint, y redactar el código. |
+| **Cómo se trabajó** | La IA propuso cada archivo con su explicación y **yo los escribí en Visual Studio**; después la IA revisó cada uno y corrió las pruebas. Al día siguiente adapté CU-16 al Outbox nuevo de Ezequiel (`AgregarAlOutbox` y el evento en Contracts), también escribiendo yo los cambios. |
+| **Aceptado sin modificaciones** | El código propuesto, las 5 pruebas de integración y la aserción del `ComercioId` del sobre del Outbox. |
+| **Modificado** | Ajustes de formato al pegar. Corregí mi comprensión del flujo: el JSON llega como *Request* y no como *Command*, y la vuelta no pasa por el command. |
+| **Descartado** | Probar la cancelación a mano con `curl`: no hay botón en el Portal (es de Lucas). Lo cerré con pruebas automáticas. |
+| **Verificación** | 5 pruebas de integración (flujo principal, sin motivo, A1, otro comercio, inexistente). Suite 184/184 y después 212/212. CI en verde (PR #19). |
+
+## **3.66 Identity: usuarios, perfiles, cookie e inquilino de la sesión**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 12/10 al 14/10/2026 |
+| **Archivos** | Paquete Identity; `Perfil.cs`, `ClaimsDeSesion.cs` (Contracts); `Usuario.cs`, `IdentidadDbContext.cs`, migración `IdentidadInicial`, `FabricaDeClaims.cs`, `ServicioSesion.cs`, `UsuariosIniciales.cs` (Infrastructure/Identity); `IServicioSesion.cs`; páginas `Ingresar` y `Salir`; `AdministracionModule.cs`; `Api/Tenancy/TenantDeSesion.cs`, `Program.cs`, `appsettings.Development.json`; `scripts/migracion-en-docker.sh`; prueba de arquitectura y ADR-0001 v2.1 |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar el inicio de sesión con ASP.NET Core Identity y que `ICurrentTenant` salga de la cookie, sin romper las pruebas del equipo. |
+| **Cómo se trabajó** | **Escribí yo**: el paquete, `Perfil`, `Usuario`, `IdentidadDbContext`, el registro en el módulo, `Program.cs`, `ClaimsDeSesion`, `FabricaDeClaims`, la cookie, `TenantDeSesion`, la configuración y las páginas `Ingresar` y `Salir`. **Escribió la IA a mi pedido**: el cambio del script de migraciones, la excepción de arquitectura y la nota del ADR, `IServicioSesion` y `ServicioSesion`, y `UsuariosIniciales` (para no escribir la contraseña de prueba en el chat). Generé las migraciones yo con el script. |
+| **Aceptado sin modificaciones** | El diseño de la cookie (HttpOnly, Secure, SameSite=Strict, 401/403 en `/api`), la fábrica de claims y el mensaje genérico ante credenciales inválidas. |
+| **Modificado** | Decisiones mías: Identity en Administración (guía §2.1) y no en la Api; **transición con interruptor** (sin sesión, sólo en Development, sigue `TenantProvisorio`) en vez de reemplazarlo de golpe; ante el choque entre la guía y la regla de arquitectura, una **excepción acotada a `Microsoft.AspNetCore.Identity`**. Corregí un `using` que faltaba en la propuesta de la IA. Intenté cambiar la contraseña de prueba por una más corta y la volví atrás: no cumplía la política de Identity y no cambiaba los usuarios ya creados. |
+| **Descartado** | Reemplazar `TenantProvisorio` de golpe (rompía decenas de pruebas del equipo). Mover Identity a la Api (contradecía la guía). Pasar el nombre de la cookie a la marca (queda para hablar con el equipo). |
+| **Verificación** | Suite 212/212. Prueba manual en el navegador: entrar como cada operador y ver datos distintos. CI en verde (PR #20). |
+
+## **3.67 CU-03 · Seleccionar el operador de la sesión**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 14/10 y 15/10/2026 |
+| **Archivos** | `IOperadoresDelComercio.cs`, `OperadoresDelComercio.cs`, `ServicioSesion.cs`, `IServicioSesion.cs`, página `/cuenta/operador`, `Ingresar.cshtml.cs`, `AdministracionModule.cs` (gancho `OnRefreshingPrincipal`); pruebas `DatosInicialesTests`, `Identidad/Sesion.cs`, `SeleccionarOperadorTests.cs`; una línea de `PlanificacionIdentityTests` (Lucas) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que el usuario de comercio elija el operador y quede como claim en la cookie, con la única consulta autorizada a ignorar el filtro (ADR-0002 §2.4). |
+| **Cómo se trabajó** | Por falta de tiempo, **la IA escribió el código y las pruebas a mi pedido**, explicándome cada parte; yo hice la prueba manual en el navegador, los commits y los PR. Después, Ezequiel y Lucas revisaron y señalaron que el operador se perdía al rearmar la cookie: la IA escribió la corrección. |
+| **Aceptado sin modificaciones** | La consulta especial, la verificación de la relación y el gancho que conserva el operador (que además cubre A4). |
+| **Modificado** | Dos errores de la IA que detectaron las pruebas: un `OrderBy` que EF no podía traducir a SQL (lo vi como un 500 en el navegador) y el uso de `HttpContext` en Infrastructure (lo detectó la prueba de arquitectura). Al traer `main`, se unió con el ingreso por aplicación de Lucas y se actualizó una línea de su prueba. |
+| **Descartado** | Guardar el operador elegido en la base: el ADR-0002 §2.6 dice que va sólo en la cookie. |
+| **Verificación** | Prueba con `ValidationInterval = 0`, que **falla sin el arreglo** y pasa con él. Prueba manual: el envío creado con un operador no aparece en el otro. CI en verde (PR #23 y #25). |
+
+## **3.68 Autorización por perfil**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 15/10/2026 |
+| **Archivos** | `Politicas.cs` (Contracts), `Presentation/Autorizacion/PoliticaDePerfil.cs`, `AdministracionModule.cs`, `CrearEnvioEndpoint.cs`, `CancelarEnvioEndpoint.cs`, `RecibirBultoEndpoint.cs` (Ezequiel), `.csproj` de Envíos y Depósito, `UsuariosIniciales.cs`, `AutorizacionTests.cs` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que cada perfil haga sólo lo suyo dentro de su operador (pedido de Ezequiel en la revisión; objetivo del 15/10). |
+| **Cómo se trabajó** | La IA hizo el inventario de endpoints con el actor de cada caso de uso según el catálogo, y **escribió el código y las pruebas a mi pedido**. |
+| **Aceptado sin modificaciones** | Las políticas `Comercio` (con operador elegido), `OperarioDeposito` y `Administrador`, y las 6 pruebas. |
+| **Modificado** | Decisión mía: que las políticas respeten el respaldo de Development, como `TenantDeSesion` y el middleware de Lucas, para no romper las pruebas del equipo. |
+| **Descartado** | Exigir sesión siempre (rompía las pruebas del equipo). |
+| **Verificación** | Suite 272/272. CI en verde (PR #25). |
+
+## **3.69 Vínculo usuario ↔ repartidor**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 15/10/2026 |
+| **Archivos** | `Repartidor.cs` (Lucas), `RepartidorConfiguration.cs`, migración `UsuarioDelRepartidor`, `ClaimsDeSesion.cs`, `VinculoRepartidor.cs`, `FabricaDeClaims.cs`, `UsuariosIniciales.cs`, `DatosIniciales.cs`; pruebas `RepartidorTests` y `VinculoRepartidorTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | El claim `repartidor_id` que necesitan CU-50 y CU-52 (ADR-0004 §2.3). |
+| **Cómo se trabajó** | La IA buscó en el modelo de dominio de qué lado va el vínculo (`Repartidor.usuarioId`) y **escribió el código a mi pedido**. Yo generé la migración. |
+| **Aceptado sin modificaciones** | Todo. |
+| **Modificado** | La IA corrigió un error de compilación propio (usar la propiedad `UserManager` de la clase base). |
+| **Descartado** | Ignorar el filtro para buscar al repartidor al iniciar sesión: se usa `InquilinoFijo` con el operador del usuario, sin excepciones nuevas al ADR-0002. |
+| **Verificación** | 4 unitarias y 3 de integración. CI en verde (PR #26). |
+
+## **3.70 CU-07 · Gestionar la identidad visual**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 15/10/2026 |
+| **Archivos** | `IdentidadVisual.cs`, `LogoOperador.cs`, `Operador.cs`, `IOperadorRepository.cs`, `OperadorRepository.cs`, configuraciones, migración `IdentidadVisual`, `DatosIniciales.cs`, `Application/Features/GestionarIdentidadVisual/`, página `/backoffice/identidad-visual`, `MarcaDelOperadorEndpoint.cs`, layouts de Lucas e `index.html` del Portal; pruebas `IdentidadVisualTests` (unitarias e integración) y `MarcaDelOperadorTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que cada operador tenga su marca (logo, colores, contacto) y se vea distinta en el Backoffice y el Portal. |
+| **Cómo se trabajó** | La IA leyó la ficha, el modelo de dominio y la propuesta de stack, propuso un plan en tres partes y **escribió el código a mi pedido**. Yo generé la migración. |
+| **Aceptado sin modificaciones** | `IdentidadVisual` como value object, el logo en una tabla aislada por operador, `/cuenta/estilo.css` para que los layouts no conozcan los módulos, y el logo servido con `Content-Security-Policy: sandbox`. |
+| **Modificado** | La primera migración falló: la IA no había mapeado `LogoArchivoId` (propiedad de sólo lectura). Dos pruebas fallaron porque Razor codifica las tildes; se ajustaron para decodificar el HTML. Con perfil insuficiente, las páginas pasaron a responder 403. |
+| **Descartado** | Invalidar la caché (llega con el ADR de caché, 22/10) y la marca en el Seguimiento público (CU-60). |
+| **Verificación** | 12 unitarias y 7 de integración. Suite 298/298. PR #28. |
+
+## **3.71 CU-02 · Gestionar usuarios**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 16/10/2026 |
+| **Archivos** | `UnidadDeTrabajo.cs` (Ezequiel: `Transaccion` pública), `IdentidadDbContext.cs`, `Usuario.cs`, `Contracts/Events/UsuarioInvitado.cs`, `Application/Features/GestionarUsuarios/`, `Identity/ServicioUsuarios.cs`, `Identity/ErroresDeIdentity.cs`, `Persistence/DatosParaUsuarios.cs`, páginas de `/backoffice/usuarios` y `/cuenta/activar`, `AdministracionModule.cs`, `_Layout.cshtml`; pruebas `UsuarioTests` y `GestionarUsuariosTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar el listado, el alta con invitación, el cambio de perfil y la desactivación (nivel C). |
+| **Cómo se trabajó** | El plan estaba para escribirlo yo en 4 sesiones, pero por falta de tiempo decidí que **la IA escribiera CU-02 y yo escribiera CU-19**. La IA escribió el código y las pruebas, y un documento de estudio archivo por archivo (`repaso/09`). |
+| **Aceptado sin modificaciones** | Una única clase que consulta la tabla de usuarios, filtrando por operador (compensa la falta de filtro, ADR-0002 §2.4); el enlace de 48 h y un solo uso; desactivar cambiando el security stamp; el alta y su evento en una transacción. |
+| **Modificado** | Decisión mía: que Identity use la conexión y la transacción de la `UnidadDeTrabajo` para guardar el usuario y el evento juntos (implica hacer pública la transacción, en un archivo de Ezequiel). La IA corrigió un choque de nombres propio (`TextosUsuario.Perfil`). |
+| **Descartado** | Guardar el evento sin transacción común (podía quedar un usuario sin invitación). Esperar a Ezequiel para resolver el outbox. |
+| **Verificación** | 6 unitarias y 9 de integración (incluye alta → outbox → activación → ingreso → enlace usado, y que desactivar cierra la sesión). Suite 340/342; las 2 que fallaron por timeout pasan solas. |
+
+## **3.72 CU-19 · Reprogramar un envío no entregado**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 16/10/2026 |
+| **Archivos** | `Envio.cs` (`ElegirNuevoIntento`), `Application/Features/ReprogramarEnvio/` (command y handler), evento `EnvioReprogramado.v1`, `IEnvioRepository.RegistrarReprogramacion`, request y endpoint `POST /api/envios/{id}/reprogramacion`, política `Despachador`; pruebas `UnitTests/Envios/ReprogramarEnvioTests` e `IntegrationTests/Envios/ReprogramarEnvioTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Reprogramar un envío no entregado eligiendo la fecha y la franja del nuevo intento (T9, nivel M). |
+| **Cómo se trabajó** | **Escribí yo** el método de dominio (`ElegirNuevoIntento`: A1 contra `ReintentoDesde`, reutilizando `DefinirPlanificacion`), sus 4 pruebas unitarias y el command y el handler (franjas con `ResolverFranjasAsync` y paso de la zona horaria del operador a UTC), con la propuesta y la revisión de la IA. La IA escribió el evento, el registro en el Outbox, el request, el endpoint con la política nueva y las 4 pruebas de integración, y el documento de estudio `repaso/11`. |
+| **Aceptado sin modificaciones** | El evento por Outbox junto con el cambio de fecha; la política `Despachador` en el endpoint. |
+| **Modificado** | *(completar)* |
+| **Descartado** | *(completar)* |
+| **Verificación** | 4 unitarias y 4 de integración. PR #31 junto con CU-02, CI en verde. |
+
+## **3.73 Repaso guiado de CU-03**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 18/10/2026 |
+| **Archivos** | Ninguno (repaso, sin cambios de código) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Entender para la defensa CU-03, que había escrito la IA. |
+| **Cómo se trabajó** | La IA me explicó el recorrido y los tres lugares clave del código (la consulta que ignora sólo el filtro "Tenant", la verificación de la relación antes de volver a emitir la cookie y la página con A1 y A3), con preguntas de defensa. Lo probé en la web, cambiando entre los dos operadores. |
+| **Aceptado sin modificaciones** | — |
+| **Modificado** | Corregí mi idea de que el operador era una persona: es la empresa, el inquilino. |
+| **Descartado** | — |
+| **Verificación** | Prueba manual en la web: el Portal cambia de marca (verde y azul) al cambiar de operador. |
+
+## **3.74 CU-04 · Definir zonas de cobertura y franjas horarias**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 18/10/2026 |
+| **Archivos** | `Zona.cs`, `FranjaHoraria.cs`, `IZonaRepository.cs`, `Application/Features/DefinirZonas/` (`ConsultarZonasHandler`, `GestionarZonasHandler`), `ZonaRepository.cs`, `AdministracionModule.cs`, páginas de `/backoffice/zonas` (listado, nueva y detalle), `_Layout.cshtml`; en Envíos (módulo de Ezequiel): `IEnviosModuleApi.HayEnviosComprometidosAsync`, `Envio.EstadosConEntregaPendiente`, `IEnvioRepository` y `EnvioRepository`; documentos `modelo-de-dominio.md` y `casos-de-uso.md`; pruebas `UnitTests/Administracion/ZonaTests` e `IntegrationTests/Administracion/DefinirZonasTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que el administrador defina dónde reparte su operador (zonas por código postal) y en qué horarios (franjas), nivel M, con A1 a A5. |
+| **Cómo se trabajó** | La IA leyó la ficha, el modelo de dominio y el código de Lucas (CU-40), y propuso un plan de 8 pasos de adentro hacia afuera. **Escribí yo** `Zona.cs` (`Modificar`, `Desactivar`, `Cubre`) y `FranjaHoraria.SeSuperponeCon`. Por tiempo, pedí que la IA escribiera el resto de a un archivo, explicándome cada uno. También me explicó el caso sin tecnicismos, con ejemplos. |
+| **Aceptado sin modificaciones** | Las reglas que miran una sola zona o franja en el dominio y las que comparan con las demás (A1, A2, A3) en el handler; los DTOs de sólo lectura para las páginas; el repositorio sin filtrar por operador a mano (lo hace el filtro "Tenant"). |
+| **Modificado** | Decisiones mías, confirmadas con Lucas: (1) `FranjaHoraria` queda como entidad propia y no dentro de `Zona`, distinto del modelo de dominio, que se alineó; (2) la reprogramación por lote de la ampliación del 09/10 queda pendiente; (3) la zona y sus franjas se cargan en dos pantallas. Por pedido de Lucas se agregó el bloqueo: no se reemplaza una franja con envíos comprometidos desde esa fecha. Para eso se consulta a Envíos por su contrato (aviso a Ezequiel). |
+| **Descartado** | Cambiar `FranjaHoraria` a composición (rompía la planificación y CU-19). Implementar ahora la reprogramación por lote. |
+| **Verificación** | 8 unitarias y 6 de integración, incluida la del bloqueo. Verifiqué que la prueba de A3 y la del bloqueo fallan si se quita la regla. Arquitectura 54/54. Prueba manual en la web. La suite completa falló por Docker colgado (la integración de WSL con Ubuntu y otros proyectos corriendo a la vez). Después de arreglarlo, las 12 clases que habían fallado pasaron: 117/117. |
+
+## **3.75 ADR-0006 · Estrategia de caché e invalidación (borrador)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 18/10/2026 |
+| **Archivos** | `docs/analisis-diseno/ADR-0006-estrategia-de-cache.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Borrador del ADR obligatorio de caché (letra 6.7 y 8.2) para el hito del 22/10. |
+| **Cómo se trabajó** | Le pedí a la IA un borrador a partir de la letra, la propuesta de stack, el ADR-0001, el ADR-0002 y las fichas de CU-04 a CU-07 y CU-60. Las decisiones que necesitan validación del equipo quedaron marcadas como "a confirmar". |
+| **Aceptado sin modificaciones** | Cache-aside sobre una pieza común; la clave con el operador la arma la pieza; dos perfiles (seguimiento con expiración corta e invalidación por evento; configuración con versiones inmutables y un puntero "vigente"). |
+| **Modificado** | La v0.2 se alineó con la pieza común que implementó Ezequiel (PR #36); la v0.3, con CU-60; la v0.4 corrigió cómo se invalida cada caso (entrada 3.82); la v0.6, con la aclaración docente (entrada 3.92). |
+| **Descartado** | `HybridCache` (caché local por instancia, que complica invalidar); invalidar la configuración por Outbox. |
+| **Verificación** | Revisión del equipo y las pruebas de caché de cada caso (tabla de la sección 4 del ADR). |
+
+## **3.76 CU-04 · Correcciones de la revisión de Lucas y Ezequiel**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 19/10/2026 |
+| **Archivos** | `GestionarZonasHandler.cs`, `FranjaHoraria.cs` (`ProgramarCambio`), `Zona.cs`, `ZonaRepository.cs`, `Detalle.cshtml.cs`; contratos nuevos en Envíos (`EnviosSinFechaConFranjasAsync`) y Planificación (`HayRutasActivasConEnviosAsync`, una línea en dos repositorios de prueba de Lucas); `DefinirZonasTests`, `ZonaTests`; ficha de CU-04 y modelo de dominio |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Atender la revisión del PR #34: envíos sin fecha en rutas activas (Lucas), validar antes de modificar y fechas pasadas (Ezequiel). |
+| **Cómo se trabajó** | Le pasé a la IA los mensajes de Lucas y Ezequiel; verificó que nadie lo hubiera arreglado ya, propuso el arreglo y lo escribió a mi pedido. |
+| **Aceptado sin modificaciones** | Usar el mismo bloqueo de planificación del operador que las rutas; preguntar a Envíos y a Planificación por sus contratos; fecha futura en la zona horaria del operador. |
+| **Modificado** | La IA encontró que, tras un rechazo dentro de la transacción, la página daba 500; se corrigió sumando cada lectura a la transacción en curso. |
+| **Descartado** | — |
+| **Verificación** | 10 pruebas de integración de CU-04 (4 nuevas) y verificación de que fallan si se quita cada arreglo. |
+
+## **3.77 CU-05 · Configurar el cuadro tarifario**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 19/10/2026 |
+| **Archivos** | Dominio `Domain/Tarifas/` (ReglaTarifa, AjusteTarifa, VersionTarifario, TablaTarifaria, ITarifarioRepository), `Modalidad`, `EstadoVersion`; configuraciones, `TarifarioRepository`, migración `TarifarioCU05`, `DatosIniciales`; `Application/Features/ConfigurarTarifario/` (TarifarioVigente con caché, handlers); `CalcularTarifaAsync` en `IAdministracionModuleApi`; páginas `/backoffice/tarifario`; `VersionTarifarioTests`, `ConfigurarTarifarioTests`; `PostgresApiFactory` (una línea) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | CU-05 nivel C: versiones del tarifario con borrador y publicación, A1 a A5, y la caché del ADR-0006 (escenario 5 de la defensa). |
+| **Cómo se trabajó** | La IA armó un plan en 6 sesiones con 5 decisiones que confirmé. **Escribí yo el dominio (sesión 1)** con el código que me pasaba, archivo por archivo. Por tiempo, pedí que la IA escribiera las pruebas unitarias y las sesiones 3 a 6, generara la migración y dejara una guía de estudio y de prueba (`repaso/12`, `13` y `14`). |
+| **Aceptado sin modificaciones** | Rangos con "desde" incluido y "hasta" excluido; ajustes sobre el precio base; "programada" por fechas; invalidar la caché en el handler después de guardar; un borrador por operador con índice parcial y A5 con `xmin`; caché con puntero "vigente" y versiones inmutables. |
+| **Modificado** | Las pruebas de integración usaban el Valkey real de desarrollo y leían datos de otra corrida: se configuró la fábrica de pruebas sin Valkey y se limpiaron las claves. |
+| **Descartado** | Un despachador de eventos en memoria para `TarifarioPublicado`. |
+| **Verificación** | 12 unitarias y 4 de integración. Se verificó que, si se quita la invalidación de la caché, la prueba falla. |
+
+## **3.78 CU-06 · Configurar las reglas operativas**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 19/10/2026 |
+| **Archivos** | `Domain/Reglas/` (VersionReglas, MotivoNoEntrega, PruebaExigida, PoliticaDevolucion, PlazoModalidad, DatosReglas, IReglasRepository); configuraciones, `ReglasRepository`, migración `ReglasOperativasCU06`, `DatosIniciales`; `Application/Features/ConfigurarReglas/` (ReglasVigentes con caché y handlers); `ReglasOperativas` y dos funciones en `IAdministracionModuleApi`; páginas `/backoffice/reglas`; `VersionReglasTests`, `ConfigurarReglasTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | CU-06 nivel C: versiones de las reglas operativas con borrador y publicación, A1 a A3, caché del ADR-0006 y el contrato que Envíos necesita para CU-10, CU-17 y CU-18 (escenario 5). |
+| **Cómo se trabajó** | La IA armó un plan en 6 sesiones con 3 decisiones a acordar con el equipo. Ezequiel definió el contrato (las reglas por versión del envío y las vigentes para el alta) y lo hace él en Envíos; Lucas confirma después lo del máximo de paradas. Por tiempo, pedí que la IA escribiera las 6 sesiones, generara la migración y dejara la guía de estudio y de prueba (`repaso/15`, `16` y `17`). |
+| **Aceptado sin modificaciones** | El mismo ciclo de vida que el tarifario; validar al publicar mostrando todos los errores juntos; el código de motivo como identificador estable en mayúsculas; pruebas y devolución como columnas y plazos como JSON. |
+| **Modificado** | La pregunta de los motivos con Id nuevo entre versiones se resolvió con la propuesta de Ezequiel: cada envío guarda su versión, así que el motivo se busca en el catálogo de esa versión. |
+| **Descartado** | Usar siempre las reglas vigentes para todos los envíos (no cumple la letra 6.6). Tocar el código de Planificación antes de que Lucas confirme. |
+| **Verificación** | 9 unitarias y 4 de integración. La de integración comprueba que la versión 1 conserva sus reglas después de publicar la 2, y falla si se quita la invalidación de la caché. |
+
+## **3.79 CU-60 · Consultar el seguimiento público**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 19/10/2026 |
+| **Archivos** | Seguimiento: `TokenSeguimiento`, `ClaveSeguimiento`, `SeguimientoModuleApi`, `ConsultarSeguimientoHandler`, `TextosSeguimiento`, `InvalidarSeguimiento`, `InquilinoDelToken`, `ConsultarSeguimientoEndpoint`, página `Enlace`; `ISeguimientoModuleApi`, `LimitesSeguimiento`; Envíos: `SeguimientoDeAsync` e `IdPorNumeroAsync`; Administración: `MarcaDelOperadorAsync`; `Http.Contracts/Seguimiento`; app `SeguimientoPublico` (página `/seguimiento/{token}`); `Logistica.Api/Program.cs` (límite de tasa), `Logistica.Worker/Program.cs` (caché); configuración; pruebas `TokenSeguimientoTests`, `TextosSeguimientoTests`, `SeguimientoDeEnvioTests`, `CacheSeguimientoTests`, `SeguimientoPublicoTests`; ficha de CU-60, ADR-0002 y ADR-0006 |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | CU-60 nivel C: seguimiento sin autenticación con token firmado, inquilino desde el token, A1 a A3, caché de 1 minuto invalidada por los eventos de Envíos y la página con la marca del operador. |
+| **Cómo se trabajó** | La IA revisó qué existía, armó un plan en 6 sesiones con 5 decisiones (S1 a S5) que acepté y le mandé al equipo, y escribió las sesiones a mi pedido, con un resumen de estudio y una guía de prueba (`repaso/18` a `20`). |
+| **Aceptado sin modificaciones** | Token HMAC determinístico con clave de configuración; el token se convierte en claims, como la cookie, sin tocar `TenantDeSesion`; caché con clave EnvioId; invalidación por eventos en el Worker; A1 y A2 con la misma respuesta; límite de tasa por IP. |
+| **Modificado** | S1: en lugar de la tabla de lectura del requerimiento 4, un contrato síncrono a Envíos con caché, porque faltaban eventos de Envíos; la tabla queda para CU-66. Se actualizaron la ficha y el ADR-0002. Para obtener el enlace se hizo una página propia en Seguimiento, sin tocar el detalle del envío de Ezequiel. |
+| **Descartado** | Data Protection de ASP.NET para el token; buscar el envío sin filtro para descubrir su operador; "cuántas entregas quedan antes" para el 22/10. |
+| **Verificación** | 20 pruebas unitarias y 9 de integración. Se verificó que las de integración fallan si se quita el límite de tasa o si el filtro no fija el inquilino. |
+
+## **3.80 Página de seguimiento del Backoffice (pedido de Lucas)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 22/10/2026 |
+| **Archivos** | `IEnviosModuleApi.ListarParaSeguimientoAsync` y `EnvioParaSeguimiento` (Envios.Contracts); página `/backoffice/seguimiento` (Seguimiento, perfiles Administrador y Despachador) con "Ver enlace"; ítem en `_Layout.cshtml`; dos pruebas nuevas en `SeguimientoPublicoTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que el personal encuentre un envío y copie su enlace de seguimiento sin conocer el número de memoria, a pedido de Lucas. |
+| **Cómo se trabajó** | La IA escribió la página y el contrato a mi pedido, reutilizando el listado de CU-13 con sus validaciones y el filtro "Tenant", y me dejó una guía (`repaso/23`). |
+| **Aceptado sin modificaciones** | Reutilizar el listado del Backoffice en lugar de una consulta nueva; perfiles Administrador y Despachador. |
+| **Modificado** | Después Lucas sacó el ítem del menú y puso el enlace en el listado de Envíos; se ajustó la prueba que buscaba el ítem. |
+| **Descartado** | Mandar el enlace por correo desde esta página: es CU-62 (Ezequiel). |
+| **Verificación** | `SeguimientoPublicoTests`: 7 pruebas, incluidas Depósito sin acceso (403) y aislamiento entre operadores. PR #53. |
+
+## **3.81 CU-21 · Declarar un envío como extraviado**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 23/10/2026 |
+| **Archivos** | `Envio.DeclararExtravio`; evento `EnvioExtraviado.v1`; `IEnvioRepository`/`EnvioRepository.RegistrarExtravio` (Outbox); `Application/Features/DeclararExtravio/`; página `/backoffice/envios/{numero}/extravio` y botón en el detalle; `InvalidarSeguimiento` (se suma el evento); pruebas `DeclararExtravioTests` (unitarias e integración) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | CU-21 nivel M: T16 con motivo obligatorio, la incidencia de extravío en la misma transacción y el aviso por Outbox. |
+| **Cómo se trabajó** | La IA armó el plan sobre la ficha, T16 y el modelo de dominio. `Envio.DeclararExtravio` lo escribí yo; el resto (evento, repositorio, handler, página y pruebas) lo escribió la IA a mi pedido, archivo por archivo, explicando cada uno. |
+| **Aceptado sin modificaciones** | El handler busca por número; la incidencia se crea con la transición; perfiles Administrador o Despachador, como dice la ficha. |
+| **Modificado** | El botón quedó en el detalle del envío de Lucas, sin cambiar su estructura. |
+| **Descartado** | Tratar la parada fallida acá: la cubre el cierre de ruta de Lucas (a confirmar con él en su momento). |
+| **Verificación** | 6 pruebas unitarias y 6 de integración. PR #54. |
+
+## **3.82 ADR-0006 v0.4 · Alinear la estrategia de caché con lo implementado**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 24/10/2026 |
+| **Archivos** | `ADR-0006-estrategia-de-cache.md`; `InvalidarSeguimiento` (`EnvioExtraviado`); `Logistica.Worker/Program.cs` (exporta la métrica de caché) |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que el ADR dijera lo mismo que el código antes del monitoreo del 29/10. |
+| **Cómo se trabajó** | Pedí revisar el ADR contra el código. La IA encontró contradicciones: el ADR decía que el seguimiento se invalidaba con eventos en memoria (en el código va por Outbox, RabbitMQ y Worker), que la configuración se invalidaba con eventos (lo hace el handler de publicar) y justificaba los 60 segundos con un dato no implementado. Escribió la v0.4 a mi pedido. |
+| **Aceptado sin modificaciones** | Las correcciones, la tabla de pruebas con su clase y estado, zonas e identidad visual fuera del alcance. |
+| **Modificado** | La nota para el ADR-0001 (sección 2.5) se la pasé a Lucas en lugar de aplicarla, porque ese ADR es suyo. |
+| **Descartado** | Implementar "cuántas entregas quedan antes" sólo para justificar el valor de expiración. |
+| **Verificación** | Revisión contra el código; pruebas de caché existentes. PR #55. |
+
+## **3.83 CU-20 · Iniciar la devolución de un envío**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 25/10/2026 (ajuste el 28/10/2026) |
+| **Archivos** | `Envio.IniciarDevolucion`; evento `DevolucionIniciada.v1`; `RegistrarDevolucion` (Outbox); `Application/Features/IniciarDevolucion/`; página `/backoffice/envios/{numero}/devolucion` y botón; endpoint `POST /api/envios/{id}/devolucion` (política Comercio); `InvalidarSeguimiento`; pruebas unitarias e integración |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | CU-20 nivel M: T12 y T14 desde el Backoffice y la API del comercio, con la `Devolucion` y el aviso. |
+| **Cómo se trabajó** | La IA armó el plan con cinco decisiones (F1 a F5) que acepté, y escribió el código a mi pedido en cuatro bloques, con un resumen corto y una pregunta de defensa por bloque. |
+| **Aceptado sin modificaciones** | F1: T10 manual es inalcanzable (NoEntregado es de paso), se explica en la defensa. F2: T14 automático queda fuera. F3: el comercio, sólo por API. F5: en el Backoffice, sólo Despachador. |
+| **Modificado** | 28/10: para que CU-31 de Ezequiel pudiera entregarla, la devolución nace recibida en el depósito, salvo que el envío siga en el vehículo (PR #64). |
+| **Descartado** | Tocar CU-18 para que su devolución automática publique `DevolucionIniciada` (F4): es código de Ezequiel y se le avisó. |
+| **Verificación** | 8 pruebas unitarias y 7 de integración. |
+
+## **3.84 CU-66 · Ver el tablero de operación en vivo**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 26/10/2026 |
+| **Archivos** | Seguimiento: `TableroHub` (SignalR, salas por operador, backplane Valkey), `RiesgoDeEntrega`, `ActualizarPosicionTablero`, `NotificarNovedadTablero`, `ConsultarTableroHandler`, `RevisarConflictoHandler`, página `/backoffice/tablero` (Leaflet y cliente SignalR); contratos nuevos de Planificación (rutas en curso) y Envíos (envíos en riesgo); Ejecución: `MarcarRevisada` y contrato de conflictos; pruebas `TableroEnVivoTests`, `RiesgoDeEntregaTests`, `LectorHechosEnvioTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | CU-66 nivel C: mapa con las posiciones de los vehículos, envíos en riesgo y conflictos de sincronización, en tiempo real y aislado por operador. |
+| **Cómo se trabajó** | La IA armó el plan en seis bloques con cinco decisiones (G1 a G5). Hicimos juntos los primeros bloques y, a mi pedido, escribió el resto. Lo probé de punta a punta con la PWA de Lucas. |
+| **Aceptado sin modificaciones** | G1: el tiempo real llega desde el Worker por el backplane de SignalR sobre Valkey. G4: perfiles Despachador o Administrador. G5: Leaflet con OpenStreetMap. |
+| **Modificado** | G2: la foto inicial se arma con los contratos de cada módulo en lugar de la tabla de lectura de la ficha (se anota como desvío). G3: los conflictos quedaron en Ejecución, que ya los guarda, y se marcan revisados ahí; eso además destraba la rendición. Se ajustó `TrazasMensajeriaTests` porque `RutaDespachada` pasó a tener dos consumidores. |
+| **Descartado** | Correr consumidores de RabbitMQ dentro de la API, porque duplicaría trabajo con el Worker. |
+| **Verificación** | `TableroEnVivoTests` con un cliente SignalR real (salas por operador y autorización), verificada por mutación; prueba manual: la posición de la PWA aparece en el mapa y otro operador no ve nada. PR #60. |
+
+## **3.85 CU-61 · Solicitar la reprogramación desde el seguimiento público**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 27/10/2026 |
+| **Archivos** | `Envio` (reprogramación por el destinatario), `ReprogramarPorDestinatarioHandler`, `IEnviosModuleApi` y `OpcionReprogramacion`; contrato de Planificación para quitar el envío de una ruta planificada; `SolicitarReprogramacionHandler` y endpoint con el token; `Seguimiento.razor`; pruebas `ReprogramarPorDestinatarioTests` y `ReprogramacionPublicaTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | CU-61 nivel M: que el destinatario elija otra fecha y franja desde el enlace público, con T18, T19 o un nuevo intento, respetando la anticipación y los intentos del operador. |
+| **Cómo se trabajó** | La IA armó el plan en cuatro bloques con seis decisiones (H1 a H6), que acepté. Escribió el código a mi pedido, reutilizando lo de CU-19 y CU-60, y me dejó una guía para probarlo a mano antes del PR. |
+| **Aceptado sin modificaciones** | H1: desde NoEntregado se resuelve como Reprogramado. H2: coordina Envíos, Seguimiento sólo expone la página. H3: próximos 7 días, franjas de la zona que empiecen después de la anticipación. H4: T19 con un contrato de Planificación en la misma transacción. H5: el mismo límite de tasa del seguimiento. H6: en Admitido sólo se guardan la fecha y la franja, y se publica `EnvioReprogramado`. |
+| **Modificado** | *(revisar: completar si se cambió algo al probarlo)* |
+| **Descartado** | Cupos por franja: no existen en el modelo. |
+| **Verificación** | Pruebas unitarias de las reglas y de integración (cada estado, A1, A2 y aislamiento por token); prueba manual en incógnito. |
+
+## **3.86 Análisis del cambio de requerimientos (RF 31 a 36)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 01/11 y 02/11/2026 |
+| **Archivos** | Documento "Entrega parcial de bultos: lo acordado y lo que falta decidir" y borrador de la matriz de estados (compartidos con el equipo); base de `decisiones-entrega-parcial.md` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Entender el cambio del 30/10, separar lo que corresponde a un equipo de tres (RF 31 a 36) y llevar las decisiones abiertas al equipo. |
+| **Cómo se trabajó** | La IA leyó el PDF del cambio, el Trello exportado y el informe de revisión del equipo; estimó la carga, marcó dependencias y contradicciones de fechas, y propuso un orden. Redactó a mi pedido el documento de decisiones pendientes, con una propuesta por punto. |
+| **Aceptado sin modificaciones** | El contador "entregados / total"; el reparto por áreas como propuesta. |
+| **Modificado** | Las decisiones las cerró el equipo (decisiones-entrega-parcial.md, versiones 1.0 a 1.2). |
+| **Descartado** | Retiro en domicilio (RF 37 a 41): es para equipos de cuatro. |
+| **Verificación** | Revisión con el equipo. |
+
+## **3.87 CU-08 · Gestionar repartidores y vehículos**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 01/11 y 02/11/2026 |
+| **Archivos** | `Repartidor` y `Vehiculo` (`Modificar`, `Desactivar`); `IFlotaRepository` y `FlotaRepository`; `GestionarFlotaHandler` y `ConsultarFlotaHandler`; páginas `GestionarFlota` (listado, repartidor y vehículo); contrato de Planificación para saber si está en una ruta sin terminar; pruebas `RepartidorTests`, `VehiculoTests` y `GestionarFlotaTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | CU-08 nivel M: alta, modificación, desactivación y consulta, con A1 (matrícula y documento únicos por operador), A2 (capacidades mayores que cero) y A3 (no desactivar si está en una ruta sin terminar). |
+| **Cómo se trabajó** | La IA propuso empezar por el dominio, porque `Repartidor` y `Vehiculo` ya existían desde CU-40 de Lucas, y siguió de adentro hacia afuera. *(revisar: qué partes escribí yo y cuáles la IA)* |
+| **Aceptado sin modificaciones** | Desactivar en lugar de borrar, para no romper las rutas viejas; A1 con índice único en el repositorio, porque la entidad no conoce a los demás vehículos; A3 preguntándole a Planificación por su contrato. |
+| **Modificado** | Se agregó una línea a los repositorios de prueba de `ArmarRutaTests` y `QuitarEnvioDeRutaTests` (Lucas) por el método nuevo del contrato. |
+| **Descartado** | — |
+| **Verificación** | Pruebas unitarias de las reglas y `GestionarFlotaTests` de integración (incluye que otro operador no ve la flota). PR #67. |
+
+## **3.88 CU-02 · Correo de invitación (paso 7)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 28/10 (hallazgo) y 03/11/2026 |
+| **Archivos** | Seguimiento: `EnviarInvitacionHandler`, consumidor `EnviarInvitacion` (cola `seguimiento.enviar-invitacion`, con inbox), registro en `SeguimientoModule`, `MensajeCorreo` y `PlantillaCorreo` (botón opcional); `EnviarInvitacionTests` |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que el correo de invitación de CU-02 llegue de verdad: el evento `UsuarioInvitado.v1` quedaba en el Outbox y nadie lo consumía. |
+| **Cómo se trabajó** | Al probar con dos repartidores, la IA encontró que no había consumidor del evento. Propuso cuatro archivos siguiendo el patrón de CU-62 de Ezequiel; lo hablé con el equipo y le pedí que lo escribiera. |
+| **Aceptado sin modificaciones** | Consumidor en el Worker con inbox; enlace relativo en el evento, que el Worker completa. |
+| **Modificado** | — |
+| **Descartado** | Sacar el enlace de activación del Outbox a mano (fue sólo el atajo para probar mientras tanto). |
+| **Verificación** | 3 pruebas de integración, una de punta a punta: Backoffice, RabbitMQ, Worker y Mailpit. Entró con el PR #71. |
+
+## **3.89 RF 31 · Estados por bulto y resumen derivado del envío**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 03/11/2026 |
+| **Archivos** | `tabla-de-transiciones-de-estados.md` (sección de transiciones por bulto y resumen); Envíos: `Bulto.Estado` e `IntentosFallidos`, `ResumenEnvio`, `Envio.Resumen`, `Terminado`, `BultosEntregados` y `RecalcularResumen`, puente en `Transicionar`, `Envio.RecibirBulto` e `IEnviosModuleApi.RecibirBultoAsync`, guarda de T17 por bulto, `Envio.RegistrarVisita` con `ResultadoBulto`, `IntentoEntrega.BultoIds`, consulta con resumen y estado por bulto; migraciones `EntregaParcialBultos` y `BultosDeCadaIntento`; pruebas unitarias y de integración |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | RF 31: el estado vive en cada bulto y el envío guarda un resumen derivado (Creado, En operación, Entregado parcialmente, Entregado), con las transiciones declarativas y verificables. |
+| **Cómo se trabajó** | Primero la IA escribió, a mi pedido, la tabla por bulto en el documento de transiciones, y el equipo la aprobó. Después escribió el dominio, la persistencia y las pruebas, explicando cada paso. |
+| **Aceptado sin modificaciones** | Reutilizar los estados del envío para el bulto; resumen persistido y recalculado al final de cada operación; un puente que mueve los bultos que acompañan al envío mientras los demás módulos siguen decidiendo por el envío entero; la migración preserva las recepciones parciales ya escaneadas. |
+| **Modificado** | El ejemplo "cancelados después de recibir" lo propuse como inalcanzable (T17 exige que no se haya recibido ninguno) y el equipo lo aprobó; la migración se regeneró después de integrar `AmbienteEnviosApi` de Lucas. |
+| **Descartado** | Agregar sólo un estado "Entregado parcialmente" al envío; convertir el bulto en un agregado propio (ADR-0007). |
+| **Verificación** | 391 unitarias, 56 de arquitectura y 560 de integración tras integrar `main`. PR #71. |
+
+## **3.90 RF 33 · Reglas operativas de la entrega parcial y recargo de la nueva visita**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 05/11 al 07/11/2026 |
+| **Archivos** | Administración: `ReglasEntregaParcial`, `PoliticaPendientes` (Contracts), `VersionReglas`, `DatosReglas`, configuración y migración `EntregaParcialReglas`, `ReglasOperativas`, `ReglasVigentes`, páginas de `ConfigurarReglas`, `DatosIniciales`. Envíos: `ReglasEntrega` (`DebeDevolver`), `Envio` (`RegistrarVisita` y recargo), `RecargoNuevaVisita`, `RecargoRegistrado`, `IEnvioRepository`, `EnvioRepository`, configuración y migración `RecargoNuevaVisita`, `ReglasDeEntregaDeAdministracion`, `IEnviosHojaRuta`, `IEnviosModuleApi.ListarRecargosAsync` y `RecargoLiquidable`, detalle del envío en el Backoffice. Pruebas: `VersionReglasTests`, `VisitaPorBultoTests`, `EntregaEIntentosTests`, `EntregaParcialReglasTests`, `RecargoNuevaVisitaTests`. `casos-de-uso.md` (CU-06, v2.0 y v2.2) y `modelo-de-dominio.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | RF 33 del cambio de requerimientos: que cada operador configure y versione si admite la entrega parcial, qué pasa con los bultos pendientes y el recargo de la nueva visita, y que ese recargo se registre al ocurrir. |
+| **Cómo se trabajó** | La IA escribió el código a mi pedido, por capas, explicando cada paso. El 07/11, al revisar la tarjeta de Trello contra el código, detectó que faltaba registrar el recargo; presentó las decisiones R1 a R6, las aprobé y le pedí que lo implementara completo. |
+| **Aceptado sin modificaciones** | Las tres reglas como value object dentro de `VersionReglas` (versionado, letra 6.6); las versiones ya publicadas quedan sin entrega parcial; una sola regla `DebeDevolver` para el intento del envío entero y la visita por bulto; el recargo como entidad aparte dentro del agregado `Envio`, uno por visita adicional (aunque falle, nunca la primera ni por bulto), con el monto copiado. |
+| **Modificado** | El seed lo elegí yo (opción A): nadie admite la parcial y Envíos del Este cobra $150. |
+| **Descartado** | Calcular el recargo al liquidar con las reglas del día (la sección 5 de las decisiones pide cobrar el monto registrado). Integrar el recargo en la liquidación: es de Ezequiel (CU-32) y se le avisó, junto con la frase "sin recargos por reintentos" de la ficha de CU-32, anterior al cambio. |
+| **Verificación** | Suite completa (446 unitarias, 56 de arquitectura e integración) y prueba manual en el Backoffice de los valores por defecto y las validaciones. La prueba de integración del recargo encontró una consulta que EF Core no podía traducir (`OrderBy` después de armar el resultado), y se corrigió. PR #80 y #81. |
+
+## **3.91 RF 35 · Avance de la entrega por bulto en el seguimiento público**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 04/11 al 07/11/2026 |
+| **Archivos** | Listado del Backoffice: columna "Entrega" (`ResumenEnvioTexto`, PR #75, con la actualización de paquetes a 10.0.14 por el aviso NU1903). Envíos: `SeguimientoEnvio` y `BultoSeguimiento` (Contracts), `SeguimientoDeAsync`. Seguimiento: `TextosSeguimiento` (`Titulo`, `Avance`, `NombreBulto`), `ConsultarSeguimientoHandler`. `Http.Contracts/Seguimiento/SeguimientoPublicoResponse`. App `SeguimientoPublico`: `Seguimiento.razor`. Pruebas: `TextosSeguimientoTests` y `SeguimientoPublicoTests`. `casos-de-uso.md` (CU-60, v2.1). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Que la página pública muestre el avance ("2 de 3 bultos entregados") y el estado de cada bulto sin exponer identificadores internos, y que con entrega parcial el título no diga "Entrega reprogramada". |
+| **Cómo se trabajó** | La IA leyó la letra y la tarjeta y armó un plan con 4 decisiones. Escribió el lado del servidor; después cambié la forma de trabajo: me pasó cada bloque con su explicación y yo pegué la página y las pruebas. Creó un envío de prueba en el Portal y simuló la visita parcial con SQL en mi base local para mostrarlo (la PWA todavía no permite elegir bultos). |
+| **Aceptado sin modificaciones** | Título con el resumen de RF 31 cuando hay entrega parcial; avance sobre el total original; sin avance con un solo bulto; el historial queda como está. |
+| **Modificado** | El nombre de cada bulto: la IA propuso "Bulto N"; lo consulté con Lucas y Ezequiel y quedó "BTO 1, 2, 3", sólo en la página pública (el código de etiqueta sigue en depósito, PWA y Backoffice). Achiqué la documentación de CU-60 y de CU-06 al estilo de mis compañeros. |
+| **Descartado** | Mostrar el código del bulto en la página pública. |
+| **Verificación** | Pruebas de Seguimiento: 149 unitarias y 91 de integración. La de integración busca en el JSON que no aparezca ni el Id ni el código de ningún bulto. Prueba manual con ENV-000008 (0 de 3 y después 2 de 3). PR #81, con el CI en verde. |
+
+## **3.92 Caché · Frescura del tarifario y las reglas, y ADR-0006 v0.6**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes (con Ezequiel Marcenal) |
+| **Fecha** | 08/11/2026 |
+| **Archivos** | `TarifarioVigente` y `ReglasVigentes` (puntero de 10 a 1 minuto); prueba nueva `VersionProgramadaTests`; `ADR-0006-estrategia-de-cache.md` (v0.6). |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cerrar mi parte de la aclaración docente de caché: acotar la carrera del puntero viejo y la invalidación fallida, probar con reloj controlado el inicio de una versión programada y actualizar el ADR. |
+| **Cómo se trabajó** | La IA comparó contra el código el análisis que hizo la IA de Ezequiel, confirmó cada dato y propuso pasar la demo de las dos APIs a prioridad. Pegué yo el cambio de expiración. La prueba con reloj la escribió la IA para compilarla y correrla antes de dármela, y escribió el borrador del ADR a mi pedido. Me dejó una guía para probarlo en la llamada (`repaso/32`). |
+| **Aceptado sin modificaciones** | Puntero de 1 minuto (acota los dos riesgos sin sobreingeniería); reloj ajustable inyectado en la API; sección 2.8 del ADR sobre el estado compartido entre instancias. |
+| **Modificado** | La prueba con reloj adelantaba un día y vencía la sesión del administrador; se cambió para cruzar el instante exacto (23:59 a 00:01). Se incorporaron al ADR los cambios de Ezequiel (prueba 4 hecha con `ValkeyCaidoTests`). |
+| **Descartado** | Cerrar la carrera por completo (escribir "sólo si no existe" o una doble invalidación): `IDistributedCache` no ofrece lo primero y la aclaración pide resolver o acotar. Reintentar la invalidación: los reintentos del Worker duran más que la expiración. |
+| **Verificación** | `VersionProgramadaTests` (2) pasa, y falla si se desactiva la comparación con `ValidoHasta` (prueba de mutación). Todas las de Administración pasan (90 unitarias y 37 de integración). En vivo, el puntero aparece en Valkey con TTL de 60 segundos y desaparece solo. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -977,3 +1430,4 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.39 | 03/11/2026 | Entrada de la visita por bulto en la sincronización (3.60). | Ezequiel Marcenal |
 | 0.40 | 05/11/2026 | Entrada del cambio del entorno productivo a Azure (3.61) y corrección de la tabla de la entrada 3.59. | Ezequiel Marcenal |
 | 0.41 | 05/11/2026 | Entrada del tablero de observabilidad en producción (3.62). | Ezequiel Marcenal |
+| 0.42 | 08/11/2026 | Registro retrospectivo de las entradas de Cristian Reyes (3.63 a 3.92), del 06/10 al 08/11, y su herramienta en la sección 2. Reconstruido con las conversaciones con el asistente, Git y la documentación de estudio, para revisión del responsable. | Cristian Reyes |
