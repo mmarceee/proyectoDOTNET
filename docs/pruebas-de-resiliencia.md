@@ -55,6 +55,15 @@ bash scripts/test-en-docker.sh Resiliencia
 
 Con estas pruebas se configuró el backplane en FailFast con 1 s de espera, igual que la caché. Antes, cada aviso esperaba hasta 5 s en la cola del cliente de Valkey, y cada posición que sincroniza la PWA demoraba esos 5 s. Esto se verificó revisando el código; no tiene una prueba propia.
 
+**Invalidación fallida:** segundo caso de `ValkeyCaidoTests`. Mide el dato viejo que puede quedar cuando el cambio ocurre con Valkey caído.
+
+| | Comportamiento |
+| :---- | :---- |
+| **Esperado** | Publicar un tarifario con Valkey detenido se guarda igual; borrar el puntero falla y no deshace la publicación (ADR-0006, sección 2.5). Mientras Valkey está caído, el precio sale de PostgreSQL y es el nuevo. Si al volver Valkey conserva el puntero viejo, la API puede leerlo hasta que vence, como mucho 1 minuto desde que se guardó. |
+| **Observado** | La publicación respondió con éxito y, sin Valkey, el cálculo dio el precio nuevo. Al volver, Valkey recuperó su volcado con el puntero viejo: el precio anterior se vio hasta **59,6 s** después de guardado el puntero y, desde entonces, siempre el nuevo. Con el puntero en 10 minutos, la prueba falla (precio viejo a los 64,8 s). Coincide con lo esperado. |
+
+La prueba tarda poco más de un minuto, porque espera ese vencimiento.
+
 ---
 
 ## 3. Caso 2: cola (RabbitMQ) detenida
@@ -116,3 +125,4 @@ Con el entorno completo levantado (`docker compose up -d --build --wait`):
 | Versión | Fecha | Descripción |
 | :---: | :---: | :---- |
 | 1.0 | 08/11/2026 | Versión inicial: los cuatro casos con su prueba de integración, el chequeo de PostgreSQL en `/health`, el 503 con la base caída y el backplane de SignalR en FailFast. |
+| 1.1 | 08/11/2026 | Caso 1: invalidación fallida, con el puntero del tarifario de 1 minuto. El precio viejo duró 59,6 s y la prueba falla con 10 minutos. |
