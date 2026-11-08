@@ -945,6 +945,8 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Verificación ejecutada** | Solución compilada sin errores ni advertencias; 453 pruebas unitarias, 56 de arquitectura y 15 de integración aprobadas. Siete pruebas del generador también pasan en Linux .NET 10. pypdf y Poppler comprobaron tamaño, cantidad, numeración y disposición; ZXingBrowser de la PWA reconoció tres muestras renderizadas en Chrome headless. El módulo de descarga conservó los bytes del PDF. |
 | **Pendiente** | Aceptación física con impresión a tamaño real, cámara del teléfono y lector del depósito. No se desplegó en Azure ni se afirma que la prueba de hardware esté realizada. |
 
+**Ampliación documental · 08/11/2026.** A pedido de Lucas, Codex preparó la [guía para la defensa de CU-15](analisis-diseno/cu-15/guia-defensa.md): recorrido desde las pantallas y HTTP hasta el handler, lectura filtrada, adaptador QuestPDF/ZXing y descarga; ubicación exacta de GeneratePdf, dependencias, decisiones, límites y preguntas de exposición. Se contrastó con el código actual, sin modificar la implementación ni volver a ejecutar las pruebas históricas. La consulta posterior sobre carga incompleta se contrastó con RF 19 de la letra original, la decisión de entrega parcial (secciones 5 y 6), T4/T5 y el handler de carga; no se registró una nueva decisión funcional ni se implementó RF 32.
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -992,3 +994,4 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.40 | 05/11/2026 | Entrada del cambio del entorno productivo a Azure (3.61) y corrección de la tabla de la entrada 3.59. | Ezequiel Marcenal |
 | 0.41 | 05/11/2026 | Entrada del tablero de observabilidad en producción (3.62). | Ezequiel Marcenal |
 | 0.42 | 07/11/2026 | CU-15: análisis, impresión individual/múltiple en el Portal, reimpresión en depósito, decisión técnica y verificación automatizada/visual (3.63). | Lucas Ottonello |
+| 0.43 | 08/11/2026 | Guía de estudio de CU-15 para la defensa y registro del contraste entre carga incompleta, entrega parcial y comportamiento implementado. | Lucas Ottonello |
