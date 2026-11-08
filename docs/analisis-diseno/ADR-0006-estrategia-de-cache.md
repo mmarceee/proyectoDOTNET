@@ -1,8 +1,8 @@
 # **ADR-0006 · Estrategia de caché e invalidación**
 
-| Estado | Propuesto — versión alineada con la implementación, pendiente de revisión por el equipo |
+| Estado | Aceptado (revisado por Lucas Ottonello y Ezequiel Marcenal, 08/11/2026) |
 | :---- | :---- |
-| **Versión** | 0.6 |
+| **Versión** | 1.0 |
 | **Fecha** | 8 de noviembre de 2026 |
 | **Responsable** | Cristian Reyes |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
@@ -11,7 +11,7 @@
 
 **Este registro define qué se guarda en la caché distribuida (Valkey), con qué clave, cuánto dura, cuándo se invalida y cómo se mide. Se cachean dos casos de uso con perfiles de acceso opuestos: el seguimiento público, que se lee mucho y cambia seguido, y la configuración del operador (cuadro tarifario y reglas operativas), que se lee mucho y casi no cambia. La clave siempre incluye el operador, para que la caché no se convierta en una fuga entre inquilinos.**
 
-> Las decisiones que siguen abiertas están en la sección 5. Con la revisión del equipo, el registro pasa a *Aceptado* (versión 1.0).
+> Aceptado por el equipo el 08/11/2026 (v1.0), con las pruebas de la sección 4. Las decisiones que quedan abiertas están en la sección 5.
 
 # **1\. Contexto y restricciones**
 
@@ -85,7 +85,7 @@ Incluye el cuadro tarifario (CU-05) y las reglas operativas (CU-06). Se leen en 
 - **La vigencia futura no se resuelve con un evento:** una versión publicada hoy para regir el 1/11 no dispara nada el 1/11. Por eso el puntero guarda, junto con el número vigente, **`ValidoHasta`: el inicio de la próxima versión programada**. Cada lectura lo compara con la hora actual y, si ya pasó, borra el puntero y lo vuelve a cargar: ese mismo instante se empieza a leer la nueva versión, sin esperar a que venza el puntero. Lo comprueba `VersionProgramadaTests` con un reloj que se adelanta de las 23:59 a las 00:01 (sección 4).
 - **Un envío ya admitido no consulta el puntero:** usa la versión que guardó (`VersionTarifarioId`, `VersionReglasId`), así que nunca le afecta una publicación posterior.
 
-**Por qué el puntero dura 1 minuto (v0.5).** Hay dos situaciones en las que el puntero viejo puede quedar en la caché después de publicar (sección 2.5): una lectura que lo cargó de la base justo antes de la publicación y lo guarda justo después del borrado, y un borrado que falló porque Valkey no respondía. En los dos casos el dato viejo dura lo que dura la entrada, y con 10 minutos se podía cobrar una tarifa vieja durante demasiado tiempo. Con 1 minuto, como el seguimiento:
+**Por qué el puntero dura 1 minuto (v0.5).** Hay dos situaciones en las que el puntero viejo puede quedar en la caché después de publicar (sección 2.5): una lectura que lo cargó de la base justo antes de la publicación y lo guarda justo después del borrado, y un borrado que falló porque Valkey no respondía. En los dos casos el dato viejo dura lo que dura la entrada, y con 10 minutos se podía cobrar una tarifa vieja durante demasiado tiempo. Medido después de una caída: el precio viejo duró 59,6 s con 1 minuto, y la prueba falla con 10 (sección 4, prueba 9). Con 1 minuto, como el seguimiento:
 - Los dos riesgos quedan acotados a un minuto. Valkey cuenta la expiración por su lado, así que el límite vale también después de una caída.
 - El costo es bajo: recargar el puntero son dos consultas livianas (la versión vigente y el próximo inicio). Lo pesado, la tabla de cada versión, sigue guardándose 24 horas.
 - Evitar la carrera por completo exigiría escribir "sólo si la clave no existe" o una doble invalidación con demora. `IDistributedCache` no ofrece lo primero, y las dos opciones son desproporcionadas para el alcance del laboratorio. La aclaración docente pide resolver *o acotar* el riesgo.
@@ -170,10 +170,11 @@ La aclaración docente sobre caché distribuida (sección 3.1 de *Cambios de Req
 | 2 | **Invalidación:** después de publicar un tarifario o unas reglas, y de un evento de cambio de estado del envío, la lectura siguiente devuelve el dato nuevo. | `ConfigurarTarifarioTests`, `ConfigurarReglasTests` (recorrido completo hasta el precio o la regla nueva); `CacheSeguimientoTests` | Hecha |
 | 3 | **Vigencia futura:** una versión programada no rige antes de su fecha, y empieza a regir en el instante de su inicio aunque el puntero no haya vencido (`ValidoHasta`). | `ConfigurarTarifarioTests`, `ConfigurarReglasTests` (no rige todavía); `VersionProgramadaTests` (tarifario y reglas: el reloj de la API pasa de las 23:59 a las 00:01 y rige la versión nueva sin publicar nada) | Hecha. Verificada por mutación: sin la comparación con `ValidoHasta`, las dos pruebas fallan |
 | 4 | **Resiliencia:** con Valkey caído, se lee de la fuente sin esperar y `cache.errores` aumenta. | `CacheDistribuidaTests` (Valkey inalcanzable, caché que falla); `ValkeyCaidoTests` (Valkey detenido con la API corriendo y reconexión al volver, opcional 7.4, `docs/pruebas-de-resiliencia.md`) | Hecha |
-| 5 | **Métrica:** una lectura repetida suma un fallo y después un acierto. | `CacheDistribuidaTests` | Hecha; *pendiente (Ezequiel):* verla por caso en Aspire |
+| 5 | **Métrica:** una lectura repetida suma un fallo y después un acierto; en el tablero se ven por caso. | `CacheDistribuidaTests`; recorrido manual con Docker Compose (revisión de aclaraciones, sección 11.1): en Aspire, `aciertos` (30) y `fallos` (6) con la etiqueta `cache` en `reglas`, `seguimiento` y `tarifario`, y `errores` al detener Valkey | Hecha |
 | 6 | **Producción sin Valkey no arranca.** | `ConfiguracionProduccionTests` | Hecha |
-| 7 | **Demostración docente:** dos instancias completas de la API con PostgreSQL y Valkey compartidos; se publica una tarifa en una y la otra responde enseguida con el valor nuevo. | Docker Compose con un segundo servicio de la API | *Pendiente (Ezequiel)* |
-| 8 | **Invalidación del seguimiento de punta a punta:** recepción en el depósito, Outbox, RabbitMQ, Worker y borrado de la clave. | Recorrido manual con los servicios de Docker Compose | *Pendiente (Ezequiel)* |
+| 7 | **Demostración docente:** dos instancias completas de la API con PostgreSQL y Valkey compartidos; se publica una tarifa en una y la otra responde enseguida con el valor nuevo. | `TarifarioEntreDosApisTests` (revisión, sección 11): dos hosts de la API dentro del proceso de pruebas, no dos contenedores de Docker Compose, sobre la misma base y el mismo Valkey de Testcontainers. Las dos cobran $150; se publica $175 desde una y la otra lo cobra sin esperar. Con la segunda API en memoria, la prueba falla | Hecha |
+| 8 | **Invalidación del seguimiento de punta a punta:** recepción en el depósito, Outbox, RabbitMQ, Worker y borrado de la clave. | `InvalidacionSeguimientoTests` (revisión, sección 11.2): la API y el Worker como hosts separados que sólo comparten PostgreSQL, RabbitMQ y Valkey. El estado nuevo apareció a los 3,1 s, con un plazo de 20 s, muy por debajo de la expiración; con el Worker en memoria, la prueba falla | Hecha |
+| 9 | **Frescura después de una invalidación fallida:** se publica con Valkey caído (el borrado del puntero falla) y, al volver Valkey con el puntero viejo, el precio nuevo rige en a lo sumo un minuto. | Segundo caso de `ValkeyCaidoTests` (revisión, sección 11.3): el precio viejo se vio hasta 59,6 s después de reconectarse; con el puntero en 10 minutos la prueba falla (seguía a los 64,8 s) | Hecha |
 
 # **5\. Decisiones abiertas**
 
@@ -183,8 +184,8 @@ La aclaración docente sobre caché distribuida (sección 3.1 de *Cambios de Req
 | Alcance | **Cerrada:** seguimiento, tarifario y reglas. Zonas e identidad visual quedan como extensión posible (sección 2.4). |
 | Quién publica el evento de cambio de estado para el seguimiento | **Cerrada:** Envíos lo publica por Outbox; Seguimiento lo consume en el Worker (`InvalidarSeguimiento`, sección 2.3). |
 | Evento de la recepción en el depósito (T2) | **Cerrada:** Envíos publica `EnvioRecibidoEnDeposito` al recibir todos los bultos y `InvalidarSeguimiento` lo consume (sección 2.3). |
-| Resultados de las pruebas 5, 7 y 8 | **Abierta:** los aporta Ezequiel; con ellos se completa la sección 4. |
-| Aprobación del equipo | **Abierta:** revisión de Lucas y Ezequiel para pasar a *Aceptado* (v1.0). |
+| Resultados de las pruebas 5, 7, 8 y 9 | **Cerrada (v1.0):** los aportó Ezequiel Marcenal (revisión de aclaraciones, secciones 11 a 11.3). |
+| Aprobación del equipo | **Cerrada:** Lucas Ottonello y Ezequiel Marcenal aprobaron el registro el 08/11/2026. |
 
 # **6\. Referencias**
 
@@ -206,3 +207,4 @@ La aclaración docente sobre caché distribuida (sección 3.1 de *Cambios de Req
 | 0.4 | 24/10/2026 | Se alinea el texto con lo implementado: el seguimiento se invalida con los eventos de Envíos que consume el Worker (lista de eventos, `EnvioExtraviado` incluido, y T2 sin evento); la configuración, directamente en el handler de publicar, con el puntero `ValidoHasta`; zonas e identidad visual quedan fuera del alcance; el Worker también exporta la métrica; pruebas con su clase y estado; decisiones abiertas cerradas o actualizadas. Escrito con IA a pedido del responsable. | Cristian Reyes |
 | 0.5 | 08/11/2026 | Prueba 4 (resiliencia) hecha de punta a punta con `ValkeyCaidoTests`, de las pruebas de resiliencia (opcional 7.4). | Ezequiel Marcenal |
 | 0.6 | 08/11/2026 | Aclaración docente de caché: el puntero de configuración baja a 1 minuto y acota la carrera y la invalidación fallida; producción exige Valkey; T2 ya publica evento; demora real del respaldo (hasta 2 s la primera lectura); estado compartido entre instancias (sección 2.8); prueba de vigencia con reloj ajustable (`VersionProgramadaTests`); pruebas 5, 7 y 8 pendientes. Borrador con IA a pedido del responsable. | Cristian Reyes |
+| 1.0 | 08/11/2026 | Aceptado por el equipo. Pruebas 5, 7 y 8 hechas y prueba 9 nueva (frescura tras una invalidación fallida: 59,6 s con el puntero de 1 minuto), con los resultados de Ezequiel Marcenal. La demostración de las dos APIs queda como prueba automática, no en Docker Compose. | Cristian Reyes |
