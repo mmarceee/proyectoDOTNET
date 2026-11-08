@@ -21,14 +21,15 @@ internal sealed class ReglasDeEntregaDeAdministracion(IAdministracionModuleApi a
         return new Contracts.ReglasParaHoja(envio.VersionReglasId is null ? "Vigente" : "DelEnvio", reglas.VersionId,
             reglas.ExigeFoto, reglas.ExigeNombreYDocumento, reglas.MaxIntentos, reglas.PlazoEntreIntentos,
             reglas.Motivos.Select(m => new Contracts.MotivoParaHoja(m.Id, m.Codigo, m.Descripcion, m.Reprogramable,
-                m.ExigeEvidencia)).ToArray());
+                m.ExigeEvidencia)).ToArray(), reglas.AdmiteEntregaParcial);
     }
 
     public async Task<ReglasEntrega> DelEnvioAsync(Envio envio, CancellationToken ct)
     {
         var reglas = await DeAdministracionAsync(envio, ct);
         return new ReglasEntrega(reglas.ExigeFoto, reglas.ExigeNombreYDocumento, reglas.MaxIntentos,
-            reglas.PlazoEntreIntentos, reglas.DevolverTrasIntentosAgotados);
+            reglas.PlazoEntreIntentos, reglas.DevolverTrasIntentosAgotados, reglas.AdmiteEntregaParcial, reglas.Pendientes,
+            reglas.RecargoNuevaVisita);
     }
 
     // El motivo se busca en el catálogo de la versión del envío: los Id son de esa versión.

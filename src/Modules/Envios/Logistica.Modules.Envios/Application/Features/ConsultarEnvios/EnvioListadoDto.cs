@@ -13,4 +13,6 @@ internal sealed record EnvioListadoDto(
     string Resumen = "Creado",
     bool Terminado = false,
     int BultosEntregados = 0,
-    int TotalBultos = 0);
+    int TotalBultos = 0,
+    string? ReferenciaComercio = null,
+    Guid? ZonaId = null);

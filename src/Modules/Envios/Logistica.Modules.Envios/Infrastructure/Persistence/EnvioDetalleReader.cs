@@ -73,7 +73,8 @@ internal sealed class EnvioDetalleReader(EnviosDbContext db) : IEnvioDetalleRead
                 e.Modalidad.ToString(),
                 e.Resumen.ToString(),
                 e.Terminado,
-                e.BultosEntregados) })
+                e.BultosEntregados,
+                e.Recargos.OrderBy(r => r.OcurridoEn).Select(r => new RecargoDetalleDto(r.OcurridoEn, r.Monto)).ToList()) })
             .SingleOrDefaultAsync(ct);
 
         if (encontrado is null)

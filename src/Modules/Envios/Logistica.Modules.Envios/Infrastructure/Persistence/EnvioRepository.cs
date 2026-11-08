@@ -107,6 +107,19 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         return cerrados.Select(e => new EnvioCerrado(e.Id, e.Numero, e.Estado, e.LlegoEn!.Value, e.MontoTarifa)).ToList();
     }
 
+    public async Task<IReadOnlyList<RecargoRegistrado>> ListarRecargosAsync(Guid comercioId, DateTimeOffset desde,
+        DateTimeOffset hasta, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        // El filtro "Tenant" deja sólo los del operador de la sesión (ADR-0002); el número sale del envío del recargo.
+        return await db.RecargosNuevaVisita.AsNoTracking()
+            .Where(r => r.ComercioId == comercioId && r.OcurridoEn >= desde && r.OcurridoEn < hasta)
+            .OrderBy(r => r.OcurridoEn)
+            .Join(db.Envios, r => r.EnvioId, e => e.Id, (r, e) => new RecargoRegistrado(r.Id, r.EnvioId, e.Numero, r.OcurridoEn,
+                r.Monto))
+            .ToListAsync(ct);
+    }
+
     public async Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, bool esPrueba, CancellationToken ct)
     {
         // Tras un guardado rechazado por el índice (CU-11, A4), el contexto se desengancha de la transacción revertida.

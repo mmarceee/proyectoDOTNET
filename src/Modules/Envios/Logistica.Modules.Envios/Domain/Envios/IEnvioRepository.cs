@@ -16,6 +16,10 @@ internal interface IEnvioRepository
     Task<IReadOnlyList<EnvioCerrado>> ListarCerradosAsync(Guid comercioId, DateTimeOffset desde, DateTimeOffset hasta,
         CancellationToken ct);
 
+    // RF 33: los recargos de nueva visita del comercio en [desde, hasta), sólo para leer.
+    Task<IReadOnlyList<RecargoRegistrado>> ListarRecargosAsync(Guid comercioId, DateTimeOffset desde, DateTimeOffset hasta,
+        CancellationToken ct);
+
     // CU-11: el envío del comercio con esa referencia, sólo para leer.
     Task<Envio?> ObtenerPorReferenciaAsync(Guid comercioId, string referencia, bool esPrueba, CancellationToken ct);
     Task<Envio?> ObtenerPruebaPorNumeroAsync(string numero, CancellationToken ct);

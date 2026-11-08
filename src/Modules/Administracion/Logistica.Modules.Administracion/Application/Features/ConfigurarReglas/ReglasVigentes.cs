@@ -67,5 +67,7 @@ internal sealed class ReglasVigentes(IReglasRepository versiones, ICacheDistribu
         version.MaxParadasPorRuta,
         version.Motivos.OrderBy(m => m.Codigo)
             .Select(m => new MotivoNoEntregaResultado(m.Id, m.Codigo, m.Descripcion, m.Reprogramable, m.ExigeEvidencia))
-            .ToList());
+            .ToList(),
+        version.EntregaParcial.AdmiteEntregaParcial, version.EntregaParcial.Pendientes,
+        version.EntregaParcial.RecargoNuevaVisita);
 }

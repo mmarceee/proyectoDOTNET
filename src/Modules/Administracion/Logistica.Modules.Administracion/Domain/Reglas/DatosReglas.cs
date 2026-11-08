@@ -10,4 +10,6 @@ internal sealed record DatosReglas(
     PoliticaDevolucion PoliticaDevolucion,
     IReadOnlyList<PlazoModalidad> Plazos,
     int AnticipacionReprogramacionHoras,
-    int MaxParadasPorRuta);
+    int MaxParadasPorRuta,
+    // RF 33. Si no se indica, las reglas de antes del cambio (ReglasEntregaParcial.ComoAntes).
+    ReglasEntregaParcial? EntregaParcial = null);

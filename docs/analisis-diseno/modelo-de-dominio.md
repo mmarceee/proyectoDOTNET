@@ -360,6 +360,8 @@ La [especificación técnica de CU-40](cu-40/especificacion-tecnica-cu-40.md), s
 
 * maxParadasPorRuta: int (RF 14)
 
+* entregaParcial: ReglasEntregaParcial (RF 33)
+
 **Métodos**
 
 * publicar(desde: DateTimeOffset): void
@@ -389,6 +391,20 @@ La [especificación técnica de CU-40](cu-40/especificacion-tecnica-cu-40.md), s
 * devolverTrasIntentosAgotados: bool
 
 * plazoDevolucionDias: int
+
+**ReglasEntregaParcial**
+
+*sin id propio — parte de VersionReglas (RF 33; decisiones-entrega-parcial.md, sección 5)*
+
+**Atributos**
+
+* admiteEntregaParcial: bool (falso: en cada visita se entregan todos los bultos o ninguno; vale falso en las versiones publicadas antes del cambio)
+
+* pendientes: PoliticaPendientes (NuevaVisitaSinRecargo, NuevaVisitaConRecargo o Devolver: qué pasa con un bulto no entregado)
+
+* recargoNuevaVisita: decimal (monto fijo; mayor que cero sólo con NuevaVisitaConRecargo, cero con las otras)
+
+*Con Devolver, un bulto no entregado pasa a devolución (T10) aunque le queden intentos. Con las otras dos sigue la regla de siempre: el motivo y los intentos deciden entre T9 y T10. Con nueva visita con recargo, el envío registra un RecargoNuevaVisita en cada visita adicional; cobrarlo es de la liquidación (CU-32).*
 
 **PlazoModalidad**
 
@@ -609,6 +625,20 @@ Produccion, Prueba
 * evidencia: PruebaEntrega (opcional)
 
 * observaciones: string (opcional)
+
+**RecargoNuevaVisita**
+
+*RF 33: el cargo de una visita adicional del envío, cuando su versión de reglas indica nueva visita con recargo. Uno por visita, aunque falle; nunca en la primera ni por cada bulto. La liquidación (CU-32) cobra el monto guardado*
+
+**Atributos**
+
+* id: Guid
+
+* envioId: Guid
+
+* monto: decimal (el recargoNuevaVisita de las reglas del envío en ese momento)
+
+* ocurridoEn: DateTimeOffset
 
 **PruebaEntrega**
 
@@ -1301,12 +1331,14 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | VersionReglas | 1 | composición | 1..\* | PlazoModalidad |
 | VersionReglas | 1 | composición | 1 | PruebaExigida |
 | VersionReglas | 1 | composición | 1 | PoliticaDevolucion |
+| VersionReglas | 1 | composición | 1 | ReglasEntregaParcial |
 | RelacionComercial | 1 | asociación | 0..\* | Envio |
 | Envio | 1 | composición | 1..\* | Bulto |
 | Envio | 1 | composición | 1 | Destinatario |
 | Envio | 1 | composición | 1 | Direccion |
 | Envio | 1 | composición | 1..\* | EventoEnvio |
 | Envio | 1 | composición | 0..\* | IntentoEntrega |
+| Envio | 1 | composición | 0..\* | RecargoNuevaVisita |
 | IntentoEntrega | 1 | composición | 0..1 | PruebaEntrega |
 | Envio | 1 | asociación | 0..\* | Incidencia |
 | Envio | 1 | asociación | 0..1 | Devolucion |

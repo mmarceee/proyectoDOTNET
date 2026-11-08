@@ -91,4 +91,10 @@ public interface IEnviosModuleApi
     // la tarifa con que se admitieron. Los cancelados y extraviados no se cobran. El operador lo pone el filtro "Tenant".
     Task<IReadOnlyList<EnvioLiquidable>> ListarLiquidablesAsync(Guid comercioId, DateTimeOffset desde, DateTimeOffset hasta,
         CancellationToken ct);
+
+    // RF 33 y CU-32: los recargos de nueva visita del comercio registrados entre desde (inclusive) y hasta (exclusive).
+    // Cada uno se cobra una vez; el RecargoId sirve para no repetirlo en otra liquidación. El operador lo pone el filtro
+    // "Tenant".
+    Task<IReadOnlyList<RecargoLiquidable>> ListarRecargosAsync(Guid comercioId, DateTimeOffset desde, DateTimeOffset hasta,
+        CancellationToken ct);
 }

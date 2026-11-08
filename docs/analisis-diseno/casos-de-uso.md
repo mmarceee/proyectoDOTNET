@@ -131,6 +131,8 @@ Cada caso de uso se describe con los campos: caso de uso, descripción, pre-cond
 * El máximo de paradas por ruta se guarda en la versión de reglas, y Planificación lo toma de la versión que rige al confirmar la operación, con el mismo contrato `ObtenerReglasPlanificacionAsync` (acordado con Lucas Ottonello, 19/10/2026). Sigue contando paradas agrupadas, no envíos; el historial de cada ruta conserva la versión y el límite que usó. `VersionReglasPlanificacion` queda sin uso y se retira después.
 * Los motivos se validan contra el catálogo de la versión que guardó el envío; la PWA sigue enviando el Id del motivo. Los catálogos históricos se conservan y el código del motivo se mantiene estable entre versiones.
 
+**Ampliación por RF 33 (05/11/2026, Cristian Reyes).** Cada versión de reglas indica si el operador admite la entrega parcial, qué pasa con los bultos que no se entregaron (nueva visita sin recargo, con recargo o devolución) y el monto del recargo, que tiene que ser mayor que cero sólo con la política con recargo (A1). Las versiones publicadas antes del cambio no admiten la entrega parcial. Cada envío usa los valores de su versión. Con recargo, cada visita adicional del envío registra el monto una sola vez, aunque falle; la liquidación lo lee por contrato. Quedan para después su cobro en la liquidación (CU-32) y la validación en la carga.
+
 ### **CU-07 · Gestionar la identidad visual**
 
 | Campo | Contenido |
@@ -642,6 +644,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 * **Ventana estimada:** con fecha y franja asignadas, esa fecha y franja. Sin fecha todavía no se muestra, porque el plazo depende de la modalidad del envío (CU-10); "cuántas entregas quedan antes" queda para después.
 * **Enlace para el personal:** `/backoffice/seguimiento/{número}` (Administrador o Despachador) muestra el enlace para copiarlo, mientras el aviso por correo no lo incluya.
 
+**Ampliación por RF 35 (07/11/2026, Cristian Reyes).** El seguimiento muestra el avance de la entrega, por ejemplo *2 de 3 bultos entregados*, y el estado de cada bulto como *BTO 1*, *BTO 2*…, sin su Id ni su código de etiqueta (decisión del equipo). Con parte de los bultos entregados, el título dice *Entregado parcialmente*. Con un solo bulto no se muestra el avance. Cada visita actualiza la página al sincronizarse; la recepción de un bulto suelto en el depósito puede tardar hasta un minuto en verse, por la caché.
+
 ### **CU-61 · Solicitar la reprogramación de un envío**
 
 | Campo | Contenido |
@@ -759,7 +763,7 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Actores** | **Principal:** sistema del comercio. |
 | **Flujo de evento principal** | 1. El sistema del comercio envía `GET /api/v1/envios` con filtros (estado, fechas, referencia) y paginación, o `GET /api/v1/envios/{numero}` para un envío.<br>2. El sistema valida la clave.<br>3. El sistema responde con la página de envíos, o con el envío y su historial de eventos. |
 | **Flujos alternativos** | **A1 · Envío inexistente o de otro comercio (paso 3).** Responde **404**.<br><br>**A2 · Clave inválida o límite superado (paso 2).** Igual que en CU-81 (A1 y A2). |
-| **Requerimientos especiales** | 1. Mismas reglas de aislamiento que CU-13: la clave determina qué envíos se ven.<br>2. No expone identificadores internos: los envíos se identifican por su número. |
+| **Requerimientos especiales** | 1. Mismas reglas de aislamiento que CU-13: la clave determina qué envíos se ven.<br>2. No expone identificadores internos: los envíos se identifican por su número.<br>3. El filtro de estado usa el resumen de entrega del [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). El listado y el detalle muestran el progreso y el cierre. El detalle incluye el código y estado de cada bulto. |
 
 ### **CU-83 · Consultar la documentación de la API**
 
@@ -861,3 +865,6 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 1.10 | 06/11/2026 | CU-71: implementación en nivel básico; tabla de lectura con un registro por entrega o intento fallido, y ventana comprometida en `EnvioAdmitido`. | Ezequiel Marcenal |
 | 1.11 | 06/11/2026 | CU-72: implementación en nivel básico (tablas y CSV). CU-71: también registra las altas, y el repartidor de la flota viaja en `EnvioEntregado` e `IntentoFallidoRegistrado`. | Ezequiel Marcenal |
 | 1.12 | 06/11/2026 | CU-70: implementación en nivel básico como servicio periódico de la API (cambia el requerimiento especial 1); período de liquidación mensual. CU-32: lo genera también el cierre diario. | Ezequiel Marcenal |
+| 2.0 | 05/11/2026 | CU-06: ampliación por RF 33 (entrega parcial, política para los bultos pendientes y recargo de la nueva visita). | Cristian Reyes |
+| 2.1 | 07/11/2026 | CU-60: ampliación por RF 35 (avance de la entrega por bulto); se resume la ampliación de RF 33 en CU-06. | Cristian Reyes |
+| 2.2 | 07/11/2026 | CU-06: registro del recargo de cada visita adicional (RF 33). | Cristian Reyes |

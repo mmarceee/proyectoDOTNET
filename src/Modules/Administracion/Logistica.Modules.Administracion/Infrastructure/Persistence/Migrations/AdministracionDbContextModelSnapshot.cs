@@ -539,6 +539,21 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("Plazos");
 
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "EntregaParcial", "Logistica.Modules.Administracion.Domain.Reglas.VersionReglas.EntregaParcial#ReglasEntregaParcial", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<bool>("AdmiteEntregaParcial")
+                                .HasColumnType("boolean");
+
+                            b1.Property<string>("Pendientes")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<decimal>("RecargoNuevaVisita")
+                                .HasColumnType("numeric");
+                        });
+
                     b.ComplexProperty(typeof(Dictionary<string, object>), "PoliticaDevolucion", "Logistica.Modules.Administracion.Domain.Reglas.VersionReglas.PoliticaDevolucion#PoliticaDevolucion", b1 =>
                         {
                             b1.IsRequired();

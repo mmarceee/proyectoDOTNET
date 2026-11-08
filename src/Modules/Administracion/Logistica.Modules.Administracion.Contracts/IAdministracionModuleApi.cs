@@ -37,4 +37,6 @@ public interface IAdministracionModuleApi
 
     // CU-32: los comercios con relación con el operador de la sesión, activa o suspendida, ordenados por razón social.
     Task<IReadOnlyList<ComercioRelacionado>> ConsultarComerciosAsync(CancellationToken ct);
+
+    Task<IReadOnlyList<ZonaPlanificacion>> ConsultarZonasAsync(CancellationToken ct);
 }

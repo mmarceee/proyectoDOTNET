@@ -4,7 +4,7 @@ using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Envios.Application.Features.ConsultarEnviosApi;
 
-internal sealed record FiltrosEnviosApi(EstadoResumenApi? Estado, DateOnly? FechaDesde, DateOnly? FechaHasta,
+internal sealed record FiltrosEnviosApi(ResumenEnvio? Estado, DateOnly? FechaDesde, DateOnly? FechaHasta,
     string? ReferenciaComercio, int Pagina, int TamanoPagina);
 
 internal interface IEnviosApiReader
@@ -25,11 +25,11 @@ internal sealed class ConsultarEnviosApiHandler(IEnviosApiReader reader)
         if (desde > hasta)
             throw new DomainException("La fecha desde no puede ser posterior a la fecha hasta.");
 
-        EstadoResumenApi? resumen = null;
+        ResumenEnvio? resumen = null;
         if (!string.IsNullOrWhiteSpace(estado))
         {
             var nombre = estado.Trim();
-            if (!Enum.TryParse<EstadoResumenApi>(nombre, ignoreCase: true, out var valor)
+            if (!Enum.TryParse<ResumenEnvio>(nombre, ignoreCase: true, out var valor)
                 || !string.Equals(nombre, valor.ToString(), StringComparison.OrdinalIgnoreCase))
                 throw new DomainException("El estado debe ser Creado, EnOperacion, EntregadoParcialmente o Entregado.");
             resumen = valor;

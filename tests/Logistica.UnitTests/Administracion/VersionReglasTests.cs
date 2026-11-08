@@ -131,4 +131,47 @@ public class VersionReglasTests
         Assert.True(version.MotivoValido(" Ausente "));
         Assert.False(version.MotivoValido("RECHAZADO"));
     }
+
+    // RF 33: sin indicar las reglas de entrega parcial, la versión se comporta como antes del cambio (decisión del 03/11).
+    [Fact]
+    public void Sin_reglas_de_entrega_parcial_queda_todo_o_nada_y_revisita_sin_recargo()
+    {
+        var version = Borrador();
+
+        Assert.Equal(new ReglasEntregaParcial(false, PoliticaPendientes.NuevaVisitaSinRecargo, 0), version.EntregaParcial);
+        Assert.Empty(version.Errores());
+    }
+
+    // RF 33: el recargo existe sólo con la política que lo cobra, y entonces tiene que ser mayor que cero.
+    [Theory]
+    [InlineData(PoliticaPendientes.NuevaVisitaConRecargo, 150, null)]
+    [InlineData(PoliticaPendientes.NuevaVisitaConRecargo, 0, "tiene que ser mayor que cero")]
+    [InlineData(PoliticaPendientes.NuevaVisitaConRecargo, -10, "tiene que ser mayor que cero")]
+    [InlineData(PoliticaPendientes.NuevaVisitaSinRecargo, 150, "Sólo se indica un recargo")]
+    [InlineData(PoliticaPendientes.Devolver, 150, "Sólo se indica un recargo")]
+    [InlineData(PoliticaPendientes.Devolver, 0, null)]
+    [InlineData((PoliticaPendientes)99, 0, "política para los bultos pendientes no es válida")]
+    public void El_recargo_se_valida_segun_la_politica(PoliticaPendientes politica, int recargo, string? error)
+    {
+        var version = Borrador(Validas() with { EntregaParcial = new ReglasEntregaParcial(true, politica, recargo) });
+
+        if (error is null) Assert.Empty(version.Errores());
+        else Assert.Contains(version.Errores(), e => e.Contains(error));
+    }
+
+    // RF 33 y CU-06, paso 3: un borrador nuevo copia las reglas de la vigente, incluida la entrega parcial, y una
+    // versión publicada no las cambia más (letra 6.6).
+    [Fact]
+    public void Las_reglas_de_entrega_parcial_se_copian_al_borrador_y_no_cambian_al_publicar()
+    {
+        var parcial = new ReglasEntregaParcial(true, PoliticaPendientes.NuevaVisitaConRecargo, 120);
+        var vigente = Borrador(Validas() with { EntregaParcial = parcial });
+        vigente.Publicar(Ahora, Ahora, null);
+
+        var copia = VersionReglas.CrearBorrador(Operador, 2, vigente.Valores(), [Ausente]);
+
+        Assert.Equal(parcial, copia.EntregaParcial);
+        Assert.Throws<DomainException>(() => vigente.Modificar(Validas()));
+        Assert.Equal(parcial, vigente.EntregaParcial);
+    }
 }

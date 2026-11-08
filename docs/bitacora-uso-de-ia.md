@@ -845,6 +845,12 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Descartado** | Publicar el DTO de Backoffice, inventar resultados por bulto a partir de un envío aún en operación y marcar el caso como completo con la proyección actual. |
 | **Verificación** | `ConsultarEnviosApiTests` comprueba filtros, paginación, historial, privacidad y 404 entre comercios, operadores y ambientes. Queda demostrar 2 de 3 entregados con uno pendiente y luego el mismo envío con uno devuelto y `terminado: true`. |
 
+### **Actualización del 05/11/2026 · Integración con RF 31**
+
+Lucas retomó CU-82 tras la integración del PR #71 de Cristian. Con Codex actualizó el lector para filtrar por `Envio.Resumen`, leer el progreso persistido y proyectar el estado de cada bulto. Se conservó la lectura dentro de Envíos, el aislamiento por tenant y ambiente y el historial del envío. Se actualizó el contrato documentado en OpenAPI y se añadieron pruebas HTTP de primera recepción y del cierre mixto del mismo envío con dos de tres bultos entregados.
+
+Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de CU-82 y las regresiones de alta por API, documentación, recepción y sincronización por bulto. La prueba de cierre mixto aplica las transiciones en el agregado y verifica listado y detalle por HTTP. Queda la demostración conjunta del opcional 7.4.
+
 ## **3.57 CU-83 · Consultar la documentación de la API**
 
 | Campo | Detalle |
@@ -858,7 +864,7 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | **Aceptado sin modificaciones** | `/api/docs` y `/api/openapi/v1.json` se sirven en el host existente. El documento incluye las operaciones públicas v1. La consola conserva la clave en memoria y el servidor exige una clave de prueba en sus rutas. |
 | **Modificado** | Se alineó `Microsoft.AspNetCore.OpenApi` de 10.0.12 a 10.0.13 durante la auditoría, de acuerdo con el parche fijado en el repositorio. Se actualizó la documentación de implementación con el alcance de cada CU. |
 | **Descartado** | Una especificación duplicada a mano y una consola que sólo filtre claves de producción en el navegador. La validación en el servidor devuelve 403 incluso al invocar directamente las rutas de la consola. |
-| **Verificación** | `DocumentacionApiTests` comprueba acceso anónimo, alcance del OpenAPI, esquema de la clave, ejemplo de alta, listado y detalle y rechazo de producción. Auditoría conjunta de CU-80 a CU-83 en Release: 82 pruebas de integración y 56 de arquitectura aprobadas. El opcional 7.4 sigue abierto por el progreso por bulto de CU-82. |
+| **Verificación** | `DocumentacionApiTests` comprueba acceso anónimo, alcance del OpenAPI, esquema de la clave, ejemplo de alta, listado y detalle y rechazo de producción. La auditoría conjunta del 03/11 en Release tuvo 82 pruebas de integración y 56 de arquitectura aprobadas. La integración posterior de CU-82 se registra en la entrada 3.56. |
 
 ## **3.58 Entorno productivo en DigitalOcean**
 
@@ -967,6 +973,7 @@ Las entradas 3.22 a 3.33 se reconstruyeron el **20/10/2026** con asistencia de C
 | 0.36 | 03/11/2026 | Entradas de CU-80 a CU-83, auditoría de ADR y carpetas, ajustes de autenticación y OpenAPI, y registro del pendiente de entrega parcial en CU-82. | Lucas Ottonello |
 | 0.37 | 03/11/2026 | Entrada del entorno productivo en DigitalOcean (3.58). | Ezequiel Marcenal |
 | 0.38 | 03/11/2026 | Entrada del ADR-0004 con los conflictos por bulto (3.59). | Ezequiel Marcenal |
+| 0.39 | 05/11/2026 | Integración del resumen persistido y el progreso por bulto en CU-82 (3.56). | Lucas Ottonello |
 | 0.39 | 03/11/2026 | Entrada de la visita por bulto en la sincronización (3.60). | Ezequiel Marcenal |
 | 0.40 | 05/11/2026 | Entrada del cambio del entorno productivo a Azure (3.61) y corrección de la tabla de la entrada 3.59. | Ezequiel Marcenal |
 | 0.41 | 05/11/2026 | Entrada del tablero de observabilidad en producción (3.62). | Ezequiel Marcenal |
