@@ -19,7 +19,7 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("administracion")
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -60,6 +60,37 @@ namespace Logistica.Modules.Administracion.Infrastructure.Persistence.Migrations
                         .HasFilter("\"PublicadoEn\" IS NULL");
 
                     b.ToTable("outbox_messages", "administracion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Administracion.Domain.CierresDiarios.CierreDiario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("EjecutadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EnviosDevueltos")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("Fecha")
+                        .HasColumnType("date");
+
+                    b.Property<int>("LiquidacionesGeneradas")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RutasSinFinalizar")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Fecha")
+                        .IsUnique();
+
+                    b.ToTable("cierres_diarios", "administracion");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Administracion.Domain.Comercios.ClaveApi", b =>

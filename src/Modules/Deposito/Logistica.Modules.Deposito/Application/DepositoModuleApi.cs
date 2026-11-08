@@ -6,8 +6,12 @@ using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Deposito.Application;
 
-internal sealed class DepositoModuleApi(IRecepcionRepository recepciones, ILiquidacionRepository liquidaciones) : IDepositoModuleApi
+internal sealed class DepositoModuleApi(IRecepcionRepository recepciones, ILiquidacionRepository liquidaciones,
+    Features.GenerarLiquidacion.GenerarLiquidacionHandler generar) : IDepositoModuleApi
 {
+    public Task<int> GenerarLiquidacionesDelPeriodoAsync(DateOnly desde, DateOnly hasta, CancellationToken ct)
+        => generar.GenerarDelPeriodoAsync(desde, hasta, ct);
+
     public async Task<IReadOnlyList<MedidasBultoRecibido>> ObtenerMedidasRecepcionAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct)
         => (await recepciones.ConsultarPorBultosAsync(bultoIds, ct)).Select(r => new MedidasBultoRecibido(r.BultoId, r.PesoKg, r.LargoCm, r.AnchoCm, r.AltoCm, r.RecibidoEn)).ToList();
 

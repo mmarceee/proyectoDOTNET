@@ -40,6 +40,8 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("ConnectionStrings:Valkey", "");
         // Las pruebas históricas preparan datos sin sesión; las de seguridad desactivan este respaldo.
         builder.UseSetting("Identity:PermitirTenantProvisorio", "true");
+        // El cierre diario (CU-70) cambiaría datos de otras pruebas si llega su hora; sus pruebas lo ejecutan a mano.
+        builder.UseSetting("CierreDiario:Habilitado", "false");
     }
 
     public async Task InitializeAsync()
