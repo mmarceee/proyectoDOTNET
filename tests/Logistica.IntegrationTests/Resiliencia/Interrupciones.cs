@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using Logistica.BuildingBlocks.Infrastructure.Caching;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
 using Logistica.Http.Contracts.Envios;
 using Logistica.IntegrationTests.Identidad;
@@ -105,8 +106,9 @@ internal static class Interrupciones
             new DireccionRequest("Av. Italia", Guid.NewGuid().ToString("N")[..8], "Montevideo", "Montevideo", "11300", null),
             [new BultoRequest(2, 30, 20, 10)]));
 
-    // El Worker, como en Logistica.Worker/Program.cs: el módulo Seguimiento y el consumidor de RabbitMQ.
-    public static IHost CrearWorker(string postgres, string rabbitMq, string? smtp = null)
+    // El Worker, como en Logistica.Worker/Program.cs: el módulo Seguimiento, la caché y el consumidor de RabbitMQ. Sin
+    // Valkey, la caché es la memoria del Worker, que la API no ve: para probar la invalidación hay que pasarle el mismo.
+    public static IHost CrearWorker(string postgres, string rabbitMq, string? smtp = null, string? valkey = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -121,6 +123,7 @@ internal static class Interrupciones
         builder.Services.AddScoped<InquilinoMensaje>();
         builder.Services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<InquilinoMensaje>());
         builder.Services.AddSeguimientoModule(builder.Configuration);
+        builder.Services.AddCacheDistribuida(valkey);
         builder.Services.AddHostedService<ConsumidorRabbitMq>();
         return builder.Build();
     }
