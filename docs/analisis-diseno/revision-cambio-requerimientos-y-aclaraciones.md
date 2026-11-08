@@ -180,7 +180,7 @@ El reparto es una propuesta basada en las áreas actuales, no una asignación ya
 - [ ] Probar el instante en que comienza una versión programada con un reloj controlado.
 - [ ] Resolver o acotar explícitamente la carrera de repoblación de caché y el dato viejo tras una invalidación fallida.
 - [x] Incorporar el evento de recepción y registrarlo como evento que invalida seguimiento (resuelto por los cambios integrados desde `main`).
-- [ ] Verificar el recorrido de recepción e invalidación completo a través de Outbox, RabbitMQ y Worker.
+- [x] Verificar el recorrido de recepción e invalidación completo a través de Outbox, RabbitMQ y Worker (`InvalidacionSeguimientoTests`, sección 11.2).
 - [x] Revisar la configuración productiva para impedir una sustitución accidental por memoria local (sección 11.1).
 - [ ] Actualizar el ADR-0006 con evidencias, límites reales de latencia y resultados de estos escenarios.
 - [ ] Confirmar que las banderas continúan fuera del conjunto de opcionales elegido o planificarlas con todas las condiciones de la aclaración.
@@ -235,3 +235,17 @@ Responsable: Ezequiel Marcenal (pruebas), dentro del trabajo conjunto con Cristi
 **Caída manual.** Con el entorno local, sin servicios compartidos, se detuvo Valkey (`docker compose stop valkey`) y se consultó tres veces el seguimiento: las tres respondieron 200, en 28, 7 y 6 ms, y `logistica.cache.errores` sumó 3 con `cache = seguimiento`. Al volver a levantar Valkey, las consultas siguieron respondiendo sin reiniciar la API. El contador `errores` sólo aparece en Aspire después de la primera falla.
 
 **Configuración productiva.** `ConexionesObligatorias` impide arrancar la API y el Worker en `Production` sin `ConnectionStrings:Valkey` (prueba `ConfiguracionProduccionTests`), y Terraform la define en `main.tf`. Así, la memoria del proceso queda sólo para desarrollo y pruebas. Un Valkey configurado pero caído sigue el camino de la base (`ValkeyCaidoTests` y la prueba manual anterior). En Azure, Valkey corre sin volumen: si se reinicia el contenedor, arranca vacío. En Docker Compose y Testcontainers, en cambio, la imagen guarda su volcado al detenerse, así que en esos entornos un puntero viejo puede sobrevivir a un reinicio hasta que vence.
+
+### 11.2 Invalidación del seguimiento de punta a punta
+
+**Prueba agregada:** [`InvalidacionSeguimientoTests`](../../tests/Logistica.IntegrationTests/Seguimiento/InvalidacionSeguimientoTests.cs). La API y el Worker son hosts separados que sólo comparten PostgreSQL, RabbitMQ y Valkey (Testcontainers), como en Docker Compose. El recorrido:
+
+1. Se crea un envío de un bulto y se consulta `/api/seguimiento/{token}`: «Recibimos tu envío», que queda en Valkey por un minuto.
+2. Se recibe el bulto en el depósito (T2): Envíos pasa a `EnDeposito` y registra `EnvioRecibidoEnDeposito` en el outbox.
+3. El publicador lo manda a RabbitMQ, el Worker lo consume con `InvalidarSeguimiento` y borra la clave. La consulta siguiente muestra «En el depósito».
+
+El paso 3 tiene un plazo de 20 s, muy por debajo de la expiración de 60 s, así que el estado nuevo no puede deberse al vencimiento. **Resultado:** aprobada; el estado nuevo apareció 3,1 s después de la recepción.
+
+**Comprobación de que la prueba distingue:** con el Worker sin Valkey (la memoria de su proceso, que la API no ve), la prueba falla por tiempo: después de 20 s el seguimiento sigue mostrando el estado anterior. El cambio se revirtió después de esa corrida.
+
+**Ajuste en las pruebas:** `Interrupciones.CrearWorker` no registraba la caché, a diferencia de `Logistica.Worker/Program.cs`, así que `InvalidarSeguimiento` no podía resolverse en ese Worker de prueba. Ahora la registra y acepta la cadena de Valkey. Las pruebas de resiliencia que lo usan siguen aprobadas: 5 de 5 junto con la nueva (`ValkeyCaidoTests`, `PostgresCaidoTests`, `RabbitMqCaidoTests` y `SmtpCaidoTests`).
