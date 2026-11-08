@@ -3,9 +3,11 @@ using System.Diagnostics.Metrics;
 using System.Net;
 using DotNet.Testcontainers.Builders;
 using Logistica.BuildingBlocks.Infrastructure.Caching;
+using Logistica.IntegrationTests.Identidad;
 using Microsoft.AspNetCore.Hosting;
 using StackExchange.Redis;
 using Xunit.Abstractions;
+using static Logistica.IntegrationTests.Administracion.PaginaTarifario;
 using static Logistica.IntegrationTests.Resiliencia.Interrupciones;
 
 namespace Logistica.IntegrationTests.Resiliencia;
@@ -77,6 +79,62 @@ public sealed class ValkeyCaidoTests(PostgresApiFactory factory, ITestOutputHelp
             return respuesta.StatusCode == HttpStatusCode.Created && await HayClavesAsync() ? "ok" : null;
         }, TimeSpan.FromSeconds(60), "la API vuelve a guardar en Valkey");
         salida.WriteLine($"La API volvió a guardar en Valkey {reloj.Elapsed.TotalSeconds:0.0} s después de que volvió.");
+    }
+
+    // Invalidación fallida (ADR-0006, sección 2.5): se publica una tarifa con Valkey detenido, así que el borrado del
+    // puntero falla. Mientras está caído se lee de la base y el precio es el nuevo. Al volver, Valkey recupera su volcado
+    // con el puntero viejo, y la API puede leerlo hasta que vence: como dura 1 minuto, nunca más de un minuto desde que
+    // se guardó. Tarda poco más de un minuto, porque espera ese vencimiento.
+    [Fact]
+    public async Task Una_tarifa_publicada_sin_Valkey_rige_a_mas_tardar_al_minuto_de_guardado_el_puntero_viejo()
+    {
+        using var api = factory.WithWebHostBuilder(b => b
+            .UseSetting("ConnectionStrings:Valkey", Conexion)
+            .UseSetting("Identity:PermitirTenantProvisorio", "false"));
+        using var admin = api.CreateClient(Sesion.Opciones);
+        await Sesion.IngresarAsync(admin, "admin@operador-demo.uy");
+
+        // Antes: la versión 1 cobra $150 y su puntero queda en Valkey por un minuto, contado desde ahora.
+        Assert.Contains("$ 150 con la versión 1", await CalcularAsync(admin, ZonaDemo, "Estandar"));
+        var desdeGuardado = Stopwatch.StartNew();
+        Assert.True(await HayClavesAsync(), "La caché no guardó el puntero con Valkey disponible.");
+
+        await valkey.DetenerAsync();
+
+        // Durante: se publica $175. Guardar en la base funciona; borrar el puntero falla y no deshace la publicación.
+        await AccionAsync(admin, Pagina, "Nueva", []);
+        await QuitarReglaAsync(admin, "$ 150");
+        await AccionAsync(admin, Borrador, "Regla", Regla(ZonaDemo, "Estandar", "0", "5", "0", "0.1", "175"));
+        var publicada = await AccionAsync(admin, Borrador, "Publicar", [new("ConfirmaSinTarifa", "true")]);
+        Assert.Equal(HttpStatusCode.Redirect, publicada.StatusCode);
+        Assert.Contains("$ 175 con la versión 2", await CalcularAsync(admin, ZonaDemo, "Estandar"));
+
+        await valkey.ReanudarAsync();
+
+        // Después: se calcula una vez por segundo hasta pasado el minuto. El precio viejo sólo puede aparecer mientras
+        // el puntero recuperado no venció.
+        var ultimoViejo = TimeSpan.Zero;
+        while (desdeGuardado.Elapsed < TimeSpan.FromSeconds(65))
+        {
+            var texto = await CalcularAsync(admin, ZonaDemo, "Estandar");
+            if (texto.Contains("$ 150 con la versión 1"))
+            {
+                ultimoViejo = desdeGuardado.Elapsed;
+            }
+            else
+            {
+                Assert.Contains("$ 175 con la versión 2", texto);
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        salida.WriteLine(ultimoViejo == TimeSpan.Zero
+            ? "Al volver Valkey no se vio el precio viejo."
+            : $"El precio viejo se vio hasta {ultimoViejo.TotalSeconds:0.0} s después de guardado el puntero.");
+        Assert.True(ultimoViejo < TimeSpan.FromSeconds(61),
+            $"El precio viejo seguía vigente {ultimoViejo.TotalSeconds:0.0} s después de guardado el puntero.");
+        Assert.Contains("$ 175 con la versión 2", await CalcularAsync(admin, ZonaDemo, "Estandar"));
     }
 
     private async Task<bool> HayClavesAsync()
