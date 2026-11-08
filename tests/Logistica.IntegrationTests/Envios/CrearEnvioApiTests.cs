@@ -98,6 +98,11 @@ public sealed class CrearEnvioApiTests(PostgresApiFactory factory) : IClassFixtu
         Assert.Equal(2, eventos.Count);
         Assert.False(eventos.Single(e => e.Numero == real.Numero).EsPrueba);
         Assert.True(eventos.Single(e => e.Numero == prueba.Numero).EsPrueba);
+
+        // CU-71: el alta lleva la zona y el fin de la ventana comprometida (alta + plazo de la modalidad).
+        var alta = eventos.Single(e => e.Numero == real.Numero);
+        Assert.Equal(filas.Single(e => !e.EsPrueba).ZonaId, alta.ZonaId);
+        Assert.True(alta.EntregaComprometidaHasta > alta.OcurridoEn);
     }
 
     [Fact]

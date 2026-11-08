@@ -7,8 +7,10 @@ namespace Logistica.Modules.Planificacion.Application;
 
 // Implementación del contrato de Planificación. Es internal: los otros módulos sólo ven la interfaz.
 internal sealed class PlanificacionModuleApi(IRutaRepository rutas, IAdministracionModuleApi administracion,
-    TimeProvider reloj) : IPlanificacionModuleApi
+    TimeProvider reloj, Features.AlertarRutasSinFinalizar.AlertarRutasSinFinalizarHandler alertar) : IPlanificacionModuleApi
 {
+    public Task<int> AlertarRutasSinFinalizarAsync(DateOnly hoy, CancellationToken ct) => alertar.HandleAsync(hoy, ct);
+
     // CU-20: el envío está arriba de un vehículo si su parada pendiente es de una ruta Despachada o EnCurso.
     public async Task<bool> EnvioEnLaCalleAsync(Guid envioId, CancellationToken ct)
         => await rutas.RutaActivaDelEnvioAsync(envioId, ct) is Guid rutaId
