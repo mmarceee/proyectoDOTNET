@@ -175,7 +175,7 @@ El reparto es una propuesta basada en las áreas actuales, no una asignación ya
 ## 9. Evidencia pendiente para cerrar la aclaración
 
 - [x] Ejecutar dos APIs completas con PostgreSQL y Valkey compartidos: precalentar la tarifa en ambas, publicar desde una y consultar inmediatamente desde la otra. Usar un tarifario/base de prueba (`TarifarioEntreDosApisTests`, sección 11).
-- [x] Verificar en Aspire los aciertos, fallos y errores separados por `seguimiento`, `tarifario` y `reglas` (sección 11.1).
+- [x] Verificar en Aspire los aciertos, fallos y errores separados por `seguimiento`, `tarifario` y `reglas` (secciones 11.1 y 11.4).
 - [x] Interrumpir un Valkey de prueba que estaba activo, consultar seguimiento y calcular tarifa contra la base, recuperarlo y comprobar frescura. No detener servicios compartidos sin coordinar con el equipo (`ValkeyCaidoTests` y sección 11.1; la frescura después de una invalidación fallida, en la sección 11.3).
 - [x] Probar el instante en que comienza una versión programada con un reloj controlado (`VersionProgramadaTests`, Cristian Reyes, ADR-0006 v0.6).
 - [x] Resolver o acotar explícitamente la carrera de repoblación de caché y el dato viejo tras una invalidación fallida: el puntero dura 1 minuto (Cristian Reyes, ADR-0006 v0.6), y la invalidación fallida quedó medida en la sección 11.3.
@@ -263,3 +263,21 @@ El paso 3 tiene un plazo de 20 s, muy por debajo de la expiración de 60 s, así
 **Comprobación de que la prueba distingue:** con el puntero en 10 minutos, la prueba falla: el precio viejo seguía apareciendo a los 64,8 s, al terminar la espera. El cambio se revirtió después de esa corrida.
 
 **Costo:** la prueba tarda poco más de un minuto, porque espera el vencimiento. La clase completa (`bash scripts/test-en-docker.sh ValkeyCaido`) tardó 1 min 13 s.
+
+### 11.4 Valores por grupo en Aspire
+
+En la sección 11.1 se vieron los totales y la etiqueta con sus tres valores. Para separarlos, se generó otra tanda en el mismo entorno de Docker Compose: tres cálculos con el simulador del tarifario, tres altas de envío desde el Portal y tres consultas de seguimiento, primero con Valkey disponible y después con Valkey detenido (`docker compose stop valkey`), y se volvió a levantar. En Aspire Dashboard → Métricas → `logistica-api`, vista *Tabla*, se dejó marcado un solo valor de `cache` por vez:
+
+| Grupo | Aciertos | Fallos | Errores |
+| --- | ---: | ---: | ---: |
+| `tarifario` | 33 | 3 | 12 |
+| `reglas` | 9 | 3 | 6 |
+| `seguimiento` | 8 | 4 | 6 |
+| **Total (sin filtro)** | **50** | **10** | **24** |
+
+Son contadores acumulados desde que arrancó la API e incluyen las tandas de la sección 11.1. En los tres, la suma de los grupos coincide con el total sin filtro.
+
+- **Errores con Valkey detenido:** en `tarifario`, 12, porque cada cálculo y cada alta leen dos claves (el puntero y la versión): 6 lecturas por 2. En `reglas`, 6, por las 3 altas con dos claves cada una. En `seguimiento`, 6: 3 de esta tanda y 3 de la caída manual de la sección 11.1. Todas las solicitudes respondieron bien (cálculo, 201 en las altas y 200 en el seguimiento).
+- **Lectura de la tasa:** sin contar los errores, los aciertos fueron 92 % en tarifario, 75 % en reglas y 67 % en seguimiento. Como indica la sección 3.2, una caída suma errores y no fallos, así que la tasa debe mirarse junto con `errores`.
+
+Con esto, la tarjeta «Caché · Evidencia con dos APIs, métricas y caída de Valkey» queda cubierta por las secciones 11 a 11.4. La advertencia de esa tarjeta sobre las cookies entre dos instancias ya no aplica: las claves de Data Protection se guardan en PostgreSQL con `SetApplicationName("logistica")` (`Program.cs`), así que una cookie emitida por una API vale en la otra. Se verificó en el código; no se ensayó con dos instancias en un navegador.
