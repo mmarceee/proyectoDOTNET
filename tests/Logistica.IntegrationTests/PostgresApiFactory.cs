@@ -15,8 +15,9 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
     {
     }
 
-    // Sólo para armar la plantilla: la API arranca sobre esa base, la migra y carga los datos iniciales.
-    private PostgresApiFactory(string conexion)
+    // Para armar la plantilla, y para las pruebas de resiliencia que usan un PostgreSQL propio: la API arranca sobre
+    // esa base, la migra y carga los datos iniciales.
+    internal PostgresApiFactory(string conexion)
     {
         _conexion = conexion;
     }

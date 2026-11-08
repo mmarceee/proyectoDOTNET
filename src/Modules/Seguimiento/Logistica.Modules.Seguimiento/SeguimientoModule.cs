@@ -89,6 +89,10 @@ public static class SeguimientoModule
             signalR.AddStackExchangeRedis(valkey, opciones =>
             {
                 opciones.Configuration.AbortOnConnectFail = false; // arranca aunque Valkey no esté, como la caché
+                // Con Valkey caído, cada aviso falla enseguida en lugar de esperar 5 s en la cola del cliente: la
+                // sincronización de la PWA, que avisa cada posición, no se demora (pruebas de resiliencia, 7.4).
+                opciones.Configuration.BacklogPolicy = BacklogPolicy.FailFast;
+                opciones.Configuration.AsyncTimeout = 1000;
                 opciones.Configuration.ChannelPrefix = RedisChannel.Literal("logistica-tablero");
             });
         }
