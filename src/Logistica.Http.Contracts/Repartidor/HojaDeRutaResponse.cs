@@ -24,8 +24,8 @@ public sealed record EnvioHojaResponse(Guid Id, string Numero, string Estado, st
 public sealed record DireccionHojaResponse(string Calle, string Numero, string Localidad, string Departamento,
     string CodigoPostal, string? Referencia);
 public sealed record FranjaHojaResponse(Guid Id, TimeOnly Desde, TimeOnly Hasta);
-public sealed record BultoHojaResponse(Guid Id, string Codigo);
+public sealed record BultoHojaResponse(Guid Id, string Codigo, string Estado = "");
 public sealed record ReglasEntregaHojaResponse(string Origen, Guid? VersionId, bool FirmaObligatoria,
     bool ExigeFoto, bool ExigeNombreYDocumento, int MaxIntentos, TimeSpan PlazoEntreIntentos,
-    IReadOnlyList<MotivoHojaResponse> MotivosNoEntrega);
+    IReadOnlyList<MotivoHojaResponse> MotivosNoEntrega, bool AdmiteEntregaParcial = false);
 public sealed record MotivoHojaResponse(Guid Id, string Codigo, string NombreParaMostrar, bool Reprogramable, bool ExigeEvidencia);

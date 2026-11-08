@@ -25,6 +25,7 @@ internal sealed class ProcesarOperacionHandler(
     Features.IniciarRendicion.IniciarRendicionHandler rendir,
     IRendicionRepository rendiciones,
     IAdministracionModuleApi administracion,
+    IContextoHojaRuta contexto,
     Features.ReportarPosicion.ReportarPosicionHandler posiciones,
     IIntegrationEventPublisher eventos)
 {
@@ -80,11 +81,12 @@ internal sealed class ProcesarOperacionHandler(
 
         if (op.Tipo == "IniciarRendicion") return await rendir.HandleAsync(command, datos, ct);
         if (op.Tipo == "ReportarPosicion") return await posiciones.HandleAsync(command, datos, ct);
-        if (op.Tipo is "ConfirmarCarga" or TipoVisita or TipoEntrega or TipoIntentoFallido
+        if (op.Tipo is "ConfirmarCarga" or "IniciarRuta" or TipoVisita or TipoEntrega or TipoIntentoFallido
             && await rendiciones.ObtenerAsync(op.RutaId, ct) is { } rendicion)
             return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto,
                 rendicion.RepartidorId == command.RepartidorId ? "RutaEnRendicion" : "RutaNoAsignada", null, ct);
         if (op.Tipo == "ConfirmarCarga") return await cargas.HandleAsync(command, datos, ct);
+        if (op.Tipo == "IniciarRuta") return await IniciarRutaAsync(command, datos, ct);
 
         if (op.Tipo is not (TipoVisita or TipoEntrega or TipoIntentoFallido))
         {
@@ -104,6 +106,9 @@ internal sealed class ProcesarOperacionHandler(
         {
             return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "RutaNoAsignada", null, ct);
         }
+
+        if (await planificacion.ConsultarCargaAsync(op.RutaId, command.RepartidorId, ct) is not { Estado: "EnCurso" })
+            return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "RutaNoIniciada", null, ct);
 
         RegistroEnCalle? registro = null;
         Diagnostico diagnostico = Diagnostico.SinRechazo;
@@ -214,6 +219,36 @@ internal sealed class ProcesarOperacionHandler(
             "BultoFueraDeRuta" => "EstadoIncompatible",
             _ => motivo,
         };
+    }
+
+    private async Task<ResultadoOperacionResponse> IniciarRutaAsync(ProcesarOperacionCommand command, DatosOperacion datos,
+        CancellationToken ct)
+    {
+        var op = command.Operacion;
+        if (op.EnvioId is not null || op.DispositivoId == Guid.Empty || op.Secuencia < 1 || op.OcurridoEn == default)
+            return await RechazarAsync(op, datos, ResultadoOperacion.Invalida, "DatosIncompletos", null, ct);
+        var identidad = command.UsuarioId is Guid usuario
+            ? await contexto.ConsultarAsync(usuario, command.RepartidorId, null, ct) : null;
+        var ruta = await planificacion.ConsultarCargaAsync(op.RutaId, command.RepartidorId, ct);
+        if (identidad is null || ruta is null)
+            return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "RutaNoAsignada", null, ct);
+        if (ruta.Estado != "Despachada")
+            return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "RutaYaIniciada", null, ct);
+        var evidencia = await rendiciones.EvidenciaAsync(op.RutaId, ct);
+        if (evidencia.Operaciones.Any(o => o.Tipo == "ConfirmarCarga" && o.Resultado != ResultadoOperacion.Aplicada && !o.Revisada))
+            return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "DependeDeOperacionRechazada", null, ct);
+        var fecha = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(datos.OcurridoEn,
+            TimeZoneInfo.FindSystemTimeZoneById(identidad.ZonaHoraria)).DateTime);
+        if (ruta.Fecha != fecha)
+            return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "FechaDeInicioInvalida", null, ct);
+        var lista = await envios.ConsultarCargaAsync(ruta.Envios.ToArray(), ct);
+        if (lista.Count != ruta.Envios.Count || !lista.Any(e => e.Bultos.Any(b => b.Estado == "EnTransito")))
+            return await RechazarAsync(op, datos, ResultadoOperacion.Conflicto, "SinCargaConfirmada", null, ct);
+        // El bloqueo por operador y la transacción exterior serializan inicio, cargas y visitas.
+        await planificacion.IniciarRutaAsync(op.RutaId, ct);
+        operaciones.Agregar(OperacionDispositivo.Aplicada(op.OperacionId, datos, JsonSerializer.Serialize(op)));
+        await operaciones.GuardarCambiosAsync(ct);
+        return new(op.OperacionId, Resultados.Aplicada);
     }
 
     private DatosOperacion Datos(ProcesarOperacionCommand command)

@@ -13,15 +13,16 @@ internal sealed class PrepararRendicion(IRendicionRepository rendiciones, IEnvio
         if (lista.Count != ids.Count) throw new DescargarHojaDeRuta.HojaIncompletaException();
         var bultos = lista.OrderBy(e => e.Numero).SelectMany(e => e.Bultos.OrderBy(b => b.Codigo).Select(b =>
         {
-            var situacion = e.Estado switch
+            var situacion = (b.Estado.Length == 0 ? e.Estado : b.Estado) switch
             {
                 "Entregado" => "EntregadoEnCalle",
                 "Devuelto" => "Resuelto",
                 "Extraviado" => "Extraviado",
                 "EnTransito" => "NoIntentado",
                 "Reprogramado" or "EnDevolucion" when evidencia.Intentados.Contains(e.Id) => "IntentoFallido",
-                "AsignadoARuta" when evidencia.BultosEscaneados.Contains(b.Id) => "CargaParcial",
+                "AsignadoARuta" when !evidencia.CargaPorBulto && evidencia.BultosEscaneados.Contains(b.Id) => "CargaParcial",
                 "AsignadoARuta" => "NoCargado",
+                "EnDeposito" => "NoCargado",
                 _ => "Revisar"
             };
             return new BultoRendicionResponse(e.Id, e.Numero, b.Id, b.Codigo, situacion,

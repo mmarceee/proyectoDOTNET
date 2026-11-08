@@ -24,19 +24,21 @@ else
     {
         var rendicion = MisRutas.EstadosLocales.LastOrDefault(e => e.RutaId == ruta.RutaId && e.Tipo == "rendicion")?.Resultado;
         var carga = MisRutas.EstadosLocales.LastOrDefault(e => e.RutaId == ruta.RutaId && e.Tipo == "carga")?.Resultado;
+        var inicio = MisRutas.EstadosLocales.LastOrDefault(e => e.RutaId == ruta.RutaId && e.Tipo == "inicio")?.Resultado;
+        var iniciada = ruta.Estado == "EnCurso" || inicio is "Pendiente" or "Aplicada";
         var cerrada = ruta.Estado == "Finalizada" || ruta.RendicionCerrada;
         var pendiente = rendicion == "Pendiente";
         var esperaDeposito = ruta.RendicionIniciada || rendicion == "Aplicada";
         var futura = ruta.FechaRuta > MisRutas.FechaOperativa;
         var anterior = ruta.FechaRuta < MisRutas.FechaOperativa;
-        var sinIniciarAtrasada = anterior && ruta.Estado == "Despachada" && carga != "Pendiente";
+        var sinIniciarAtrasada = anterior && !iniciada && ruta.Estado == "Despachada" && carga != "Pendiente";
         var activa = !cerrada && (ruta.Estado is "Despachada" or "EnCurso") && !futura;
         <section class="card mb-3" @key="ruta.RutaId" aria-label="@($"Ruta del {ruta.FechaRuta:dd/MM/yyyy}")">
             <div class="card-body">
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <h2 class="h4 mb-0">Ruta del @ruta.FechaRuta.ToString("dd/MM/yyyy")</h2>
                     <span class="badge @(cerrada ? "text-bg-secondary" : pendiente ? "text-bg-warning" : esperaDeposito ? "text-bg-info" : "text-bg-primary")">
-                        @(cerrada ? "Finalizada" : pendiente ? "Pendiente de sincronizar" : esperaDeposito ? "Pendiente de cierre" : futura ? "Próxima ruta" : sinIniciarAtrasada ? "Pendiente de resolución por despacho" : ruta.Estado == "EnCurso" ? "En curso" : ruta.Estado == "Despachada" ? "Pendiente de carga" : "Copia anterior")
+                        @(cerrada ? "Finalizada" : pendiente ? "Pendiente de sincronizar" : esperaDeposito ? "Pendiente de cierre" : futura ? "Próxima ruta" : sinIniciarAtrasada ? "Pendiente de resolución por despacho" : iniciada ? inicio == "Pendiente" ? "Inicio pendiente de sincronizar" : "En curso" : ruta.Estado == "Despachada" ? "Pendiente de comenzar" : "Copia anterior")
                     </span>
                 </div>
                 <p class="text-muted mb-2">Vehículo @(ruta.Matricula ?? "sin información") · @ruta.Envios @(ruta.Envios == 1 ? "envío" : "envíos") · @ruta.Paradas @(ruta.Paradas == 1 ? "parada" : "paradas")</p>
@@ -58,9 +60,9 @@ else
                         else
                         {
                             <a class="btn btn-outline-primary" href="@Enlace("hoja-de-ruta", ruta.RutaId)">Ver ruta</a>
-                            @if (carga == "Pendiente") { <a class="btn btn-primary" href="@Enlace("carga", ruta.RutaId)">Ver carga pendiente</a> }
-                            else if (ruta.CargaPendiente && !anterior) { <a class="btn btn-primary" href="@Enlace("carga", ruta.RutaId)">@(ruta.Estado == "EnCurso" ? "Continuar carga" : "Cargar vehículo")</a> }
-                            @if (ruta.Estado == "EnCurso") { <a class="btn @(rendicion == "Rechazada" ? "btn-outline-primary" : "btn-danger ms-auto")" href="@Enlace("rendicion", ruta.RutaId)">@(rendicion == "Rechazada" ? "Revisar rendición" : "Finalizar ruta")</a> }
+                            @if (!iniciada && carga == "Pendiente") { <a class="btn btn-primary" href="@Enlace("carga", ruta.RutaId)">Ver carga pendiente y comenzar</a> }
+                            else if (!iniciada && !anterior) { <a class="btn btn-primary" href="@Enlace("carga", ruta.RutaId)">@(carga == "Aplicada" || !ruta.CargaPendiente ? "Comenzar ruta" : "Cargar vehículo")</a> }
+                            @if (iniciada) { <a class="btn @(rendicion == "Rechazada" ? "btn-outline-primary" : "btn-danger ms-auto")" href="@Enlace("rendicion", ruta.RutaId)">@(rendicion == "Rechazada" ? "Revisar rendición" : "Finalizar ruta")</a> }
                         }
                     </div>
                 }

@@ -70,13 +70,13 @@ internal sealed class DescargarHojaDeRutaHandler(IConsultaConsistente lectura, I
                 var r = e.Reglas;
                 return new(e.Id, e.Numero, e.Estado, e.Nombre, e.Telefono,
                     new(e.Calle, e.NumeroPuerta, e.Localidad, e.Departamento, e.CodigoPostal, e.Referencia),
-                    franja, e.Bultos.Select(b => new BultoHojaResponse(b.Id, b.Codigo)).ToArray(),
+                    franja, e.Bultos.Select(b => new BultoHojaResponse(b.Id, b.Codigo, b.Estado)).ToArray(),
                     new(r.Origen, r.VersionId, true, r.ExigeFoto, r.ExigeNombreYDocumento, r.MaxIntentos, r.PlazoEntreIntentos,
-                        r.Motivos.Select(m => new MotivoHojaResponse(m.Id, m.Codigo, m.Nombre, m.Reprogramable, m.ExigeEvidencia)).ToArray()));
+                        r.Motivos.Select(m => new MotivoHojaResponse(m.Id, m.Codigo, m.Nombre, m.Reprogramable, m.ExigeEvidencia)).ToArray(), r.AdmiteEntregaParcial));
             }
             var paradas = ruta.Paradas.OrderBy(p => p.Orden).Select(p => new ParadaHojaResponse(p.Id, p.Orden, p.Estado,
                 p.Direccion, p.Desde, p.Hasta, p.Envios.Select(id => Mapear(porId[id])).ToArray())).ToArray();
-            return new HojaDeRutaResponse(2, usuario, contexto.OperadorId, repartidor, ruta.Id, ruta.Revision, ruta.Fecha, sesion.FechaOperativa,
+            return new HojaDeRutaResponse(3, usuario, contexto.OperadorId, repartidor, ruta.Id, ruta.Revision, ruta.Fecha, sesion.FechaOperativa,
                 contexto.ZonaHoraria, ruta.Estado, reloj.GetUtcNow(), new(ruta.VehiculoId, contexto.Matricula),
                 zonas.Values.OrderBy(z => z.Nombre).ToArray(), paradas)
             { Rendicion = await rendiciones.ConsultarAsync(ruta.Id, ids, ct) };

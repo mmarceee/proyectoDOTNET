@@ -17,6 +17,12 @@ internal sealed class RendicionRepository(EjecucionDbContext db) : IRendicionRep
         return await db.Rendiciones.AsNoTracking().Include(r => r.Lineas).Where(r => r.FinalizadaEn == null)
             .OrderBy(r => r.IniciadaEn).ThenBy(r => r.Id).Skip((pagina - 1) * 20).Take(20).ToListAsync(ct);
     }
+    public async Task<IReadOnlyList<Rendicion>> ConfirmadasAsync(int pagina, CancellationToken ct)
+    {
+        await db.ParticiparEnTransaccionAsync(ct);
+        return await db.Rendiciones.AsNoTracking().Include(r => r.Lineas).Where(r => r.FinalizadaEn != null)
+            .OrderByDescending(r => r.FinalizadaEn).ThenBy(r => r.Id).Skip((pagina - 1) * 20).Take(20).ToListAsync(ct);
+    }
     public async Task<EvidenciaRuta> EvidenciaAsync(Guid rutaId, CancellationToken ct)
     {
         await db.ParticiparEnTransaccionAsync(ct);
@@ -26,9 +32,11 @@ internal sealed class RendicionRepository(EjecucionDbContext db) : IRendicionRep
         var ops = await db.Operaciones.AsNoTracking().Where(o => o.RutaId == rutaId)
             .Select(o => new OperacionRuta(o.Id, o.RepartidorId, o.EnvioId, o.Tipo, o.Resultado, o.Revisada)).ToListAsync(ct);
         // Una visita aplicada cuenta como intento: si el envío quedó Reprogramado o EnDevolucion, tuvo bultos sin entregar.
+        var porBulto = await db.Operaciones.AnyAsync(o => o.RutaId == rutaId && o.Tipo == "ConfirmarCarga"
+            && o.Resultado == ResultadoOperacion.Aplicada && o.Contenido != null, ct);
         return new(bultos.ToHashSet(), ops.Where(o => o.Resultado == ResultadoOperacion.Aplicada
                 && o.Tipo is "RegistrarIntentoFallido" or "RegistrarVisita"
-                && o.EnvioId != null).Select(o => o.EnvioId!.Value).ToHashSet(), ops);
+                && o.EnvioId != null).Select(o => o.EnvioId!.Value).ToHashSet(), ops, porBulto);
     }
     public async Task<bool> TieneActividadRegistradaAsync(Guid rutaId, CancellationToken ct)
     {

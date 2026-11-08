@@ -40,8 +40,30 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
-        return lista.Select(e => new EnvioParaCarga(e.Id, e.Estado.ToString(),
-            e.Bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray()) { Numero = e.Numero }).ToArray();
+        var resultado = new List<EnvioParaCarga>();
+        foreach (var e in lista)
+            resultado.Add(new(e.Id, e.Estado.ToString(), e.Bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo, b.Estado.ToString())).ToArray())
+            { Numero = e.Numero, AdmiteEntregaParcial = (await reglasDeEntrega.ParaHojaAsync(e, ct)).AdmiteEntregaParcial });
+        return resultado;
+    }
+
+    public async Task<bool> RegistrarCargaPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, Guid? responsable, DateTimeOffset ocurridoEn, CancellationToken ct)
+    {
+        var lista = await envios.ObtenerPorBultosAsync(bultoIds, ct);
+        if (bultoIds.Distinct().Count() != bultoIds.Count || lista.Sum(e => e.Bultos.Count(b => bultoIds.Contains(b.Id))) != bultoIds.Count) return false;
+        foreach (var envio in lista)
+        {
+            var ids = envio.Bultos.Where(b => bultoIds.Contains(b.Id)).Select(b => b.Id).ToArray();
+            var reglas = await reglasDeEntrega.ParaHojaAsync(envio, ct);
+            if (!envio.PuedeCargarBultos(ids, reglas.AdmiteEntregaParcial)) return false;
+        }
+        foreach (var envio in lista)
+        {
+            envio.CargarBultos(envio.Bultos.Where(b => bultoIds.Contains(b.Id)).Select(b => b.Id).ToArray(), responsable, ocurridoEn);
+            eventos.Registrar(EnvioEnTransito.Tipo, new EnvioEnTransito(envio.Id, envio.Numero, ocurridoEn, responsable), ocurridoEn);
+        }
+        await envios.GuardarCambiosAsync(ct);
+        return true;
     }
 
     public async Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct)
@@ -134,7 +156,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
             // Avisos v1 (pendiente 6): EnvioEntregado sólo si se entregaron todos los bultos; si quedó alguno, el intento
             // fallido. Un comercio v1 nunca recibe una entrega completa que no ocurrió.
-            if (intentos.All(i => i.Resultado == ResultadoIntento.Exitoso))
+            if (envio.Bultos.All(b => b.Estado == EstadoEnvio.Entregado))
             {
                 var entregadoEn = envio.Eventos[^1].OcurridoEn;
                 eventos.Registrar(EnvioEntregado.Tipo,

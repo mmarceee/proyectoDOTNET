@@ -3,10 +3,10 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptada: decisión funcional cerrada. Implementación pendiente.** |
-| Versión y fecha | 1.2 · 03/11/2026 |
+| Versión y fecha | 1.3 · 08/11/2026 |
 | Responsable del registro | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
-| Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas en este intercambio. No registra firmas ni aprobaciones individuales adicionales. |
+| Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas. La ampliación del 08/11 sobre alcance de visita, foto compartida, faltantes y reservas fue confirmada por Lucas en el chat; no registra aprobaciones individuales adicionales de otros integrantes. |
 | ADR relacionado | [ADR-0007 · Adaptación a entrega parcial](ADR-0007-adaptacion-a-entrega-parcial.md) |
 
 ## 1. Acuerdo para compartir con el equipo
@@ -67,10 +67,36 @@ Como el resumen cambia con el primer bulto, cada escaneo de recepción actualiza
 ## 4. Visita, resultados y evidencia
 
 - Se registra una visita **por envío dentro de la parada**. Una parada puede agrupar varios envíos.
-- Cada visita identifica el resultado de cada bulto de su alcance; la firma y la evidencia referencian explícitamente los bultos entregados. La foto complementa la firma cuando las reglas la exigen; no elimina la firma obligatoria del flujo de entrega existente.
+- Cada visita identifica el resultado de cada bulto de su alcance. La firma referencia explícitamente los bultos entregados. Una única foto de presencia en el lugar puede respaldar los resultados entregados y no entregados de esa visita; complementa la firma cuando las reglas la exigen y no elimina su obligatoriedad para una entrega. La asociación y el alcance de ambas pruebas se precisan en 4.1.
 - Se mantiene atomicidad por visita de un envío: si falla una línea, se rechaza la visita completa y se conserva evidencia y diagnóstico. Otros envíos de la misma parada se procesan independientemente.
 - Se conserva OperacionId como identificador idempotente. Un reenvío no duplica resultados, evidencia aplicada, eventos, avisos ni recargos.
 - Una visita sin entregas registra su intento fallido y los pasos transitorios de los bultos. **No fuerza el resumen del envío a NoEntregado**: si hubo entregas anteriores, el resumen sigue siendo Entregado parcialmente. Debe adaptarse la semántica anterior de T7/T9/T10 a este nivel, no reproducirse un historial de envío que contradiga su derivación.
+
+### 4.1 Alcance de visita y foto compartida · confirmado por Lucas el 08/11/2026
+
+- La visita registra resultados de los bultos que viajaron y corresponden a ese envío en esa visita. La PWA distingue los cargados, los que quedaron en depósito y los ya resueltos. Un bulto que no salió no recibe un motivo de intento fallido en domicilio ni consume un intento por esa visita.
+- **Se utiliza una sola foto por visita como evidencia de presencia en el lugar**, tanto si se entrega todo, nada o una parte. Puede ser referenciada por los distintos resultados de esa misma visita. No se exige una foto de entrega y otra foto adicional de rechazo. La obligatoriedad de aportar foto continúa determinada por las reglas del envío y los motivos seleccionados.
+- La firma respalda exclusivamente el conjunto efectivamente entregado, mostrado antes de firmar. Si ese conjunto cambia después de la firma, se debe volver a firmar. Una visita sin entregas no exige firma de recepción.
+- Ejemplo: una primera visita entrega los bultos 1 y 2 y usa la firma A y la foto A. Si el bulto 3 viajó pero no se entregó, conserva su motivo y puede compartir la foto A como evidencia de esa visita, sin quedar incluido en la firma. Si el tercero quedó en depósito, no forma parte de sus resultados. Cuando se entregue en una visita posterior, se registran firma B y foto B cuando corresponda, sin sobrescribir las pruebas anteriores.
+- El modelo actual permite vincular cada resultado a sus BultoIds y referenciar la misma foto desde la prueba exitosa y los intentos fallidos. Esta decisión no exige dividir el campo Foto en fotos independientes de entrega y rechazo. Su aplicación completa en la PWA y la integración por bulto siguen pendientes.
+
+### 4.2 Faltantes de carga y exclusividad · confirmado por Lucas el 08/11/2026
+
+Se contempla carga de parte de los bultos cuando el operador admite parcial, como prevé el contexto docente de 2.1 y T5 de la tabla del equipo. Si no la admite y falta un bulto necesario para completar la entrega, ese envío no sale incompleto; otros envíos independientes pueden continuar. En una revisita no se vuelve a exigir cargar los ya entregados.
+
+El faltante se informa al confirmar la carga, con un motivo de carga, y depósito verifica la ubicación. No se interpreta automáticamente la ausencia de escaneo como prueba de custodia en depósito.
+
+| Situación | Disponibilidad y reserva |
+| --- | --- |
+| Bulto cargado | Conserva su asignación activa a la ruta y pasa a EnTransito. |
+| No cargado y confirmado en depósito | Vuelve a EnDeposito, se cierra su asignación a la ruta y queda disponible para otra planificación. |
+| No localizado | Se registra la discrepancia y permanece bloqueado para otra asignación hasta conciliación por depósito. No se declara Extraviado automáticamente. |
+| Entregado | Se cierra su asignación activa, conservando el historial. |
+| Viajó y no se entregó | No queda disponible para otro vehículo mientras conserve la custodia el repartidor. Se libera para nueva planificación al confirmar retorno o transferencia autorizada. El estado Reprogramado por sí solo no acredita disponibilidad física. |
+
+Existe como máximo una asignación activa por bulto, con protección frente a planificación concurrente. Estados y reservas se confirman juntos en el servidor. La PWA puede conservar la carga pendiente sin red, pero no libera una reserva global por una decisión exclusivamente local. No se borra el historial de asignaciones.
+
+Un faltante de carga no consume un intento de entrega ni genera un recargo al confirmar la carga. La eventual visita posterior se trata según RF 33 y la versión de reglas del envío. Estas decisiones funcionales requieren concretar los contratos, motivos de carga, conciliación de custodia y controles de concurrencia; no afirman que el código actual ya las implemente.
 
 ## 5. Reglas del operador acordadas (RF 33)
 
@@ -90,9 +116,11 @@ La estructura monetaria, moneda, redondeo, clave de unicidad del cargo y contrat
 
 La decisión funcional anterior está cerrada. **No equivale a declarar terminada la especificación técnica de RF 31 a 36.** Falta:
 
+**Avance del 08/11/2026:** [RF 32 en la PWA](rf-32/README.md) implementa visita por bulto, foto única, guardado cifrado, diagnóstico de rechazos y adaptaciones de carga/hoja/rendición. La conciliación de custodia y las reservas/reasignación por bulto siguen siendo pendientes de RF 34; el avance no los da por implementados.
+
 1. ~~Tabla completa y verificable de transiciones por bulto y de cambios del resumen del envío, y sus guardas.~~ **Resuelto el 03/11/2026:** el equipo aprobó la [tabla por bulto](tabla-de-transiciones-de-estados.md#entrega-parcial-transiciones-por-bulto-y-resumen-del-envío) de Cristian, con sus pares inalcanzables y los hechos que no cambian el resumen. También aprobó mantener T17 y tratar como inalcanzable el ejemplo «Todos cancelados después de recibir alguno» (sección 3).
-2. Contratos de resultados por bulto, escaneo, faltantes no escaneables y evidencia por motivo. Política de carga incompleta para operadores que sí admiten parcial; custodia física, rendición y disponibilidad de faltantes.
-3. Exclusividad de asignación activa por bulto y liberación de reservas: decidir cuándo un pendiente puede entrar en otra ruta sin asignarlo simultáneamente a dos. CU-42 ordena las visitas resultantes y no decide esta pertenencia.
+2. Completar contratos e implementación de resultados por bulto, escaneo, faltantes no escaneables y evidencia. **Definición funcional precisada por Lucas el 08/11/2026 en 4.1 y 4.2:** alcance de la visita sobre los que viajaron, una foto compartida por visita, firma de los entregados y tratamiento del faltante según custodia. Pendientes los detalles técnicos de motivos de carga, confirmación de ubicación, hoja descargada, almacenamiento local e integración de rendición.
+3. Implementar exclusividad de asignación activa por bulto y liberación de reservas según 4.2, incluyendo transacción y concurrencia. **Criterio funcional confirmado por Lucas el 08/11/2026:** sólo se habilita nueva asignación con disponibilidad física confirmada; Reprogramado no basta. CU-42 ordena las visitas resultantes y no decide esta pertenencia.
 4. ~~Confirmación del alcance de extravío individual y de sus autorizaciones.~~ **Resuelto el 03/11/2026:** para el 12/11 el extravío sigue siendo del envío entero (CU-21). Pasan a Extraviado los bultos que acompañan al envío, es decir, los que están en su mismo estado; los ya entregados no cambian. El extravío de un bulto suelto queda para después. Con eso, una visita sobre un envío extraviado cae entera en conflicto (ADR-0004, secciones 2.11 y 4.2).
 5. ~~Migración de datos existentes y operaciones offline antiguas.~~ **Resuelto el 03/11/2026:**
    - **Datos.** La migración `EntregaParcialBultos` copia a cada bulto el estado de su envío y sus intentos fallidos, y conserva las recepciones parciales ya escaneadas. No inventa historial por bulto.
@@ -115,3 +143,4 @@ Este documento reemplaza las propuestas anteriores de derivar el envío con todo
 | 1.0 | 02/11/2026 | Registro de la decisión cerrada y separación de pendientes técnicos. | Lucas Ottonello |
 | 1.1 | 02/11/2026 | La ejecución se inicia con la recepción del primer bulto; se actualizan el esquema, los ejemplos y el pendiente 1. | Ezequiel Marcenal |
 | 1.2 | 03/11/2026 | Decisiones del equipo: tabla por bulto aprobada y ejemplo de cancelación después de recibir declarado inalcanzable (pendiente 1 y sección 3); extravío del envío entero para el 12/11 (pendiente 4); migración y traducción de las operaciones antiguas (pendiente 5); política de intentos agotados y `AdmiteEntregaParcial` falso en las versiones publicadas (sección 5). | Ezequiel Marcenal |
+| 1.3 | 08/11/2026 | Confirmación de Lucas: alcance de visita sobre bultos que viajaron, una foto compartida por visita, firma de los entregados, faltantes de carga según custodia y exclusividad/liberación de reservas. Se conserva como pendiente la especificación técnica e implementación. | Lucas Ottonello |

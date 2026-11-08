@@ -59,6 +59,114 @@ public sealed class ConfirmarCargaTests(PostgresApiFactory factory) : IClassFixt
         return new(ruta.Id,ruta.Revision,envios,fecha);
     }
     private HttpClient Cliente() => factory.WithWebHostBuilder(b=>b.UseSetting("Identity:PermitirTenantProvisorio","false")).CreateClient(Sesion.Opciones);
+
+    [Fact]
+    public async Task La_carga_nueva_no_inicia_la_ruta_y_el_inicio_cierra_carga_sin_duplicar_al_reenviar()
+    {
+        var d = await PrepararAsync();
+        using var cliente = Cliente();
+        await Sesion.IngresarAsync(cliente, "repartidor@operador-demo.uy");
+        var original = Operacion(d, [d.Envios[0].Bultos[0].Codigo, d.Envios[1].Bultos[0].Codigo], acepta:true);
+        var carga = original with { Carga = original.Carga! with { PorBulto = true, Faltantes = [] } };
+        Assert.Equal("Aplicada", (await Enviar(cliente, carga)).Resultado);
+        using (var scope = Scope())
+            Assert.Equal(EstadoRuta.Despachada, (await scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>()
+                .Rutas.SingleAsync(r => r.Id == d.Ruta)).Estado);
+        var visitaAntes = carga with { OperacionId = Guid.CreateVersion7(), Tipo = "RegistrarVisita", Carga = null,
+            EnvioId = d.Envios[1].Id, Latitud = -34.9m, Longitud = -56.1m,
+            Visita = new([new(d.Envios[1].Bultos[0].Codigo)]) };
+        Assert.Equal("RutaNoIniciada", (await Enviar(cliente, visitaAntes)).Motivo);
+
+        var inicio = carga with { OperacionId = Guid.CreateVersion7(), Tipo = "IniciarRuta", Carga = null, Secuencia = 2 };
+        var resultados = await Task.WhenAll(Enviar(cliente, inicio), Enviar(cliente, inicio));
+        Assert.Contains(resultados, r => r.Resultado == "Aplicada");
+        Assert.Contains(resultados, r => r.Resultado == "YaAplicada");
+        var tardia = Operacion(d, d.Envios[0].Bultos.Select(b => b.Codigo), acepta:true);
+        tardia = tardia with { Carga = tardia.Carga! with { PorBulto = true, Faltantes = [] } };
+        Assert.Equal("RutaYaIniciada", (await Enviar(cliente, tardia)).Motivo);
+        Assert.Equal("YaAplicada", (await Enviar(cliente, carga)).Resultado);
+        using var final = Scope();
+        var ruta = await final.ServiceProvider.GetRequiredService<PlanificacionDbContext>().Rutas.SingleAsync(r => r.Id == d.Ruta);
+        Assert.Equal(EstadoRuta.EnCurso, ruta.Estado);
+        Assert.Equal(d.Revision + 2, ruta.Revision); // una carga y un inicio, sin duplicados
+        var envio = await final.ServiceProvider.GetRequiredService<EnviosDbContext>().Envios.SingleAsync(e => e.Id == d.Envios[0].Id);
+        Assert.All(envio.Bultos, b => Assert.Equal(EstadoEnvio.AsignadoARuta, b.Estado));
+        Assert.Single(await final.ServiceProvider.GetRequiredService<EjecucionDbContext>().Operaciones.Where(o => o.Id == inicio.OperacionId).ToListAsync());
+    }
+
+    [Fact]
+    public async Task El_lote_aplica_carga_antes_de_inicio_y_un_rechazo_de_carga_bloquea_el_inicio()
+    {
+        var d = await PrepararAsync();
+        using var cliente = Cliente();
+        await Sesion.IngresarAsync(cliente, "repartidor@operador-demo.uy");
+        var carga = Operacion(d);
+        carga = carga with { Carga = carga.Carga! with { PorBulto = true, Faltantes = [] } };
+        var inicio = carga with { OperacionId = Guid.CreateVersion7(), Tipo = "IniciarRuta", Carga = null, Secuencia = 2 };
+        var respuesta = await cliente.PostAsJsonAsync("/api/repartidor/sincronizacion", new SincronizacionRequest([inicio, carga]));
+        respuesta.EnsureSuccessStatusCode();
+        Assert.All((await respuesta.Content.ReadFromJsonAsync<SincronizacionResponse>())!.Resultados, r => Assert.Equal("Aplicada", r.Resultado));
+        var otro = await PrepararAsync();
+        var invalida = Operacion(otro);
+        invalida = invalida with { Carga = invalida.Carga! with { RevisionRuta = 999, PorBulto = true, Faltantes = [] } };
+        var dependiente = invalida with { OperacionId = Guid.CreateVersion7(), Tipo = "IniciarRuta", Carga = null, Secuencia = 2 };
+        respuesta = await cliente.PostAsJsonAsync("/api/repartidor/sincronizacion", new SincronizacionRequest([invalida, dependiente]));
+        respuesta.EnsureSuccessStatusCode();
+        var rechazadas = (await respuesta.Content.ReadFromJsonAsync<SincronizacionResponse>())!.Resultados;
+        Assert.Equal("RutaModificada", rechazadas[0].Motivo);
+        Assert.Equal("DependeDeOperacionRechazada", rechazadas[1].Motivo);
+        // Un lote posterior tampoco puede ignorar la carga rechazada de un lote anterior.
+        var corregida = Operacion(otro);
+        corregida = corregida with { Carga = corregida.Carga! with { PorBulto = true, Faltantes = [] } };
+        Assert.Equal("Aplicada", (await Enviar(cliente, corregida)).Resultado);
+        Assert.Equal("DependeDeOperacionRechazada", (await Enviar(cliente,
+            dependiente with { OperacionId = Guid.CreateVersion7() })).Motivo);
+        using var scope = Scope();
+        Assert.Equal(EstadoRuta.Despachada, (await scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>()
+            .Rutas.SingleAsync(r => r.Id == otro.Ruta)).Estado);
+    }
+
+    [Fact]
+    public async Task No_se_puede_comenzar_sin_carga_ni_desde_otro_operador()
+    {
+        var d = await PrepararAsync();
+        using var cliente = Cliente();
+        await Sesion.IngresarAsync(cliente, "repartidor@operador-demo.uy");
+        var inicio = Operacion(d) with { Tipo = "IniciarRuta", Carga = null };
+        Assert.Equal("SinCargaConfirmada", (await Enviar(cliente, inicio)).Motivo);
+        using var ajeno = Cliente();
+        await Sesion.IngresarAsync(ajeno, "repartidor@envios-del-este.uy");
+        Assert.Equal("RutaNoAsignada", (await Enviar(ajeno, inicio with { OperacionId = Guid.CreateVersion7() })).Motivo);
+        using var scope = Scope();
+        var ruta = await scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>().Rutas.SingleAsync(r => r.Id == d.Ruta);
+        Assert.Equal(EstadoRuta.Despachada, ruta.Estado);
+        Assert.Equal(d.Revision, ruta.Revision);
+    }
+    [Fact]
+    public async Task Por_bulto_un_envio_sin_parcial_no_pide_motivos_ni_bloquea_otro_completo()
+    {
+        var d=await PrepararAsync();using var cliente=Cliente();await Sesion.IngresarAsync(cliente,"repartidor@operador-demo.uy");
+        var original=Operacion(d,[d.Envios[0].Bultos[0].Codigo,d.Envios[1].Bultos[0].Codigo],acepta:true);
+        var op=original with { Carga=original.Carga! with { PorBulto=true,Faltantes=[] } };
+        Assert.Equal("Aplicada",(await Enviar(cliente,op)).Resultado);
+        Assert.Equal("YaAplicada",(await Enviar(cliente,op)).Resultado);
+        using var scope=Scope();var db=scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var bloqueado=await db.Envios.SingleAsync(e=>e.Id==d.Envios[0].Id);
+        Assert.All(bloqueado.Bultos,b=>Assert.Equal(EstadoEnvio.AsignadoARuta,b.Estado));
+        var completo=await db.Envios.SingleAsync(e=>e.Id==d.Envios[1].Id);
+        Assert.All(completo.Bultos,b=>Assert.Equal(EstadoEnvio.EnTransito,b.Estado));
+    }
+    [Fact]
+    public async Task Por_bulto_sin_ningun_envio_cargable_se_rechaza_aunque_acepte_faltantes()
+    {
+        var d=await PrepararAsync();using var cliente=Cliente();await Sesion.IngresarAsync(cliente,"repartidor@operador-demo.uy");
+        var original=Operacion(d,[d.Envios[0].Bultos[0].Codigo],acepta:true);
+        var op=original with { Carga=original.Carga! with { PorBulto=true,Faltantes=[] } };
+        Assert.Equal("CargaIncompletaNoAdmitida",(await Enviar(cliente,op)).Motivo);
+        using var scope=Scope();var db=scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var envios=await db.Envios.Where(e=>d.Envios.Select(x=>x.Id).Contains(e.Id)).ToListAsync();
+        Assert.All(envios.SelectMany(e=>e.Bultos),b=>Assert.Equal(EstadoEnvio.AsignadoARuta,b.Estado));
+    }
     private static OperacionDispositivoRequest Operacion(Datos d, IEnumerable<string>? codigos = null, bool acepta = false)
     {
         var ahora=new DateTimeOffset(d.Fecha.ToDateTime(new TimeOnly(15,0)),TimeSpan.Zero);

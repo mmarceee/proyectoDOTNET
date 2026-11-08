@@ -55,10 +55,15 @@ La PWA no envía "el envío X quedó *Entregado*", sino **la operación que hizo
 | Tipo de operación | Caso de uso | Efecto en el servidor |
 | :---- | :---- | :---- |
 | `ConfirmarCarga` | CU-51 | T5 de los envíos de la ruta |
+| `IniciarRuta` | CU-51 · ajuste del 08/11/2026 | Despachada → EnCurso; cierra la carga y habilita visitas y GPS |
 | `RegistrarEntrega` | CU-17 | T6, con su `IntentoEntrega` y su `PruebaEntrega` |
 | `RegistrarIntentoFallido` | CU-18 | T7 y, en la misma transacción, T9 o T10 |
 | `ReportarPosicion` | CU-53 | Una `PosicionVehiculo`; no cambia estados |
 | `IniciarRendicion` | CU-54 | Una `Rendicion` |
+
+**Inicio explícito acordado con Lucas (08/11/2026).** La carga por bulto nueva aplica T5 sin comenzar automáticamente el recorrido. `IniciarRuta` es una operación sin `EnvioId` ni payload adicional: se guarda cifrada y atómicamente con su borrador separado, y se envía después de las cargas y antes de las visitas/posiciones, por `Secuencia`. Antes del inicio no se permite registrar entregas o intentos; después no se admiten cargas nuevas. El servidor exige ruta propia Despachada, fecha operativa de la ruta y bultos efectivamente cargados; inicio, cambio de estado y registro idempotente comparten el bloqueo por operador y la transacción. Un rechazo de carga o inicio bloquea las operaciones siguientes de esa ruta; también se revisan cargas rechazadas no resueltas de lotes anteriores. No genera entregas, intentos ni recargos. La rendición incluye el inicio entre sus dependencias.
+
+El dispositivo permite continuar sin conexión después de guardar el inicio, mostrando que está pendiente; eso no sustituye la validación del servidor. Cerrar carga e iniciar se serializan en IndexedDB entre pestañas. Un rechazo conserva la operación y su motivo e impide continuar con nuevas visitas. Las cargas antiguas sin `PorBulto` conservan su interpretación de salida implícita para no romper operaciones ya guardadas; las rutas que ya estaban EnCurso se consideran iniciadas. No se reescriben datos históricos ni se borra IndexedDB. Véase [CU-51](cu-51/README.md).
 
 Cada operación lleva:
 

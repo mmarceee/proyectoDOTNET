@@ -22,7 +22,7 @@ function identity(s) {
 }
 export function validarHoja(h) {
     identity({ ...h, verificadaEn: h?.generadaEn });
-    if (![1,2].includes(h.schemaVersion) || !guid(h.rutaId) || !Number.isSafeInteger(h.revisionRuta) || h.revisionRuta < 0
+    if (![1,2,3].includes(h.schemaVersion) || !guid(h.rutaId) || !Number.isSafeInteger(h.revisionRuta) || h.revisionRuta < 0
         || !date(h.fechaRuta) || !['Despachada', 'EnCurso'].includes(h.estadoRuta)
         || !guid(h.vehiculo?.id) || !text(h.vehiculo?.matricula)
         || !Array.isArray(h.zonas) || h.zonas.length === 0 || h.zonas.some(z => !guid(z.id) || !text(z.nombre) || !text(z.codigo))
@@ -47,14 +47,16 @@ export function validarHoja(h) {
                 || r.motivosNoEntrega.some(m => !guid(m.id) || !text(m.codigo) || !text(m.nombreParaMostrar)
                     || typeof m.reprogramable !== 'boolean' || typeof m.exigeEvidencia !== 'boolean'))
                 throw new Error('La hoja contiene un envío incompleto.');
+            if (h.schemaVersion >= 3 && typeof r.admiteEntregaParcial !== 'boolean') throw new Error('Falta la regla de entrega parcial.');
             envios.add(e.id);
             for (const b of e.bultos) {
                 if (!guid(b.id) || !text(b.codigo) || bultos.has(b.id)) throw new Error('La hoja contiene bultos inválidos.');
+                if (h.schemaVersion >= 3 && !['Admitido','EnDeposito','AsignadoARuta','EnTransito','Entregado','NoEntregado','Reprogramado','EnDevolucion','Devuelto','Extraviado','Cancelado'].includes(b.estado)) throw new Error('Falta el estado del bulto.');
                 bultos.add(b.id);
             }
         }
     }
-    if (h.schemaVersion === 2) {
+    if (h.schemaVersion >= 2) {
         const declarables = new Set(['NoIntentado','IntentoFallido','CargaParcial']);
         const situaciones = new Set([...declarables,'NoCargado','EntregadoEnCalle','Extraviado','Resuelto','Revisar']);
         const manifiesto = new Map(h.paradas.flatMap(p => p.envios).flatMap(e => e.bultos.map(b => [b.id, { envio:e.id, codigo:b.codigo }])));
@@ -263,7 +265,10 @@ async function activo() {
     if (!s) throw new Error('Iniciá sesión con conexión para acceder a la carga.');
     return s;
 }
-function draftKey(s, ruta, tipo = 'carga') { return `${key(s)}:${ruta}${tipo === 'rendicion' ? ':rendicion' : ''}`; }
+function draftKey(s, ruta, tipo = 'carga') {
+    // Conservar las claves históricas de carga/rendición; cada visita tiene espacio propio por envío.
+    return `${key(s)}:${ruta}${tipo === 'carga' ? '' : ':' + tipo}`;
+}
 async function cifrar(tipo, id, valor, s) {
     const meta = { espacio: key(s), tipo, id }, iv = randomBytes(12);
     const clave = await encryptionKey(key(s));
@@ -293,9 +298,48 @@ export async function borradorCarga(ruta) {
 }
 async function leerBorrador(ruta, tipo) {
     const s = await activo(), id = draftKey(s, ruta, tipo);
+    await recuperarColisionVisita(s, ruta);
     const valor = await descifrar(await read('borradores', id), 'borrador', id, s);
     if ((await activo()).token !== s.token) throw new Error('La sesión cambió.');
     return valor;
+}
+
+// La primera versión RF32 escribía las visitas sobre la clave de carga. Separar ambos documentos
+// atómicamente, volviendo a cifrar con sus IDs correctos (los IDs son datos autenticados de AES-GCM).
+async function recuperarColisionVisita(s, ruta) {
+    const idCarga = draftKey(s, ruta), registro = await read('borradores', idCarga);
+    const visita = await descifrar(registro, 'borrador', idCarga, s);
+    if (!visita?.tipoBorrador?.startsWith('visita:')) return;
+    if (!guid(visita.envioId) || visita.tipoBorrador !== 'visita:' + visita.envioId || !Array.isArray(visita.bultos))
+        throw new Error('El borrador guardado necesita revisión. Los datos se conservaron.');
+    const idVisita = draftKey(s, ruta, visita.tipoBorrador);
+    const copiaVisita = await cifrar('borrador', idVisita, visita, s);
+    const operaciones = await operacionesDeRuta(s, ruta);
+    const ultima = operaciones.filter(r => r.op.tipo === 'ConfirmarCarga').at(-1);
+    const hoja = ultima ? null : await cargar(ruta);
+    const carga = { rutaId:ruta, revision:(registro.revision ?? 0)+1,
+        revisionRuta:ultima?.op.carga.revisionRuta ?? hoja?.hoja.revisionRuta ?? 0, lecturas:ultima?.op.carga.lecturas ?? [],
+        faltantes:ultima?.op.carga.faltantes ?? [], operacionId:ultima?.op.operacionId ?? null,
+        resultado:ultima ? (ultima.estado === 'Enviando' ? 'Pendiente' : ultima.estado) : null,
+        detalle:ultima ? null : 'La carga sin confirmar debe revisarse: se conservó el borrador de la visita.' };
+    const copiaCarga = await cifrar('borrador', idCarga, carga, s);
+    const db = await open();
+    try {
+        const tx = db.transaction(['espacios','borradores'], 'readwrite'), done = completed(tx);
+        comprobarToken(tx.objectStore('espacios'), s, () => {
+            const store = tx.objectStore('borradores'), actual = store.get(idCarga);
+            actual.onsuccess = () => {
+                if (actual.result?.revision !== registro.revision) { tx.abort(); return; }
+                const destino = store.get(idVisita);
+                destino.onsuccess = () => {
+                    if (!destino.result) store.put({ ...copiaVisita, revision:visita.revision, bloqueaRuta:false }, idVisita);
+                    store.put({ ...copiaCarga, revision:carga.revision, bloqueaRuta:false }, idCarga);
+                };
+            };
+        }, tx);
+        try { await done; }
+        catch { throw new Error('La sesión o el borrador cambió durante la recuperación. Volvé a abrir la ruta; los datos se conservaron.'); }
+    } finally { db.close(); }
 }
 async function escribirBorrador(valor, esperado, s, operacion = null) {
     const id = draftKey(s, valor.rutaId, valor.tipoBorrador), registro = await cifrar('borrador', id, valor, s);
@@ -308,13 +352,23 @@ async function escribirBorrador(valor, esperado, s, operacion = null) {
             r.onsuccess = () => {
                 if ((r.result?.revision ?? 0) !== esperado) { tx.abort(); return; }
                 const escribir = () => {
-                    store.put({ ...registro, revision:valor.revision, bloqueaRuta:valor.tipoBorrador === 'rendicion' && !!valor.operacionId && valor.resultado !== 'Rechazada' }, id);
+                    store.put({ ...registro, revision:valor.revision, bloqueaRuta:valor.tipoBorrador === 'rendicion' && !!valor.operacionId && valor.resultado !== 'Rechazada',
+                        bloqueaCarga:valor.tipoBorrador === 'inicio' && !!valor.operacionId && valor.resultado !== 'Rechazada' }, id);
                     if (op) tx.objectStore('operaciones').add({ ...op, estado:'Pendiente', secuencia:operacion.secuencia }, operacion.operacionId);
                 };
-                if (operacion?.tipo === 'ConfirmarCarga') {
+                const escribirConCarga = () => {
+                    if ((valor.tipoBorrador ?? 'carga') === 'carga') {
+                        const inicio = store.get(draftKey(s, valor.rutaId, 'inicio'));
+                        inicio.onsuccess = () => { if (inicio.result?.bloqueaCarga) tx.abort(); else escribir(); };
+                    } else if (valor.tipoBorrador === 'inicio') {
+                        const carga = store.get(draftKey(s, valor.rutaId));
+                        carga.onsuccess = () => { if ((carga.result?.revision ?? 0) !== valor.revisionCarga) tx.abort(); else escribir(); };
+                    } else escribir();
+                };
+                if (['ConfirmarCarga','RegistrarVisita','IniciarRuta'].includes(operacion?.tipo)) {
                     const rendicion = store.get(draftKey(s, valor.rutaId, 'rendicion'));
-                    rendicion.onsuccess = () => { if (rendicion.result?.bloqueaRuta) tx.abort(); else escribir(); };
-                } else escribir();
+                    rendicion.onsuccess = () => { if (rendicion.result?.bloqueaRuta) tx.abort(); else escribirConCarga(); };
+                } else escribirConCarga();
             };
         }, tx);
         try { await done; } catch { throw new Error('No se pudo guardar: la carga cambió en otra pestaña, cambió la sesión o no hay espacio. Actualizá para revisar.'); }
@@ -340,17 +394,20 @@ export async function abrirCarga(ruta) {
     if (copia?.hoja.fechaRuta !== fechaOperativaActual(s) && anterior?.operacionId && anterior.resultado) return anterior;
     await exigirFechaDeCarga(ruta, copia);
     await exigirJornadaAbierta(ruta, copia);
-    if (anterior && (!anterior.resultado || anterior.resultado === 'Rechazada')) return anterior;
+    if (anterior?.resultado === 'Pendiente') return anterior;
+    if ((await estadoInicioRuta(ruta, copia)).iniciada && anterior) return anterior;
+    if (anterior?.resultado === 'Rechazada') return anterior;
     if (anterior && anterior.revisionRuta === copia.hoja.revisionRuta) return anterior;
-    const pendientes = new Set(copia.hoja.paradas.flatMap(p => p.envios).filter(e => e.estado === 'AsignadoARuta')
-        .flatMap(e => e.bultos).map(b => b.codigo));
+    const pendientes = new Set(copia.hoja.paradas.flatMap(p => p.envios).flatMap(e => e.bultos.filter(b => (b.estado || e.estado) === 'AsignadoARuta')).map(b => b.codigo));
     const valor = { rutaId:ruta, revisionRuta:copia.hoja.revisionRuta, revision:(anterior?.revision ?? 0)+1,
-        lecturas:anterior?.resultado === 'Aplicada' ? anterior.lecturas.filter(l => pendientes.has(l.codigoBulto)) : [],
+        lecturas:!anterior?.resultado ? anterior?.lecturas ?? [] : anterior.resultado === 'Aplicada' ? anterior.lecturas.filter(l => pendientes.has(l.codigoBulto)) : [],
+        faltantes:anterior?.faltantes?.filter(f => pendientes.has(f.codigoBulto)) ?? [],
         operacionId:null, resultado:null, detalle:null };
     return escribirBorrador(valor, anterior?.revision ?? 0, s);
 }
 export async function escanearCarga(ruta, revision, codigo) {
     await exigirFechaDeCarga(ruta);
+    await exigirCargaAbierta(ruta);
     await exigirJornadaAbierta(ruta);
     codigo = codigo.trim();
     if (!codigo || codigo.length > 200) throw new Error('Ingresá un código de bulto válido.');
@@ -376,21 +433,40 @@ async function instalacion() {
 }
 export async function confirmarCarga(ruta, revision, aceptaFaltantes) {
     await exigirFechaDeCarga(ruta);
+    await exigirCargaAbierta(ruta);
     await exigirJornadaAbierta(ruta);
     const s = await activo(), actual = await borradorCarga(ruta), copia = await cargar();
     if (!actual || actual.operacionId || actual.revision !== revision || !actual.lecturas.length)
         throw new Error('Revisá el avance de carga antes de confirmar.');
     if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta || copia.hoja.revisionRuta !== actual.revisionRuta)
-        throw new Error('La hoja cambió. Revisá la carga antes de confirmar.');
-    const candidatos = copia.hoja.paradas.flatMap(p => p.envios).filter(e => e.estado === 'AsignadoARuta');
+        throw new Error('La hoja cambió. Usá «Actualizar hoja y revisar carga» antes de confirmar; se conservan tus escaneos.');
+    const candidatos = copia.hoja.paradas.flatMap(p => p.envios).map(e => ({ ...e, bultos:e.bultos.filter(b => (b.estado || e.estado) === 'AsignadoARuta') })).filter(e => e.bultos.length);
     const codigos = new Set(actual.lecturas.map(l => l.codigoBulto));
-    if (!aceptaFaltantes && candidatos.some(e => e.bultos.some(b => !codigos.has(b.codigo))))
+    const porBulto = copia.hoja.schemaVersion >= 3;
+    const bloqueados = candidatos.filter(e => e.reglasEntrega.admiteEntregaParcial !== true && e.bultos.some(b => !codigos.has(b.codigo)));
+    if (porBulto && !candidatos.some(e => e.bultos.every(b => codigos.has(b.codigo))
+        || e.reglasEntrega.admiteEntregaParcial === true && e.bultos.some(b => codigos.has(b.codigo))))
+        throw new Error('Completá los envíos: esta carga no tiene bultos habilitados para salir.');
+    if (!aceptaFaltantes && candidatos.some(e => (!porBulto || e.reglasEntrega.admiteEntregaParcial === true) && e.bultos.some(b => !codigos.has(b.codigo))))
         throw new Error('Confirmá expresamente que vas a continuar con faltantes.');
+    const faltantes = candidatos.filter(e => !porBulto || e.reglasEntrega.admiteEntregaParcial === true).flatMap(e => e.bultos).filter(b => !codigos.has(b.codigo));
+    if (copia.hoja.schemaVersion >= 3 && faltantes.some(b => !actual.faltantes?.some(f => f.codigoBulto === b.codigo))) throw new Error('Indicá el motivo de cada faltante de carga.');
     const dispositivo = await instalacion();
     const op = { ...dispositivo, operacionId:uuidv7(), tipo:'ConfirmarCarga', rutaId:ruta, envioId:null,
         ocurridoEn:new Date().toISOString(), latitud:null, longitud:null, correlacionId:traceparent(),
-        carga:{ revisionRuta:actual.revisionRuta, lecturas:actual.lecturas, aceptaFaltantes } };
+        carga:{ revisionRuta:actual.revisionRuta, lecturas:actual.lecturas, aceptaFaltantes:aceptaFaltantes || porBulto && bloqueados.length > 0, ...(porBulto ? { porBulto:true, faltantes:faltantes.map(b => actual.faltantes.find(f => f.codigoBulto === b.codigo)) } : {}) } };
     return escribirBorrador({ ...actual, revision:revision+1, operacionId:op.operacionId, resultado:'Pendiente' }, revision, s, op);
+}
+export async function motivoFaltanteCarga(ruta, revision, codigoBulto, motivo) {
+    await exigirCargaAbierta(ruta);
+    const s = await activo(), actual = await borradorCarga(ruta), copia = await cargar();
+    await exigirFechaDeCarga(ruta, copia);
+    await exigirJornadaAbierta(ruta, copia);
+    if (!actual || actual.operacionId || actual.revision !== revision || !copia || copia.sinRuta
+        || !copia.hoja.paradas.flatMap(p => p.envios).some(e => e.bultos.some(b => b.codigo === codigoBulto && (b.estado || e.estado) === 'AsignadoARuta'))
+        || actual.lecturas.some(l => l.codigoBulto === codigoBulto)
+        || !['NoDisponible','NoLocalizado','SinEspacio','Otro'].includes(motivo)) throw new Error('Revisá el faltante y su motivo.');
+    return escribirBorrador({ ...actual, revision:revision+1, faltantes:[...(actual.faltantes ?? []).filter(f => f.codigoBulto !== codigoBulto), { codigoBulto, motivo }] }, revision, s);
 }
 async function listaOperaciones(s, todas = false) {
     const db = await open();
@@ -410,9 +486,9 @@ export async function pendientesCarga() {
     return Promise.all((await listaOperaciones(s)).map(r => descifrar(r,'operacion',r.meta.id,s)));
 }
 async function aceptarResultado(op, respuesta, s) {
-    const tipo = op.tipo === 'IniciarRendicion' ? 'rendicion' : 'carga';
+    const tipo = op.tipo === 'IniciarRendicion' ? 'rendicion' : op.tipo === 'IniciarRuta' ? 'inicio' : 'carga';
     const id = draftKey(s, op.rutaId, tipo), anterior = await leerBorrador(op.rutaId, tipo);
-    if (!['ConfirmarCarga','IniciarRendicion'].includes(op.tipo)) return aceptarSinBorrador(op, respuesta, s);
+    if (!['ConfirmarCarga','IniciarRendicion','IniciarRuta'].includes(op.tipo)) return aceptarSinBorrador(op, respuesta, s);
     if (!anterior || anterior.operacionId !== op.operacionId) throw new Error('La confirmación local cambió.');
     const aplicada = ['Aplicada','YaAplicada'].includes(respuesta.resultado);
     const valor = { ...anterior, revision:anterior.revision+1, resultado:aplicada ? 'Aplicada' : 'Rechazada',
@@ -424,7 +500,8 @@ async function aceptarResultado(op, respuesta, s) {
             const borradores = tx.objectStore('borradores'), actual = borradores.get(id);
             actual.onsuccess = () => {
                 if (actual.result?.revision !== anterior.revision) { tx.abort(); return; }
-                borradores.put({ ...cifrada, revision:valor.revision, bloqueaRuta:tipo === 'rendicion' && aplicada },id);
+                borradores.put({ ...cifrada, revision:valor.revision, bloqueaRuta:tipo === 'rendicion' && aplicada,
+                    bloqueaCarga:tipo === 'inicio' && aplicada },id);
                 const store = tx.objectStore('operaciones');
                 if (aplicada) {
                     tx.objectStore('recibos').put({ ...recibo, estado:'Aplicada', secuencia:op.secuencia },op.operacionId);
@@ -504,6 +581,7 @@ async function ejecutarSincronizacion() {
     }
 }
 export async function revisarRechazo(ruta, revision) {
+    await exigirCargaAbierta(ruta);
     await exigirFechaDeCarga(ruta);
     const s = await activo(), actual = await borradorCarga(ruta), copia = await cargar();
     if (!actual || actual.revision !== revision || actual.resultado !== 'Rechazada' || !copia || copia.sinRuta || copia.hoja.rutaId !== ruta)
@@ -516,6 +594,48 @@ function conexionRecuperada() { cargaRef?.invokeMethodAsync('Reconectar').catch(
 export function escucharConexion(ref) { cargaRef=ref; globalThis.addEventListener?.('online',conexionRecuperada); }
 export function dejarConexion() { globalThis.removeEventListener?.('online',conexionRecuperada); cargaRef=null; }
 
+export async function estadoInicioRuta(ruta, copia = null) {
+    copia ??= await cargar(ruta);
+    const inicio = await leerBorrador(ruta, 'inicio');
+    if (copia?.hoja.estadoRuta === 'EnCurso') return { iniciada:true, resultado:inicio?.resultado ?? 'Aplicada', detalle:inicio?.detalle ?? null };
+    if (inicio?.operacionId) return { iniciada:inicio.resultado !== 'Rechazada', resultado:inicio.resultado, detalle:inicio.detalle ?? null };
+    // Compatibilidad con cargas pendientes del cliente anterior al manifiesto por bulto.
+    if (copia?.hoja.schemaVersion < 3) {
+        const s = await activo();
+        const antiguas = (await operacionesDeRuta(s, ruta)).filter(r => r.op.tipo === 'ConfirmarCarga' && r.estado !== 'Rechazada');
+        if (antiguas.some(r => copia.hoja.paradas.flatMap(p => p.envios).some(e => e.bultos.every(b => r.op.carga.lecturas.some(l => l.codigoBulto === b.codigo)))))
+            return { iniciada:true, resultado:'Pendiente', detalle:null };
+    }
+    return { iniciada:false, resultado:null, detalle:null };
+}
+async function exigirCargaAbierta(ruta) {
+    if ((await estadoInicioRuta(ruta)).iniciada) throw new Error('La ruta ya comenzó. La carga está cerrada.');
+}
+async function exigirRutaIniciada(ruta, copia = null) {
+    if (!(await estadoInicioRuta(ruta, copia)).iniciada) throw new Error('Primero debés pulsar «Comenzar ruta».');
+}
+export async function comenzarRuta(ruta) {
+    const s = await activo(), copia = await cargar();
+    await exigirFechaDeCarga(ruta, copia);
+    await exigirJornadaAbierta(ruta, copia);
+    if ((await estadoInicioRuta(ruta, copia)).iniciada) return estadoInicioRuta(ruta, copia);
+    const carga = await borradorCarga(ruta), anterior = await leerBorrador(ruta, 'inicio');
+    if (anterior?.resultado === 'Rechazada') throw new Error('El inicio fue rechazado: revisá el conflicto con despacho antes de continuar.');
+    if (carga && !carga.operacionId && carga.lecturas.length) throw new Error('Confirmá primero la carga que estás preparando.');
+    const operaciones = await operacionesDeRuta(s, ruta);
+    const confirmadas = operaciones.filter(r => r.op.tipo === 'ConfirmarCarga' && r.estado !== 'Rechazada');
+    const cargados = copia.hoja.paradas.flatMap(p => p.envios).some(e => e.bultos.some(b => (b.estado || e.estado) === 'EnTransito'))
+        || confirmadas.some(r => copia.hoja.paradas.flatMap(p => p.envios).some(e => e.bultos.every(b => r.op.carga.lecturas.some(l => l.codigoBulto === b.codigo))
+            || e.reglasEntrega.admiteEntregaParcial && e.bultos.some(b => r.op.carga.lecturas.some(l => l.codigoBulto === b.codigo))));
+    if (!cargados) throw new Error('Confirmá una carga con bultos habilitados antes de comenzar la ruta.');
+    const dispositivo = await instalacion();
+    const op = { ...dispositivo, operacionId:uuidv7(), tipo:'IniciarRuta', rutaId:ruta, envioId:null,
+        ocurridoEn:new Date().toISOString(), latitud:null, longitud:null, correlacionId:traceparent() };
+    await escribirBorrador({ tipoBorrador:'inicio', rutaId:ruta, revision:(anterior?.revision ?? 0)+1,
+        revisionCarga:carga?.revision ?? 0, operacionId:op.operacionId, resultado:'Pendiente', detalle:null }, anterior?.revision ?? 0, s, op);
+    return estadoInicioRuta(ruta, copia);
+}
+
 // CU-54: mismo almacén cifrado y mismo transporte, con un borrador separado del de carga.
 export async function borradorRendicion(ruta) { return leerBorrador(ruta, 'rendicion'); }
 async function exigirJornadaAbierta(ruta, copia = null) {
@@ -525,7 +645,10 @@ async function exigirJornadaAbierta(ruta, copia = null) {
 }
 async function aceptarSinBorrador(op, respuesta, s) {
     const aplicada = ['Aplicada','YaAplicada'].includes(respuesta.resultado);
-    const recibo = aplicada && op.tipo !== 'ReportarPosicion' ? await cifrar('operacion',op.operacionId,op,s) : null, db = await open();
+    const recibo = aplicada && op.tipo !== 'ReportarPosicion' ? await cifrar('operacion',op.operacionId,op,s) : null;
+    const rechazo = !aplicada ? await cifrar('operacion', op.operacionId, { ...op,
+        diagnostico:{ detalle:respuesta.detalle ?? null, bultos:respuesta.bultos ?? [] } }, s) : null;
+    const db = await open();
     try {
         const tx = db.transaction(['espacios','operaciones','recibos'],'readwrite'), done = completed(tx);
         comprobarToken(tx.objectStore('espacios'),s,() => {
@@ -535,7 +658,7 @@ async function aceptarSinBorrador(op, respuesta, s) {
                 if (aplicada) {
                     if (recibo) tx.objectStore('recibos').put({ ...recibo, estado:'Aplicada', secuencia:op.secuencia },op.operacionId);
                     store.delete(op.operacionId);
-                } else store.put({ ...r.result, estado:'Rechazada', motivo:respuesta.motivo },op.operacionId);
+                } else store.put({ ...r.result, ...rechazo, estado:'Rechazada', motivo:respuesta.motivo },op.operacionId);
             };
         },tx);
         await done;
@@ -547,22 +670,30 @@ async function baseRendicion(ruta) {
         throw new Error('Actualizá la hoja con conexión antes de preparar la rendición. La copia anterior sigue disponible.');
     const h = copia.hoja, bultos = structuredClone(h.rendicion.bultos), envios = h.paradas.flatMap(p => p.envios);
     if (h.rendicion.iniciada) return { bultos, dependencias:[], iniciada:h.rendicion.iniciada };
-    let enCurso = h.estadoRuta === 'EnCurso';
+    const enCurso = (await estadoInicioRuta(ruta, copia)).iniciada;
     const dependencias = [], filas = await listaOperaciones(s, true);
     for (const fila of filas) {
         const op = await descifrar(fila, 'operacion', fila.meta.id, s);
-        if (op.rutaId !== ruta || !['ConfirmarCarga','RegistrarEntrega','RegistrarIntentoFallido'].includes(op.tipo)) continue;
+        if (op.rutaId !== ruta || !['ConfirmarCarga','IniciarRuta',...TIPOS_EN_CALLE].includes(op.tipo)) continue;
         if (fila.estado === 'Rechazada') throw new Error('Revisá las operaciones rechazadas de la ruta antes de rendir.');
         dependencias.push(op.operacionId);
+        if (op.tipo === 'IniciarRuta') continue;
         if (op.tipo === 'ConfirmarCarga') {
             const leidos = new Set(op.carga.lecturas.map(l => l.codigoBulto));
             for (const envio of envios) {
                 const completos = envio.bultos.every(b => leidos.has(b.codigo));
                 for (const b of bultos.filter(b => b.envioId === envio.id)) {
                     if (b.situacion !== 'NoCargado' && b.situacion !== 'CargaParcial') continue;
-                    if (completos) { b.situacion = 'NoIntentado'; b.requiereDeclaracion = true; enCurso = true; }
-                    else if (leidos.has(b.codigo)) { b.situacion = 'CargaParcial'; b.requiereDeclaracion = true; }
+                    if (completos || op.carga.porBulto && envio.reglasEntrega.admiteEntregaParcial && leidos.has(b.codigo)) { b.situacion = 'NoIntentado'; b.requiereDeclaracion = true; }
+                    else if (!op.carga.porBulto && leidos.has(b.codigo)) { b.situacion = 'CargaParcial'; b.requiereDeclaracion = true; }
                 }
+            }
+        } else if (op.tipo === 'RegistrarVisita') {
+            for (const resultado of op.visita.bultos) {
+                const b = bultos.find(b => b.envioId === op.envioId && b.codigo === resultado.codigoBulto);
+                if (!b) throw new Error('La visita contiene un bulto fuera de la rendición.');
+                b.situacion = resultado.motivoId ? 'IntentoFallido' : 'EntregadoEnCalle';
+                b.requiereDeclaracion = !!resultado.motivoId;
             }
         } else if (['RegistrarEntrega','RegistrarIntentoFallido'].includes(op.tipo)) {
             for (const b of bultos.filter(b => b.envioId === op.envioId)) {
@@ -630,8 +761,84 @@ export async function confirmarRendicion(ruta, revision) {
 // las del dispositivo (ADR-0004). Un registro por envío: si ya hay uno pendiente, aplicado o rechazado, no se agrega
 // otro (un rechazo del servidor es definitivo y lo revisa despacho). Las reglas salen de la hoja: las de la versión del
 // envío. El servidor vuelve a validar todo al sincronizar.
-const TIPOS_EN_CALLE = ['RegistrarEntrega','RegistrarIntentoFallido'];
+const TIPOS_EN_CALLE = ['RegistrarVisita','RegistrarEntrega','RegistrarIntentoFallido'];
 const MAX_ARCHIVO = 1024 * 1024;
+
+// RF 32: el conjunto de la visita se obtiene del manifiesto y de las cargas confirmadas localmente.
+// Nunca convertir los no cargados en intentos fallidos ni incluir los ya resueltos en una nueva firma.
+async function contextoVisita(ruta, envioId) {
+    const s = await activo(), copia = await cargar();
+    if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta) throw new Error('Abrí la hoja de esta ruta antes de registrar.');
+    await exigirJornadaAbierta(ruta, copia);
+    await exigirRutaIniciada(ruta, copia);
+    const envio = copia.hoja.paradas.flatMap(p => p.envios).find(e => e.id === envioId);
+    if (!envio) throw new Error('El envío no está en esta ruta.');
+    const operaciones = await operacionesDeRuta(s, ruta);
+    if (operaciones.some(r => TIPOS_EN_CALLE.includes(r.op.tipo) && r.op.envioId === envioId))
+        throw new Error('Este envío ya está registrado en este dispositivo.');
+    const cargados = new Set(operaciones.filter(r => r.op.tipo === 'ConfirmarCarga' && r.estado !== 'Rechazada')
+        .flatMap(r => r.op.carga.lecturas.map(l => l.codigoBulto)));
+    const asignados = envio.bultos.filter(b => (b.estado || envio.estado) === 'AsignadoARuta');
+    const cargaCompleta = asignados.length > 0 && asignados.every(b => cargados.has(b.codigo));
+    const alcance = envio.bultos.filter(b => (b.estado || envio.estado) === 'EnTransito'
+        || (b.estado || envio.estado) === 'AsignadoARuta' && cargados.has(b.codigo)
+            && (envio.reglasEntrega.admiteEntregaParcial === true || cargaCompleta));
+    if (!alcance.length) throw new Error('No hay bultos cargados para registrar esta visita.');
+    return { s, envio, alcance };
+}
+export async function abrirVisita(ruta, envioId) {
+    const { s, envio, alcance } = await contextoVisita(ruta, envioId);
+    const tipoBorrador = 'visita:' + envioId;
+    const anterior = await leerBorrador(ruta, tipoBorrador);
+    const codigos = alcance.map(b => b.codigo);
+    if (anterior && !anterior.operacionId && Array.isArray(anterior.bultos) && anterior.bultos.length === codigos.length
+        && anterior.bultos.every(b => codigos.includes(b.codigoBulto))) return anterior;
+    const valor = { tipoBorrador, rutaId:ruta, envioId, revision:(anterior?.revision ?? 0)+1, operacionId:null,
+        bultos:alcance.map(b => ({ codigoBulto:b.codigo, entregado:false, motivoId:null })),
+        excluidos:envio.bultos.filter(b => !codigos.includes(b.codigo)).map(b => ({ codigoBulto:b.codigo, estado:b.estado || envio.estado })) };
+    return escribirBorrador(valor, anterior?.revision ?? 0, s);
+}
+export async function resultadoVisita(ruta, envioId, revision, codigo, entregado, motivoId) {
+    const { s, envio } = await contextoVisita(ruta, envioId);
+    const actual = await leerBorrador(ruta, 'visita:' + envioId);
+    codigo = codigo.trim();
+    if (!actual || actual.operacionId || actual.revision !== revision || !actual.bultos.some(b => b.codigoBulto === codigo))
+        throw new Error('El bulto no pertenece a esta visita o el borrador cambió.');
+    if (entregado && actual.bultos.find(b => b.codigoBulto === codigo).entregado) throw new Error('Ese bulto ya fue escaneado.');
+    if (motivoId && !envio.reglasEntrega.motivosNoEntrega.some(m => m.id === motivoId)) throw new Error('Elegí un motivo del catálogo.');
+    return escribirBorrador({ ...actual, revision:revision+1,
+        bultos:actual.bultos.map(b => b.codigoBulto === codigo ? { codigoBulto:codigo, entregado:!!entregado, motivoId:entregado ? null : motivoId || null } : b)
+    }, revision, s);
+}
+export async function registrarVisita(ruta, envioId, revision, datos) {
+    const { s, envio, alcance } = await contextoVisita(ruta, envioId);
+    const actual = await leerBorrador(ruta, 'visita:' + envioId);
+    if (!actual || actual.operacionId || actual.revision !== revision || actual.bultos.length !== alcance.length
+        || actual.bultos.some(b => !alcance.some(a => a.codigo === b.codigoBulto))) throw new Error('La visita cambió. Revisá los bultos.');
+    if (actual.bultos.some(b => !b.entregado && !b.motivoId)) throw new Error('Escaneá cada entregado o elegí su motivo de no entrega.');
+    const entregados = actual.bultos.filter(b => b.entregado).length, reglas = envio.reglasEntrega;
+    if (entregados && reglas.admiteEntregaParcial !== true && (entregados !== actual.bultos.length
+        || envio.bultos.some(b => !['Entregado','Devuelto','Extraviado','Cancelado'].includes(b.estado || envio.estado)
+            && !alcance.some(a => a.codigo === b.codigo)))) throw new Error('Este operador no admite entrega parcial: se entregan todos los pendientes o ninguno.');
+    const firma = entregados ? archivo(datos?.firma, 'La firma') : null;
+    if (entregados && !firma) throw new Error('La firma de los bultos entregados es obligatoria.');
+    const foto = archivo(datos?.foto, 'La foto');
+    if (!foto && (entregados && reglas.exigeFoto || actual.bultos.some(b => b.motivoId
+        && reglas.motivosNoEntrega.find(m => m.id === b.motivoId)?.exigeEvidencia))) throw new Error('Esta visita exige una foto como evidencia.');
+    const nombre = entregados ? datos?.nombreReceptor?.trim() || null : null;
+    const documento = entregados ? datos?.documentoReceptor?.trim() || null : null;
+    if (entregados && reglas.exigeNombreYDocumento && (!nombre || !documento)) throw new Error('Completá el nombre y documento de quien recibe.');
+    const observaciones = datos?.observaciones?.trim() || null;
+    if ((nombre?.length ?? 0) > 200 || (documento?.length ?? 0) > 50 || (observaciones?.length ?? 0) > 1000) throw new Error('Los datos superan el largo permitido.');
+    if (!coordenada(datos?.latitud,90) || !coordenada(datos?.longitud,180)) throw new Error('Activá la ubicación para registrar la visita.');
+    const dispositivo = await instalacion();
+    const op = { ...dispositivo, operacionId:uuidv7(), tipo:'RegistrarVisita', rutaId:ruta, envioId,
+        ocurridoEn:new Date().toISOString(), latitud:Math.round(datos.latitud*1e6)/1e6, longitud:Math.round(datos.longitud*1e6)/1e6,
+        correlacionId:traceparent(), visita:{ bultos:actual.bultos.map(b => ({ codigoBulto:b.codigoBulto, motivoId:b.entregado ? null : b.motivoId })),
+            firma, foto, nombreReceptor:nombre, documentoReceptor:documento, observaciones } };
+    await escribirBorrador({ ...actual, revision:revision+1, operacionId:op.operacionId }, revision, s, op);
+    return { envioId, tipo:op.tipo, estado:'Pendiente', motivo:null };
+}
 async function operacionesDeRuta(s, ruta) {
     const lista = [];
     for (const fila of await listaOperaciones(s, true)) {
@@ -644,12 +851,13 @@ export async function estadosEnvios(ruta) {
     const s = await sesionLocal();
     if (!s) return [];
     return (await operacionesDeRuta(s, ruta)).filter(r => TIPOS_EN_CALLE.includes(r.op.tipo))
-        .map(r => ({ envioId:r.op.envioId, tipo:r.op.tipo, estado:r.estado, motivo:r.motivo }));
+        .map(r => ({ envioId:r.op.envioId, tipo:r.op.tipo, estado:r.estado, motivo:r.motivo, ...(r.op.visita ? { resultados:r.op.visita.bultos } : {}), ...(r.op.diagnostico ? { detalle:r.op.diagnostico.detalle, bultos:r.op.diagnostico.bultos } : {}) }));
 }
 async function envioParaRegistrar(ruta, envioId) {
     const s = await activo(), copia = await cargar();
     if (!copia || copia.sinRuta || copia.hoja.rutaId !== ruta) throw new Error('Abrí la hoja de esta ruta antes de registrar.');
     await exigirJornadaAbierta(ruta, copia);
+    await exigirRutaIniciada(ruta, copia);
     const envio = copia.hoja.paradas.flatMap(p => p.envios).find(e => e.id === envioId);
     if (!envio) throw new Error('El envío no está en esta ruta.');
     const operaciones = await operacionesDeRuta(s, ruta);
@@ -720,10 +928,7 @@ export async function rutaParaSeguimiento() {
         const h = copia.hoja, rendicion = await borradorRendicion(h.rutaId);
         if (copia.sinRuta || h.rendicion?.iniciada || rendicion?.operacionId
             || await read('instalacion',`gps-cerrada:${key(s)}:${h.rutaId}`)) continue;
-        const carga = await borradorCarga(h.rutaId);
-        const completa = carga?.operacionId && carga.resultado !== 'Rechazada'
-            && h.paradas.flatMap(p => p.envios).some(e => e.bultos.every(b => carga.lecturas.some(l => l.codigoBulto === b.codigo)));
-        if (h.estadoRuta === 'EnCurso' || completa) candidatas.push(h.rutaId);
+        if ((await estadoInicioRuta(h.rutaId, copia)).iniciada) candidatas.push(h.rutaId);
     }
     if ((await sesionLocal())?.token !== s.token) return null;
     if (candidatas.length > 1) throw new Error('Hay más de una ruta en curso. Actualizá tus rutas para habilitar el seguimiento.');

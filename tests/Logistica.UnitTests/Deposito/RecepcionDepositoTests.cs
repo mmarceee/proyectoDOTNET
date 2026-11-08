@@ -49,4 +49,15 @@ public class RecepcionDepositoTests
     {
         Assert.Throws<DomainException>(() => Registrar(SinMedir with { LargoCm = 0 }));
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Las_medidas_no_positivas_se_rechazan_aunque_no_haya_un_valor_declarado(decimal valor)
+    {
+        foreach (var medidas in new[] { SinMedir with { PesoKg = valor }, SinMedir with { LargoCm = valor },
+            SinMedir with { AnchoCm = valor }, SinMedir with { AltoCm = valor } })
+            Assert.Throws<DomainException>(() => RecepcionDeposito.Registrar(Guid.NewGuid(), Guid.NewGuid(),
+                Guid.NewGuid(), SinMedir, medidas, Ahora));
+    }
 }

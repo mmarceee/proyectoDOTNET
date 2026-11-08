@@ -17,19 +17,35 @@
 @if (Hoja.RequiereIngreso) { <a class="btn btn-primary" href="/repartidor/ingresar">Iniciar sesión</a> }
 else if (Cargas.Borrador is { } borrador && Hoja.Copia is { } copia)
 {
-    var envios = copia.Hoja.Paradas.SelectMany(p => p.Envios).Where(e => e.Estado == "AsignadoARuta").ToArray();
+    var envios = copia.Hoja.Paradas.SelectMany(p => p.Envios)
+        .Select(e => e with { Bultos = e.Bultos.Where(b => (b.Estado.Length == 0 ? e.Estado : b.Estado) == "AsignadoARuta").ToArray() })
+        .Where(e => e.Bultos.Count > 0).ToArray();
     var codigos = borrador.Lecturas.Select(l => l.CodigoBulto).ToHashSet(StringComparer.Ordinal);
     var esperados = envios.SelectMany(e => e.Bultos).Select(b => b.Codigo).ToHashSet(StringComparer.Ordinal);
-    var faltantes = esperados.Except(codigos).ToArray();
+    var bloqueados = envios.Where(e => !e.ReglasEntrega.AdmiteEntregaParcial && e.Bultos.Any(b => !codigos.Contains(b.Codigo))).ToArray();
+    var faltantesParciales = envios.Where(e => e.ReglasEntrega.AdmiteEntregaParcial).SelectMany(e => e.Bultos)
+        .Where(b => !codigos.Contains(b.Codigo)).Select(b => b.Codigo).ToArray();
+    var hayCargables = envios.Any(e => e.Bultos.All(b => codigos.Contains(b.Codigo))
+        || e.ReglasEntrega.AdmiteEntregaParcial && e.Bultos.Any(b => codigos.Contains(b.Codigo)));
     var sobrantes = codigos.Except(esperados).ToArray();
-    var puedeFinalizar = copia.Hoja.Rendicion?.Iniciada is null && (copia.Hoja.EstadoRuta == "EnCurso"
-        || borrador.Resultado is "Pendiente" or "Aplicada" && envios.Any(e => e.Bultos.All(b => codigos.Contains(b.Codigo))));
+    var iniciada = Cargas.Inicio?.Iniciada == true;
+    var puedeFinalizar = copia.Hoja.Rendicion?.Iniciada is null && iniciada;
     <p>Ruta del @copia.Hoja.FechaRuta.ToString("dd/MM/yyyy") · Vehículo <strong>@copia.Hoja.Vehiculo.Matricula</strong></p>
     @if (puedeFinalizar)
     {
         <p>Cuando termines el recorrido, declará los bultos que devolvés al depósito.</p>
     }
-    @if (borrador.Resultado == "Pendiente")
+    @if (iniciada)
+    {
+        <div class="alert alert-success" role="status">Ruta iniciada. La carga está cerrada.</div>
+        @if (Cargas.Inicio?.Resultado == "Pendiente")
+        {
+            <p>El inicio está guardado en este dispositivo, pendiente de sincronizar.</p>
+            <button class="btn btn-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.SincronizarAsync">Sincronizar operaciones</button>
+        }
+        <a class="btn btn-outline-primary" href="@($"hoja-de-ruta?rutaId={copia.Hoja.RutaId}")">Ver hoja y registrar entregas</a>
+    }
+    else if (borrador.Resultado == "Pendiente")
     {
         <div class="alert alert-warning">Carga guardada, pendiente de sincronizar. Los estados del servidor todavía no se confirmaron.</div>
         <button class="btn btn-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.SincronizarAsync">Sincronizar carga</button>
@@ -59,43 +75,78 @@ else if (envios.Length == 0) { <div class="alert alert-success">No quedan envío
             @if (camaraActiva) { <button class="btn btn-outline-secondary" @onclick="DetenerCamara">Detener cámara</button> }
         </div>
         <p class="small text-muted">Tu avance se guarda automáticamente en este dispositivo.</p>
+        <button class="btn btn-outline-secondary mb-3" disabled="@Cargas.Ocupado" @onclick="Cargas.ActualizarYRevisarAsync">Actualizar hoja y revisar carga</button>
         @foreach (var envio in envios)
         {
+            var bloqueado = bloqueados.Any(e => e.Id == envio.Id);
             <section class="card mb-2"><div class="card-body">
                 <h2 class="h5">@envio.Numero · @(envio.Bultos.All(b => codigos.Contains(b.Codigo)) ? "Completo" : "Incompleto")</h2>
                 <ul class="list-unstyled mb-0 carga-bultos">
                     @foreach (var b in envio.Bultos)
                     {
                         var cargado = codigos.Contains(b.Codigo);
-                        <li class="carga-bulto @(cargado ? "carga-bulto-cargado" : "")" @key="b.Codigo">
+                        <li class="carga-bulto @(cargado && !bloqueado ? "carga-bulto-cargado" : "")" @key="b.Codigo">
                             <span class="carga-bulto-codigo">@b.Codigo</span>
                             <span class="carga-bulto-estado">
-                                @if (cargado)
+                                @if (cargado && !bloqueado)
                                 {
                                     <svg class="carga-bulto-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6" /></svg>
                                 }
-                                @(cargado ? "Cargado" : "Faltante")
+                                @(cargado ? bloqueado ? "Escaneado · no sale" : "Cargado" : "Faltante")
                             </span>
                         </li>
                     }
                 </ul>
+                @if (bloqueado)
+                {
+                    <div class="alert alert-warning mt-3 mb-0" role="alert">
+                        <strong>Este envío no admite carga parcial.</strong> Escaneá todos sus bultos para poder cargarlo.
+                        Si continuás con otros envíos, este envío queda completo fuera del vehículo; retirá también los bultos que ya escaneaste.
+                    </div>
+                }
             </div></section>
         }
         @if (sobrantes.Length > 0)
         {
             <div class="alert alert-warning"><strong>Sobrantes: separalos del vehículo.</strong><ul class="mb-0">@foreach (var s in sobrantes) { <li>@s</li> }</ul></div>
         }
-        @if (faltantes.Length > 0)
+        @if (faltantesParciales.Length > 0)
         {
-            <div class="alert alert-warning">@(faltantes.Length == 1 ? "Falta 1 bulto." : $"Faltan {faltantes.Length} bultos.") Los envíos incompletos seguirán asignados a la ruta, sin pasar a En tránsito.</div>
+            <div class="alert alert-warning">@(faltantesParciales.Length == 1 ? "Falta 1 bulto de un envío que admite parcial." : $"Faltan {faltantesParciales.Length} bultos de envíos que admiten parcial.") Indicá los motivos si vas a continuar sin ellos.</div>
+            @if (copia.Hoja.SchemaVersion >= 3)
+            {
+                @foreach (var faltante in faltantesParciales)
+                {
+                    <label class="form-label" for="@($"faltante-{faltante}")">Motivo de carga · @faltante</label>
+                    <select class="form-select mb-2" id="@($"faltante-{faltante}")" disabled="@Cargas.Ocupado"
+                        value="@(borrador.Faltantes?.FirstOrDefault(f => f.CodigoBulto == faltante)?.Motivo ?? "")"
+                        @onchange="e => ElegirMotivoCarga(faltante, e)">
+                        <option value="">Elegí el motivo</option><option value="NoDisponible">No disponible para cargar</option>
+                        <option value="NoLocalizado">No localizado</option><option value="SinEspacio">Sin espacio en el vehículo</option><option value="Otro">Otro</option>
+                    </select>
+                }
+            }
             <label class="d-block mb-3"><input type="checkbox" @bind="aceptaFaltantes" /> Revisé los faltantes y confirmo que voy a continuar con la carga incompleta.</label>
         }
-        <button class="btn btn-primary mb-4" @onclick="Confirmar" disabled="@(Cargas.Ocupado || borrador.Lecturas.Count == 0 || faltantes.Length > 0 && !aceptaFaltantes)">Confirmar carga</button>
+        <button class="btn btn-primary mb-4" @onclick="() => Confirmar(bloqueados.Length > 0)" disabled="@(Cargas.Ocupado || !hayCargables || faltantesParciales.Length > 0 && !aceptaFaltantes || copia.Hoja.SchemaVersion >= 3 && faltantesParciales.Any(c => borrador.Faltantes?.Any(f => f.CodigoBulto == c) != true))">@(bloqueados.Length > 0 && faltantesParciales.Length == 0 ? "Confirmar envíos completos" : "Confirmar carga")</button>
     }
-    @if (puedeFinalizar || borrador.Resultado == "Aplicada" && copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa)
+    @if (!iniciada && copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa
+        && (borrador.Resultado is "Aplicada" or "Pendiente" || borrador.Lecturas.Count == 0 && copia.Hoja.Paradas.SelectMany(p => p.Envios).Any(e => e.Bultos.Any(b => b.Estado == "EnTransito"))))
+    {
+        @if (Cargas.Inicio?.Resultado == "Rechazada")
+        {
+            <div class="alert alert-danger">El inicio de ruta fue rechazado: @Cargas.Inicio.Detalle. Revisalo con despacho antes de continuar.</div>
+        }
+        else
+        {
+            <p>Cuando todos los bultos que van a salir estén cargados, comenzá el recorrido. Después no podrás agregar más carga.</p>
+            <button class="btn btn-success mb-3" disabled="@Cargas.Ocupado" @onclick="Cargas.ComenzarAsync">Comenzar ruta</button>
+        }
+    }
+    @if (puedeFinalizar || !iniciada && borrador.Resultado == "Aplicada" && copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa)
     {
         <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mb-3">
-            @if (borrador.Resultado == "Aplicada" && copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa)
+            @if (!iniciada && borrador.Resultado == "Aplicada" && copia.Hoja.FechaRuta == Hoja.Sesion?.FechaOperativa)
             {
                 <button class="btn btn-outline-primary" disabled="@Cargas.Ocupado" @onclick="Cargas.AbrirAsync">Revisar carga restante</button>
             }
@@ -111,6 +162,7 @@ else { <p>@(Hoja.Copia is null ? "Descargá tu hoja de ruta antes de comenzar." 
 <video @ref="video" playsinline muted style="width:100%;max-height:320px;display:@(camaraActiva ? "block" : "none")" aria-label="Vista de la cámara para escanear bultos"></video>
 
 @code {
+    private Task ElegirMotivoCarga(string codigo, ChangeEventArgs e) => Cargas.MotivoFaltanteAsync(codigo, e.Value?.ToString() ?? "");
     private string codigo = "";
     private bool aceptaFaltantes, camaraActiva;
     private string? errorCamara;
@@ -137,7 +189,7 @@ else { <p>@(Hoja.Copia is null ? "Descargá tu hoja de ruta antes de comenzar." 
     });
     private async Task LeerManual() { await Cargas.LeerAsync(codigo); codigo=""; aceptaFaltantes=false; }
     [JSInvokable] public async Task CodigoDetectado(string valor) { await Cargas.LeerAsync(valor); aceptaFaltantes=false; await InvokeAsync(StateHasChanged); }
-    private async Task Confirmar() { await DetenerCamara(); await Cargas.ConfirmarAsync(aceptaFaltantes); }
+    private async Task Confirmar(bool omiteNoParciales) { await DetenerCamara(); await Cargas.ConfirmarAsync(aceptaFaltantes || omiteNoParciales); }
     private async Task IniciarCamara()
     {
         errorCamara=null;

@@ -4,8 +4,9 @@ using Microsoft.JSInterop;
 namespace Logistica.Repartidor.Pwa.Services;
 
 public sealed record BorradorCarga(Guid RutaId, long RevisionRuta, long Revision, IReadOnlyList<LecturaCargaRequest> Lecturas,
-    Guid? OperacionId, string? Resultado, string? Detalle);
+    Guid? OperacionId, string? Resultado, string? Detalle, IReadOnlyList<FaltanteCargaRequest>? Faltantes = null);
 public sealed record ResumenSincronizacion(string? Mensaje, int Aplicadas);
+public sealed record InicioRutaLocal(bool Iniciada, string? Resultado, string? Detalle);
 
 public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsyncDisposable
 {
@@ -13,6 +14,7 @@ public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsync
     private DotNetObjectReference<CargaService>? referencia;
     private readonly SemaphoreSlim mutex = new(1,1);
     public BorradorCarga? Borrador { get; private set; }
+    public InicioRutaLocal? Inicio { get; private set; }
     public string? Mensaje { get; private set; }
     public bool Ocupado { get; private set; }
     public event Action? Cambio;
@@ -32,7 +34,7 @@ public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsync
             if (!hoja.Cargando && hoja.Sesion is not null) _ = SincronizarAsync();
             return;
         }
-        Borrador = null; Mensaje = null; Cambio?.Invoke();
+        Borrador = null; Inicio = null; Mensaje = null; Cambio?.Invoke();
     }
     public Task AbrirAsync() => AbrirRutaAsync(null);
     public async Task AbrirRutaAsync(Guid? rutaId)
@@ -43,6 +45,7 @@ public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsync
             if (hoja.RequiereIngreso || hoja.Copia is null) { Borrador = null; return; }
             Borrador = null;
             Borrador = await modulo!.InvokeAsync<BorradorCarga>("abrirCarga", hoja.Copia.Hoja.RutaId);
+            Inicio = await modulo!.InvokeAsync<InicioRutaLocal>("estadoInicioRuta", hoja.Copia.Hoja.RutaId);
             if (Borrador.Resultado is null) Mensaje = null;
         });
     }
@@ -50,8 +53,8 @@ public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsync
     {
         if (Borrador is null) return;
         Borrador = await modulo!.InvokeAsync<BorradorCarga>("escanearCarga",Borrador.RutaId,Borrador.Revision,codigo);
-        var esperado = hoja.Copia?.Hoja.Paradas.SelectMany(p => p.Envios).Where(e => e.Estado == "AsignadoARuta")
-            .SelectMany(e => e.Bultos).Any(b => b.Codigo == codigo.Trim()) == true;
+        var esperado = hoja.Copia?.Hoja.Paradas.SelectMany(p => p.Envios)
+            .Any(e => e.Bultos.Any(b => b.Codigo == codigo.Trim() && (b.Estado.Length == 0 ? e.Estado : b.Estado) == "AsignadoARuta")) == true;
         Mensaje = esperado ? "Bulto registrado y guardado." : "Bulto sobrante: separalo de la carga. Quedó registrado.";
     });
     public async Task ConfirmarAsync(bool aceptaFaltantes)
@@ -64,6 +67,32 @@ public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsync
         });
         if (Borrador?.Resultado == "Pendiente") await SincronizarAsync();
     }
+    public Task MotivoFaltanteAsync(string codigo, string motivo) => Ejecutar(async () =>
+    {
+        if (Borrador is not null)
+            Borrador = await modulo!.InvokeAsync<BorradorCarga>("motivoFaltanteCarga", Borrador.RutaId, Borrador.Revision, codigo, motivo);
+    });
+    public Task ActualizarYRevisarAsync() => Ejecutar(async () =>
+    {
+        if (Borrador is null || Borrador.Resultado == "Pendiente") return;
+        await hoja.ActualizarAsync();
+        if (hoja.SinConexion || hoja.RequiereIngreso || hoja.Error is not null) return;
+        Borrador = Borrador.Resultado == "Rechazada"
+            ? await modulo!.InvokeAsync<BorradorCarga>("revisarRechazo", Borrador.RutaId, Borrador.Revision)
+            : await modulo!.InvokeAsync<BorradorCarga>("abrirCarga", Borrador.RutaId);
+        Inicio = await modulo!.InvokeAsync<InicioRutaLocal>("estadoInicioRuta", Borrador.RutaId);
+        Mensaje = "Hoja actualizada. Revisá los bultos; se conservaron los escaneos de la carga en preparación.";
+    });
+    public async Task ComenzarAsync()
+    {
+        await Ejecutar(async () =>
+        {
+            if (Borrador is null) return;
+            Inicio = await modulo!.InvokeAsync<InicioRutaLocal>("comenzarRuta", Borrador.RutaId);
+            Mensaje = "Ruta iniciada en este dispositivo. La carga está cerrada; el inicio se sincroniza antes de las entregas.";
+        });
+        if (Inicio is { Iniciada:true, Resultado:"Pendiente" }) await SincronizarAsync();
+    }
     [JSInvokable]
     public Task Reconectar() => SincronizarAsync();
     public Task SincronizarAsync() => Ejecutar(async () =>
@@ -72,6 +101,12 @@ public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsync
         if (resultado.Mensaje is not null) Mensaje = resultado.Mensaje;
         if (Borrador is not null) Borrador = await modulo!.InvokeAsync<BorradorCarga?>("borradorCarga",Borrador.RutaId);
         if (resultado.Aplicadas > 0) await hoja.ActualizarAsync();
+        if (Borrador is not null)
+        {
+            Inicio = await modulo!.InvokeAsync<InicioRutaLocal>("estadoInicioRuta", Borrador.RutaId);
+            if (Borrador.Resultado is null && hoja.Copia?.Hoja.RevisionRuta != Borrador.RevisionRuta)
+                Borrador = await modulo!.InvokeAsync<BorradorCarga>("abrirCarga", Borrador.RutaId);
+        }
     });
     public Task RevisarAsync() => Ejecutar(async () =>
     {

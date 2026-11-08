@@ -111,11 +111,14 @@ internal sealed class Ruta : Entity, IOperadorOwned
         foreach (var parada in _paradas) parada.Cerrar(entregados);
         Estado = EstadoRuta.Finalizada; Actualizar();
     }
-    public void RegistrarCarga(bool tieneEnviosCargados)
+    public void RegistrarCarga(bool tieneEnviosCargados, bool inicioExplicito = false)
     {
         if (Estado is not (EstadoRuta.Despachada or EstadoRuta.EnCurso))
             throw new DomainException("La ruta no está disponible para cargar.");
-        if (tieneEnviosCargados) Estado = EstadoRuta.EnCurso;
+        if (inicioExplicito && Estado != EstadoRuta.Despachada)
+            throw new DomainException("La ruta ya comenzó y su carga está cerrada.");
+        // Las cargas antiguas conservan su interpretación; la PWA nueva separa carga de salida.
+        if (tieneEnviosCargados && !inicioExplicito) Estado = EstadoRuta.EnCurso;
         Actualizar();
     }
     private void Reorganizar(IReadOnlyList<EnvioRuta> envios)

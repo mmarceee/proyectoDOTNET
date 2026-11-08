@@ -42,6 +42,8 @@ Los cambios que alimentan al Worker, avisos y proyecciones durables se registran
 
 ### 2.3 Configuración, aislamiento y compatibilidad
 
+**Avance de RF 32 · 08/11/2026.** La [implementación de la PWA](rf-32/README.md) incorpora visita por bulto, foto compartida, hoja schema 3, borrador/operación cifrados, diagnóstico local de rechazo, carga parcial y proyección de rendición. No declara terminadas RF 34, las reservas por bulto ni el resto de la adaptación. El documento enlazado distingue pruebas, límites e integración pendiente. La firma respalda los entregados; la única foto de presencia puede compartirse con los resultados no entregados de esa misma visita, según la confirmación de Lucas del 08/11.
+
 Administración incorpora las reglas RF 33 a versiones por operador; el envío conserva su versión para visitas y sincronizaciones posteriores. El cargo fijo de una visita adicional se registra una sola vez al realizarla y se integra con liquidación mediante su contrato de negocio.
 
 Se mantienen tenant de sesión/mensaje, filtros e interceptor del ADR-0002. La pertenencia de cada BultoId debe comprobarse contra operador, comercio cuando corresponda, envío y visita/ruta. Los datos de dispositivo no fijan el tenant ni pueden trasladar evidencia a otro envío.

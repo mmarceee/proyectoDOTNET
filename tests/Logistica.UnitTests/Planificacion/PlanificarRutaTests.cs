@@ -5,6 +5,21 @@ namespace Logistica.UnitTests.Planificacion;
 
 public class PlanificarRutaTests
 {
+    [Fact]
+    public void Cargar_con_inicio_explicito_no_sale_y_despues_de_iniciar_no_se_admiten_mas_cargas()
+    {
+        var ruta = Nueva();
+        ruta.Despachar(DateTimeOffset.UtcNow);
+        ruta.RegistrarCarga(true, inicioExplicito:true);
+        Assert.Equal(EstadoRuta.Despachada, ruta.Estado);
+        Assert.True(ruta.ReservaActiva);
+        ruta.Iniciar();
+        var revision = ruta.Revision;
+        Assert.Throws<DomainException>(() => ruta.RegistrarCarga(true, inicioExplicito:true));
+        Assert.Equal(EstadoRuta.EnCurso, ruta.Estado);
+        Assert.Equal(revision, ruta.Revision);
+    }
+
     [Theory]
     [InlineData(0, "Fallida")]
     [InlineData(1, "Fallida")]

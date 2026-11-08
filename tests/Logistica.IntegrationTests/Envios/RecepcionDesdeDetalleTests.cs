@@ -124,7 +124,7 @@ public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : ICl
         Assert.Contains("CodigoBulto=" + envio.Numero + "-1", recepcionUrl);
         var formulario = await client.GetStringAsync(recepcionUrl);
         Assert.Contains($"href=\"{detalleUrl}\"", WebUtility.HtmlDecode(formulario));
-        Assert.DoesNotContain("value=\"2\"", Input(formulario, "PesoKg"));
+        Assert.Equal("2", Valor(formulario, "PesoKg"));
 
         var campos = new Dictionary<string, string> { ["CodigoBulto"] = envio.Numero + "-1" };
         foreach (var nombre in new[] { "Pagina", "TamanoPagina", "Estado", "FechaDesde", "FechaHasta", "Texto", "__RequestVerificationToken" })
@@ -186,7 +186,7 @@ public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : ICl
     }
 
     [Fact]
-    public async Task Precarga_solo_codigo_y_actualiza_acciones_al_recibir_cada_bulto()
+    public async Task Precarga_las_medidas_del_comercio_y_actualiza_acciones_al_recibir_cada_bulto()
     {
         var client = factory.CreateClient();
         var envio = await CrearAsync(client);
@@ -197,13 +197,12 @@ public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : ICl
         Assert.Contains($"href=\"{primero}\"", detalle);
         Assert.Contains($"href=\"{segundo}\"", detalle);
 
-        // Aunque se agreguen medidas a la URL, el formulario sólo toma el código por GET.
+        // Las medidas provienen del comercio, nunca de parámetros manipulados en la URL.
         var formulario = await client.GetStringAsync(primero + "&PesoKg=99&LargoCm=99&AnchoCm=99&AltoCm=99");
         Assert.Contains($"value=\"{envio.Numero}-1\"", Input(formulario, "CodigoBulto"));
-        foreach (var campo in new[] { "PesoKg", "LargoCm", "AnchoCm", "AltoCm" })
+        foreach (var (campo, esperado) in new[] { ("PesoKg", "2"), ("LargoCm", "30"), ("AnchoCm", "20"), ("AltoCm", "10") })
         {
-            var valor = Regex.Match(Input(formulario, campo), "value=\"([^\"]*)\"");
-            Assert.True(!valor.Success || valor.Groups[1].Value == "");
+            Assert.Equal(esperado, Valor(formulario, campo));
         }
         Assert.Contains($"href=\"{detalleUrl}\"", formulario);
         // Abrir el formulario no registra la recepción.
@@ -238,6 +237,65 @@ public sealed class RecepcionDesdeDetalleTests(PostgresApiFactory factory) : ICl
         Assert.DoesNotContain("Recepcionar</a>", detalle);
         Assert.Contains("En depósito", detalle);
         Assert.DoesNotContain(">Pendiente</td>", detalle);
+    }
+
+    [Fact]
+    public async Task Consultar_un_codigo_precarga_datos_editables_sin_registrar_y_descarta_medidas_del_bulto_anterior()
+    {
+        using var client = factory.CreateClient();
+        var envio = await CrearAsync(client);
+        var campos = await FormularioAsync(client, envio.Numero + "-1");
+        campos["PesoKg"] = "99";
+        campos["LargoCm"] = "0";
+        campos["ConfirmarDiferencias"] = "true";
+        campos["ConfirmacionMedidas"] = "anterior";
+        var respuesta = await client.PostAsync("/backoffice/deposito/recepcion?handler=Consultar", new FormUrlEncodedContent(campos));
+        respuesta.EnsureSuccessStatusCode();
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Equal("2", Valor(html, "PesoKg"));
+        Assert.Equal("30", Valor(html, "LargoCm"));
+        Assert.Equal("20", Valor(html, "AnchoCm"));
+        Assert.Equal("10", Valor(html, "AltoCm"));
+        Assert.DoesNotContain("readonly", Input(html, "PesoKg"));
+        Assert.Contains("step=\"any\"", Input(html, "PesoKg"));
+        Assert.Contains("step=\"any\"", Input(html, "LargoCm"));
+        Assert.DoesNotContain("data-advertencia-recepcion", html.Split("<script>")[0]);
+        Assert.Equal(0, await RecepcionesAsync(envio.Id));
+        foreach (var campo in new[] { "PesoKg", "LargoCm", "AnchoCm", "AltoCm" }) campos[campo] = Valor(html, campo);
+        Assert.Contains("Bulto recibido", await RegistrarPaginaAsync(client, campos));
+        using var scope = factory.Services.CreateScope();
+        var recibida = await scope.ServiceProvider.GetRequiredService<DepositoDbContext>().Recepciones.SingleAsync(r => r.EnvioId == envio.Id);
+        Assert.Equal(2m, recibida.PesoKg);
+        Assert.Equal(30m, recibida.LargoCm);
+    }
+
+    [Theory]
+    [InlineData("PesoKg", "0")]
+    [InlineData("LargoCm", "0")]
+    [InlineData("AnchoCm", "0")]
+    [InlineData("AltoCm", "0")]
+    [InlineData("PesoKg", "-1")]
+    public async Task Una_medida_no_positiva_se_rechaza_en_servidor_y_no_se_reemplaza_por_la_sugerida(string campo, string valor)
+    {
+        using var client = factory.CreateClient();
+        var envio = await CrearAsync(client);
+        var campos = await FormularioAsync(client, envio.Numero + "-1");
+        campos[campo] = valor;
+        var html = await RegistrarPaginaAsync(client, campos);
+        Assert.Contains("debe ser mayor que cero", html);
+        Assert.Equal(valor, Valor(html, campo));
+        Assert.Equal(0, await RecepcionesAsync(envio.Id));
+        var medida = decimal.Parse(valor, System.Globalization.CultureInfo.InvariantCulture);
+        var pedido = new RecibirBultoRequest(envio.Numero + "-1");
+        pedido = campo switch
+        {
+            "PesoKg" => pedido with { PesoKg = medida },
+            "LargoCm" => pedido with { LargoCm = medida },
+            "AnchoCm" => pedido with { AnchoCm = medida },
+            _ => pedido with { AltoCm = medida },
+        };
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/deposito/recepciones", pedido)).StatusCode);
+        Assert.Equal(0, await RecepcionesAsync(envio.Id));
     }
 
     // RF 31: el listado muestra el resumen del envío; recibir el primer bulto inicia la operación (decisiones, sección 2).

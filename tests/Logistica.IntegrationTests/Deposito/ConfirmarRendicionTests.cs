@@ -27,6 +27,159 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
     // al que le va a faltar un bulto y uno que se entregó en la calle.
     private sealed record Escenario(Guid Ruta, Envio NoIntentado, Envio ConFaltante, Envio Entregado);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task El_cierre_libera_el_envio_que_no_salio_incluso_con_lecturas_de_carga_legacy(bool legacy)
+    {
+        var e = await PrepararAsync(noCargado: true, cargaLegacy: legacy);
+        using var client = await OperarioAsync();
+        var recibidos = e.ConFaltante.Bultos.Select(b => b.Codigo)
+            .Concat(legacy ? [e.NoIntentado.Bultos[0].Codigo] : Array.Empty<string>()).ToArray();
+        Assert.Equal("/backoffice/rendiciones", (await ConfirmarAsync(client, e.Ruta, recibidos)).Headers.Location?.OriginalString);
+
+        using var scope = Scope();
+        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var envio = await db.Envios.Include(x => x.Bultos).SingleAsync(x => x.Id == e.NoIntentado.Id);
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+        Assert.All(envio.Bultos, b => Assert.Equal(EstadoEnvio.EnDeposito, b.Estado));
+        Assert.False(await db.Incidencias.AnyAsync(i => i.EnvioId == envio.Id));
+        Assert.Single(await db.Outbox.Where(m => m.Tipo == EnvioDesasignadoDeRuta.Tipo
+            && m.Contenido.Contains(envio.Id.ToString())).ToListAsync());
+        Assert.Contains(envio, await scope.ServiceProvider.GetRequiredService<IEnvioRepository>()
+            .ObtenerParaPlanificacionAsync(null, default));
+    }
+
+    [Fact]
+    public async Task Cerrar_sin_confirmar_ubicacion_no_libera_un_envio_no_localizado()
+    {
+        var e = await PrepararAsync(noCargado: true);
+        using var client = await OperarioAsync();
+        var pagina = $"/backoffice/rendiciones/{e.Ruta}";
+        var respuesta = await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["Escaneados"] = string.Join("\n", e.ConFaltante.Bultos.Select(b => b.Codigo)),
+        }));
+        Assert.Equal("/backoffice/rendiciones", respuesta.Headers.Location?.OriginalString);
+        using var scope = Scope();
+        Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(scope.ServiceProvider.GetRequiredService<EnviosDbContext>(), e.NoIntentado.Id));
+        Assert.Equal(EstadoRuta.Finalizada, (await scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>()
+            .Rutas.SingleAsync(r => r.Id == e.Ruta)).Estado);
+    }
+
+    [Fact]
+    public async Task Recuperar_un_cierre_antiguo_es_explicito_e_idempotente_y_no_toca_otra_ruta_activa()
+    {
+        var e = await PrepararAsync(noCargado: true);
+        // Simula el cierre anterior al arreglo: rendición y ruta cerradas, envío aún asignado.
+        using (var scope = Scope())
+        {
+            var ejecucion = scope.ServiceProvider.GetRequiredService<EjecucionDbContext>();
+            var rendicion = await ejecucion.Rendiciones.Include(r => r.Lineas).SingleAsync(r => r.RutaId == e.Ruta);
+            rendicion.Confirmar(e.ConFaltante.Bultos.Select(b => b.Id).ToHashSet(), DateTimeOffset.UtcNow);
+            await ejecucion.SaveChangesAsync();
+            var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+            var ruta = await plan.Rutas.Include(r => r.Paradas).ThenInclude(p => p.Envios).SingleAsync(r => r.Id == e.Ruta);
+            ruta.Finalizar(new HashSet<Guid> { e.Entregado.Id });
+            await plan.SaveChangesAsync();
+        }
+        using var client = await OperarioAsync();
+        var pagina = $"/backoffice/rendiciones/{e.Ruta}";
+        // Depósito encuentra el cierre desde su propia sección, sin entrar a Rutas (sólo Despacho).
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/backoffice/rutas/{e.Ruta}")).StatusCode);
+        Assert.DoesNotContain($"href=\"{pagina}\"", await client.GetStringAsync("/backoffice/rendiciones"));
+        var confirmadas = WebUtility.HtmlDecode(await client.GetStringAsync("/backoffice/rendiciones?estado=confirmadas"));
+        Assert.Contains($"href=\"{pagina}\"", confirmadas);
+        Assert.Contains("Repartidor Demo 1", confirmadas);
+        Assert.Contains("DEMO001", confirmadas);
+        Assert.Contains("Liberar envíos no cargados", WebUtility.HtmlDecode(await client.GetStringAsync(pagina)));
+        using (var lectura = Scope())
+            Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(lectura.ServiceProvider.GetRequiredService<EnviosDbContext>(), e.NoIntentado.Id));
+        await client.PostAsync($"{pagina}?handler=RecuperarNoCargados", new FormUrlEncodedContent(new Dictionary<string, string>
+        { ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina) }));
+        using (var sinConfirmacion = Scope())
+            Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(sinConfirmacion.ServiceProvider.GetRequiredService<EnviosDbContext>(), e.NoIntentado.Id));
+        for (var i = 0; i < 2; i++)
+        {
+            var respuesta = await client.PostAsync($"{pagina}?handler=RecuperarNoCargados", new FormUrlEncodedContent(new Dictionary<string, string>
+            { ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina), ["ConfirmarNoCargadosEnDeposito"] = "true" }));
+            Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        }
+        using var final = Scope();
+        var db = final.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        Assert.Equal(EstadoEnvio.EnDeposito, await EstadoAsync(db, e.NoIntentado.Id));
+        Assert.Single(await db.Outbox.Where(m => m.Tipo == EnvioDesasignadoDeRuta.Tipo
+            && m.Contenido.Contains(e.NoIntentado.Id.ToString())).ToListAsync());
+        Assert.DoesNotContain("Liberar envíos no cargados", WebUtility.HtmlDecode(await client.GetStringAsync(pagina)));
+
+        // El envío vuelve a planificarse. Un POST atrasado sobre el cierre antiguo no puede desasignarlo.
+        var envio = await db.Envios.Include(x => x.Bultos).SingleAsync(x => x.Id == e.NoIntentado.Id);
+        envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+        var planActual = final.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+        var fecha = new DateOnly(2027, 1, 1);
+        var nueva = Ruta.Crear(DatosIniciales.OperadorDemoId, fecha, DatosIniciales.RepartidorDemoId,
+            Guid.Parse("51111111-1111-1111-1111-111111111111"),
+            [new EnvioRuta(envio.Id, envio.Numero, fecha, Guid.Parse("61111111-1111-1111-1111-111111111111"), null, false,
+                envio.Bultos.Select(b => new CargaBulto(envio.Id, b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToArray(),
+                new PuntoEntrega("Calle", "10", "Montevideo", "Montevideo", "11300"))], DateTimeOffset.UtcNow);
+        planActual.Rutas.Add(nueva);
+        await planActual.SaveChangesAsync();
+        await client.PostAsync($"{pagina}?handler=RecuperarNoCargados", new FormUrlEncodedContent(new Dictionary<string, string>
+        { ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina), ["ConfirmarNoCargadosEnDeposito"] = "true" }));
+        using var verificacion = Scope();
+        Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(verificacion.ServiceProvider.GetRequiredService<EnviosDbContext>(), envio.Id));
+    }
+
+    [Fact]
+    public async Task El_historial_de_deposito_es_paginado_y_no_expone_cierres_de_otro_operador()
+    {
+        using var inicial = factory.CreateClient();
+        await inicial.GetAsync("/health");
+        var ahora = DateTimeOffset.UtcNow.AddDays(10);
+        var cierres = Enumerable.Range(0, 21).Select(i =>
+        {
+            var r = Rendicion.Iniciar(DatosIniciales.OperadorDemoId, Guid.CreateVersion7(), DatosIniciales.RepartidorDemoId,
+                Guid.CreateVersion7(), ahora.AddMinutes(i), null, []);
+            r.Confirmar(new HashSet<Guid>(), ahora.AddMinutes(i));
+            return r;
+        }).ToArray();
+        using (var scope = Scope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EjecucionDbContext>();
+            db.Rendiciones.AddRange(cierres);
+            await db.SaveChangesAsync();
+        }
+        using var client = await OperarioAsync();
+        var primera = await client.GetStringAsync("/backoffice/rendiciones?estado=confirmadas");
+        Assert.Contains($"href=\"/backoffice/rendiciones/{cierres[^1].RutaId}\"", primera);
+        Assert.DoesNotContain($"href=\"/backoffice/rendiciones/{cierres[0].RutaId}\"", primera);
+        Assert.Contains("pagina=2", primera);
+        var segunda = await client.GetStringAsync("/backoffice/rendiciones?estado=confirmadas&pagina=2");
+        Assert.Contains($"href=\"/backoffice/rendiciones/{cierres[0].RutaId}\"", segunda);
+        using var otro = await OperarioAsync("deposito@envios-del-este.uy");
+        var ajeno = await otro.GetStringAsync("/backoffice/rendiciones?estado=confirmadas");
+        Assert.All(cierres, r => Assert.DoesNotContain(r.RutaId.ToString(), ajeno));
+        using var despacho = await OperarioAsync("despacho@operador-demo.uy");
+        Assert.Equal(HttpStatusCode.Forbidden, (await despacho.GetAsync("/backoffice/rendiciones?estado=confirmadas")).StatusCode);
+        // Estas fechas futuras sólo fuerzan el orden de paginación de este caso, no el de los demás tests.
+        using var limpieza = Scope();
+        var ids = cierres.Select(r => r.Id).ToArray();
+        await limpieza.ServiceProvider.GetRequiredService<EjecucionDbContext>().Rendiciones
+            .Where(r => ids.Contains(r.Id)).ExecuteDeleteAsync();
+    }
+
+    [Theory]
+    [InlineData("estado=otro")]
+    [InlineData("estado=confirmadas&pagina=0")]
+    [InlineData("estado=confirmadas&pagina=10001")]
+    public async Task El_historial_rechaza_filtros_invalidos(string consulta)
+    {
+        using var client = await OperarioAsync();
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/backoffice/rendiciones?{consulta}")).StatusCode);
+    }
+
     [Fact]
     public async Task Todos_entregados_solo_permite_cierre_administrativo_y_confirma_sin_escanear()
     {
@@ -218,6 +371,14 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         using var client = await OperarioAsync("deposito@envios-del-este.uy");
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/backoffice/rendiciones/{e.Ruta}")).StatusCode);
+        var pagina = $"/backoffice/rendiciones/{e.Ruta}";
+        // Token válido del mismo usuario, obtenido de una página propia: no permite recuperar datos ajenos.
+        var respuesta = await client.PostAsync($"{pagina}?handler=RecuperarNoCargados", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, "/backoffice/rendiciones"),
+            ["ConfirmarNoCargadosEnDeposito"] = "true",
+        }));
+        Assert.Equal(HttpStatusCode.NotFound, respuesta.StatusCode);
     }
 
     [Fact]
@@ -309,7 +470,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
             .AnyAsync(i => i.EnvioId == e.NoIntentado.Id || i.EnvioId == e.ConFaltante.Id));
     }
 
-    private async Task<Escenario> PrepararAsync(bool todosEntregados = false)
+    private async Task<Escenario> PrepararAsync(bool todosEntregados = false, bool noCargado = false, bool cargaLegacy = false)
     {
         using var inicial = factory.CreateClient();
         await inicial.GetAsync("/health");
@@ -317,7 +478,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         var ahora = DateTimeOffset.UtcNow.AddMinutes(-5);
         var fecha = new DateOnly(2024, 6, 1).AddDays(Interlocked.Increment(ref dia));
 
-        var envios = Enumerable.Range(0, 3).Select(_ =>
+        var envios = Enumerable.Range(0, 3).Select(i =>
         {
             var envio = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId, $"CU55-{Guid.NewGuid():N}",
                 new Destinatario("Prueba Rendición", "099123456"),
@@ -326,7 +487,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
                 ahora);
             envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
             envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
-            envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora);
+            if (!noCargado || i != 0) envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora);
             return envio;
         }).ToArray();
         envios[2].Transicionar(EstadoEnvio.Entregado, OrigenEvento.AppRepartidor, null, ahora);
@@ -350,7 +511,9 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         // Lo que declaró el repartidor en CU-54.
         DeclaracionRendicion[] lineas =
         [
-            .. envios[0].Bultos.Select(b => new DeclaracionRendicion(envios[0].Id, b.Id, todosEntregados ? "EntregadoEnCalle" : "NoIntentado", !todosEntregados, null)),
+            .. envios[0].Bultos.Select((b, i) => new DeclaracionRendicion(envios[0].Id, b.Id,
+                noCargado ? cargaLegacy && i == 0 ? "CargaParcial" : "NoCargado" : todosEntregados ? "EntregadoEnCalle" : "NoIntentado",
+                noCargado ? cargaLegacy && i == 0 : !todosEntregados, null)),
             .. envios[1].Bultos.Select(b => new DeclaracionRendicion(envios[1].Id, b.Id, todosEntregados ? "EntregadoEnCalle" : "NoIntentado", !todosEntregados, null)),
             .. envios[2].Bultos.Select(b => new DeclaracionRendicion(envios[2].Id, b.Id, "EntregadoEnCalle", false, null)),
         ];
@@ -390,6 +553,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         var campos = new Dictionary<string, string>
         {
             ["Escaneados"] = string.Join("\n", codigos),
+            ["ConfirmarNoCargadosEnDeposito"] = "true",
             ["__RequestVerificationToken"] = token,
         };
         var respuesta = await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(campos));
