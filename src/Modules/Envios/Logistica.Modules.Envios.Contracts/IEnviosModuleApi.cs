@@ -38,6 +38,10 @@ public interface IEnviosModuleApi
     // estén: Administración se los pasa a Planificación para saber si alguna ruta desde la fecha del cambio los tiene.
     Task<IReadOnlyList<Guid>> EnviosSinFechaConFranjasAsync(IReadOnlyCollection<Guid> franjaIds, CancellationToken ct);
 
+    // CU-70, paso 2 (T14): inicia la devolución de los envíos Reprogramado cuyo plazo de devolución venció. "hoy" es el
+    // día del operador que se cierra. Devuelve cuántos devolvió. Cada envío se guarda en su propia transacción.
+    Task<int> DevolverReprogramadosVencidosAsync(DateOnly hoy, CancellationToken ct);
+
     // CU-60: lo que el seguimiento público muestra de un envío. null si no existe o es de otro operador: el inquilino
     // sale del token firmado del enlace, y el filtro "Tenant" hace el resto.
     Task<SeguimientoEnvio?> SeguimientoDeAsync(Guid envioId, CancellationToken ct);

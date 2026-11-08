@@ -17,6 +17,11 @@ internal sealed class EnvioSeguido : Entity, IOperadorOwned, IComercioOwned
     public string? NombreDestinatario { get; private set; }
     // Sin correo, las notificaciones quedan NoEnviable (CU-62, A2).
     public string? EmailDestinatario { get; private set; }
+    // Indicadores de cumplimiento (CU-71). Null en los envíos admitidos antes de que el alta los trajera.
+    public Guid? ZonaId { get; private set; }
+    public DateTimeOffset? EntregaComprometidaHasta { get; private set; }
+    // Los envíos creados con una clave de prueba no cuentan en los indicadores.
+    public bool EsPrueba { get; private set; }
 
     private EnvioSeguido() { }
 
@@ -24,7 +29,8 @@ internal sealed class EnvioSeguido : Entity, IOperadorOwned, IComercioOwned
     private EnvioSeguido(Guid envioId) : base(envioId) { }
 
     public static EnvioSeguido Crear(Guid operadorId, Guid comercioId, Guid envioId, string numero,
-        string? nombreDestinatario = null, string? emailDestinatario = null)
+        string? nombreDestinatario = null, string? emailDestinatario = null, Guid? zonaId = null,
+        DateTimeOffset? entregaComprometidaHasta = null, bool esPrueba = false)
     {
         if (operadorId == Guid.Empty || comercioId == Guid.Empty || envioId == Guid.Empty || string.IsNullOrWhiteSpace(numero))
             throw new DomainException("El envío seguido necesita operador, comercio, identificador y número.");
@@ -35,6 +41,9 @@ internal sealed class EnvioSeguido : Entity, IOperadorOwned, IComercioOwned
             Numero = numero,
             NombreDestinatario = Recortar(nombreDestinatario, LargoNombre),
             EmailDestinatario = Recortar(emailDestinatario, LargoEmail),
+            ZonaId = zonaId,
+            EntregaComprometidaHasta = entregaComprometidaHasta?.ToUniversalTime(),
+            EsPrueba = esPrueba,
         };
     }
 

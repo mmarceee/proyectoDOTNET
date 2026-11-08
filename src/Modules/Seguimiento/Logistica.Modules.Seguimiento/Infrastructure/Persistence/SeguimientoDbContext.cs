@@ -1,5 +1,6 @@
 using Logistica.BuildingBlocks.Infrastructure.Persistence;
 using Logistica.Modules.Seguimiento.Domain.Avisos;
+using Logistica.Modules.Seguimiento.Domain.Indicadores;
 using Logistica.Modules.Seguimiento.Domain.Notificaciones;
 using Logistica.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ internal sealed class SeguimientoDbContext(DbContextOptions<SeguimientoDbContext
     public DbSet<EnvioSeguido> EnviosSeguidos => Set<EnvioSeguido>();
     public DbSet<Notificacion> Notificaciones => Set<Notificacion>();
     public DbSet<IdentidadOperador> IdentidadesOperador => Set<IdentidadOperador>();
+    public DbSet<RegistroCumplimiento> RegistrosCumplimiento => Set<RegistroCumplimiento>();
     public DbSet<MensajeRecibido> Inbox => Set<MensajeRecibido>();
 }
 

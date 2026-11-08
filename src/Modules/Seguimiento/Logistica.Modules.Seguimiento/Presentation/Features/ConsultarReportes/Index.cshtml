@@ -1,0 +1,96 @@
+@page "/backoffice/reportes/{handler?}"
+@using Logistica.Modules.Seguimiento.Application.Features.ConsultarReportes
+@using Logistica.Modules.Seguimiento.Presentation.Features.ConsultarReportes
+@model Logistica.Modules.Seguimiento.Presentation.Features.ConsultarReportes.IndexModel
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Reportes";
+    var tipos = new (TipoReporte Tipo, string Nombre)[]
+    {
+        (TipoReporte.Cumplimiento, "Cumplimiento"),
+        (TipoReporte.Motivos, "Motivos de no entrega"),
+        (TipoReporte.Volumen, "Volumen de envíos"),
+        (TipoReporte.Liquidacion, "Liquidación por comercio"),
+    };
+}
+
+<h1 class="mb-2">Reportes</h1>
+<p class="text-muted">
+    El cumplimiento cuenta como a tiempo la entrega dentro de la ventana comprometida: el alta más el plazo de la
+    modalidad. La liquidación incluye las liquidaciones emitidas y pagadas cuyo período se cruza con el elegido.
+</p>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" asp-validation-summary="All" role="alert"></div>
+}
+
+<form method="get" action="/backoffice/reportes" class="row g-3 align-items-end mb-4">
+    <div class="col-md-3">
+        <label class="form-label" for="tipo">Reporte</label>
+        <select id="tipo" name="Tipo" class="form-select">
+            @foreach (var (tipo, nombre) in tipos)
+            {
+                <option value="@tipo" selected="@(tipo == Model.Tipo)">@nombre</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        @* La aclaración va en la etiqueta: un texto de ayuda debajo desalinea la fila, que se alinea por abajo. *@
+        <label class="form-label" for="dimension">Agrupar por <small class="text-muted">(cumplimiento)</small></label>
+        <select id="dimension" name="Dimension" class="form-select">
+            @foreach (var dimension in Enum.GetValues<DimensionCumplimiento>())
+            {
+                <option value="@dimension" selected="@(dimension == Model.Dimension)">@TablaReporte.Dimension(dimension)</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label" for="desde">Desde</label>
+        <input id="desde" name="Desde" type="date" class="form-control" value="@Model.Desde?.ToString("yyyy-MM-dd")" required />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label" for="hasta">Hasta</label>
+        <input id="hasta" name="Hasta" type="date" class="form-control" value="@Model.Hasta?.ToString("yyyy-MM-dd")" required />
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Ver reporte</button>
+        <button type="submit" class="btn btn-outline-secondary" formaction="/backoffice/reportes/csv">Descargar CSV</button>
+    </div>
+</form>
+
+@if (Model.Tabla is { } tabla)
+{
+    <h2 class="h4">@tabla.Titulo</h2>
+    @if (tabla.Filas.Count == 0)
+    {
+        <p class="text-muted" role="status">No hay datos para el período elegido.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        @for (var i = 0; i < tabla.Columnas.Count; i++)
+                        {
+                            <th scope="col" class="@(tabla.Numericas[i] ? "text-end" : "")">@tabla.Columnas[i]</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var fila in tabla.Filas)
+                    {
+                        <tr>
+                            @for (var i = 0; i < fila.Count; i++)
+                            {
+                                <td class="@(tabla.Numericas[i] ? "text-end" : "")">@fila[i]</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}

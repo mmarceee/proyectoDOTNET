@@ -40,15 +40,15 @@ En esta tabla, «verificado» se limita al escenario efectivamente ejecutado. «
 
 | Criterio del documento | Implementación encontrada | Evidencia ejecutada y conclusión |
 | --- | --- | --- |
-| Caché distribuido, también para equipos de tres | `AddStackExchangeRedisCache` con Valkey cuando existe cadena de conexión; Compose la configura para API y Worker. No hay un nivel local adicional en ese camino. | Aprobó la prueba con dos proveedores independientes sobre Valkey real. **Verificado a nivel de infraestructura; pendiente la demostración con dos APIs completas.** |
-| Dos casos con distintos perfiles de acceso | Seguimiento: expiración absoluta de 1 minuto. Tarifario: puntero vigente de 10 minutos y versiones de 24 horas. Las reglas usan también caché versionado. | Aprobaron las pruebas de seguimiento, tarifario y reglas. **Implementado; las pruebas de negocio ejecutadas usan caché en memoria.** |
+| Caché distribuido, también para equipos de tres | `AddStackExchangeRedisCache` con Valkey cuando existe cadena de conexión; Compose la configura para API y Worker. No hay un nivel local adicional en ese camino. | Aprobó la prueba con dos proveedores independientes sobre Valkey real. **Verificado a nivel de infraestructura y, desde el 08/11, con dos APIs completas (sección 11).** |
+| Dos casos con distintos perfiles de acceso | Seguimiento: expiración absoluta de 1 minuto. Tarifario: puntero vigente de 1 minuto (10 hasta el 08/11) y versiones de 24 horas. Las reglas usan también caché versionado. | Aprobaron las pruebas de seguimiento, tarifario y reglas. **Implementado.** Las pruebas de negocio usan caché en memoria; con Valkey real lo cubren las de la sección 11 (dos APIs, invalidación de punta a punta y frescura tras una caída). |
 | Claves separadas por operador | La pieza común construye `{nombre}:{OperadorId}:{clave}`, con prefijo del proveedor `logistica:`. Sin operador lanza `TenantMismatchException`. | Aprobaron aislamiento por operador y rechazo sin tenant. La prueba de aislamiento de la pieza común usa memoria compartida; las funcionales usan PostgreSQL. **Verificado en esos escenarios.** |
 | Invalidar seguimiento al procesar eventos | El Worker registra un consumidor por tipo de evento; fija el tenant del mensaje antes de resolver el consumidor. Este elimina la clave del envío. | Aprobó una prueba que invoca directamente el consumidor. **Verificado el consumidor; esta prueba no recorre Outbox, RabbitMQ y Worker como procesos separados.** |
 | Invalidación de recepción y devolución | Tras integrar `main`, `RecibirEnDepositoAsync` registra `EnvioRecibidoEnDeposito`; la confirmación de devolución registra `EnvioDevuelto`. Ambos están en `InvalidarSeguimiento.Tipos`. | La prueba de recepción comprueba que el evento se guarda una sola vez en el Outbox al completar la recepción. **La omisión detectada en la revisión inicial está corregida en código.** Sigue pendiente observar el recorrido completo hasta la invalidación por el Worker. |
-| Tarifas versionadas e invalidación al publicar | Se guarda la publicación y después se elimina el puntero `vigente`. Las versiones publicadas no admiten editar reglas. El puntero incluye `ValidoHasta` para próximas vigencias. | Aprobó el recorrido de $150/v1 a $175/v2 y el caso de publicación futura que mantiene la versión anterior. **Verificado con memoria; falta verificar el cruce del instante de vigencia y el recorrido distribuido completo.** |
+| Tarifas versionadas e invalidación al publicar | Se guarda la publicación y después se elimina el puntero `vigente`. Las versiones publicadas no admiten editar reglas. El puntero incluye `ValidoHasta` para próximas vigencias. | Aprobó el recorrido de $150/v1 a $175/v2 y el caso de publicación futura que mantiene la versión anterior. **Verificado el 08/11:** el cruce del instante de vigencia con `VersionProgramadaTests` (reloj de la API de 23:59 a 00:01, tarifario y reglas; falla si se desactiva `ValidoHasta`), y el recorrido distribuido con dos APIs (sección 11). |
 | Métricas por caso de uso en el tablero | Contadores `logistica.cache.aciertos`, `fallos` y `errores`, etiqueta `cache`. API y Worker registran el medidor y exportan por OTLP cuando está configurado. | Un `MeterListener` verificó valores de contadores. **Instrumentación comprobada; exportación y consulta en Aspire no verificadas en esta ejecución.** |
 | Continuar contra la base si cae el caché | La pieza común captura errores de caché y ejecuta la función fuente. No revierte publicaciones si falla invalidar. | Aprobaron la caché simulada caída y Valkey inaccesible en `127.0.0.1:1`. **Verificado el fallback de infraestructura; no se detuvo un Valkey activo durante un flujo HTTP contra PostgreSQL.** |
-| Cambio de tarifa visible inmediatamente en otra API | Valkey compartido y borrado del puntero permiten el escenario secuencial. No hay caché local en ese camino. | Se probaron por separado distribución e invalidación funcional. **No se ejecutó el escenario exacto con dos APIs y una publicación HTTP.** |
+| Cambio de tarifa visible inmediatamente en otra API | Valkey compartido y borrado del puntero permiten el escenario secuencial. No hay caché local en ese camino. | Se probaron por separado distribución e invalidación funcional. **Verificado el 08/11 con dos APIs y una publicación HTTP desde el Backoffice (sección 11).** |
 | Decisión fundamentada de expiración e invalidación | El ADR-0006 describe perfiles, claves, TTL, fallback, métricas y carreras conocidas. | **Documentado.** Debe actualizarse con el alcance preciso de esta ejecución y los pendientes, sin presentar pruebas de memoria como demostración distribuida completa. |
 
 ### 3.1 Archivos principales que respaldan el contraste
@@ -66,14 +66,18 @@ En esta tabla, «verificado» se limita al escenario efectivamente ejecutado. «
 ### 3.2 Brechas y límites que no conviene ocultar
 
 **Memoria local si falta configuración.** `CachingExtensions` llama a `AddDistributedMemoryCache()` cuando la cadena es vacía. El nombre de la abstracción no convierte esa memoria en un almacén compartido. Es útil para pruebas, pero el código no limita ese comportamiento a Development/Testing. Propuesta: hacer explícita la excepción de pruebas/desarrollo y detectar la falta de configuración en producción. Distinguir esto de un Valkey configurado pero temporalmente caído: en ese caso debe seguir operando contra la base.
+**Estado al 08/11: resuelto.** `ConexionesObligatorias` impide arrancar la API y el Worker en `Production` sin la cadena de Valkey (`ConfiguracionProduccionTests`); la memoria del proceso queda para desarrollo y pruebas. Un Valkey configurado pero caído sigue contra la base (sección 11.1; ADR-0006 v1.0, sección 2.2).
 
 **Recepción con evento: hallazgo inicial corregido por `main`.** `RecibirEnDepositoAsync` ahora publica el evento en el Outbox y `InvalidarSeguimiento` lo reconoce. La prueba `Al_recibir_todos_los_bultos_el_envio_pasa_a_EnDeposito` comprueba cero eventos tras el primer bulto y uno al completar la recepción. La prueba histórica `CacheSeguimientoTests` sigue modificando el estado directamente e invocando el consumidor con un evento simulado; no sustituye la prueba completa del recorrido de recepción por RabbitMQ. Al implementar estados por bulto, revisar cada nuevo evento visible. El ADR-0006 todavía contiene afirmaciones antiguas de que la recepción no publica eventos y debe alinearse con este código.
 
 **Carrera entre lectura y publicación.** Una lectura puede obtener el puntero viejo de la base, otra solicitud publicar e invalidar, y la primera guardar después el puntero viejo. En ese caso el TTL puede mantenerlo hasta 10 minutos, salvo que `ValidoHasta` fuerce una recarga antes. Es un riesgo deducido del código y reconocido en el ADR; **no se reprodujo en esta revisión**. La aclaración de actualización inmediata justifica decidir cómo prevenirlo o demostrar que el escenario exigido queda cubierto. Usar Valkey no elimina por sí solo esta carrera.
+**Estado al 08/11: acotado.** El puntero de tarifario y reglas pasó a durar 1 minuto, así que un puntero viejo dura como máximo eso. Prevenir la carrera por completo exigiría escribir "sólo si no existe", que `IDistributedCache` no ofrece, o una doble invalidación con demora; se consideró desproporcionado (ADR-0006 v1.0, sección 2.4). El escenario exigido (publicar en una API y ver el valor nuevo en la otra) queda demostrado en la sección 11.
 
 **Invalidación durante una caída.** Si publicar confirma en PostgreSQL pero borrar la clave falla, al recuperarse Valkey puede conservar el puntero anterior hasta su expiración. El fallback protege la disponibilidad; no garantiza por sí solo frescura inmediata al recuperarse.
+**Estado al 08/11: acotado y medido.** Con el puntero de 1 minuto, el precio viejo se vio hasta 59,6 s después de reconectarse Valkey, y la misma prueba falla con 10 minutos (sección 11.3). Reintentar el borrado no ayuda: los reintentos del Worker (5 s, 30 s y 2 min) terminan después de que la entrada venció.
 
 **Tiempo de fallback.** El proveedor configura `ConnectTimeout=2000 ms`, `AsyncTimeout=1000 ms` y `FailFast`. La prueba aprobada exige menos de 2 segundos para la segunda lectura con Valkey inaccesible, después de realizar una primera conexión. No demuestra que la primera lectura ni una solicitud completa tarden como máximo 1 segundo. Hay que precisar esa afirmación en el ADR.
+**Estado al 08/11: corregido en el ADR-0006 (sección 2.6).** La primera lectura después de la caída puede tardar hasta unos 2 segundos, mientras se agota la conexión; las siguientes fallan enseguida por `FailFast` y van a la base. En la caída manual de la sección 11.1, las consultas respondieron en 28, 7 y 6 ms.
 
 **Telemetría durante fallos.** Una excepción al leer suma `errores`, no `fallos`. La tasa `aciertos / (aciertos + fallos)` representa las consultas exitosas al caché y debe observarse junto con errores para no interpretar una caída como buen rendimiento.
 
@@ -174,15 +178,15 @@ El reparto es una propuesta basada en las áreas actuales, no una asignación ya
 
 ## 9. Evidencia pendiente para cerrar la aclaración
 
-- [ ] Ejecutar dos APIs completas con PostgreSQL y Valkey compartidos: precalentar la tarifa en ambas, publicar desde una y consultar inmediatamente desde la otra. Usar un tarifario/base de prueba.
-- [ ] Verificar en Aspire los aciertos, fallos y errores separados por `seguimiento`, `tarifario` y `reglas`.
-- [ ] Interrumpir un Valkey de prueba que estaba activo, consultar seguimiento y calcular tarifa contra la base, recuperarlo y comprobar frescura. No detener servicios compartidos sin coordinar con el equipo.
-- [ ] Probar el instante en que comienza una versión programada con un reloj controlado.
-- [ ] Resolver o acotar explícitamente la carrera de repoblación de caché y el dato viejo tras una invalidación fallida.
+- [x] Ejecutar dos APIs completas con PostgreSQL y Valkey compartidos: precalentar la tarifa en ambas, publicar desde una y consultar inmediatamente desde la otra. Usar un tarifario/base de prueba (`TarifarioEntreDosApisTests`, sección 11).
+- [x] Verificar en Aspire los aciertos, fallos y errores separados por `seguimiento`, `tarifario` y `reglas` (secciones 11.1 y 11.4).
+- [x] Interrumpir un Valkey de prueba que estaba activo, consultar seguimiento y calcular tarifa contra la base, recuperarlo y comprobar frescura. No detener servicios compartidos sin coordinar con el equipo (`ValkeyCaidoTests` y sección 11.1; la frescura después de una invalidación fallida, en la sección 11.3).
+- [x] Probar el instante en que comienza una versión programada con un reloj controlado (`VersionProgramadaTests`, Cristian Reyes, ADR-0006 v0.6).
+- [x] Resolver o acotar explícitamente la carrera de repoblación de caché y el dato viejo tras una invalidación fallida: el puntero dura 1 minuto (Cristian Reyes, ADR-0006 v0.6), y la invalidación fallida quedó medida en la sección 11.3.
 - [x] Incorporar el evento de recepción y registrarlo como evento que invalida seguimiento (resuelto por los cambios integrados desde `main`).
-- [ ] Verificar el recorrido de recepción e invalidación completo a través de Outbox, RabbitMQ y Worker.
-- [ ] Revisar la configuración productiva para impedir una sustitución accidental por memoria local.
-- [ ] Actualizar el ADR-0006 con evidencias, límites reales de latencia y resultados de estos escenarios.
+- [x] Verificar el recorrido de recepción e invalidación completo a través de Outbox, RabbitMQ y Worker (`InvalidacionSeguimientoTests`, sección 11.2).
+- [x] Revisar la configuración productiva para impedir una sustitución accidental por memoria local (sección 11.1).
+- [ ] Actualizar el ADR-0006 con evidencias, límites reales de latencia y resultados de estos escenarios. **Parcial:** la v0.6 incorpora el puntero de 1 minuto, T2 con evento y la demora real del respaldo; faltan los resultados de las secciones 11 a 11.3 (filas 5, 7 y 8 de sus pruebas).
 - [ ] Confirmar que las banderas continúan fuera del conjunto de opcionales elegido o planificarlas con todas las condiciones de la aclaración.
 
 El ADR dedicado al cambio funcional es obligatorio y puede contarse dentro de los ocho exigidos. Debe registrar lo que efectivamente se modificó, qué resultó sencillo, qué no y por qué; este informe preparatorio no sustituye esa evaluación posterior.
@@ -211,3 +215,73 @@ dotnet test tests/Logistica.IntegrationTests/Logistica.IntegrationTests.csproj -
 ```
 
 Evidencia local: `TestResults/revision-aclaraciones/revision-post-main.trx`. No se ejecutaron en esta segunda revisión todas las pruebas de devoluciones, reprogramación pública o mensajes fallidos; sus cambios se inspeccionaron para determinar el impacto en el informe.
+
+## 11. Avance del 08/11/2026: dos APIs con Valkey compartido
+
+Responsable: Ezequiel Marcenal (pruebas), dentro del trabajo conjunto con Cristian Reyes sobre la aclaración de caché.
+
+**Prueba agregada:** [`TarifarioEntreDosApisTests`](../../tests/Logistica.IntegrationTests/Administracion/TarifarioEntreDosApisTests.cs). Levanta dos APIs completas (dos hosts de `WebApplicationFactory`, cada uno con su contenedor de servicios y su conexión a Valkey) sobre la misma base PostgreSQL y el mismo Valkey de Testcontainers. Cada API tiene su propia sesión del administrador de Demo. El recorrido:
+
+1. Las dos calculan con el simulador del tarifario: $150 con la versión 1, que queda en la caché.
+2. Desde la API A se arma un borrador, se cambia Estándar de 0 a 5 kg a $175 y se publica por el Backoffice.
+3. La API B, sin esperas, calcula $175 con la versión 2.
+
+**Comprobación de que la prueba distingue:** con la API B configurada sin Valkey (la memoria de su proceso), la prueba falla en el paso 3: la API B sigue mostrando el precio anterior porque conserva su propio puntero. El cambio se revirtió después de esa corrida. Así, el resultado depende del Valkey compartido y del borrado del puntero al publicar, no de una coincidencia.
+
+**Alcance:** son dos hosts dentro del mismo proceso de pruebas, no dos contenedores. Comparten sólo PostgreSQL y Valkey, que es lo que importa para el escenario; no se ejecutó con dos réplicas en Docker Compose. No cubre la carrera entre lectura y publicación ni la invalidación fallida (sección 3.2), que se acotan con la duración del puntero.
+
+**Resultado:** con `bash scripts/test-en-docker.sh Tarifario`, 6 pruebas de integración aprobadas (las cuatro de `ConfigurarTarifarioTests`, la nueva y `DetalleEnvioAmpliadoTests`). Los ayudantes de la pantalla del tarifario pasaron de `ConfigurarTarifarioTests` a [`PaginaTarifario`](../../tests/Logistica.IntegrationTests/Administracion/PaginaTarifario.cs), compartidos por las dos clases.
+
+### 11.1 Métricas en Aspire, caída manual de Valkey y configuración productiva
+
+**Métricas.** Con `docker compose up` se generó tráfico real: tres cálculos con el simulador del tarifario, tres altas de envío desde el Portal (leen tarifario y reglas) y consultas repetidas a `/api/seguimiento/{token}`, con tokens tomados de los correos de Mailpit. En Aspire Dashboard → Métricas → `logistica-api` → `Logistica.Cache` se vieron `logistica.cache.aciertos` (30) y `logistica.cache.fallos` (6), con la etiqueta `cache` en sus tres valores (`reglas`, `seguimiento`, `tarifario`) para filtrar cada grupo.
+
+**Caída manual.** Con el entorno local, sin servicios compartidos, se detuvo Valkey (`docker compose stop valkey`) y se consultó tres veces el seguimiento: las tres respondieron 200, en 28, 7 y 6 ms, y `logistica.cache.errores` sumó 3 con `cache = seguimiento`. Al volver a levantar Valkey, las consultas siguieron respondiendo sin reiniciar la API. El contador `errores` sólo aparece en Aspire después de la primera falla.
+
+**Configuración productiva.** `ConexionesObligatorias` impide arrancar la API y el Worker en `Production` sin `ConnectionStrings:Valkey` (prueba `ConfiguracionProduccionTests`), y Terraform la define en `main.tf`. Así, la memoria del proceso queda sólo para desarrollo y pruebas. Un Valkey configurado pero caído sigue el camino de la base (`ValkeyCaidoTests` y la prueba manual anterior). En Azure, Valkey corre sin volumen: si se reinicia el contenedor, arranca vacío. En Docker Compose y Testcontainers, en cambio, la imagen guarda su volcado al detenerse, así que en esos entornos un puntero viejo puede sobrevivir a un reinicio hasta que vence.
+
+### 11.2 Invalidación del seguimiento de punta a punta
+
+**Prueba agregada:** [`InvalidacionSeguimientoTests`](../../tests/Logistica.IntegrationTests/Seguimiento/InvalidacionSeguimientoTests.cs). La API y el Worker son hosts separados que sólo comparten PostgreSQL, RabbitMQ y Valkey (Testcontainers), como en Docker Compose. El recorrido:
+
+1. Se crea un envío de un bulto y se consulta `/api/seguimiento/{token}`: «Recibimos tu envío», que queda en Valkey por un minuto.
+2. Se recibe el bulto en el depósito (T2): Envíos pasa a `EnDeposito` y registra `EnvioRecibidoEnDeposito` en el outbox.
+3. El publicador lo manda a RabbitMQ, el Worker lo consume con `InvalidarSeguimiento` y borra la clave. La consulta siguiente muestra «En el depósito».
+
+El paso 3 tiene un plazo de 20 s, muy por debajo de la expiración de 60 s, así que el estado nuevo no puede deberse al vencimiento. **Resultado:** aprobada; el estado nuevo apareció 3,1 s después de la recepción.
+
+**Comprobación de que la prueba distingue:** con el Worker sin Valkey (la memoria de su proceso, que la API no ve), la prueba falla por tiempo: después de 20 s el seguimiento sigue mostrando el estado anterior. El cambio se revirtió después de esa corrida.
+
+**Ajuste en las pruebas:** `Interrupciones.CrearWorker` no registraba la caché, a diferencia de `Logistica.Worker/Program.cs`, así que `InvalidarSeguimiento` no podía resolverse en ese Worker de prueba. Ahora la registra y acepta la cadena de Valkey. Las pruebas de resiliencia que lo usan siguen aprobadas: 5 de 5 junto con la nueva (`ValkeyCaidoTests`, `PostgresCaidoTests`, `RabbitMqCaidoTests` y `SmtpCaidoTests`).
+
+### 11.3 Frescura después de una invalidación fallida
+
+**Prueba agregada:** segundo caso de [`ValkeyCaidoTests`](../../tests/Logistica.IntegrationTests/Resiliencia/ValkeyCaidoTests.cs), con el puntero de 1 minuto de Cristian ya integrado. Un Valkey real que se detiene y se vuelve a iniciar con la API corriendo:
+
+1. La versión 1 cobra $150 y su puntero queda en Valkey.
+2. Se detiene Valkey y se publica $175 desde el Backoffice. La publicación se guarda en PostgreSQL; el borrado del puntero falla y no la deshace. Mientras Valkey está caído, el cálculo va a la base y ya da $175.
+3. Se vuelve a iniciar Valkey. La imagen recupera su volcado con el puntero viejo, y la API lo vuelve a leer al reconectarse. Durante algo más de un minuto se calcula una vez por segundo.
+
+**Resultado:** aprobada. El precio viejo **se vio hasta 59,6 s después de guardado el puntero** y, desde entonces, siempre el nuevo. El riesgo de la sección 3.2 es real cuando Valkey conserva sus datos, y queda acotado por la duración del puntero. En Azure, Valkey corre sin volumen: al reiniciarse arranca vacío y este caso sólo aparece si se corta la red sin reiniciar Valkey, con el mismo límite.
+
+**Comprobación de que la prueba distingue:** con el puntero en 10 minutos, la prueba falla: el precio viejo seguía apareciendo a los 64,8 s, al terminar la espera. El cambio se revirtió después de esa corrida.
+
+**Costo:** la prueba tarda poco más de un minuto, porque espera el vencimiento. La clase completa (`bash scripts/test-en-docker.sh ValkeyCaido`) tardó 1 min 13 s.
+
+### 11.4 Valores por grupo en Aspire
+
+En la sección 11.1 se vieron los totales y la etiqueta con sus tres valores. Para separarlos, se generó otra tanda en el mismo entorno de Docker Compose: tres cálculos con el simulador del tarifario, tres altas de envío desde el Portal y tres consultas de seguimiento, primero con Valkey disponible y después con Valkey detenido (`docker compose stop valkey`), y se volvió a levantar. En Aspire Dashboard → Métricas → `logistica-api`, vista *Tabla*, se dejó marcado un solo valor de `cache` por vez:
+
+| Grupo | Aciertos | Fallos | Errores |
+| --- | ---: | ---: | ---: |
+| `tarifario` | 33 | 3 | 12 |
+| `reglas` | 9 | 3 | 6 |
+| `seguimiento` | 8 | 4 | 6 |
+| **Total (sin filtro)** | **50** | **10** | **24** |
+
+Son contadores acumulados desde que arrancó la API e incluyen las tandas de la sección 11.1. En los tres, la suma de los grupos coincide con el total sin filtro.
+
+- **Errores con Valkey detenido:** en `tarifario`, 12, porque cada cálculo y cada alta leen dos claves (el puntero y la versión): 6 lecturas por 2. En `reglas`, 6, por las 3 altas con dos claves cada una. En `seguimiento`, 6: 3 de esta tanda y 3 de la caída manual de la sección 11.1. Todas las solicitudes respondieron bien (cálculo, 201 en las altas y 200 en el seguimiento).
+- **Lectura de la tasa:** sin contar los errores, los aciertos fueron 92 % en tarifario, 75 % en reglas y 67 % en seguimiento. Como indica la sección 3.2, una caída suma errores y no fallos, así que la tasa debe mirarse junto con `errores`.
+
+Con esto, la tarjeta «Caché · Evidencia con dos APIs, métricas y caída de Valkey» queda cubierta por las secciones 11 a 11.4. La advertencia de esa tarjeta sobre las cookies entre dos instancias ya no aplica: las claves de Data Protection se guardan en PostgreSQL con `SetApplicationName("logistica")` (`Program.cs`), así que una cookie emitida por una API vale en la otra. Se verificó en el código; no se ensayó con dos instancias en un navegador.

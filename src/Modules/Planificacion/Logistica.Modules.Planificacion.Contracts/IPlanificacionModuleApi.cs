@@ -42,4 +42,8 @@ public interface IPlanificacionModuleApi
     // CU-08, A3: ¿el repartidor o el vehículo está en una ruta que todavía no se finalizó? Administración lo pregunta
     // antes de desactivarlo, con el bloqueo de planificación del operador tomado, para que nadie lo asigne mientras tanto.
     Task<bool> HayRutaSinFinalizarConAsync(Guid? repartidorId, Guid? vehiculoId, CancellationToken ct);
+
+    // CU-70, paso 3: si hay rutas con fecha hasta "hoy" sin finalizar, publica la alerta RutasSinFinalizar para el
+    // despachador. Devuelve cuántas encontró.
+    Task<int> AlertarRutasSinFinalizarAsync(DateOnly hoy, CancellationToken ct);
 }

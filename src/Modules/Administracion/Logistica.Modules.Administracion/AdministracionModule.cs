@@ -49,6 +49,19 @@ public static class AdministracionModule
         // CU-09
         services.AddScoped<Application.Features.GestionarMensajesFallidos.MensajesFallidosHandler>();
 
+        // CU-70: el cierre diario. La hora es local de cada operador; las pruebas lo apagan y lo ejecutan a mano.
+        services.AddSingleton(new Application.Features.EjecutarCierreDiario.OpcionesCierreDiario
+        {
+            Hora = TimeOnly.TryParse(configuration["CierreDiario:Hora"], System.Globalization.CultureInfo.InvariantCulture,
+                out var hora) ? hora : new TimeOnly(23, 30),
+        });
+        services.AddScoped<Domain.CierresDiarios.ICierresDiariosRepository, CierresDiariosRepository>();
+        services.AddScoped<Application.Features.EjecutarCierreDiario.EjecutarCierreDiarioHandler>();
+        if (configuration.GetValue("CierreDiario:Habilitado", true))
+        {
+            services.AddHostedService<Infrastructure.CierreDiarioPeriodico>();
+        }
+
         // CU-04: zonas y franjas horarias.
         services.AddScoped<Domain.Planificacion.IZonaRepository, ZonaRepository>();
         services.AddScoped<Application.Features.DefinirZonas.ConsultarZonasHandler>();

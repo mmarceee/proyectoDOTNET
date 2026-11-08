@@ -32,6 +32,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\Logistica.BuildingBlocks.Infrastructure\Logistica.BuildingBlocks.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Logistica.Http.Contracts\Logistica.Http.Contracts.csproj" />
     <ProjectReference Include="..\..\Ejecucion\Logistica.Modules.Ejecucion.Contracts\Logistica.Modules.Ejecucion.Contracts.csproj" />
+    <ProjectReference Include="..\..\Deposito\Logistica.Modules.Deposito.Contracts\Logistica.Modules.Deposito.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

@@ -28,6 +28,14 @@ internal sealed class LiquidacionRepository(DepositoDbContext db) : ILiquidacion
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Liquidacion>> ListarEmitidasEnPeriodoAsync(DateOnly desde, DateOnly hasta,
+        CancellationToken ct)
+    {
+        return await db.Liquidaciones.AsNoTracking().Include(l => l.Lineas)
+            .Where(l => l.Estado != EstadoLiquidacion.Borrador && l.PeriodoDesde <= hasta && l.PeriodoHasta >= desde)
+            .ToListAsync(ct);
+    }
+
     public Task<Liquidacion?> ObtenerAsync(Guid id, CancellationToken ct)
     {
         return db.Liquidaciones.Include(l => l.Lineas).SingleOrDefaultAsync(l => l.Id == id, ct);

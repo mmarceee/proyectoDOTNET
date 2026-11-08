@@ -1,9 +1,9 @@
 # **ADR-0006 · Estrategia de caché e invalidación**
 
-| Estado | Propuesto — versión alineada con la implementación, pendiente de revisión por el equipo |
+| Estado | Aceptado (revisado por Lucas Ottonello y Ezequiel Marcenal, 08/11/2026) |
 | :---- | :---- |
-| **Versión** | 0.4 |
-| **Fecha** | 24 de octubre de 2026 |
+| **Versión** | 1.0 |
+| **Fecha** | 8 de noviembre de 2026 |
 | **Responsable** | Cristian Reyes |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Decisión relacionada** | Estrategia de caché e invalidación (obligatorio, letra 6.7 y 8.2) |
@@ -11,7 +11,7 @@
 
 **Este registro define qué se guarda en la caché distribuida (Valkey), con qué clave, cuánto dura, cuándo se invalida y cómo se mide. Se cachean dos casos de uso con perfiles de acceso opuestos: el seguimiento público, que se lee mucho y cambia seguido, y la configuración del operador (cuadro tarifario y reglas operativas), que se lee mucho y casi no cambia. La clave siempre incluye el operador, para que la caché no se convierta en una fuga entre inquilinos.**
 
-> Las decisiones que siguen abiertas están en la sección 5. Con la revisión del equipo, el registro pasa a *Aceptado* (versión 1.0).
+> Aceptado por el equipo el 08/11/2026 (v1.0), con las pruebas de la sección 4. Las decisiones que quedan abiertas están en la sección 5.
 
 # **1\. Contexto y restricciones**
 
@@ -41,7 +41,7 @@ Se cachean **DTOs de lectura serializados en JSON**, nunca entidades del dominio
 El acceso a la caché se concentra en **una sola pieza** común a todos los módulos, igual que el filtro y el interceptor del ADR-0002. **Ya está implementada** (Ezequiel Marcenal, 19/10/2026, PR #36); este registro fundamenta su diseño y define cómo la usan los casos de uso:
 
 - **Interfaz** `ICacheDistribuida` en `Logistica.SharedKernel` (C# puro), con `ObtenerOCrearAsync(cache, clave, crear, duracion)` e `InvalidarAsync(cache, clave)`. `cache` nombra el grupo de datos (`seguimiento`, `tarifario`…) y es la etiqueta de la métrica. Application la usa sin conocer Valkey.
-- **Implementación** `CacheDistribuida` en `Logistica.BuildingBlocks.Infrastructure`, sobre `IDistributedCache`: Valkey cuando hay cadena de conexión (`ConnectionStrings:Valkey`) y la memoria del proceso cuando no la hay, para depurar sin Valkey y en las pruebas.
+- **Implementación** `CacheDistribuida` en `Logistica.BuildingBlocks.Infrastructure`, sobre `IDistributedCache`: Valkey cuando hay cadena de conexión (`ConnectionStrings:Valkey`) y la memoria del proceso cuando no la hay, para depurar sin Valkey y en las pruebas. **En producción la cadena es obligatoria:** `ConexionesObligatorias` no deja arrancar la API ni el Worker sin ella, así que la caché nunca cae a la memoria del proceso por un error de configuración (lo comprueba `ConfiguracionProduccionTests`). Un Valkey configurado pero caído es otro caso: se sigue contra la base (sección 2.6).
 - **La implementación arma la clave completa** con el `OperadorId` de `ICurrentTenant`: `{cache}:{OperadorId}:{clave}`. El caso de uso pasa sólo su parte (por ejemplo, `vigente`), así **no puede olvidarse del operador**. Es la misma idea que el filtro "Tenant": la protección no depende de la disciplina de cada desarrollador.
 - **Si el dato depende también del comercio**, el comercio lo pone el caso de uso en su parte de la clave. No se agrega automáticamente: una invalidación desde el Backoffice, que no tiene comercio, no borraría lo guardado desde el Portal.
 - **Sin inquilino, falla cerrado:** si `ICurrentTenant.OperadorId` es nulo, usar la caché lanza `TenantMismatchException`, igual que agregar un mensaje al Outbox. Un caso de uso nunca debería llegar ahí sin operador; si llega, es un error de programación y se ve, en lugar de pasar desapercibido.
@@ -56,17 +56,17 @@ El acceso a la caché se concentra en **una sola pieza** común a todos los mód
 | Expiración | **60 segundos, absoluta.** |
 | Invalidación | Los eventos de cambio de estado que Envíos ya publica por Outbox y RabbitMQ (ADR-0003) llegan al Worker, donde el consumidor `InvalidarSeguimiento` borra la clave del envío. El consumidor corre con el operador del sobre del mensaje como inquilino, así arma la misma clave que guardó la API. |
 
-**Eventos que invalidan:** `EnvioAsignadoARuta`, `EnvioDesasignadoDeRuta`, `EnvioEnTransito`, `EnvioEntregado`, `IntentoFallidoRegistrado`, `EnvioReprogramado`, `EnvioCancelado`, `EnvioReintegradoADeposito`, `EnvioExtraviado` y `DevolucionIniciada`. Cada caso de uso nuevo que publique un cambio de estado visible para el destinatario se suma a esta lista.
+**Eventos que invalidan:** `EnvioAsignadoARuta`, `EnvioDesasignadoDeRuta`, `EnvioEnTransito`, `EnvioEntregado`, `IntentoFallidoRegistrado`, `EnvioReprogramado`, `EnvioCancelado`, `EnvioReintegradoADeposito`, `EnvioRecibidoEnDeposito`, `EnvioDevuelto`, `EnvioExtraviado` y `DevolucionIniciada`. Cada caso de uso nuevo que publique un cambio de estado visible para el destinatario se suma a esta lista.
 
 - `EnvioAdmitido` no se incluye: es el estado inicial y, antes de crearse el envío, nadie pudo guardar su seguimiento.
-- **La recepción en el depósito (T2) no publica un evento** (CU-30). Hasta que exista, el destinatario puede ver el estado anterior durante, como máximo, la expiración de un minuto. Se propone agregar `EnvioRecibidoEnDeposito` al módulo de Envíos, que también serviría para los avisos al comercio (CU-64).
+- **La recepción en el depósito (T2) publica `EnvioRecibidoEnDeposito`** cuando llegan todos los bultos del envío (CU-30). El escaneo de un bulto suelto no publica un evento: con la entrega parcial (RF 35), el seguimiento puede tardar hasta un minuto en mostrarlo. Cada visita del repartidor sí publica `EnvioEntregado` o `IntentoFallidoRegistrado`, así que el avance "2 de 3" se actualiza al sincronizar.
 
 **Por qué la invalidación va por mensajería y no por un evento en memoria.** El ADR-0001 (sección 2.5) prevé eventos en memoria para invalidar la caché, y así se hace con la configuración (sección 2.4). En el seguimiento no alcanza: el cambio de estado ocurre en la API, pero el módulo Seguimiento procesa los hechos de Envíos en el Worker (ADR-0003, sección 2.4), y un evento en memoria de la API no llega a otro proceso. Además, esos eventos ya existen y viajan por RabbitMQ para las notificaciones (CU-62) y los avisos (CU-64): la invalidación es un consumidor más de los mismos mensajes, sin infraestructura nueva.
 
 - **No necesita inbox:** borrar dos veces la misma clave no hace daño, así que procesar un mensaje repetido no cambia el resultado.
 - **Si el mensaje se demora o se pierde,** la entrada vence sola: la invalidación acelera la actualización, y la expiración garantiza el límite.
 
-**Por qué 60 segundos.** La expiración acota lo que la invalidación no cubre: los cambios sin evento (T2), la demora de la mensajería y la carrera de la sección 2.5. Un minuto es poco para el destinatario, y alcanza para absorber las recargas repetidas de la página, que es lo que más tráfico genera. *(La versión 0.3 justificaba el valor con la cantidad de entregas que faltan antes del envío; ese dato no se implementó en CU-60.)*
+**Por qué 60 segundos.** La expiración acota lo que la invalidación no cubre: los cambios sin evento (la recepción de un bulto suelto), la demora de la mensajería y la carrera de la sección 2.5. Un minuto es poco para el destinatario, y alcanza para absorber las recargas repetidas de la página, que es lo que más tráfico genera. *(La versión 0.3 justificaba el valor con la cantidad de entregas que faltan antes del envío; ese dato no se implementó en CU-60.)*
 
 **Sobre el ADR-0002, sección 4.** Allí se decía que el seguimiento usa *el token como clave*. Se usan `OperadorId` y `EnvioId` (que el token contiene), porque el consumidor que invalida recibe el `EnvioId` en el evento, pero no el token. Se aceptó al implementar CU-60 (19/10/2026) y se actualizó esa línea del ADR-0002.
 
@@ -78,12 +78,17 @@ Incluye el cuadro tarifario (CU-05) y las reglas operativas (CU-06). Se leen en 
 | :---- | :---- | :---- | :---- |
 | **Una versión publicada** del tarifario (la tabla de precios ya calculada, `TablaTarifaria`) | `tarifario:{OperadorId}:v{Numero}` | **24 horas** | **Nunca hace falta:** una versión publicada no cambia (6.6). La expiración sólo libera memoria. |
 | **Una versión publicada** de las reglas, por número o por Id | `reglas:{OperadorId}:v{Numero}` / `reglas:{OperadorId}:id:{VersionId}` | **24 horas** | Nunca hace falta. La clave por Id es la que usa Envíos: cada envío guarda la versión con la que fue admitido (`VersionReglasId`). |
-| **Cuál es la versión vigente** (el puntero) | `tarifario:{OperadorId}:vigente` / `reglas:{OperadorId}:vigente` | **10 minutos** | El handler de publicar la borra después de guardar (CU-05 y CU-06). Además, guarda hasta cuándo es válida (ver abajo). |
+| **Cuál es la versión vigente** (el puntero) | `tarifario:{OperadorId}:vigente` / `reglas:{OperadorId}:vigente` | **1 minuto** (10 hasta la v0.4) | El handler de publicar la borra después de guardar (CU-05 y CU-06). Además, guarda hasta cuándo es válida (ver abajo). |
 
 **Coherencia con el dominio.**
 - **Separar "la versión" de "cuál está vigente"** aprovecha que las versiones son inmutables: el contenido grande se cachea mucho tiempo sin riesgo, y lo único que se invalida es un puntero chico.
-- **La vigencia futura no se resuelve con un evento:** una versión publicada hoy para regir el 1/11 no dispara nada el 1/11. Por eso el puntero guarda, junto con el número vigente, **`ValidoHasta`: el inicio de la próxima versión programada**. Cada lectura lo compara con la hora actual y, si ya pasó, borra el puntero y lo vuelve a cargar: ese mismo instante se empieza a leer la nueva versión, sin esperar a que venzan los 10 minutos.
+- **La vigencia futura no se resuelve con un evento:** una versión publicada hoy para regir el 1/11 no dispara nada el 1/11. Por eso el puntero guarda, junto con el número vigente, **`ValidoHasta`: el inicio de la próxima versión programada**. Cada lectura lo compara con la hora actual y, si ya pasó, borra el puntero y lo vuelve a cargar: ese mismo instante se empieza a leer la nueva versión, sin esperar a que venza el puntero. Lo comprueba `VersionProgramadaTests` con un reloj que se adelanta de las 23:59 a las 00:01 (sección 4).
 - **Un envío ya admitido no consulta el puntero:** usa la versión que guardó (`VersionTarifarioId`, `VersionReglasId`), así que nunca le afecta una publicación posterior.
+
+**Por qué el puntero dura 1 minuto (v0.5).** Hay dos situaciones en las que el puntero viejo puede quedar en la caché después de publicar (sección 2.5): una lectura que lo cargó de la base justo antes de la publicación y lo guarda justo después del borrado, y un borrado que falló porque Valkey no respondía. En los dos casos el dato viejo dura lo que dura la entrada, y con 10 minutos se podía cobrar una tarifa vieja durante demasiado tiempo. Medido después de una caída: el precio viejo duró 59,6 s con 1 minuto, y la prueba falla con 10 (sección 4, prueba 9). Con 1 minuto, como el seguimiento:
+- Los dos riesgos quedan acotados a un minuto. Valkey cuenta la expiración por su lado, así que el límite vale también después de una caída.
+- El costo es bajo: recargar el puntero son dos consultas livianas (la versión vigente y el próximo inicio). Lo pesado, la tabla de cada versión, sigue guardándose 24 horas.
+- Evitar la carrera por completo exigiría escribir "sólo si la clave no existe" o una doble invalidación con demora. `IDistributedCache` no ofrece lo primero, y las dos opciones son desproporcionadas para el alcance del laboratorio. La aclaración docente pide resolver *o acotar* el riesgo.
 
 **Invalidación directa, sin evento.** El cambio (publicar) y la lectura cacheada ocurren en el mismo módulo y en el mismo proceso (la API). El handler de publicar, después de confirmar, llama a `InvalidarAsync` de la misma clase que lee (`TarifarioVigente`, `ReglasVigentes`). Un evento en memoria (ADR-0001, sección 2.5) agregaría un paso más sin desacoplar nada: emisor y receptor serían el mismo módulo. Si otro módulo cacheara esta configuración, ahí sí correspondería un evento.
 
@@ -94,12 +99,14 @@ Incluye el cuadro tarifario (CU-05) y las reglas operativas (CU-06). Se leen en 
 - La clave se borra **después** de que la transacción se confirma. Si se borrara antes, otra lectura podría volver a cargar el dato viejo mientras la transacción todavía no terminó.
   - **Configuración:** el handler de publicar llama a `InvalidarAsync` después de `GuardarCambiosAsync` (sección 2.4).
   - **Seguimiento:** el evento se publica desde el Outbox, que sólo existe si la transacción se confirmó, y el Worker lo procesa después (sección 2.3).
-- Aun así queda una carrera posible: una lectura que leyó la base justo antes de la confirmación y escribe en la caché justo después del borrado. Por eso **toda entrada tiene expiración**, incluso las que se invalidan: el dato viejo, en el peor caso, dura lo que su expiración (1 minuto en el seguimiento, 10 minutos en un puntero de configuración).
-- Si borrar la clave falla (Valkey caído), la pieza común registra una advertencia, suma un error a la métrica y no deshace la operación: la entrada expira sola (ADR-0001, sección 2.5).
+- Aun así queda una carrera posible: una lectura que leyó la base justo antes de la confirmación y escribe en la caché justo después del borrado. Por eso **toda entrada tiene expiración**, incluso las que se invalidan: el dato viejo, en el peor caso, dura lo que su expiración: 1 minuto, tanto en el seguimiento como en un puntero de configuración.
+- Si borrar la clave falla (Valkey caído), la pieza común registra una advertencia, suma un error a la métrica y no deshace la operación: la entrada expira sola, también en un minuto (ADR-0001, sección 2.5). Reintentar el borrado no ayuda: los reintentos del Worker (5 s, 30 s y 2 min) terminan después de que la entrada ya venció.
 
 ## **2.6 Si Valkey no responde: se sigue sin caché**
 
-La caché acelera, no es la fuente de verdad. Si Valkey no responde, la pieza común **registra el error, cuenta la falla y lee de PostgreSQL**, sin intentar guardar. La conexión no espera a Valkey para arrancar (`AbortOnConnectFail` desactivado), no encola pedidos mientras está caído (`BacklogPolicy.FailFast`) y espera **como máximo 1 segundo**, para que una caché caída no vuelva lento todo el sistema. Es el comportamiento que verificarán las pruebas de resiliencia (7.4); `CacheDistribuidaTests` ya comprueba que, con Valkey inalcanzable, se responde desde la fuente en menos de 5 segundos.
+La caché acelera, no es la fuente de verdad. Si Valkey no responde, la pieza común **registra el error, cuenta la falla y lee de PostgreSQL**, sin intentar guardar. La conexión no espera a Valkey para arrancar (`AbortOnConnectFail` desactivado) y no encola pedidos mientras está caído (`BacklogPolicy.FailFast`), para que una caché caída no vuelva lento todo el sistema.
+
+**Cuánto demora, con los valores configurados** (corrige la v0.4, que decía "como máximo 1 segundo"): el intento de conexión tiene un límite de **2 segundos** (`ConnectTimeout`) y cada operación de **1 segundo** (`AsyncTimeout`). La primera lectura después de que Valkey cae puede tardar hasta unos 2 segundos, mientras se agota la conexión; las siguientes fallan enseguida por `FailFast` y van a la base. `CacheDistribuidaTests` comprueba, con Valkey inalcanzable, que la segunda lectura responde desde la fuente en menos de 2 segundos. El recorrido con un Valkey real que se detiene y se recupera es parte de las pruebas de resiliencia (7.4, sección 4).
 
 ## **2.7 Métrica de aciertos y fallos**
 
@@ -114,6 +121,20 @@ La pieza común publica, con OpenTelemetry (`System.Diagnostics.Metrics`), un me
 El Aspire Dashboard muestra los tres por grupo y, con ellos, la tasa de aciertos (`aciertos / (aciertos + fallos)`). **Nunca se etiqueta con el `OperadorId` ni con el envío**: no aporta a la métrica y multiplicaría las series del tablero.
 
 **Cómo se ve en la demostración** (escenario 5): en Aspire Dashboard → *Metrics* → `logistica-api` → `logistica.cache.*`, filtrando por `cache = tarifario`. Se calcula un precio dos veces (un fallo y después un acierto), se publica una versión nueva y se vuelve a calcular: aparece otro fallo, porque la publicación borró el puntero.
+
+Con Valkey caído, las lecturas suman `errores` y no `fallos`: la tasa de aciertos sólo mide las consultas que llegaron a la caché, así que se mira junto con los errores para no confundir una caída con un buen rendimiento.
+
+## **2.8 Estado compartido entre instancias**
+
+La aclaración docente sobre caché distribuida (sección 3.1 de *Cambios de Requerimientos Planificados*) extiende el mismo razonamiento a otros mecanismos que dependen del estado compartido. El equipo está exento del balanceo, pero cada punto queda registrado:
+
+| Mecanismo | Estado |
+| :---- | :---- |
+| Caché | Compartida en Valkey (este registro). |
+| SignalR del tablero (CU-66) | Backplane en Valkey cuando hay cadena de conexión: los mensajes llegan a los clientes de cualquier instancia. |
+| Claves de protección de las cookies | Guardadas en PostgreSQL (`PersistKeysToDbContext`): una cookie emitida por una instancia sirve en la otra. |
+| Limitador de tasa del seguimiento | Cuenta por instancia (el limitador de ASP.NET Core): con dos instancias, el límite efectivo es el doble del configurado. Se acepta porque corre una sola instancia; con balanceo habría que llevar la cuenta en Valkey. |
+| Tareas programadas | La depuración de posiciones (`DepurarPosiciones`) usa un temporizador local. Repetirla en dos instancias no daña datos; no hay coordinación de ejecución única. |
 
 # **3\. Alternativas consideradas y motivo de su descarte**
 
@@ -133,9 +154,9 @@ El Aspire Dashboard muestra los tres por grupo y, con ellos, la tasa de aciertos
 - Las métricas por caso permiten mostrar en la demostración el efecto de la caché (escenario 5: un cambio de tarifa en caliente invalida el puntero y la lectura siguiente es un fallo).
 
 **En contra / riesgos**
-- **Datos viejos acotados:** hasta 1 minuto en el seguimiento (por ejemplo, después de la recepción en el depósito, que no publica un evento) y, en una carrera poco probable, hasta 10 minutos en un puntero de configuración.
+- **Datos viejos acotados a 1 minuto:** en el seguimiento (por ejemplo, después de recibir un bulto suelto en el depósito, que no publica un evento) y en un puntero de configuración (una carrera poco probable con la publicación, o un borrado que falló con Valkey caído).
 - **Invalidaciones olvidadas:** un caso de uso nuevo que cambie un dato cacheado y no borre su clave mostrará datos viejos hasta que expiren. En el seguimiento, cada evento nuevo de cambio de estado tiene que sumarse a `InvalidarSeguimiento.Tipos`, como se hizo con `EnvioExtraviado` (CU-21) y `DevolucionIniciada` (CU-20). Se mitiga con una prueba de integración por cada dato cacheado (cambiar y leer de nuevo).
-- **Cambios de estado sin evento:** la recepción en el depósito (T2) no publica un evento, así que el seguimiento puede mostrar el estado anterior hasta un minuto (sección 2.3).
+- **Cambios de estado sin evento:** la recepción de un bulto suelto no publica un evento, así que el seguimiento puede mostrar el estado anterior hasta un minuto (sección 2.3).
 - **Serialización:** un cambio en un DTO cacheado puede dejar entradas con la forma vieja. Se mitiga incluyendo una versión del formato en la clave cuando el DTO cambie, o vaciando la caché al desplegar.
 - **Un servicio más que operar:** Valkey en desarrollo (Docker Compose) y en producción.
 
@@ -147,19 +168,24 @@ El Aspire Dashboard muestra los tres por grupo y, con ellos, la tasa de aciertos
 | :-: | :---- | :---- | :---- |
 | 1 | **Aislamiento:** con la misma clave lógica, el operador A y el operador B leen entradas distintas; sin inquilino, usar la caché falla cerrado. | `CacheDistribuidaTests`; `ConfigurarTarifarioTests` y `ConfigurarReglasTests` (cada operador ve su versión vigente) | Hecha |
 | 2 | **Invalidación:** después de publicar un tarifario o unas reglas, y de un evento de cambio de estado del envío, la lectura siguiente devuelve el dato nuevo. | `ConfigurarTarifarioTests`, `ConfigurarReglasTests` (recorrido completo hasta el precio o la regla nueva); `CacheSeguimientoTests` | Hecha |
-| 3 | **Vigencia futura:** una versión programada no rige antes de su fecha, y el puntero se recarga cuando llega su inicio (`ValidoHasta`). | `ConfigurarTarifarioTests`, `ConfigurarReglasTests` (la versión programada no rige todavía) | Parcial: falta probar el paso de la fecha con un reloj fijo |
-| 4 | **Resiliencia:** con Valkey caído, se lee de la fuente sin esperar y `cache.errores` aumenta. | `CacheDistribuidaTests` (Valkey inalcanzable, caché que falla) | Hecha en la pieza común; falta la prueba de punta a punta con Valkey detenido (opcional 7.4) |
-| 5 | **Métrica:** una lectura repetida suma un fallo y después un acierto. | `CacheDistribuidaTests` | Hecha |
+| 3 | **Vigencia futura:** una versión programada no rige antes de su fecha, y empieza a regir en el instante de su inicio aunque el puntero no haya vencido (`ValidoHasta`). | `ConfigurarTarifarioTests`, `ConfigurarReglasTests` (no rige todavía); `VersionProgramadaTests` (tarifario y reglas: el reloj de la API pasa de las 23:59 a las 00:01 y rige la versión nueva sin publicar nada) | Hecha. Verificada por mutación: sin la comparación con `ValidoHasta`, las dos pruebas fallan |
+| 4 | **Resiliencia:** con Valkey caído, se lee de la fuente sin esperar y `cache.errores` aumenta. | `CacheDistribuidaTests` (Valkey inalcanzable, caché que falla); `ValkeyCaidoTests` (Valkey detenido con la API corriendo y reconexión al volver, opcional 7.4, `docs/pruebas-de-resiliencia.md`) | Hecha |
+| 5 | **Métrica:** una lectura repetida suma un fallo y después un acierto; en el tablero se ven por caso. | `CacheDistribuidaTests`; recorrido manual con Docker Compose (revisión de aclaraciones, sección 11.1): en Aspire, `aciertos` (30) y `fallos` (6) con la etiqueta `cache` en `reglas`, `seguimiento` y `tarifario`, y `errores` al detener Valkey | Hecha |
+| 6 | **Producción sin Valkey no arranca.** | `ConfiguracionProduccionTests` | Hecha |
+| 7 | **Demostración docente:** dos instancias completas de la API con PostgreSQL y Valkey compartidos; se publica una tarifa en una y la otra responde enseguida con el valor nuevo. | `TarifarioEntreDosApisTests` (revisión, sección 11): dos hosts de la API dentro del proceso de pruebas, no dos contenedores de Docker Compose, sobre la misma base y el mismo Valkey de Testcontainers. Las dos cobran $150; se publica $175 desde una y la otra lo cobra sin esperar. Con la segunda API en memoria, la prueba falla | Hecha |
+| 8 | **Invalidación del seguimiento de punta a punta:** recepción en el depósito, Outbox, RabbitMQ, Worker y borrado de la clave. | `InvalidacionSeguimientoTests` (revisión, sección 11.2): la API y el Worker como hosts separados que sólo comparten PostgreSQL, RabbitMQ y Valkey. El estado nuevo apareció a los 3,1 s, con un plazo de 20 s, muy por debajo de la expiración; con el Worker en memoria, la prueba falla | Hecha |
+| 9 | **Frescura después de una invalidación fallida:** se publica con Valkey caído (el borrado del puntero falla) y, al volver Valkey con el puntero viejo, el precio nuevo rige en a lo sumo un minuto. | Segundo caso de `ValkeyCaidoTests` (revisión, sección 11.3): el precio viejo se vio hasta 59,6 s después de reconectarse; con el puntero en 10 minutos la prueba falla (seguía a los 64,8 s) | Hecha |
 
 # **5\. Decisiones abiertas**
 
 | Tema | Estado |
 | :---- | :---- |
-| Valores de expiración (60 s, 10 min, 24 h) | **Cerrada (v0.4):** se confirman. Si las métricas del tablero mostraran pocos aciertos, se revisan. |
+| Valores de expiración (60 s, 1 min, 24 h) | **Cerrada (v0.5):** el puntero de configuración baja de 10 minutos a 1 para acotar la carrera y la invalidación fallida (sección 2.4). Si las métricas del tablero mostraran pocos aciertos, se revisan. |
 | Alcance | **Cerrada:** seguimiento, tarifario y reglas. Zonas e identidad visual quedan como extensión posible (sección 2.4). |
 | Quién publica el evento de cambio de estado para el seguimiento | **Cerrada:** Envíos lo publica por Outbox; Seguimiento lo consume en el Worker (`InvalidarSeguimiento`, sección 2.3). |
-| Evento de la recepción en el depósito (T2) | **Abierta:** proponer a Ezequiel (CU-30) un `EnvioRecibidoEnDeposito`, que también serviría para los avisos al comercio (CU-64). |
-| Aprobación del equipo | **Abierta:** revisión de Lucas y Ezequiel para pasar a *Aceptado* (v1.0). |
+| Evento de la recepción en el depósito (T2) | **Cerrada:** Envíos publica `EnvioRecibidoEnDeposito` al recibir todos los bultos y `InvalidarSeguimiento` lo consume (sección 2.3). |
+| Resultados de las pruebas 5, 7, 8 y 9 | **Cerrada (v1.0):** los aportó Ezequiel Marcenal (revisión de aclaraciones, secciones 11 a 11.3). |
+| Aprobación del equipo | **Cerrada:** Lucas Ottonello y Ezequiel Marcenal aprobaron el registro el 08/11/2026. |
 
 # **6\. Referencias**
 
@@ -179,3 +205,6 @@ El Aspire Dashboard muestra los tres por grupo y, con ellos, la tasa de aciertos
 | 0.2 | 19/10/2026 | Se alinea con la pieza común implementada por Ezequiel Marcenal (PR #36): `ICacheDistribuida`, falla cerrado con excepción, memoria del proceso sin Valkey, espera máxima de 1 s, nombres de los contadores y comercio en la clave a cargo del caso de uso. | Cristian Reyes |
 | 0.3 | 19/10/2026 | Se confirma la clave del seguimiento (EnvioId) y se registra qué usa la caché para el 22/10: tarifario, reglas y seguimiento. En el seguimiento, los eventos de Envíos se consumen en el Worker sólo para borrar la entrada. | Cristian Reyes |
 | 0.4 | 24/10/2026 | Se alinea el texto con lo implementado: el seguimiento se invalida con los eventos de Envíos que consume el Worker (lista de eventos, `EnvioExtraviado` incluido, y T2 sin evento); la configuración, directamente en el handler de publicar, con el puntero `ValidoHasta`; zonas e identidad visual quedan fuera del alcance; el Worker también exporta la métrica; pruebas con su clase y estado; decisiones abiertas cerradas o actualizadas. Escrito con IA a pedido del responsable. | Cristian Reyes |
+| 0.5 | 08/11/2026 | Prueba 4 (resiliencia) hecha de punta a punta con `ValkeyCaidoTests`, de las pruebas de resiliencia (opcional 7.4). | Ezequiel Marcenal |
+| 0.6 | 08/11/2026 | Aclaración docente de caché: el puntero de configuración baja a 1 minuto y acota la carrera y la invalidación fallida; producción exige Valkey; T2 ya publica evento; demora real del respaldo (hasta 2 s la primera lectura); estado compartido entre instancias (sección 2.8); prueba de vigencia con reloj ajustable (`VersionProgramadaTests`); pruebas 5, 7 y 8 pendientes. Borrador con IA a pedido del responsable. | Cristian Reyes |
+| 1.0 | 08/11/2026 | Aceptado por el equipo. Pruebas 5, 7 y 8 hechas y prueba 9 nueva (frescura tras una invalidación fallida: 59,6 s con el puntero de 1 minuto), con los resultados de Ezequiel Marcenal. La demostración de las dos APIs queda como prueba automática, no en Docker Compose. | Cristian Reyes |

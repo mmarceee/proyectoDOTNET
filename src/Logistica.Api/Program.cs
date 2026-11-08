@@ -2,6 +2,7 @@ using Logistica.Api.Errores;
 using Logistica.Api.Tenancy;
 using Logistica.Api.Seguridad;
 using Logistica.Api.ApiPublica;
+using Logistica.Api.Salud;
 using Logistica.BuildingBlocks.Infrastructure.Caching;
 using Logistica.BuildingBlocks.Infrastructure.Configuracion;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
@@ -27,7 +28,9 @@ using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHealthChecks();
+// /health chequea sólo PostgreSQL, con un límite de 3 s para que una base colgada no lo deje esperando (PostgresHealthCheck).
+builder.Services.AddHealthChecks()
+    .AddCheck<PostgresHealthCheck>(PostgresHealthCheck.Nombre, timeout: TimeSpan.FromSeconds(3));
 
 // Trazas distribuidas (letra, sección 6.12): cada request, sus consultas a PostgreSQL y las fuentes propias de los
 // módulos, como la sincronización de la PWA (ADR-0004, sección 2.9), y la publicación del outbox, que el Worker
@@ -80,6 +83,8 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<TenantMismatchExceptionHandler>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddExceptionHandler<ConcurrenciaExceptionHandler>();
+// PostgreSQL caído: 503 con Retry-After en lugar de 500 (pruebas de resiliencia, opcional 7.4).
+builder.Services.AddExceptionHandler<BaseDeDatosNoDisponibleExceptionHandler>();
 
 // Un body sin un campo obligatorio, o con null donde el DTO no lo admite, responde 400 antes de llegar al endpoint.
 builder.Services.ConfigureHttpJsonOptions(options =>

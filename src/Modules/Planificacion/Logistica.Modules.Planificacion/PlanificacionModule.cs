@@ -37,6 +37,7 @@ public static class PlanificacionModule
         services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
         services.AddScoped<IResponsablePlanificacion, ResponsablePlanificacion>();
         services.AddScoped<ArmarRutaHandler>();
+        services.AddScoped<Application.Features.AlertarRutasSinFinalizar.AlertarRutasSinFinalizarHandler>();
         services.AddScoped<Application.Features.OrdenarParadas.OrdenarParadasHandler>();
         services.AddScoped<Application.Features.DespacharRuta.DespacharRutaHandler>();
         services.AddScoped<Application.Features.AnularDespacho.AnularDespachoHandler>();

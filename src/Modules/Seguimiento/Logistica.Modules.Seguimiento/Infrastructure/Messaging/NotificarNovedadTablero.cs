@@ -18,7 +18,7 @@ internal sealed class NotificarNovedadTablero(ITableroEnVivo tablero) : IConsumi
     [
         RutaDespachada.Tipo, EnvioEnTransito.Tipo, EnvioEntregado.Tipo, IntentoFallidoRegistrado.Tipo,
         EnvioDesasignadoDeRuta.Tipo, EnvioExtraviado.Tipo, DevolucionIniciada.Tipo,
-        CargaConDiscrepancias.Tipo, ConflictoSincronizacionRegistrado.Tipo,
+        CargaConDiscrepancias.Tipo, ConflictoSincronizacionRegistrado.Tipo, RutasSinFinalizar.Tipo,
     ];
 
     public static string Cola(string tipo) => $"seguimiento.tablero.{tipo}";
@@ -57,6 +57,10 @@ internal sealed class NotificarNovedadTablero(ITableroEnVivo tablero) : IConsumi
                 alerta: true),
             ConflictoSincronizacionRegistrado.Tipo => Novedad(
                 $"Conflicto de sincronización ({Texto("Resultado")}): {Texto("Motivo")}", alerta: true),
+            // CU-70, paso 3: el cierre diario encontró rutas sin finalizar.
+            RutasSinFinalizar.Tipo => Novedad(Cantidad("RutaIds") == 1
+                ? "Cierre del día: 1 ruta quedó sin finalizar."
+                : $"Cierre del día: {Cantidad("RutaIds")} rutas quedaron sin finalizar.", alerta: true),
             _ => throw new InvalidDataException("Tipo de evento desconocido para el tablero."),
         };
     }

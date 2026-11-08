@@ -20,6 +20,15 @@ internal static class LectorHechosEnvio
         string? Texto(string nombre) =>
             raiz.TryGetProperty(nombre, out var valor) && valor.ValueKind == JsonValueKind.String ? valor.GetString() : null;
 
+        // Los campos opcionales que no vienen (eventos publicados antes de agregarlos) quedan en null.
+        Guid? Identificador(string nombre) =>
+            raiz.TryGetProperty(nombre, out var valor) && valor.ValueKind == JsonValueKind.String
+                && valor.TryGetGuid(out var guid) && guid != Guid.Empty ? guid : null;
+
+        DateTimeOffset? Fecha(string nombre) =>
+            raiz.TryGetProperty(nombre, out var valor) && valor.ValueKind == JsonValueKind.String
+                && valor.TryGetDateTimeOffset(out var fecha) ? fecha : null;
+
         HechoEnvio Hecho(string estado, bool intentoFallido = false, bool esAlta = false) =>
             new(mensaje.Id, envioId, Texto("Numero"), estado, intentoFallido, mensaje.OcurridoEn, esAlta);
 
@@ -30,16 +39,18 @@ internal static class LectorHechosEnvio
                 NombreDestinatario = Texto("NombreDestinatario"),
                 EmailDestinatario = Texto("EmailDestinatario"),
                 EsPrueba = raiz.TryGetProperty("EsPrueba", out var prueba) && prueba.ValueKind == JsonValueKind.True,
+                ZonaId = Identificador("ZonaId"),
+                EntregaComprometidaHasta = Fecha("EntregaComprometidaHasta"),
             },
             EnvioAsignadoARuta.Tipo => Hecho("AsignadoARuta"),
             EnvioDesasignadoDeRuta.Tipo => Hecho("EnDeposito"),
             EnvioEnTransito.Tipo => Hecho("EnTransito"),
-            EnvioEntregado.Tipo => Hecho("Entregado"),
+            EnvioEntregado.Tipo => Hecho("Entregado") with { RepartidorId = Identificador("RepartidorId") },
             // T7 y, en la misma operación, T9 o T10: el hecho lleva el estado en que quedó el envío.
             IntentoFallidoRegistrado.Tipo => Hecho(
                 Texto("EstadoFinal") is { Length: > 0 } estado
                     ? estado : throw new InvalidDataException("El intento fallido no tiene el estado final."),
-                intentoFallido: true),
+                intentoFallido: true) with { Motivo = Texto("Motivo"), RepartidorId = Identificador("RepartidorId") },
             EnvioReprogramado.Tipo => Hecho("Reprogramado") with
             {
                 // System.Text.Json escribe DateOnly como yyyy-MM-dd.

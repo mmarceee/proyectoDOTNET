@@ -91,6 +91,9 @@ services:
       # Los contenedores corren en Production, que exige la contraseña de los usuarios de demostración (UsuariosIniciales).
       # En local se usa la de siempre; en DigitalOcean la genera Terraform.
       Demo__Contrasena: ${DEMO_CONTRASENA:-Demo-2026!}
+      # CU-70: hora local del operador a partir de la cual se cierra el día. Para probarlo, 00:00 lo cierra en la
+      # primera revisión (a los 5 minutos de arrancar).
+      CierreDiario__Hora: ${CIERRE_DIARIO_HORA:-23:30}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on: &app-depends-on

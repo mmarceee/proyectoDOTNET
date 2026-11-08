@@ -12,8 +12,11 @@ namespace Logistica.Modules.Envios.Application;
 // Implementación del contrato de Envíos. Es internal: los otros módulos sólo ven la interfaz.
 internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj, IReglasDeEntrega reglasDeEntrega,
     IIntegrationEventPublisher eventos, ConsultarEnviosHandler listado,
-    Features.ReprogramarPorDestinatario.ReprogramarPorDestinatarioHandler reprogramar) : IEnviosModuleApi
+    Features.ReprogramarPorDestinatario.ReprogramarPorDestinatarioHandler reprogramar,
+    Features.IniciarDevolucion.DevolverReprogramadosVencidosHandler vencidos) : IEnviosModuleApi
 {
+    public Task<int> DevolverReprogramadosVencidosAsync(DateOnly hoy, CancellationToken ct) => vencidos.HandleAsync(hoy, ct);
+
     public async Task<IReadOnlyList<EnvioLiquidable>> ListarLiquidablesAsync(Guid comercioId, DateTimeOffset desde,
         DateTimeOffset hasta, CancellationToken ct)
     {
@@ -160,7 +163,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             {
                 var entregadoEn = envio.Eventos[^1].OcurridoEn;
                 eventos.Registrar(EnvioEntregado.Tipo,
-                    new EnvioEntregado(envio.Id, envio.Numero, entregadoEn, visita.ResponsableId), entregadoEn);
+                    new EnvioEntregado(envio.Id, envio.Numero, entregadoEn, visita.ResponsableId, visita.RepartidorId), entregadoEn);
             }
             else
             {
@@ -169,7 +172,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
                     eventos.Registrar(IntentoFallidoRegistrado.Tipo,
                         new IntentoFallidoRegistrado(envio.Id, envio.Numero, fallido.NumeroIntento,
                             motivos[fallido.MotivoNoEntregaId!.Value].Codigo, envio.Estado.ToString(), fallido.FechaHora,
-                            envio.ReintentoDesde),
+                            envio.ReintentoDesde, visita.RepartidorId),
                         fallido.FechaHora);
                 }
             }
