@@ -5,14 +5,15 @@ using Logistica.SharedKernel;
 namespace Logistica.Modules.Administracion.Application.Features.ConfigurarReglas;
 
 // La lectura de las reglas operativas con la caché (ADR-0006, sección 2.4), igual que TarifarioVigente:
-// - "vigente": qué número rige ahora. 10 minutos, se borra al publicar y no se usa más allá de la próxima programada.
+// - "vigente": qué número rige ahora. 1 minuto, se borra al publicar y no se usa más allá de la próxima programada. El
+//   minuto acota el puntero viejo que puede quedar por una lectura simultánea a la publicación o un borrado fallido.
 // - "v{numero}" e "id:{versionId}": una versión publicada. 24 horas; nunca hace falta borrarlas, porque no cambian.
 // Se guarda directamente el resultado del contrato (ReglasOperativas): es lo que piden los demás módulos.
 internal sealed class ReglasVigentes(IReglasRepository versiones, ICacheDistribuida cache, TimeProvider reloj)
 {
     public const string Cache = "reglas";
     private const string ClaveVigente = "vigente";
-    private static readonly TimeSpan DuracionVigente = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan DuracionVigente = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan DuracionVersion = TimeSpan.FromHours(24);
 
     internal sealed record Puntero(int? Numero, DateTimeOffset? ValidoHasta);

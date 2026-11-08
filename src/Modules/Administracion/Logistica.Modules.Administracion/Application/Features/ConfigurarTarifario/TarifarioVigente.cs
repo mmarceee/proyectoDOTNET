@@ -5,15 +5,17 @@ namespace Logistica.Modules.Administracion.Application.Features.ConfigurarTarifa
 
 // La lectura del cuadro tarifario que rige, con la caché (ADR-0006, sección 2.4). Se lee mucho (cada bulto de cada
 // envío) y cambia poco (cuando el administrador publica):
-// - "vigente": qué número rige ahora. Dura 10 minutos, se borra al publicar y nunca se usa más allá del inicio de la
-//   próxima versión programada, porque ese día cambia sin que nadie publique nada.
+// - "vigente": qué número rige ahora. Dura 1 minuto, se borra al publicar y nunca se usa más allá del inicio de la
+//   próxima versión programada, porque ese día cambia sin que nadie publique nada. El minuto acota los dos casos en que
+//   puede quedar un puntero viejo: una lectura que lo vuelve a guardar justo después de publicar, y un borrado que
+//   falló porque Valkey no respondía (ADR-0006).
 // - "v{numero}": la versión publicada. Dura 24 horas y nunca hace falta borrarla: una versión publicada no cambia.
 // La caché agrega el operador de la sesión a cada clave (ICacheDistribuida).
 internal sealed class TarifarioVigente(ITarifarioRepository versiones, ICacheDistribuida cache, TimeProvider reloj)
 {
     public const string Cache = "tarifario";
     private const string ClaveVigente = "vigente";
-    private static readonly TimeSpan DuracionVigente = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan DuracionVigente = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan DuracionVersion = TimeSpan.FromHours(24);
 
     // El número que rige y hasta cuándo se puede confiar en él (el inicio de la próxima programada, si hay).
