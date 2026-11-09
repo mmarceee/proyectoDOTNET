@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptada: decisión funcional cerrada. Implementación pendiente.** |
-| Versión y fecha | 1.3 · 09/11/2026 (pendiente 6 resuelto) |
+| Versión y fecha | 1.4 · 09/11/2026 (pendiente 6 resuelto; avance del pendiente 8) |
 | Responsable del registro | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas en este intercambio. No registra firmas ni aprobaciones individuales adicionales. |
@@ -107,6 +107,8 @@ La decisión funcional anterior está cerrada. **No equivale a declarar terminad
    - Contrato en [integracion-cu64.md](cu-63/integracion-cu64.md#mensaje-v2-rf-36).
 7. Invalidación de seguimiento y actualización del tablero por cambios de bulto, incluso cuando el resumen siga siendo Entregado parcialmente (por ejemplo, de 1/3 a 2/3).
 8. Migración de consultas y consumidores que hoy deciden por EstadoEnvio: retirar esa dependencia de las decisiones operativas. Actualizar dominio, casos de uso y ADR-0004/0006 con la implementación real.
+   - **Avance del 09/11/2026 (nueva visita, RF 34):** las operaciones de una ruta usan los bultos que acompañan al envío, los que están en su mismo estado (`Envio.BultosQueAcompanan`, la misma regla del puente de `Transicionar`). Así se filtran las consultas de Envíos para planificar (capacidad), la hoja de ruta de la PWA y la carga (`ConsultarCargaAsync`): en la nueva visita ya no aparecen los bultos entregados, que antes impedían confirmar la carga. La rendición usa una consulta aparte con todos los bultos y su estado (Ezequiel Marcenal). Lo comprueba `NuevaVisitaTests`.
+   - **Para el 15/11:** envíos activos de un comercio (`EnviosDeComercio`, por `Terminado`), envíos liquidables (CU-32), reprogramación desde el seguimiento (CU-61) y textos de la PWA.
 
 ## 7. Referencias y vigencia
 
@@ -121,3 +123,4 @@ Este documento reemplaza las propuestas anteriores de derivar el envío con todo
 | 1.0 | 02/11/2026 | Registro de la decisión cerrada y separación de pendientes técnicos. | Lucas Ottonello |
 | 1.1 | 02/11/2026 | La ejecución se inicia con la recepción del primer bulto; se actualizan el esquema, los ejemplos y el pendiente 1. | Ezequiel Marcenal |
 | 1.2 | 03/11/2026 | Decisiones del equipo: tabla por bulto aprobada y ejemplo de cancelación después de recibir declarado inalcanzable (pendiente 1 y sección 3); extravío del envío entero para el 12/11 (pendiente 4); migración y traducción de las operaciones antiguas (pendiente 5); política de intentos agotados y `AdmiteEntregaParcial` falso en las versiones publicadas (sección 5). | Ezequiel Marcenal |
+| 1.4 | 09/11/2026 | Pendiente 8: avance para la nueva visita (bultos que acompañan al envío en planificar, hoja de ruta y carga) y lo que queda para el 15/11. | Cristian Reyes |

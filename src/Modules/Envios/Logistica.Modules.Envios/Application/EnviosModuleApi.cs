@@ -44,9 +44,10 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
+        // Sólo los bultos que acompañan al envío: en una nueva visita (RF 34) no se cargan los ya entregados.
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
         return lista.Select(e => new EnvioParaCarga(e.Id, e.Estado.ToString(),
-            e.Bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray()) { Numero = e.Numero }).ToArray();
+            e.BultosQueAcompanan.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray()) { Numero = e.Numero }).ToArray();
     }
 
     public async Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct)
@@ -251,7 +252,8 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         var lista = await envios.ObtenerParaPlanificacionAsync(envioIds, ct);
         return lista.Select(e => new EnvioPlanificable(e.Id, e.OperadorId, e.Numero, e.Estado.ToString(), e.ZonaId,
             e.FranjaHorariaId, e.FechaEntregaProgramada, $"{e.Direccion.Calle} {e.Direccion.Numero}, {e.Direccion.Localidad}",
-            e.Direccion.CodigoPostal, e.Bultos.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
+            // Sólo los bultos que acompañan al envío: la capacidad del vehículo no cuenta los ya entregados (RF 34).
+            e.Direccion.CodigoPostal, e.BultosQueAcompanan.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
             new PuntoEntregaPlanificable(e.Direccion.Calle, e.Direccion.Numero, e.Direccion.Localidad, e.Direccion.Departamento, e.Direccion.CodigoPostal),
             e.ReintentoDesde, e.Modalidad.ToString())).ToList();
     }

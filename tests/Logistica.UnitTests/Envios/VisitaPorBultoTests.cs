@@ -161,6 +161,23 @@ public class VisitaPorBultoTests
             Reglas(), null, Ahora));
     }
 
+    // Consumidores de EstadoEnvio (decisiones-entrega-parcial.md, sección 6, punto 8): para operar una ruta cuentan sólo
+    // los bultos que acompañan al envío. Sin entrega parcial son todos; después, sólo el pendiente, también en la ruta nueva.
+    [Fact]
+    public void Despues_de_una_entrega_parcial_solo_acompanan_al_envio_los_bultos_pendientes()
+    {
+        var envio = EnvioEnTransito(3);
+        var b = envio.Bultos;
+        Assert.Equal(3, envio.BultosQueAcompanan.Count);
+
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id), new(b[2].Id, Ausente)], Firma, null, null, Lugar, Reglas(), null,
+            Ahora);
+        Assert.Equal([b[2].Id], envio.BultosQueAcompanan.Select(x => x.Id));
+
+        LlevarAEnTransito(envio, b[2]);
+        Assert.Equal([b[2].Id], envio.BultosQueAcompanan.Select(x => x.Id));
+    }
+
     // RF 33, recargo de la nueva visita (decisiones-entrega-parcial.md, sección 5): una vez por visita adicional
     // realizada, aunque falle; nunca en la primera ni por cada bulto.
     private static ReglasEntrega ConRecargo() =>

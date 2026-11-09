@@ -16,7 +16,8 @@ internal sealed class EnviosHojaRuta(EnviosDbContext db, IReglasDeEntrega reglas
             var d = e.Direccion;
             resultado.Add(new(e.Id, e.Numero, e.Estado.ToString(), e.Destinatario.Nombre, e.Destinatario.Telefono,
                 d.Calle, d.Numero, d.Localidad, d.Departamento, d.CodigoPostal, d.Referencia, e.ZonaId, e.FranjaHorariaId,
-                e.Bultos.OrderBy(b => b.Codigo).Select(b => new BultoParaHoja(b.Id, b.Codigo)).ToArray(),
+                // Sólo los bultos que acompañan al envío: la PWA no ofrece cargar ni entregar los ya entregados (RF 34).
+                e.BultosQueAcompanan.OrderBy(b => b.Codigo).Select(b => new BultoParaHoja(b.Id, b.Codigo)).ToArray(),
                 await reglas.ParaHojaAsync(e, ct)));
         }
         return resultado;
