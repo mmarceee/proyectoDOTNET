@@ -68,6 +68,12 @@ variable "ip_administracion" {
   default     = ""
 }
 
+variable "ci_principal_id" {
+  description = "Identificador de objeto de la entidad de servicio del CI (az ad sp list --display-name logistica-ci --query \"[0].id\" -o tsv). Recibe Contributor sobre el grupo de recursos. Vacío, el CI no despliega."
+  type        = string
+  default     = ""
+}
+
 variable "observabilidad" {
   description = "Crea Aspire Dashboard y envía la telemetría de la API y el Worker. false lo borra cuando no hace falta mostrarlo (ahorra crédito)."
   type        = bool

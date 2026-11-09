@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptado como decisión de diseño. Implementación y evaluación retrospectiva pendientes.** |
-| Versión y fecha | 1.4 · 06/11/2026 |
+| Versión y fecha | 1.5 · 09/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | `586f630` (CU-42) |
@@ -108,8 +108,8 @@ Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de 
 | Evidencia requerida | Qué debe comprobar | Estado al 02/11/2026 |
 | --- | --- | --- |
 | Pruebas de dominio | Tablas declarativas, pares prohibidos, combinaciones alcanzables, resumen, Terminado y ausencia de eventos intermedios ficticios. | Pendiente. |
-| Atomicidad y concurrencia | Fallo de una línea revierte toda la visita; otros envíos continúan; dos operaciones no resuelven dos veces el mismo bulto. | Política y pruebas en el ADR-0004 (sección 2.11 y pruebas 10 a 13). Servidor implementado el 03/11: se evalúan todos los bultos antes de aplicar; una visita rechazada no cambia bultos, resumen ni Outbox; la visita de otro envío del lote se aplica, y un bulto ya resuelto es conflicto (`VisitaPorBultoTests` y `DiagnosticoVisitaTests`). Falta la PWA nueva. |
-| Reenvío idempotente | Un OperacionId repetido no duplica evidencia, intentos, eventos ni cargos; el consumidor no duplica avisos. | Pendiente para parcial. |
+| Atomicidad y concurrencia | Fallo de una línea revierte toda la visita; otros envíos continúan; dos operaciones no resuelven dos veces el mismo bulto. | Política y pruebas en el ADR-0004 (sección 2.11 y pruebas 10 a 15). Servidor implementado el 03/11: se evalúan todos los bultos antes de aplicar; una visita rechazada no cambia bultos, resumen ni Outbox; la visita de otro envío del lote se aplica, y un bulto ya resuelto es conflicto (`VisitaPorBultoTests` y `DiagnosticoVisitaTests`). El 09/11: una visita que el envío rechaza al registrarla tampoco deja cambios (`Envio.RegistrarVisita` comprueba la transición antes de tocar los bultos). Falta la PWA nueva. |
+| Reenvío idempotente | Un OperacionId repetido no duplica evidencia, intentos, eventos ni cargos; el consumidor no duplica avisos. | Servidor verificado el 09/11: reenviar una visita aplicada con recargo responde *YaAplicada* y no cambia intentos, evidencia, eventos, Outbox ni recargos (`VisitaPorBultoTests`, prueba 14 del ADR-0004). Los consumidores ya descartan mensajes repetidos con su inbox (ADR-0003). Falta la PWA nueva. |
 | Rutas y depósito | Sólo pendientes elegibles se reasignan; no hay doble reserva activa por bulto; recepción y rendición preservan custodia y estados. | Pendiente. |
 | Aislamiento | IDs/evidencia ajenos no acceden ni escriben entre operadores o comercios. | Pendiente sobre los contratos nuevos. |
 | Migración/formatos antiguos | Historial preservado y operaciones pendientes tratadas sin inventar resultados ambiguos. | Migración `EntregaParcialBultos` y traducción de las operaciones antiguas a visita, con sus pruebas (`VisitaPorBultoTests`, 03/11). Falta la PWA nueva. |
@@ -142,3 +142,4 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | 1.2 | 03/11/2026 | Sección 4.3: riesgo de bultos entregados sin aplicar por la atomicidad por visita; sección 4.4: la atomicidad queda especificada en el ADR-0004, versión 1.4. | Ezequiel Marcenal |
 | 1.3 | 03/11/2026 | Sección 4.3: pendientes 1, 4 y 5 de la decisión resueltos; sección 4.4: estado de la migración y de los formatos antiguos. | Ezequiel Marcenal |
 | 1.4 | 06/11/2026 | Sección 4.4: la atomicidad por visita queda implementada en el servidor, con sus pruebas. Sección 2.2: las operaciones offline antiguas ya están especificadas en el ADR-0004. | Ezequiel Marcenal |
+| 1.5 | 09/11/2026 | Sección 4.4: reenvío idempotente de la visita verificado en el servidor, y atomicidad ante un rechazo al registrar la visita. | Ezequiel Marcenal |

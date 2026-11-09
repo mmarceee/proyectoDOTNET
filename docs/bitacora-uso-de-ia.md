@@ -1384,6 +1384,20 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Descartado** | Cerrar la carrera por completo (escribir "sólo si no existe" o una doble invalidación): `IDistributedCache` no ofrece lo primero y la aclaración pide resolver o acotar. Reintentar la invalidación: los reintentos del Worker duran más que la expiración. |
 | **Verificación** | `VersionProgramadaTests` (2) pasa, y falla si se desactiva la comparación con `ValidoHasta` (prueba de mutación). Todas las de Administración pasan (90 unitarias y 37 de integración). En vivo, el puntero aparece en Valkey con TTL de 60 segundos y desaparece solo. |
 
+## **3.93 Despliegue continuo · El job deploy con el ambiente destruido**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 09/11/2026 |
+| **Archivos** | `.github/workflows/ci.yml` (job `deploy`); `infra/terraform/main.tf`, `variables.tf`, `terraform.tfvars.example` y `README.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Al reunir evidencia para el ADR del despliegue, la IA encontró que el job `deploy` fallaba en todos los push a `main` desde el 06/11 con «No subscriptions found». |
+| **Cómo se trabajó** | La IA leyó los registros del CI y encontró la causa: la entidad de servicio tenía el rol asignado con `--scopes` sobre el grupo de recursos, y `terraform destroy` borró el grupo junto con la asignación. Le pedí que lo arreglara. |
+| **Aceptado sin modificaciones** | `azurerm_role_assignment` en Terraform con la variable `ci_principal_id`, para que cada `apply` restaure el permiso. El inicio de sesión con `continue-on-error`: si falla, el job promueve las imágenes, deja un aviso y no despliega, que es lo que ya prometía el README. |
+| **Descartado** | `allow-no-subscriptions` en `azure/login`: no se pudo confirmar si la acción igual intenta seleccionar la suscripción del JSON. Dar el rol sobre toda la suscripción: le da al CI más permiso del necesario. |
+| **Verificación** | `terraform fmt -check` y `terraform validate` pasan; `actionlint` no marca errores nuevos en el workflow. Falta verlo en GitHub Actions (el próximo push a `main` tiene que quedar en verde con el aviso) y el `apply` con `ci_principal_id`. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -1431,3 +1445,4 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.40 | 05/11/2026 | Entrada del cambio del entorno productivo a Azure (3.61) y corrección de la tabla de la entrada 3.59. | Ezequiel Marcenal |
 | 0.41 | 05/11/2026 | Entrada del tablero de observabilidad en producción (3.62). | Ezequiel Marcenal |
 | 0.42 | 08/11/2026 | Registro retrospectivo de las entradas de Cristian Reyes (3.63 a 3.92), del 06/10 al 08/11, y su herramienta en la sección 2. Reconstruido con las conversaciones con el asistente, Git y la documentación de estudio, para revisión del responsable. | Cristian Reyes |
+| 0.43 | 09/11/2026 | Entrada del job de despliegue con el ambiente destruido (3.93). | Ezequiel Marcenal |
