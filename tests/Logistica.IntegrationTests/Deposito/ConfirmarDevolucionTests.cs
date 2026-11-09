@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text.Json;
 using Logistica.IntegrationTests.Identidad;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Logistica.Modules.Ejecucion.Domain.Rendiciones;
@@ -145,6 +146,13 @@ public sealed class ConfirmarDevolucionTests(PostgresApiFactory factory) : IClas
             guardado.Bultos.OrderBy(b => b.Codigo).Select(b => b.Estado));
         Assert.Equal((ResumenEnvio.EntregadoParcialmente, true), (guardado.Resumen, guardado.Terminado));
         Assert.Empty(await db.Incidencias.Where(i => i.EnvioId == envio.Id).ToListAsync());
+
+        // RF 36: el cierre es mixto (los avisos v1 no lo reciben) y sólo el bulto devuelto tiene su evento.
+        var eventos = (await db.Outbox.AsNoTracking().ToListAsync()).Where(m => m.Contenido.Contains(envio.Id.ToString())).ToList();
+        var cierre = JsonSerializer.Deserialize<EnvioDevuelto>(Assert.Single(eventos, m => m.Tipo == EnvioDevuelto.Tipo).Contenido)!;
+        Assert.Equal(2, cierre.BultosEntregados);
+        var bulto = JsonSerializer.Deserialize<BultoDevuelto>(Assert.Single(eventos, m => m.Tipo == BultoDevuelto.Tipo).Contenido)!;
+        Assert.Equal((devuelto.Codigo, "Devuelto"), (bulto.CodigoBulto, bulto.EstadoEnvio));
     }
 
     [Fact]

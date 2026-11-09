@@ -10,6 +10,8 @@ public sealed class NuevaSuscripcionFormulario : IValidatableObject
     public bool CambioDeEstado { get; set; }
     public bool EntregaFallida { get; set; }
     public bool Devolucion { get; set; }
+    // RF 36: con los eventos de cada bulto, la suscripción es v2.
+    public bool EventosDeBulto { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -27,6 +29,6 @@ public sealed class NuevaSuscripcionFormulario : IValidatableObject
         if (CambioDeEstado) tipos.Add("CambioDeEstado");
         if (EntregaFallida) tipos.Add("EntregaFallida");
         if (Devolucion) tipos.Add("Devolucion");
-        return new(UrlDestino.Trim(), tipos);
+        return new(UrlDestino.Trim(), tipos, EventosDeBulto ? 2 : 1);
     }
 }

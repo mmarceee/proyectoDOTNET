@@ -700,6 +700,14 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | **Flujos alternativos** | **A1 · El receptor falla o no responde (paso 5).** Respuesta distinta de 2xx o sin respuesta en 10 segundos. El Worker reintenta con espera creciente.<br><br>**A2 · Se agotan los reintentos (paso 5).** La entrega pasa a *En cola de fallidos*.<br><br>**A3 · El receptor vuelve a estar disponible.** Los avisos pendientes de reintento se entregan; los que ya estaban en la cola de fallidos se recuperan reenviándolos (CU-65). |
 | **Requerimientos especiales** | 1. Cada aviso lleva un identificador único, para que el receptor pueda descartar duplicados.<br>2. El orden de llegada no está garantizado; cada aviso incluye la fecha del evento.<br>3. **Receptor de prueba** provisto por el equipo, con escenarios de falla (sección 6.9). Es el escenario 6 de la defensa. |
 
+**Avisos versionados por la entrega parcial (RF 36, 09/11/2026, Ezequiel Marcenal):**
+
+* La suscripción tiene una versión, que el comercio elige al crearla (CU-63) y no cambia. Las existentes quedan en **v1**. Para pasar a **v2**, el comercio crea otra suscripción y desactiva la anterior.
+* Envíos publica, además de los eventos del envío, un evento por bulto: `BultoEntregado` y `BultoNoEntregado` en la visita, y `BultoDevuelto` cuando el comercio recibe el bulto devuelto (CU-31). `BultoExtraviado` no existe todavía: el extravío sigue siendo del envío entero (pendiente 4 de la decisión).
+* **v1** recibe lo mismo que antes, con el mismo contenido byte a byte. No recibe los hechos de bulto ni valores nuevos. `EnvioEntregado` se publica sólo con todos los bultos del envío entregados. Una devolución con bultos ya entregados (cierre mixto) tampoco llega a v1, porque *Devuelto* le haría creer que no se entregó nada. Para verlo, el comercio pasa a v2.
+* **v2** recibe todo lo de v1 y los hechos de bulto. El contenido suma `version` y `bulto` (código de etiqueta, estado y motivo). Un hecho de bulto se clasifica por el estado del bulto: un bulto en devolución es *Devolución* aunque el envío siga *Reprogramado* por otro bulto.
+* La entrega guarda su versión y su bulto: los reintentos y los reenvíos (CU-65) mandan el mismo cuerpo, con la misma firma `v1=`. El contrato está en [integracion-cu64.md](cu-63/integracion-cu64.md#mensaje-v2-rf-36).
+
 ### **CU-65 · Consultar el historial de avisos y reenviar los fallidos**
 
 | Campo | Contenido |
@@ -871,3 +879,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 2.1 | 07/11/2026 | CU-60: ampliación por RF 35 (avance de la entrega por bulto); se resume la ampliación de RF 33 en CU-06. | Cristian Reyes |
 | 2.2 | 07/11/2026 | CU-06: registro del recargo de cada visita adicional (RF 33). | Cristian Reyes |
 | 2.3 | 09/11/2026 | CU-31: la devolución de un envío entregado en parte tiene sólo los bultos que vuelven. CU-55: T4 para los envíos que no salieron. | Ezequiel Marcenal |
+| 2.4 | 09/11/2026 | CU-64: avisos versionados v1 y v2 con los eventos de bulto (RF 36). | Ezequiel Marcenal |

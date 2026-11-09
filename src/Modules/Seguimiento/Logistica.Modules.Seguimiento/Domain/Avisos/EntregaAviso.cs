@@ -20,12 +20,21 @@ internal sealed class EntregaAviso : Entity, IOperadorOwned, IComercioOwned
     public DateTimeOffset FechaEvento { get; private set; }
     public EstadoEntregaAviso Estado { get; private set; }
     public bool EsPrueba { get; private set; }
+    // RF 36: la versión de la suscripción al preparar el aviso y, en v2, el bulto del hecho. Se guardan con la entrega
+    // para que los reintentos y los reenvíos manden el mismo contenido, aunque la suscripción cambie después.
+    public int Version { get; private set; } = SuscripcionAviso.VersionInicial;
+    public string? CodigoBulto { get; private set; }
+    public string? EstadoBulto { get; private set; }
+    public string? MotivoBulto { get; private set; }
     public IReadOnlyCollection<IntentoAviso> Intentos => _intentos.AsReadOnly();
+
+    public BultoAviso? Bulto => CodigoBulto is null ? null : new(CodigoBulto, EstadoBulto!, MotivoBulto);
 
     private EntregaAviso() { }
 
     public static EntregaAviso Crear(SuscripcionAviso suscripcion, Guid eventoId, EnvioSeguido envio,
-        string estadoEnvio, TipoEventoAviso tipo, DateTimeOffset fechaEvento, bool esPrueba = false)
+        string estadoEnvio, TipoEventoAviso tipo, DateTimeOffset fechaEvento, bool esPrueba = false,
+        BultoAviso? bulto = null)
     {
         if (eventoId == Guid.Empty || string.IsNullOrWhiteSpace(estadoEnvio))
             throw new DomainException("La entrega del aviso necesita el evento y el estado del envío.");
@@ -33,6 +42,12 @@ internal sealed class EntregaAviso : Entity, IOperadorOwned, IComercioOwned
             throw new DomainException("La suscripción no pertenece al comercio del envío.");
         if (!suscripcion.Recibe(tipo))
             throw new DomainException("La suscripción no recibe este tipo de evento.");
+        if (bulto is not null && suscripcion.Version < SuscripcionAviso.VersionConBultos)
+            throw new DomainException("Una suscripción v1 no recibe avisos de bulto.");
+        if (bulto is not null && (string.IsNullOrWhiteSpace(bulto.Codigo) || string.IsNullOrWhiteSpace(bulto.Estado)
+            || bulto.Codigo.Length > BultoAviso.LargoCodigo || bulto.Estado.Length > BultoAviso.LargoEstado
+            || bulto.Motivo?.Length > BultoAviso.LargoMotivo))
+            throw new DomainException("El bulto del aviso necesita un código y un estado válidos.");
 
         return new()
         {
@@ -47,6 +62,10 @@ internal sealed class EntregaAviso : Entity, IOperadorOwned, IComercioOwned
             FechaEvento = fechaEvento,
             Estado = EstadoEntregaAviso.Pendiente,
             EsPrueba = esPrueba,
+            Version = suscripcion.Version,
+            CodigoBulto = bulto?.Codigo,
+            EstadoBulto = bulto?.Estado,
+            MotivoBulto = bulto?.Motivo,
         };
     }
 

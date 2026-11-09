@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptada: decisión funcional cerrada. Implementación pendiente.** |
-| Versión y fecha | 1.2 · 03/11/2026 |
+| Versión y fecha | 1.3 · 09/11/2026 (pendiente 6 resuelto) |
 | Responsable del registro | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas en este intercambio. No registra firmas ni aprobaciones individuales adicionales. |
@@ -98,7 +98,13 @@ La decisión funcional anterior está cerrada. **No equivale a declarar terminad
    - **Datos.** La migración `EntregaParcialBultos` copia a cada bulto el estado de su envío y sus intentos fallidos, y conserva las recepciones parciales ya escaneadas. No inventa historial por bulto.
    - **Operaciones sin conexión antiguas.** Una entrega o un intento fallido por envío que llegue desde la cola de la PWA se traduce a una visita con el mismo resultado para todos los bultos del envío, que es lo que significaban antes de RF 31. Si algún bulto ya no está en tránsito, la operación se rechaza como cualquier visita, sin inventar un resultado (ADR-0004, sección 2.11).
    - **PWA.** La versión nueva envía sólo visitas (Lucas).
-6. Avisos v1/v2: eventos, selección de versión, traducción compatible para v1, firma del payload, reintentos y reenvíos con la misma versión. Un receptor v1 no debe recibir enums desconocidos ni darse por enterado de una entrega completa que no ocurrió.
+6. ~~Avisos v1/v2: eventos, selección de versión, traducción compatible para v1, firma del payload, reintentos y reenvíos con la misma versión. Un receptor v1 no debe recibir enums desconocidos ni darse por enterado de una entrega completa que no ocurrió.~~ **Resuelto el 09/11/2026 (RF 36):**
+   - La versión es de la suscripción, se elige al crearla y no cambia; las existentes son v1.
+   - Envíos publica `BultoEntregado`, `BultoNoEntregado` y `BultoDevuelto`, sólo para v2. `BultoExtraviado` espera el extravío individual (pendiente 4).
+   - v1 recibe el mismo contenido de siempre, sin valores nuevos. `EnvioEntregado` sale sólo con todos los bultos entregados.
+   - **Cierre mixto** (devuelto con bultos ya entregados): v1 no lo recibe, para no darle un estado final falso. Para verlo, el comercio pasa a v2.
+   - La entrega guarda versión y bulto: reintentos y reenvíos mandan el mismo cuerpo, con la misma firma.
+   - Contrato en [integracion-cu64.md](cu-63/integracion-cu64.md#mensaje-v2-rf-36).
 7. Invalidación de seguimiento y actualización del tablero por cambios de bulto, incluso cuando el resumen siga siendo Entregado parcialmente (por ejemplo, de 1/3 a 2/3).
 8. Migración de consultas y consumidores que hoy deciden por EstadoEnvio: retirar esa dependencia de las decisiones operativas. Actualizar dominio, casos de uso y ADR-0004/0006 con la implementación real.
 

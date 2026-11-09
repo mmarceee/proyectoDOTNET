@@ -18,6 +18,11 @@ internal sealed class EntregaAvisoConfiguration : IEntityTypeConfiguration<Entre
         b.Property(e => e.EstadoEnvio).HasMaxLength(30);
         b.Property(e => e.Tipo).HasConversion<string>().HasMaxLength(30);
         b.Property(e => e.Estado).HasConversion<string>().HasMaxLength(30);
+        // RF 36: el bulto de un aviso v2. La migración deja en v1 las suscripciones y entregas anteriores.
+        b.Property(e => e.CodigoBulto).HasMaxLength(BultoAviso.LargoCodigo);
+        b.Property(e => e.EstadoBulto).HasMaxLength(BultoAviso.LargoEstado);
+        b.Property(e => e.MotivoBulto).HasMaxLength(BultoAviso.LargoMotivo);
+        b.Ignore(e => e.Bulto);
         b.HasMany(e => e.Intentos).WithOne().HasForeignKey(i => i.EntregaAvisoId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(e => e.Intentos).UsePropertyAccessMode(PropertyAccessMode.Field);
     }

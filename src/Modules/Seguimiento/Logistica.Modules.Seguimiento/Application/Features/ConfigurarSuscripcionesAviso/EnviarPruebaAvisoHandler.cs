@@ -24,7 +24,9 @@ internal sealed class EnviarPruebaAvisoHandler(ISuscripcionesAvisoRepository sus
             TipoEventoAviso.Devolucion => "EnDevolucion",
             _ => "Admitido"
         };
-        var mensaje = new MensajeAviso(Guid.CreateVersion7(), tipo.ToString(), reloj.GetUtcNow(), "PRUEBA", estado, true);
+        // RF 36: la prueba llega con la forma de la versión de la suscripción, sin bulto.
+        var mensaje = new MensajeAviso(Guid.CreateVersion7(), tipo.ToString(), reloj.GetUtcNow(), "PRUEBA", estado, true,
+            suscripcion.Version);
         var secreto = secretos.Descifrar(suscripcion.SecretoFirma, operador, comercio);
         var resultado = await emisor.EnviarAsync(suscripcion.UrlDestino, secreto, mensaje, ct);
         return new(mensaje.Id, resultado.Exitosa, resultado.CodigoRespuesta, resultado.Error);

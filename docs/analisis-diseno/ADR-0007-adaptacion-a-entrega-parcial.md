@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptado como decisión de diseño. Implementación y evaluación retrospectiva pendientes.** |
-| Versión y fecha | 1.6 · 09/11/2026 |
+| Versión y fecha | 1.7 · 09/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | `586f630` (CU-42) |
@@ -46,7 +46,7 @@ Administración incorpora las reglas RF 33 a versiones por operador; el envío c
 
 Se mantienen tenant de sesión/mensaje, filtros e interceptor del ADR-0002. La pertenencia de cada BultoId debe comprobarse contra operador, comercio cuando corresponda, envío y visita/ruta. Los datos de dispositivo no fijan el tenant ni pueden trasladar evidencia a otro envío.
 
-Seguimiento preserva el token público y no expone identificadores internos. Su caché sigue separado por operador (ADR-0006) y se invalida también cuando cambia el progreso por bulto. Los avisos v2 incorporan eventos de bulto; v1 mantiene semántica compatible, sin nuevos valores inesperados ni falsas entregas completas. Payload, firma y versión deben ser reproducibles en reintentos y reenvíos; el contrato detallado continúa pendiente con su responsable.
+Seguimiento preserva el token público y no expone identificadores internos. Su caché sigue separado por operador (ADR-0006) y se invalida también cuando cambia el progreso por bulto. Los avisos v2 incorporan eventos de bulto; v1 mantiene semántica compatible, sin nuevos valores inesperados ni falsas entregas completas. Payload, firma y versión deben ser reproducibles en reintentos y reenvíos. El contrato se especificó e implementó el 09/11 (RF 36): la versión es de la suscripción y la entrega la conserva; ver el [contrato de avisos](cu-63/integracion-cu64.md#mensaje-v2-rf-36).
 
 ### 2.4 Adaptación incremental y alcance por componente
 
@@ -113,7 +113,7 @@ Quedan por especificar los puntos enumerados en la sección 6 de [decisiones de 
 | Rutas y depósito | Sólo pendientes elegibles se reasignan; no hay doble reserva activa por bulto; recepción y rendición preservan custodia y estados. | Parcial al 09/11: la recepción cambia cada bulto y recalcula el resumen (`RecibirBultoTests`); la devolución al comercio tiene sólo los bultos que vuelven, y la rendición devuelve al depósito (T4) lo que no salió (`ConfirmarDevolucionTests` y `ConfirmarRendicionTests`). Falta que carga, hoja de ruta y rendición del repartidor usen el estado del bulto (contrato `BultoParaCarga`, con Lucas) y la devolución de un bulto suelto (pendiente 2 de la decisión). |
 | Aislamiento | IDs/evidencia ajenos no acceden ni escriben entre operadores o comercios. | Pendiente sobre los contratos nuevos. |
 | Migración/formatos antiguos | Historial preservado y operaciones pendientes tratadas sin inventar resultados ambiguos. | Migración `EntregaParcialBultos` y traducción de las operaciones antiguas a visita, con sus pruebas (`VisitaPorBultoTests`, 03/11). Falta la PWA nueva. |
-| Compatibilidad y caché | Receptor v1 compatible, v2 recibe resultados por bulto; pasar de 1/3 a 2/3 actualiza seguimiento aunque el resumen no cambie. | Pendiente. |
+| Compatibilidad y caché | Receptor v1 compatible, v2 recibe resultados por bulto; pasar de 1/3 a 2/3 actualiza seguimiento aunque el resumen no cambie. | Avisos verificados el 09/11 (RF 36): una suscripción v1 recibe el mismo contenido byte a byte, sin hechos de bulto ni el cierre mixto, y nunca una entrega completa que no ocurrió; una v2 recibe además `BultoEntregado`, `BultoNoEntregado` y `BultoDevuelto`, con el mismo cuerpo y firma en reintentos y reenvíos (`AvisosVersionadosTests`, `EntregarAvisosTests` y `EventosDeBultoTests`). El seguimiento público también se invalida con los eventos de bulto (`InvalidarSeguimiento`); falta verificar de punta a punta el paso de 1/3 a 2/3 y el tablero (pendiente 7). |
 | Escenario docente | Tres bultos: dos entregados offline, uno con motivo; sincronizar, comprobar backoffice/público/aviso y reenviar sin duplicados. | Pendiente, objetivo 12/11. |
 
 ### 4.5 Retrospectiva obligatoria de la implementación
@@ -144,3 +144,4 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | 1.4 | 06/11/2026 | Sección 4.4: la atomicidad por visita queda implementada en el servidor, con sus pruebas. Sección 2.2: las operaciones offline antiguas ya están especificadas en el ADR-0004. | Ezequiel Marcenal |
 | 1.5 | 09/11/2026 | Sección 4.4: reenvío idempotente de la visita verificado en el servidor, y atomicidad ante un rechazo al registrar la visita. | Ezequiel Marcenal |
 | 1.6 | 09/11/2026 | Sección 4.4: estado de rutas y depósito (recepción, devolución por bulto y T4 en la rendición). | Ezequiel Marcenal |
+| 1.7 | 09/11/2026 | Secciones 2.3 y 4.4: avisos v1 y v2 con los eventos de bulto (RF 36), especificados e implementados. | Ezequiel Marcenal |

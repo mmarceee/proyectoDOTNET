@@ -12,11 +12,16 @@ internal sealed class PrepararAvisosHandler(EnviosSeguidos envios, ISuscripcione
     public async Task HandleAsync(HechoEnvio hecho, CancellationToken ct)
     {
         var envio = await envios.ObtenerOCrearAsync(hecho, ct);
-        var tipo = ClasificadorAvisos.Clasificar(hecho.EstadoEnvio, hecho.IntentoFallido);
+        // Un hecho de bulto se clasifica por el estado del bulto: un bulto en devolución es Devolucion aunque el envío
+        // siga Reprogramado por otro bulto.
+        var tipo = ClasificadorAvisos.Clasificar(hecho.Bulto?.Estado ?? hecho.EstadoEnvio, hecho.IntentoFallido);
         foreach (var suscripcion in await suscripciones.ListarActivasAsync(envio.ComercioId, ct))
         {
-            if (!suscripcion.Recibe(tipo) || await entregas.ExisteAsync(hecho.EventoId, suscripcion.Id, ct)) continue;
-            var entrega = EntregaAviso.Crear(suscripcion, hecho.EventoId, envio, hecho.EstadoEnvio, tipo, hecho.FechaEvento, hecho.EsPrueba);
+            // RF 36: cada suscripción recibe los hechos de su versión.
+            if (!suscripcion.Recibe(tipo, hecho.Bulto is not null, hecho.CierreMixto)
+                || await entregas.ExisteAsync(hecho.EventoId, suscripcion.Id, ct)) continue;
+            var entrega = EntregaAviso.Crear(suscripcion, hecho.EventoId, envio, hecho.EstadoEnvio, tipo, hecho.FechaEvento,
+                hecho.EsPrueba, hecho.Bulto);
             entregas.Agregar(entrega);
             eventos.Registrar(AvisoPendiente.Tipo, new AvisoPendiente(entrega.Id), hecho.FechaEvento);
         }

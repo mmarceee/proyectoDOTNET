@@ -6,6 +6,8 @@ using Logistica.Modules.Envios.Domain.Devoluciones;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Domain.Incidencias;
 using Logistica.SharedKernel;
+using BultoDevuelto = Logistica.Modules.Envios.Contracts.Results.BultoDevuelto;
+using EventoBultoDevuelto = Logistica.Modules.Envios.Contracts.Events.BultoDevuelto;
 
 namespace Logistica.Modules.Envios.Application;
 
@@ -135,23 +137,43 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
                 envios.Agregar(Devolucion.Crear(envio, $"Intento fallido: {motivo.Codigo}.", visita.OcurridoEn));
             }
 
-            // Avisos v1 (pendiente 6): EnvioEntregado sólo si se entregaron todos los bultos; si quedó alguno, el intento
-            // fallido. Un comercio v1 nunca recibe una entrega completa que no ocurrió.
-            if (intentos.All(i => i.Resultado == ResultadoIntento.Exitoso))
+            // Avisos v1 (RF 36): EnvioEntregado sólo si el envío tiene todos sus bultos entregados, no sólo los de esta
+            // visita (uno pudo quedar en devolución en una visita anterior). Un comercio v1 nunca recibe una entrega
+            // completa que no ocurrió. Con pendientes, el intento fallido, como antes.
+            if (envio.Bultos.All(b => b.Estado == EstadoEnvio.Entregado))
             {
                 var entregadoEn = envio.Eventos[^1].OcurridoEn;
                 eventos.Registrar(EnvioEntregado.Tipo,
                     new EnvioEntregado(envio.Id, envio.Numero, entregadoEn, visita.ResponsableId, visita.RepartidorId), entregadoEn);
             }
-            else
+
+            foreach (var fallido in intentos.Where(i => i.Resultado == ResultadoIntento.Fallido))
             {
-                foreach (var fallido in intentos.Where(i => i.Resultado == ResultadoIntento.Fallido))
+                eventos.Registrar(IntentoFallidoRegistrado.Tipo,
+                    new IntentoFallidoRegistrado(envio.Id, envio.Numero, fallido.NumeroIntento,
+                        motivos[fallido.MotivoNoEntregaId!.Value].Codigo, envio.Estado.ToString(), fallido.FechaHora,
+                        envio.ReintentoDesde, visita.RepartidorId),
+                    fallido.FechaHora);
+            }
+
+            // Avisos v2 (RF 36): el resultado de cada bulto, además de los eventos del envío.
+            var estadoEnvio = envio.Estado.ToString();
+            foreach (var resultado in visita.Resultados)
+            {
+                var bulto = envio.Bultos.Single(b => b.Id == resultado.BultoId);
+                if (resultado.MotivoId is Guid motivoId)
                 {
-                    eventos.Registrar(IntentoFallidoRegistrado.Tipo,
-                        new IntentoFallidoRegistrado(envio.Id, envio.Numero, fallido.NumeroIntento,
-                            motivos[fallido.MotivoNoEntregaId!.Value].Codigo, envio.Estado.ToString(), fallido.FechaHora,
-                            envio.ReintentoDesde, visita.RepartidorId),
-                        fallido.FechaHora);
+                    eventos.Registrar(BultoNoEntregado.Tipo,
+                        new BultoNoEntregado(envio.Id, envio.Numero, bulto.Codigo, motivos[motivoId].Codigo,
+                            bulto.Estado.ToString(), estadoEnvio, visita.OcurridoEn, visita.RepartidorId),
+                        visita.OcurridoEn);
+                }
+                else
+                {
+                    eventos.Registrar(BultoEntregado.Tipo,
+                        new BultoEntregado(envio.Id, envio.Numero, bulto.Codigo, estadoEnvio, visita.OcurridoEn,
+                            visita.RepartidorId),
+                        visita.OcurridoEn);
                 }
             }
 
@@ -455,7 +477,14 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
                 $"Devolución entregada al comercio sin los bultos: {string.Join(", ", faltantes)}.", ahora));
         }
 
-        eventos.Registrar(EnvioDevuelto.Tipo, new EnvioDevuelto(envio.Id, envio.Numero, ahora, confirmacion.ResponsableId), ahora);
+        // RF 36: con bultos ya entregados el cierre es mixto; el evento lo indica para que los avisos v1 no lo reciban.
+        eventos.Registrar(EnvioDevuelto.Tipo,
+            new EnvioDevuelto(envio.Id, envio.Numero, ahora, confirmacion.ResponsableId, envio.BultosEntregados), ahora);
+        foreach (var bulto in enDevolucion.Where(b => entregados.Contains(b.Id)).OrderBy(b => b.Codigo))
+        {
+            eventos.Registrar(EventoBultoDevuelto.Tipo,
+                new EventoBultoDevuelto(envio.Id, envio.Numero, bulto.Codigo, envio.Estado.ToString(), ahora), ahora);
+        }
         await envios.GuardarCambiosAsync(ct);
     }
 }

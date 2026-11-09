@@ -177,13 +177,33 @@ public sealed class SuscripcionesAvisoApiTests(PostgresApiFactory factory) : ICl
             "{\"urlDestino\":\"http://comercio.example/avisos\",\"tiposEvento\":[\"CambioDeEstado\"]}",
             "{\"urlDestino\":\"https://comercio.example/avisos\",\"tiposEvento\":[\"Desconocido\"]}",
             "{\"urlDestino\":\"https://comercio.example/avisos\",\"tiposEvento\":[\"0\"]}",
-            "{\"urlDestino\":\"https://comercio.example/avisos\",\"tiposEvento\":[null]}"
+            "{\"urlDestino\":\"https://comercio.example/avisos\",\"tiposEvento\":[null]}",
+            // RF 36: sólo las versiones 1 y 2.
+            "{\"urlDestino\":\"https://comercio.example/avisos\",\"tiposEvento\":[\"CambioDeEstado\"],\"version\":3}",
+            "{\"urlDestino\":\"https://comercio.example/avisos\",\"tiposEvento\":[\"CambioDeEstado\"],\"version\":0}"
         })
         {
             using var respuesta = await client.PostAsync(Ruta, new StringContent(json, Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
         }
         Assert.Equal(cantidad, await db.SuscripcionesAviso.CountAsync());
+    }
+
+    // RF 36: la versión se elige al crear y se consulta; sin indicarla, la suscripción es v1, como las anteriores.
+    [Fact]
+    public async Task La_version_se_elige_al_crear_y_por_omision_es_1()
+    {
+        using var api = CrearApi();
+        using var client = api.CreateClient(Sesion.Opciones);
+        await IngresarAsync(client);
+
+        var v1 = await CrearAsync(client);
+        using var alta = await client.PostAsJsonAsync(Ruta, Solicitud() with { Version = 2 });
+        Assert.Equal(HttpStatusCode.Created, alta.StatusCode);
+        var v2 = (await alta.Content.ReadFromJsonAsync<SecretoSuscripcionAvisoResponse>())!;
+
+        Assert.Equal(1, (await client.GetFromJsonAsync<SuscripcionAvisoResponse>($"{Ruta}/{v1.Id}"))!.Version);
+        Assert.Equal(2, (await client.GetFromJsonAsync<SuscripcionAvisoResponse>($"{Ruta}/{v2.Id}"))!.Version);
     }
 
     [Fact]

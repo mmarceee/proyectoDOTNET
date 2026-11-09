@@ -305,6 +305,107 @@ public sealed class EntregarAvisosTests(PostgresApiFactory factory, RabbitMqFixt
         finally { await worker.StopAsync(); }
     }
 
+    // RF 36, compatibilidad: con un cierre mixto (un bulto entregado y otro devuelto), la suscripción v1 recibe sólo los
+    // hechos del envío que ya recibía y ningún estado final falso; la v2 recibe además cada bulto y el cierre.
+    [Fact]
+    public async Task Una_suscripcion_v1_no_recibe_bultos_ni_el_cierre_mixto_y_una_v2_recibe_todo()
+    {
+        using var api = CrearApi(new Receptor());
+        var (operador, comercio, envio) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var v1 = await SuscribirAsync(api.Services, operador, comercio, TipoEventoAviso.CambioDeEstado);
+        var v2 = await SuscribirAsync(api.Services, operador, comercio, SuscripcionAviso.VersionConBultos,
+            TipoEventoAviso.CambioDeEstado);
+        var devoluciones = await SuscribirAsync(api.Services, operador, comercio, SuscripcionAviso.VersionConBultos,
+            TipoEventoAviso.Devolucion);
+        const string numero = "ENV-RF36-A";
+        // El alta y la visita: el bulto 1 se entrega y el 2 se devuelve; el envío queda EnDevolucion. Después, el cierre.
+        var hechos = new[]
+        {
+            Mensaje(EnvioAdmitido.Tipo, new EnvioAdmitido(envio, numero, Ahora), operador, comercio),
+            Mensaje(BultoEntregado.Tipo, new BultoEntregado(envio, numero, $"{numero}-1", "EnDevolucion", Ahora), operador, null),
+            Mensaje(BultoNoEntregado.Tipo, new BultoNoEntregado(envio, numero, $"{numero}-2", "RECHAZADO", "EnDevolucion",
+                "EnDevolucion", Ahora), operador, null),
+            Mensaje(IntentoFallidoRegistrado.Tipo, new IntentoFallidoRegistrado(envio, numero, 1, "RECHAZADO", "EnDevolucion",
+                Ahora, null), operador, null),
+            Mensaje(EnvioDevuelto.Tipo, new EnvioDevuelto(envio, numero, Ahora, null, BultosEntregados: 1), operador, null),
+            Mensaje(BultoDevuelto.Tipo, new BultoDevuelto(envio, numero, $"{numero}-2", "Devuelto", Ahora), operador, null),
+        };
+        foreach (var hecho in hechos)
+        {
+            await ProcesarAsync(api.Services, PrepararAvisos.Cola(hecho.Tipo), hecho);
+        }
+
+        await using var scope = api.Services.CreateAsyncScope();
+        await using var db = Contexto(scope, operador, null);
+        var entregas = await db.EntregasAviso.AsNoTracking().Where(e => e.EnvioId == envio).ToListAsync();
+        var orden = hechos.Select((h, i) => (h.Id, i)).ToDictionary(x => x.Id, x => x.i);
+        string Hechos(Suscrita s) => string.Join(" | ", entregas.Where(e => e.SuscripcionAvisoId == s.Suscripcion.Id)
+            .OrderBy(e => orden[e.EventoId]).Select(e => $"{e.Tipo}:{e.EstadoEnvio}:{e.CodigoBulto}:{e.EstadoBulto}:{e.Version}"));
+
+        Assert.Equal("CambioDeEstado:Admitido:::1 | Devolucion:EnDevolucion:::1", Hechos(v1));
+        Assert.Equal("CambioDeEstado:Admitido:::2 | CambioDeEstado:EnDevolucion:ENV-RF36-A-1:Entregado:2"
+            + " | Devolucion:EnDevolucion:ENV-RF36-A-2:EnDevolucion:2 | Devolucion:EnDevolucion:::2"
+            + " | Devolucion:Devuelto:::2 | Devolucion:Devuelto:ENV-RF36-A-2:Devuelto:2", Hechos(v2));
+        // Por tipo: el bulto entregado no es una devolución, aunque el envío esté EnDevolucion.
+        Assert.Equal("Devolucion:EnDevolucion:ENV-RF36-A-2:EnDevolucion:2 | Devolucion:EnDevolucion:::2"
+            + " | Devolucion:Devuelto:::2 | Devolucion:Devuelto:ENV-RF36-A-2:Devuelto:2", Hechos(devoluciones));
+        Assert.Equal("RECHAZADO", entregas.Single(e => e.SuscripcionAvisoId == v2.Suscripcion.Id && e.EstadoBulto == "EnDevolucion").MotivoBulto);
+    }
+
+    // RF 36: el aviso v2 llega con la versión y el bulto, firmado igual que v1, y los reintentos y el reenvío manual
+    // mandan exactamente el mismo cuerpo. El v1 del mismo envío no trae los campos nuevos.
+    [Fact]
+    public async Task Un_aviso_v2_conserva_cuerpo_y_firma_en_reintentos_y_reenvios_y_el_v1_no_cambia()
+    {
+        var receptor = new Receptor(500, 503, 200, 200);
+        using var api = CrearApi(receptor);
+        var (operador, comercio, envio) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var v1 = await SuscribirAsync(api.Services, operador, comercio, TipoEventoAviso.CambioDeEstado);
+        var v2 = await SuscribirAsync(api.Services, operador, comercio, SuscripcionAviso.VersionConBultos,
+            TipoEventoAviso.EntregaFallida);
+        await ProcesarAsync(api.Services, PrepararAvisos.Cola(EnvioAdmitido.Tipo),
+            Mensaje(EnvioAdmitido.Tipo, new EnvioAdmitido(envio, "ENV-RF36-B", Ahora), operador, comercio));
+        var fallo = Mensaje(BultoNoEntregado.Tipo, new BultoNoEntregado(envio, "ENV-RF36-B", "ENV-RF36-B-1", "AUSENTE",
+            "Reprogramado", "Reprogramado", Ahora), operador, null);
+        await ProcesarAsync(api.Services, PrepararAvisos.Cola(BultoNoEntregado.Tipo), fallo);
+        Guid deV2, deV1;
+        await using (var scope = api.Services.CreateAsyncScope())
+        {
+            await using var db = Contexto(scope, operador, null);
+            deV2 = (await db.EntregasAviso.SingleAsync(e => e.SuscripcionAvisoId == v2.Suscripcion.Id)).Id;
+            deV1 = (await db.EntregasAviso.SingleAsync(e => e.SuscripcionAvisoId == v1.Suscripcion.Id)).Id;
+        }
+
+        // Intento con 500, último reintento con 503 (cola de fallidos) y reenvío manual (CU-65) con 200.
+        var aviso = Mensaje(AvisoPendiente.Tipo, new AvisoPendiente(deV2), operador, null);
+        await Assert.ThrowsAsync<AvisoNoEntregadoException>(() => ProcesarAsync(api.Services, EntregarAviso.Cola, aviso));
+        await Assert.ThrowsAsync<AvisoNoEntregadoException>(() => ProcesarAsync(api.Services, EntregarAviso.Cola,
+            aviso with { Intento = RabbitMqTransport.Esperas.Length }));
+        Assert.Equal(EstadoEntregaAviso.EnColaDeFallidos, (await LeerEntregaAsync(api.Services, operador, deV2)).Estado);
+        await ProcesarAsync(api.Services, EntregarAviso.Cola, Mensaje(AvisoPendiente.Tipo, new AvisoPendiente(deV2), operador, null));
+        await ProcesarAsync(api.Services, EntregarAviso.Cola, Mensaje(AvisoPendiente.Tipo, new AvisoPendiente(deV1), operador, null));
+
+        Assert.Equal(EstadoEntregaAviso.Exitosa, (await LeerEntregaAsync(api.Services, operador, deV2)).Estado);
+        var deLaV2 = receptor.Recibidos.Where(r => r.Id == deV2).ToList();
+        Assert.Equal(3, deLaV2.Count);
+        Assert.All(deLaV2, r =>
+        {
+            r.Verificar(v2.Secreto);
+            Assert.Equal(deLaV2[0].Cuerpo, r.Cuerpo);
+        });
+        var json = deLaV2[0].Json;
+        Assert.Equal(2, json.GetProperty("version").GetInt32());
+        Assert.Equal(("EntregaFallida", "Reprogramado"), (json.GetProperty("tipo").GetString(), json.GetProperty("estado").GetString()));
+        var bulto = json.GetProperty("bulto");
+        Assert.Equal(("ENV-RF36-B-1", "Reprogramado", "AUSENTE"), (bulto.GetProperty("codigo").GetString(),
+            bulto.GetProperty("estado").GetString(), bulto.GetProperty("motivo").GetString()));
+
+        var deLaV1 = Assert.Single(receptor.Recibidos, r => r.Id == deV1);
+        deLaV1.Verificar(v1.Secreto);
+        Assert.Equal(["id", "tipo", "fechaEvento", "numeroEnvio", "estado", "prueba"],
+            deLaV1.Json.EnumerateObject().Select(p => p.Name));
+    }
+
     private WebApplicationFactory<Program> CrearApi(Receptor receptor) =>
         factory.WithWebHostBuilder(b => b.UseSetting("Seguimiento:Avisos:ClaveCifrado", Clave)
             .ConfigureServices(s => s.AddHttpClient<IEmisorAvisos, EmisorAvisosHttp>()
@@ -332,14 +433,17 @@ public sealed class EntregarAvisosTests(PostgresApiFactory factory, RabbitMqFixt
 
     private sealed record Suscrita(SuscripcionAviso Suscripcion, string Secreto);
 
+    private static Task<Suscrita> SuscribirAsync(IServiceProvider services, Guid operador, Guid comercio,
+        params TipoEventoAviso[] tipos) => SuscribirAsync(services, operador, comercio, SuscripcionAviso.VersionInicial, tipos);
+
     private static async Task<Suscrita> SuscribirAsync(IServiceProvider services, Guid operador, Guid comercio,
-        params TipoEventoAviso[] tipos)
+        int version, params TipoEventoAviso[] tipos)
     {
         await using var scope = services.CreateAsyncScope();
         var secretos = scope.ServiceProvider.GetRequiredService<ISecretosAviso>();
         var secreto = secretos.Generar();
         var suscripcion = SuscripcionAviso.Crear(operador, comercio, Guid.NewGuid(), "https://comercio.example/avisos",
-            tipos, secretos.Cifrar(secreto, operador, comercio));
+            tipos, secretos.Cifrar(secreto, operador, comercio), version);
         await using var db = Contexto(scope, operador, comercio);
         db.SuscripcionesAviso.Add(suscripcion);
         await db.SaveChangesAsync();
