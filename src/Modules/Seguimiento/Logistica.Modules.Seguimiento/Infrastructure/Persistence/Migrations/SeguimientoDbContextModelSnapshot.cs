@@ -99,6 +99,10 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CodigoBulto")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
                     b.Property<Guid>("ComercioId")
                         .HasColumnType("uuid");
 
@@ -113,6 +117,10 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<string>("EstadoBulto")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<string>("EstadoEnvio")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -123,6 +131,10 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("FechaEvento")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MotivoBulto")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("NumeroEnvio")
                         .IsRequired()
@@ -139,6 +151,9 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -255,6 +270,9 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.Property<string>("UrlDestino")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 

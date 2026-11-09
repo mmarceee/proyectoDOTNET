@@ -56,6 +56,14 @@ public interface IEnviosModuleApi
     // CU-55 (T8): los envíos que salieron y no llegaron a intentarse vuelven al depósito, y cada uno publica
     // EnvioReintegradoADeposito por Outbox. Si alguno ya no está EnTransito, lanza una DomainException.
     Task ReintegrarADepositoAsync(IReadOnlyCollection<Guid> envioIds, Guid? responsableId, CancellationToken ct);
+    // CU-55 (T4): los envíos de la ruta que no salieron, porque no se cargaron o se cargaron incompletos, quedan otra vez
+    // en el depósito al cerrar la rendición, y cada uno publica EnvioDesasignadoDeRuta. Se omiten los que ya no están
+    // AsignadoARuta (el despachador pudo quitarlos antes). Devuelve cuántos volvieron.
+    Task<int> ReintegrarNoCargadosAsync(Guid rutaId, IReadOnlyCollection<Guid> envioIds, CancellationToken ct);
+
+    // CU-54 y CU-55 (RF 31): los envíos con todos sus bultos y el estado de cada uno, para armar y confirmar la rendición.
+    // Los que no son del operador actual no vuelven.
+    Task<IReadOnlyList<EnvioParaRendicion>> ConsultarParaRendicionAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
 
     // CU-55, A1: los bultos que tenían que volver en una rendición y no llegaron. Abre una incidencia por envío con sus
     // códigos; el despachador decide si declara el extravío (CU-21).

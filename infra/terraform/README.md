@@ -191,6 +191,9 @@ de la PWA sigue de la API al Worker por la cabecera `traceparent` del mensaje.
 
 ## Historia
 
+La decisión, con sus alternativas y consecuencias, está en el
+[ADR-0008](../../docs/analisis-diseno/ADR-0008-despliegue-e-infraestructura.md).
+
 El primer diseño (03/11/2026) usaba DigitalOcean App Platform con el crédito de estudiante de GitHub. DigitalOcean retiró
 ese beneficio el 01/08/2026, así que el 05/11/2026 el ambiente pasó a Azure for Students, con la misma forma: dos
 componentes administrados con HTTPS, PostgreSQL administrado y Valkey. São Paulo no está entre las regiones permitidas

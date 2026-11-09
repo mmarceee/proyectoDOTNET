@@ -42,7 +42,7 @@ internal static class ConfigurarSuscripcionesAvisoEndpoints
         CrearSuscripcionAvisoRequest request, CrearSuscripcionAvisoHandler handler, CancellationToken ct)
     {
         var tipos = request.TiposEvento.Select(TipoEvento).ToArray();
-        var resultado = await handler.HandleAsync(new(request.UrlDestino, tipos), ct);
+        var resultado = await handler.HandleAsync(new(request.UrlDestino, tipos, request.Version), ct);
         return TypedResults.Created($"{Ruta}/{resultado.Id}", new SecretoSuscripcionAvisoResponse(resultado.Id, resultado.SecretoFirma));
     }
 
@@ -57,7 +57,7 @@ internal static class ConfigurarSuscripcionesAvisoEndpoints
             : TypedResults.NotFound();
 
     private static SuscripcionAvisoResponse Respuesta(SuscripcionAvisoVista s) =>
-        new(s.Id, s.UrlDestino, s.TiposEvento.Select(t => t.ToString()).ToArray(), s.Activa);
+        new(s.Id, s.UrlDestino, s.TiposEvento.Select(t => t.ToString()).ToArray(), s.Activa, s.Version);
 
     private static async Task<Results<Ok<ResultadoPruebaAvisoResponse>, NotFound>> EnviarPruebaAsync(
         Guid id, EnviarPruebaAvisoHandler handler, CancellationToken ct) =>
