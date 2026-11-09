@@ -29,6 +29,12 @@ internal static class LectorHechosEnvio
             raiz.TryGetProperty(nombre, out var valor) && valor.ValueKind == JsonValueKind.String
                 && valor.TryGetDateTimeOffset(out var fecha) ? fecha : null;
 
+        string EstadoDelEnvio() => Texto("EstadoEnvio") is { Length: > 0 } estado
+            ? estado : throw new InvalidDataException("El evento del bulto no tiene el estado del envío.");
+
+        string CodigoBulto() => Texto("CodigoBulto") is { Length: > 0 } codigo
+            ? codigo : throw new InvalidDataException("El evento del bulto no tiene su código.");
+
         HechoEnvio Hecho(string estado, bool intentoFallido = false, bool esAlta = false) =>
             new(mensaje.Id, envioId, Texto("Numero"), estado, intentoFallido, mensaje.OcurridoEn, esAlta);
 
@@ -61,8 +67,26 @@ internal static class LectorHechosEnvio
             EnvioReintegradoADeposito.Tipo => Hecho("EnDeposito"),
             // T2 (CU-30): el depósito recibió el envío.
             EnvioRecibidoEnDeposito.Tipo => Hecho("EnDeposito"),
-            // T15 (CU-31): el comercio recibió el envío devuelto.
-            EnvioDevuelto.Tipo => Hecho("Devuelto"),
+            // T15 (CU-31): el comercio recibió el envío devuelto. Con bultos ya entregados, el cierre es mixto (RF 36).
+            EnvioDevuelto.Tipo => Hecho("Devuelto") with
+            {
+                CierreMixto = raiz.TryGetProperty("BultosEntregados", out var entregados)
+                    && entregados.ValueKind == JsonValueKind.Number && entregados.GetInt32() > 0,
+            },
+            // RF 36: los hechos de cada bulto, sólo para los avisos v2. El estado del hecho es el del envío.
+            BultoEntregado.Tipo => Hecho(EstadoDelEnvio()) with
+            {
+                Bulto = new(CodigoBulto(), "Entregado"),
+                RepartidorId = Identificador("RepartidorId"),
+            },
+            BultoNoEntregado.Tipo => Hecho(EstadoDelEnvio(), intentoFallido: true) with
+            {
+                Bulto = new(CodigoBulto(), Texto("EstadoBulto") is { Length: > 0 } estadoBulto
+                    ? estadoBulto : throw new InvalidDataException("El bulto no entregado no tiene su estado."), Texto("Motivo")),
+                Motivo = Texto("Motivo"),
+                RepartidorId = Identificador("RepartidorId"),
+            },
+            BultoDevuelto.Tipo => Hecho(EstadoDelEnvio()) with { Bulto = new(CodigoBulto(), "Devuelto") },
             // CU-20: la devolución manual (T12 o T14); el clasificador la avisa como Devolucion. La automática de CU-18
             // ya llega como IntentoFallidoRegistrado con EstadoFinal EnDevolucion, así que no se avisa dos veces.
             DevolucionIniciada.Tipo => Hecho("EnDevolucion"),

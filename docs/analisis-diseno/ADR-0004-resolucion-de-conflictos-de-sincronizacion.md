@@ -1,6 +1,6 @@
 # **ADR-0004 · Resolución de conflictos de sincronización**
 
-> **Evolución por entrega parcial · 02/11/2026:** el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) y la [decisión cerrada](decisiones-entrega-parcial.md) extienden esta política con resultados por bulto y atomicidad por visita de un envío. Se conservan OperacionId, transacción y evidencia de rechazos. **La política por bulto (RF 32) está en la sección 2.11**, con su alternativa descartada (3.10), su riesgo (4.2) y sus pruebas (5, puntos 10 a 13). Las secciones 2.1 a 2.10 describen el contrato por envío y siguen valiendo en lo que la sección 2.11 no cambia. Las entregas e intentos por envío que todavía guarde la PWA se traducen a una visita (sección 2.11; decisión cerrada, pendiente 5).
+> **Evolución por entrega parcial · 02/11/2026:** el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) y la [decisión cerrada](decisiones-entrega-parcial.md) extienden esta política con resultados por bulto y atomicidad por visita de un envío. Se conservan OperacionId, transacción y evidencia de rechazos. **La política por bulto (RF 32) está en la sección 2.11**, con su alternativa descartada (3.10), su riesgo (4.2) y sus pruebas (5, puntos 10 a 15). Las secciones 2.1 a 2.10 describen el contrato por envío y siguen valiendo en lo que la sección 2.11 no cambia. Las entregas e intentos por envío que todavía guarde la PWA se traducen a una visita (sección 2.11; decisión cerrada, pendiente 5).
 
 | Estado | Aceptado — aprobado por el equipo el 15/10/2026; la sección 2.11 (entrega parcial), el 03/11/2026 |
 | :---- | :---- |
@@ -315,6 +315,10 @@ Con la entrega parcial (sección 2.11):
 
 13\.  Reenviar una visita rechazada devuelve el mismo resultado y el mismo diagnóstico, sin aplicar nada ni consumir intentos.
 
+14\.  Reenviar una visita aplicada responde *YaAplicada* y no duplica intentos, evidencia, eventos, mensajes del Outbox ni el recargo de la nueva visita.
+
+15\.  Una visita que el envío rechaza al registrarla (por ejemplo, porque el envío ya no puede quedar *Entregado*) no deja ningún cambio, y la visita de otro envío del mismo lote se aplica.
+
 **Demostración del escenario 3** (letra, sección 9.3): con la PWA sin conexión, el repartidor registra una entrega. Desde el Backoffice, el despachador declara extraviado ese envío (CU-21). Al recuperar la conexión, la PWA muestra la entrega rechazada con el motivo, el envío sigue *Extraviado* y el conflicto aparece en el tablero con la firma registrada.
 
 # **6\. Decisiones a revisar**
@@ -337,7 +341,7 @@ Con la entrega parcial (sección 2.11):
 | 22/10 | Cola local cifrada, disparadores, lotes y pantalla de rechazos en la PWA | Lucas |
 | 22/10 | Autenticación del repartidor. **Hecho el 15/10** (claim `repartidor_id`). | Cristian |
 | 29/10 | Conflictos en el tablero en tiempo real (CU-66) | Cristian |
-| Entrega parcial | Visita con resultados por bulto, conflictos de la sección 2.11 y pruebas 10 a 13, junto con el estado por bulto de Envíos (ADR-0007, sección 2.4). **Servidor hecho el 03/11**: operación `RegistrarVisita`, `DiagnosticoVisita` en Ejecución, `ConsultarParaVisitaAsync` y `RegistrarVisitaAsync` en el contrato de Envíos sobre `Envio.RegistrarVisita` (Cristian), diagnóstico guardado en `operaciones_dispositivo` y traducción de las operaciones anteriores. Falta la PWA. | Ezequiel (servidor), Lucas (PWA) y Cristian (Envíos) |
+| Entrega parcial | Visita con resultados por bulto, conflictos de la sección 2.11 y pruebas 10 a 15, junto con el estado por bulto de Envíos (ADR-0007, sección 2.4). **Servidor hecho el 03/11**: operación `RegistrarVisita`, `DiagnosticoVisita` en Ejecución, `ConsultarParaVisitaAsync` y `RegistrarVisitaAsync` en el contrato de Envíos sobre `Envio.RegistrarVisita` (Cristian), diagnóstico guardado en `operaciones_dispositivo` y traducción de las operaciones anteriores. El 09/11, pruebas 14 y 15 (reenvío de una visita aplicada con recargo, y atomicidad dentro del lote). Falta la PWA. | Ezequiel (servidor), Lucas (PWA) y Cristian (Envíos) |
 
 # **8\. Historial de versiones**
 
@@ -353,3 +357,4 @@ Con la entrega parcial (sección 2.11):
 | 1.5 | 03/11/2026 | Sección 2.11 aprobada por el equipo (Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes), junto con la tabla de transiciones por bulto. | Ezequiel Marcenal |
 | 1.6 | 03/11/2026 | Sección 2.11: traducción de las operaciones anteriores a la entrega parcial (acordada por el responsable) y prioridad de la invalidez sobre el conflicto. Sección 4.2: alcance del riesgo con el extravío del envío entero. Sección 7: el lado del servidor de la visita queda implementado. | Ezequiel Marcenal |
 | 1.7 | 06/11/2026 | Nota inicial: las operaciones antiguas de la PWA ya no quedan para definir al implementar, porque la versión 1.6 las traduce a una visita (sección 2.11). | Ezequiel Marcenal |
+| 1.8 | 09/11/2026 | Sección 5: pruebas 14 (reenviar una visita aplicada no duplica intentos, evidencia, eventos, Outbox ni recargo) y 15 (una visita rechazada al registrarla no deja cambios y el lote sigue). Sección 7: estado del servidor. | Ezequiel Marcenal |

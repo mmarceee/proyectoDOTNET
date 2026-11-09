@@ -48,6 +48,54 @@ eventos reales, incluyendo la superposición entre cambio de estado, entrega fal
 que una misma suscripción no reciba dos mensajes por el mismo hecho sólo por coincidir en varios tipos.
 Esta clasificación pertenece a CU-64; está implementada y documentada en el [README de CU-64](../cu-64/README.md).
 
+## Mensaje v2 (RF 36)
+
+Agregado el 09/11/2026 por la entrega parcial. La versión es de la suscripción: se elige al crearla
+(`version` en `POST /api/avisos/suscripciones`, 1 o 2; sin indicarla, 1) y no cambia. Las suscripciones
+anteriores son v1. Para pasar a v2, el comercio crea otra suscripción y desactiva la anterior cuando su
+sistema ya procesa la nueva.
+
+**v1 no cambia.** Mismos campos, en el mismo orden, con los mismos bytes. No recibe los hechos de bulto ni
+valores nuevos de `tipo` o `estado`. Tampoco recibe un estado final falso:
+
+- `EnvioEntregado` (estado `Entregado`) se publica sólo si todos los bultos del envío están entregados.
+- En una visita con pendientes, v1 recibe el intento fallido de siempre, con el estado de compatibilidad del envío (`Reprogramado` o `EnDevolucion`).
+- Una devolución con bultos ya entregados (cierre mixto) no llega a v1: `Devuelto` le haría creer que no se entregó nada. **Para ver un cierre mixto, el receptor tiene que pasar a v2.**
+
+**v2** recibe todo lo de v1 y, además, un aviso por cada hecho de bulto. El cuerpo suma `version` y `bulto`:
+
+```json
+{"id":"0192d6a1-0000-7000-8000-000000000001","version":2,"tipo":"EntregaFallida","fechaEvento":"2026-10-21T12:00:00+00:00","numeroEnvio":"ENV-1","estado":"Reprogramado","bulto":{"codigo":"ENV-1-2","estado":"EnDevolucion","motivo":"RECHAZADO"},"prueba":false}
+```
+
+| Campo | Tipo y significado |
+| --- | --- |
+| `version` | Siempre `2` |
+| `estado` | Estado de compatibilidad del envío después del hecho, como en v1 |
+| `bulto` | `null` en los hechos del envío. En los de bulto: `codigo` (el de la etiqueta), `estado` del bulto después del hecho y `motivo` (código del motivo de no entrega, o `null`) |
+
+| Evento de Envíos | `bulto.estado` | `tipo` |
+| --- | --- | --- |
+| `BultoEntregado.v1` | `Entregado` | `CambioDeEstado` |
+| `BultoNoEntregado.v1` | `Reprogramado` o `EnDevolucion` | `EntregaFallida`, o `Devolucion` si quedó en devolución |
+| `BultoDevuelto.v1` | `Devuelto` | `Devolucion` |
+
+El `tipo` de un hecho de bulto sale del estado del bulto: un bulto en devolución es `Devolucion` aunque
+el envío siga `Reprogramado` por otro bulto. `BultoExtraviado` no existe todavía: el extravío sigue siendo
+del envío entero (decisiones-entrega-parcial.md, pendiente 4). El `.v1` del evento de Envíos es la
+versión del evento de integración (ADR-0003), no la del aviso.
+
+**Reintentos y reenvíos.** La entrega guarda su versión y su bulto al prepararse. Cada reintento y cada
+reenvío desde el historial (CU-65) mandan el mismo cuerpo, byte a byte, aunque la suscripción cambie
+después. La firma es la misma en las dos versiones (`v1=`, sección siguiente). Sólo cambia la fecha de la
+cabecera, que es la del intento. La prueba manual de CU-63 usa la forma de la versión de la suscripción,
+con `bulto: null`.
+
+Lo verifican `AvisosVersionadosTests` (unitarias: bytes de v1 y v2, firma estable y reglas por
+versión), `LectorHechosEnvioTests`, `EntregarAvisosTests` (una suscripción v1 y una v2 con el mismo cierre
+mixto; reintento, cola de fallidos y reenvío con el mismo cuerpo) y `EventosDeBultoTests` (eventos que
+publica la visita).
+
 ## Firma HMAC-SHA256
 
 Cabeceras:

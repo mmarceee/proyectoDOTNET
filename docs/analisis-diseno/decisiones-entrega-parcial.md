@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptada: decisión funcional cerrada. Implementación pendiente.** |
-| Versión y fecha | 1.3 · 08/11/2026 |
+| Versión y fecha | 1.4 · 09/11/2026 (RF 32 y pendiente 6 integrado) |
 | Responsable del registro | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas. La ampliación del 08/11 sobre alcance de visita, foto compartida, faltantes y reservas fue confirmada por Lucas en el chat; no registra aprobaciones individuales adicionales de otros integrantes. |
@@ -126,7 +126,13 @@ La decisión funcional anterior está cerrada. **No equivale a declarar terminad
    - **Datos.** La migración `EntregaParcialBultos` copia a cada bulto el estado de su envío y sus intentos fallidos, y conserva las recepciones parciales ya escaneadas. No inventa historial por bulto.
    - **Operaciones sin conexión antiguas.** Una entrega o un intento fallido por envío que llegue desde la cola de la PWA se traduce a una visita con el mismo resultado para todos los bultos del envío, que es lo que significaban antes de RF 31. Si algún bulto ya no está en tránsito, la operación se rechaza como cualquier visita, sin inventar un resultado (ADR-0004, sección 2.11).
    - **PWA.** La versión nueva envía sólo visitas (Lucas).
-6. Avisos v1/v2: eventos, selección de versión, traducción compatible para v1, firma del payload, reintentos y reenvíos con la misma versión. Un receptor v1 no debe recibir enums desconocidos ni darse por enterado de una entrega completa que no ocurrió.
+6. ~~Avisos v1/v2: eventos, selección de versión, traducción compatible para v1, firma del payload, reintentos y reenvíos con la misma versión. Un receptor v1 no debe recibir enums desconocidos ni darse por enterado de una entrega completa que no ocurrió.~~ **Resuelto el 09/11/2026 (RF 36):**
+   - La versión es de la suscripción, se elige al crearla y no cambia; las existentes son v1.
+   - Envíos publica `BultoEntregado`, `BultoNoEntregado` y `BultoDevuelto`, sólo para v2. `BultoExtraviado` espera el extravío individual (pendiente 4).
+   - v1 recibe el mismo contenido de siempre, sin valores nuevos. `EnvioEntregado` sale sólo con todos los bultos entregados.
+   - **Cierre mixto** (devuelto con bultos ya entregados): v1 no lo recibe, para no darle un estado final falso. Para verlo, el comercio pasa a v2.
+   - La entrega guarda versión y bulto: reintentos y reenvíos mandan el mismo cuerpo, con la misma firma.
+   - Contrato en [integracion-cu64.md](cu-63/integracion-cu64.md#mensaje-v2-rf-36).
 7. Invalidación de seguimiento y actualización del tablero por cambios de bulto, incluso cuando el resumen siga siendo Entregado parcialmente (por ejemplo, de 1/3 a 2/3).
 8. Migración de consultas y consumidores que hoy deciden por EstadoEnvio: retirar esa dependencia de las decisiones operativas. Actualizar dominio, casos de uso y ADR-0004/0006 con la implementación real.
 
@@ -144,3 +150,4 @@ Este documento reemplaza las propuestas anteriores de derivar el envío con todo
 | 1.1 | 02/11/2026 | La ejecución se inicia con la recepción del primer bulto; se actualizan el esquema, los ejemplos y el pendiente 1. | Ezequiel Marcenal |
 | 1.2 | 03/11/2026 | Decisiones del equipo: tabla por bulto aprobada y ejemplo de cancelación después de recibir declarado inalcanzable (pendiente 1 y sección 3); extravío del envío entero para el 12/11 (pendiente 4); migración y traducción de las operaciones antiguas (pendiente 5); política de intentos agotados y `AdmiteEntregaParcial` falso en las versiones publicadas (sección 5). | Ezequiel Marcenal |
 | 1.3 | 08/11/2026 | Confirmación de Lucas: alcance de visita sobre bultos que viajaron, una foto compartida por visita, firma de los entregados, faltantes de carga según custodia y exclusividad/liberación de reservas. Se conserva como pendiente la especificación técnica e implementación. | Lucas Ottonello |
+| 1.4 | 09/11/2026 | Integración de avisos v1/v2 (pendiente 6) y lectura de rendición por bulto; conserva los acuerdos de RF 32 sobre inicio de ruta, escaneos que no salieron y confirmación de custodia antes de liberar una asignación. | Lucas Ottonello |

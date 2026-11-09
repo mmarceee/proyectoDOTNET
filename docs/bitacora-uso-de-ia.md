@@ -1384,7 +1384,35 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Descartado** | Cerrar la carrera por completo (escribir "sólo si no existe" o una doble invalidación): `IDistributedCache` no ofrece lo primero y la aclaración pide resolver o acotar. Reintentar la invalidación: los reintentos del Worker duran más que la expiración. |
 | **Verificación** | `VersionProgramadaTests` (2) pasa, y falla si se desactiva la comparación con `ValidoHasta` (prueba de mutación). Todas las de Administración pasan (90 unitarias y 37 de integración). En vivo, el puntero aparece en Valkey con TTL de 60 segundos y desaparece solo. |
 
-## **3.93 Etiquetas de envío y reimpresión en depósito (CU-15)**
+## **3.93 Despliegue continuo · El job deploy con el ambiente destruido**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 09/11/2026 |
+| **Archivos** | `.github/workflows/ci.yml` (job `deploy`); `infra/terraform/main.tf`, `variables.tf`, `terraform.tfvars.example` y `README.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Al reunir evidencia para el ADR del despliegue, la IA encontró que el job `deploy` fallaba en todos los push a `main` desde el 06/11 con «No subscriptions found». |
+| **Cómo se trabajó** | La IA leyó los registros del CI y encontró la causa: la entidad de servicio tenía el rol asignado con `--scopes` sobre el grupo de recursos, y `terraform destroy` borró el grupo junto con la asignación. Le pedí que lo arreglara. |
+| **Aceptado sin modificaciones** | `azurerm_role_assignment` en Terraform con la variable `ci_principal_id`, para que cada `apply` restaure el permiso. El inicio de sesión con `continue-on-error`: si falla, el job promueve las imágenes, deja un aviso y no despliega, que es lo que ya prometía el README. |
+| **Descartado** | `allow-no-subscriptions` en `azure/login`: no se pudo confirmar si la acción igual intenta seleccionar la suscripción del JSON. Dar el rol sobre toda la suscripción: le da al CI más permiso del necesario. |
+| **Verificación** | `terraform fmt -check` y `terraform validate` pasan; `actionlint` no marca errores nuevos en el workflow. Falta verlo en GitHub Actions (el próximo push a `main` tiene que quedar en verde con el aviso) y el `apply` con `ci_principal_id`. |
+
+## **3.94 ADR-0008 · Despliegue e infraestructura como código**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 09/11/2026 |
+| **Archivos** | `ADR-0008-despliegue-e-infraestructura.md` (v0.1); propuesta de stack (v1.8, secciones 6 y 8); README de `infra/terraform`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Completar los ocho registros que pide el documento de cambio de requerimientos con la decisión de despliegue, que ya estaba tomada y aplicada desde el 05/11. |
+| **Cómo se trabajó** | La IA comprobó primero que hubiera material suficiente: Terraform, el README, el CI, las entradas 3.58, 3.61 y 3.62 y la letra (6.14, 6.15 y 8.2). Me preguntó por el costo real, el despliegue continuo y el estado del ambiente, y revisó las ejecuciones del CI (así apareció el problema de la entrada 3.93). Después escribió el borrador a mi pedido. |
+| **Aceptado sin modificaciones** | Un solo registro para plataforma, Terraform y entrega continua, escrito después de aplicar la decisión y aclarándolo. Como alternativas, sólo las que se evaluaron de verdad (DigitalOcean, Vercel, Netlify, Render, Oracle, CloudAMQP, la caché administrada, São Paulo, Aspire sólo local y el permiso asignado a mano). |
+| **Modificado** | El borrador decía que escalar la API necesitaba un backplane de SignalR y revisar el Outbox con varias instancias. Al verificarlo en el código, el backplane sobre Valkey ya existe (CU-66) y el publicador usa `FOR UPDATE SKIP LOCKED`; lo que realmente falta son las migraciones al arrancar. |
+| **Verificación** | Cada dato del ADR se contrastó con `main.tf`, `ci.yml`, `PublicadorOutbox`, `Program.cs` de la API y las ejecuciones de GitHub Actions del 05/11 y el 09/11. Queda abierta la evidencia de costo, que se toma en la próxima puesta en marcha. |
+
+## **3.95 Etiquetas de envío y reimpresión en depósito (CU-15)**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -1400,7 +1428,7 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 
 **Ampliación documental · 08/11/2026.** A pedido de Lucas, Codex preparó la [guía para la defensa de CU-15](analisis-diseno/cu-15/guia-defensa.md): recorrido desde las pantallas y HTTP hasta el handler, lectura filtrada, adaptador QuestPDF/ZXing y descarga; ubicación exacta de GeneratePdf, dependencias, decisiones, límites y preguntas de exposición. Se contrastó con el código actual, sin modificar la implementación ni volver a ejecutar las pruebas históricas. La consulta posterior sobre carga incompleta se contrastó con RF 19 de la letra original, la decisión de entrega parcial (secciones 5 y 6), T4/T5 y el handler de carga; no se registró una nueva decisión funcional ni se implementó RF 32.
 
-## **3.94 RF 32 · Visita por bulto sin conexión en la PWA**
+## **3.96 RF 32 · Visita por bulto sin conexión en la PWA**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -1425,6 +1453,8 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 **Inicio explícito de ruta y revisión de carga.** Lucas reportó un borrador de carga con revisión anterior de la hoja y pidió Comenzar ruta, cerrando carga e impidiendo entregas previas. Se conserva el avance al actualizar una carga en preparación y se preservan las operaciones ya pendientes. La PWA agrega inicio cifrado, persistente e idempotente a la cola, con protección entre pestañas; Ejecución coordina el cambio de Planificación mediante su contrato y valida estado, fecha, pertenencia y carga. Se bloquean cargas posteriores, visitas previas y dependencias de un rechazo; GPS y rendición respetan el inicio. Se mantiene la compatibilidad de cargas antiguas y rutas ya EnCurso. Se documentó en ADR-0004, CU-51 y RF 32. La verificación incluye JavaScript, PostgreSQL con sesiones reales y Chrome con PWA compilada y API simulada, sin tocar datos locales del usuario.
 
 **Corrección de una carrera en la prueba de SignalR de CI.** Lucas aportó una ejecución completa de Release con cobertura en la que sólo fallaba por timeout `TableroEnVivoTests.Una_posicion_reportada_llega_al_tablero_de_su_operador`. Se identificó la diferencia entre completar el handshake de SignalR y terminar el alta de la conexión en el grupo del operador. El helper ahora espera el OnConnectedAsync real mediante un filtro exclusivo de pruebas y una señal por conexión; conserva los cinco segundos de límite y libera las conexiones si el inicio falla. Se agregó un caso con suscripción demorada y controlada, sin sleeps ni reenvíos del mensaje, para reproducir el orden que ocasionaba la pérdida. Las cuatro pruebas dirigidas pasan en Release con cobertura; la suite completa local con las mismas opciones de CI también pasó: 625 de integración (8 min 41 s), 475 unitarias y 56 de arquitectura, sin omisiones. La ejecución local es Windows; falta repetir el runner Linux tras subir la corrección. No se modifica la PWA, la entrega parcial ni el protocolo de producción. [Explicación](analisis-diseno/cu-53/integracion-cu-66.md).
+
+**Integración de main del 09/11/2026.** Lucas autorizó resolver los conflictos preservando la confirmación de custodia y la distinción entre escaneo y carga, sumando la consulta de rendición y los avisos v2. Se conservaron ambas bitácoras, renumerando CU-15/RF-32 como 3.95/3.96 y actualizando referencias. Se integró ConsultarParaRendicionAsync en las lecturas de depósito y rendición, se alineó el manifiesto HTTP de la hoja con el de la rendición y se usó ReintegrarNoCargadosAsync después de las comprobaciones y la confirmación de ubicación. Se quitaron las liberaciones automáticas duplicadas. Las regresiones comprueban que una revisita no libera bultos sin confirmar y conserva lo entregado antes, y que un escaneo de un envío bloqueado no simula un retorno físico. Compilación Release sin errores ni advertencias; 143 pruebas de integración dirigidas, 489 unitarias, 56 de arquitectura y 72 de JavaScript aprobadas. Docker estaba detenido en el primer intento de integración; tras iniciarlo pasaron las pruebas. No se integra todavía la rama de Cristian ni se declara resuelto RF 34 completo.
 
 # **4\. Historial de versiones**
 
@@ -1472,7 +1502,9 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.39 | 03/11/2026 | Entrada de la visita por bulto en la sincronización (3.60). | Ezequiel Marcenal |
 | 0.40 | 05/11/2026 | Entrada del cambio del entorno productivo a Azure (3.61) y corrección de la tabla de la entrada 3.59. | Ezequiel Marcenal |
 | 0.41 | 05/11/2026 | Entrada del tablero de observabilidad en producción (3.62). | Ezequiel Marcenal |
-| 0.42 | 07/11/2026 | CU-15: análisis, impresión individual/múltiple en el Portal, reimpresión en depósito, decisión técnica y verificación automatizada/visual (3.93). | Lucas Ottonello |
+| 0.42 | 07/11/2026 | CU-15: análisis, impresión individual/múltiple en el Portal, reimpresión en depósito, decisión técnica y verificación automatizada/visual (3.95). | Lucas Ottonello |
 | 0.43 | 08/11/2026 | Guía de estudio de CU-15 para la defensa y registro del contraste entre carga incompleta, entrega parcial y comportamiento implementado. | Lucas Ottonello |
-| 0.44 | 08/11/2026 | RF 32: visita por bulto en la PWA, foto compartida, operación offline e integración de carga y rendición; límites con RF 34 y verificación (3.94). | Lucas Ottonello |
+| 0.44 | 08/11/2026 | RF 32: visita por bulto en la PWA, foto compartida, operación offline e integración de carga y rendición; límites con RF 34 y verificación (3.96). | Lucas Ottonello |
 | 0.45 | 08/11/2026 | Registro retrospectivo de las entradas de Cristian Reyes (3.63 a 3.92), del 06/10 al 08/11, y su herramienta en la sección 2. Reconstruido con las conversaciones con el asistente, Git y la documentación de estudio, para revisión del responsable. | Cristian Reyes |
+| 0.46 | 09/11/2026 | Entrada del job de despliegue con el ambiente destruido (3.93). | Ezequiel Marcenal |
+| 0.47 | 09/11/2026 | Entrada del ADR-0008, despliegue e infraestructura como código (3.94). | Ezequiel Marcenal |

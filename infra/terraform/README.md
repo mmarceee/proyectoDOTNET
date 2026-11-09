@@ -106,16 +106,27 @@ En cada push a `main`, el CI (`.github/workflows/ci.yml`):
 1. compila y publica las imágenes con la etiqueta del commit (job `docker-images`);
 2. si pasan las pruebas, las promueve a `latest` y actualiza la imagen de las dos Container Apps (job `deploy`).
 
-El paso 2 necesita el secreto `AZURE_CREDENTIALS` en el repositorio (*Settings → Secrets and variables → Actions*), con
-una entidad de servicio limitada al grupo de recursos:
+El paso 2 necesita una entidad de servicio con permiso sólo sobre el grupo de recursos. Se crea una vez, sin rol:
 
 ```bash
-az ad sp create-for-rbac --name logistica-ci --role contributor --scopes /subscriptions/<suscripción>/resourceGroups/logistica-produccion --json-auth
+az ad sp create-for-rbac --name logistica-ci --json-auth
 ```
 
-Se pega la salida JSON completa como valor del secreto. Sin el secreto, o con el ambiente destruido, el CI sólo promueve
-las imágenes. Si la cuenta de estudiante no permite crear la entidad de servicio, se despliega a mano con la misma orden
-que usa el CI:
+Se pega la salida JSON completa como valor del secreto `AZURE_CREDENTIALS` del repositorio (*Settings → Secrets and
+variables → Actions*). El permiso lo da Terraform: con `ci_principal_id` en `produccion.tfvars`, cada `apply` le asigna
+*Contributor* sobre el grupo de recursos. El valor es el identificador de objeto de la entidad, no el `clientId` del JSON:
+
+```bash
+az ad sp list --display-name logistica-ci --query "[0].id" -o tsv
+```
+
+**Por qué el permiso lo asigna Terraform:** el primer diseño lo daba `create-for-rbac` con `--scopes` sobre el grupo.
+`destroy` borra el grupo y, con él, la asignación; desde el 06/11, con el ambiente destruido, el job fallaba en cada push
+a `main` («No subscriptions found») y, al reconstruir el ambiente, el grupo nuevo quedaba sin permiso.
+
+Sin el secreto, o con el ambiente destruido (el inicio de sesión falla porque la entidad no tiene acceso a nada), el CI
+sólo promueve las imágenes y deja un aviso. Si la cuenta de estudiante no permite crear la entidad de servicio, se
+despliega a mano con la misma orden que usa el CI:
 
 ```bash
 az containerapp update -g logistica-produccion -n logistica-produccion-api --image ghcr.io/mmarceee/proyectodotnet/api:<commit>
@@ -179,6 +190,9 @@ de la PWA sigue de la API al Worker por la cabecera `traceparent` del mensaje.
   panel y reinicia la API y el Worker sin exportar; con `true` vuelve.
 
 ## Historia
+
+La decisión, con sus alternativas y consecuencias, está en el
+[ADR-0008](../../docs/analisis-diseno/ADR-0008-despliegue-e-infraestructura.md).
 
 El primer diseño (03/11/2026) usaba DigitalOcean App Platform con el crédito de estudiante de GitHub. DigitalOcean retiró
 ese beneficio el 01/08/2026, así que el 05/11/2026 el ambiente pasó a Azure for Students, con la misma forma: dos

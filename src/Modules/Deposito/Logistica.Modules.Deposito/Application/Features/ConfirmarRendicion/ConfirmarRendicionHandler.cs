@@ -153,10 +153,13 @@ internal sealed class ConfirmarRendicionHandler(
             .ToDictionary(g => g.Key, g => g.Select(l => l.BultoId).ToHashSet());
         if (candidatos.Count == 0) return [];
         var recuperables = new List<Guid>();
-        foreach (var envio in await envios.ConsultarCargaAsync(candidatos.Keys.ToArray(), ct))
+        foreach (var envio in await envios.ConsultarParaRendicionAsync(candidatos.Keys.ToArray(), ct))
         {
-            if (envio.Estado != "AsignadoARuta" || envio.Bultos.Any(b => b.Estado != "AsignadoARuta")
-                || !candidatos[envio.Id].SetEquals(envio.Bultos.Select(b => b.Id))) continue;
+            // La revisita puede conservar otros bultos ya entregados. Sólo se libera el conjunto asignado
+            // de esta ruta, sin mover los resultados anteriores ni depender del filtro de carga.
+            var asignados = envio.Bultos.Where(b => b.Estado == "AsignadoARuta").Select(b => b.Id).ToArray();
+            if (envio.Estado != "AsignadoARuta" || asignados.Length == 0
+                || !candidatos[envio.Id].SetEquals(asignados)) continue;
             if (!await planificacion.HayRutasActivasConEnviosAsync([envio.Id], DateOnly.MinValue, ct))
                 recuperables.Add(envio.Id);
         }
@@ -166,9 +169,7 @@ internal sealed class ConfirmarRendicionHandler(
     private async Task<int> LiberarNoCargadosAsync(RendicionPendiente rendicion, CancellationToken ct)
     {
         var ids = await NoCargadosRecuperablesAsync(rendicion, ct);
-        foreach (var id in ids)
-            await envios.DesasignarDeRutaAsync(rendicion.RutaId, id, responsableId: null, ct);
-        return ids.Count;
+        return await envios.ReintegrarNoCargadosAsync(rendicion.RutaId, ids, ct);
     }
 
     // El lector escribe el código como un teclado: se compara sin espacios y sin distinguir mayúsculas.
@@ -176,7 +177,9 @@ internal sealed class ConfirmarRendicionHandler(
         IReadOnlyCollection<string> codigos, CancellationToken ct)
     {
         var envioIds = rendicion.Lineas.Select(l => l.EnvioId).Distinct().ToArray();
-        var codigoDe = (await envios.ConsultarCargaAsync(envioIds, ct))
+        // Todos los bultos, no sólo los que acompañan al envío (RF 31): un bulto que quedó en devolución mientras el envío
+        // sigue Reprogramado también vuelve en la rendición.
+        var codigoDe = (await envios.ConsultarParaRendicionAsync(envioIds, ct))
             .SelectMany(e => e.Bultos).ToDictionary(b => b.Id, b => b.Codigo);
         var escaneados = codigos.Select(c => c.Trim()).Where(c => c.Length > 0)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

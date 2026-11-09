@@ -8,7 +8,7 @@ internal sealed class SuscripcionesAvisoReader(SeguimientoDbContext db) : ISuscr
 {
     // Proyección explícita: ni siquiera se lee el secreto cifrado para las consultas del Portal.
     private static IQueryable<SuscripcionAvisoVista> Proyectar(IQueryable<SuscripcionAviso> consulta) => consulta
-        .Select(s => new SuscripcionAvisoVista(s.Id, s.UrlDestino, s.TiposEvento.ToArray(), s.Activa));
+        .Select(s => new SuscripcionAvisoVista(s.Id, s.UrlDestino, s.TiposEvento.ToArray(), s.Activa, s.Version));
 
     public async Task<IReadOnlyList<SuscripcionAvisoVista>> ListarAsync(CancellationToken ct) =>
         await Proyectar(db.SuscripcionesAviso.AsNoTracking().OrderBy(s => s.Id)).ToListAsync(ct);

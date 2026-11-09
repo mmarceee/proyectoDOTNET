@@ -19,6 +19,16 @@ resource "azurerm_resource_group" "this" {
   location = var.ubicacion
 }
 
+# Permiso del despliegue continuo (job deploy del CI) sobre el grupo de recursos. Va acá y no a mano porque destroy
+# borra el grupo y, con él, la asignación: cada apply la vuelve a crear.
+resource "azurerm_role_assignment" "ci" {
+  count                = var.ci_principal_id == "" ? 0 : 1
+  scope                = azurerm_resource_group.this.id
+  role_definition_name = "Contributor"
+  principal_id         = var.ci_principal_id
+  principal_type       = "ServicePrincipal"
+}
+
 # --- Claves y contraseñas que genera Terraform ------------------------------------------------------------------
 # Quedan sólo en el estado y en los secretos de Container Apps, nunca en el repositorio. Si se destruye el ambiente se
 # generan otras, y la base nueva no tiene nada cifrado con las anteriores.

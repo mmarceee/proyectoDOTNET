@@ -131,14 +131,22 @@ jobs:
         if: ${{ env.AZURE_CREDENTIALS == '' }}
         run: echo "::notice::Falta el secreto AZURE_CREDENTIALS; no se actualiza Azure."
 
+      # La entidad de servicio sólo tiene permiso sobre el grupo de recursos (lo asigna Terraform). Con el ambiente
+      # destruido, el grupo y el permiso ya no existen y el inicio de sesión falla: el job sigue, sin desplegar.
       - uses: azure/login@v2
+        id: azure-login
         if: ${{ env.AZURE_CREDENTIALS != '' }}
+        continue-on-error: true
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
 
+      - name: Check Azure login
+        if: ${{ steps.azure-login.outcome == 'failure' }}
+        run: echo "::warning::No se pudo iniciar sesión en Azure. Si el ambiente $GRUPO está destruido es lo esperado; si existe, revisar AZURE_CREDENTIALS y la variable ci_principal_id de Terraform."
+
       # La API primero: aplica las migraciones al iniciar. Si el ambiente no existe, no hace nada.
       - name: Deploy to Container Apps
-        if: ${{ env.AZURE_CREDENTIALS != '' }}
+        if: ${{ steps.azure-login.outcome == 'success' }}
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt --only-show-errors
           if ! az containerapp show -g "$GRUPO" -n "$GRUPO-api" --query name -o tsv > /dev/null 2>&1; then

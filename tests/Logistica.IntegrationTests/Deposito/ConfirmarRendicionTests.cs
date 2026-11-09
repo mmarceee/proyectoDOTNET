@@ -30,6 +30,34 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task La_revisita_no_cargada_conserva_el_entregado_anterior_y_exige_confirmar_ubicacion(bool confirmar)
+    {
+        var e = await PrepararAsync(noCargado:true, revisita:true);
+        using var client = await OperarioAsync();
+        var pagina = $"/backoffice/rendiciones/{e.Ruta}";
+        var respuesta = await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["Escaneados"] = string.Join("\n", e.ConFaltante.Bultos.Select(b => b.Codigo)),
+            ["ConfirmarNoCargadosEnDeposito"] = confirmar.ToString(),
+        }));
+        Assert.Equal("/backoffice/rendiciones", respuesta.Headers.Location?.OriginalString);
+        using var scope = Scope();
+        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var envio = await db.Envios.Include(x => x.Bultos).SingleAsync(x => x.Id == e.NoIntentado.Id);
+        Assert.Equal(confirmar ? EstadoEnvio.EnDeposito : EstadoEnvio.AsignadoARuta, envio.Estado);
+        Assert.Equal(EstadoEnvio.Entregado, envio.Bultos.Single(b => b.Id == e.NoIntentado.Bultos[0].Id).Estado);
+        Assert.Equal(confirmar ? EstadoEnvio.EnDeposito : EstadoEnvio.AsignadoARuta,
+            envio.Bultos.Single(b => b.Id == e.NoIntentado.Bultos[1].Id).Estado);
+        Assert.Equal(1, envio.BultosEntregados);
+        var rendicion = await scope.ServiceProvider.GetRequiredService<EjecucionDbContext>().Rendiciones
+            .Include(r => r.Lineas).SingleAsync(r => r.RutaId == e.Ruta);
+        Assert.DoesNotContain(rendicion.Lineas, l => l.BultoId == e.NoIntentado.Bultos[0].Id);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task El_cierre_libera_el_envio_que_no_salio_incluso_con_lecturas_de_carga_legacy(bool legacy)
     {
         var e = await PrepararAsync(noCargado: true, cargaLegacy: legacy);
@@ -470,7 +498,80 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
             .AnyAsync(i => i.EnvioId == e.NoIntentado.Id || i.EnvioId == e.ConFaltante.Id));
     }
 
-    private async Task<Escenario> PrepararAsync(bool todosEntregados = false, bool noCargado = false, bool cargaLegacy = false)
+    // T4 en la rendición: lo que no salió vuelve a estar en el depósito para otra ruta. Un envío no se cargó; otro se
+    // cargó incompleto y su bulto cargado volvió; al tercero, cargado incompleto, no le volvió el bulto cargado, así que
+    // queda AsignadoARuta con la incidencia del faltante, igual que un no intentado incompleto.
+    [Fact]
+    public async Task Los_envios_que_no_salieron_vuelven_al_deposito_si_volvio_lo_que_se_cargo()
+    {
+        using var inicial = factory.CreateClient();
+        await inicial.GetAsync("/health");
+        var ahora = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var fecha = new DateOnly(2024, 6, 1).AddDays(Interlocked.Increment(ref dia));
+        var envios = Enumerable.Range(0, 3).Select(_ =>
+        {
+            var envio = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId, $"CU55-{Guid.NewGuid():N}",
+                new Destinatario("Prueba Rendición", "099123456"), new Direccion("Calle", "10", "Montevideo", "Montevideo", "11300"),
+                [new DatosBulto(1, 10, 10, 10, 0), new DatosBulto(1, 10, 10, 10, 0)], OrigenEvento.PortalComercio, null, ahora);
+            envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
+            envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
+            return envio;
+        }).ToArray();
+        var (noCargado, parcialVuelto, parcialFaltante) = (envios[0], envios[1], envios[2]);
+        Guid rutaId;
+        using (var scope = Scope())
+        {
+            var enviosDb = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+            enviosDb.Envios.AddRange(envios);
+            await enviosDb.SaveChangesAsync();
+            var ruta = Ruta.Crear(DatosIniciales.OperadorDemoId, fecha, DatosIniciales.RepartidorDemoId,
+                Guid.Parse("51111111-1111-1111-1111-111111111111"), envios.Select(e => new EnvioRuta(e.Id, e.Numero, fecha,
+                    Guid.Parse("61111111-1111-1111-1111-111111111111"), null, false,
+                    e.Bultos.Select(b => new CargaBulto(e.Id, b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToArray(),
+                    new PuntoEntrega("Calle", "10", "Montevideo", "Montevideo", "11300"))).ToArray(), ahora);
+            ruta.Despachar(ahora);
+            var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+            plan.Rutas.Add(ruta);
+            await plan.SaveChangesAsync();
+            rutaId = ruta.Id;
+
+            // Lo que declaró el repartidor en CU-54: el primer bulto de los dos incompletos se escaneó en la carga.
+            DeclaracionRendicion[] lineas =
+            [
+                .. noCargado.Bultos.Select(b => new DeclaracionRendicion(noCargado.Id, b.Id, "NoCargado", false, null)),
+                .. new[] { parcialVuelto, parcialFaltante }.SelectMany(e => new[]
+                {
+                    new DeclaracionRendicion(e.Id, e.Bultos[0].Id, "CargaParcial", true, null),
+                    new DeclaracionRendicion(e.Id, e.Bultos[1].Id, "NoCargado", false, null),
+                }),
+            ];
+            var ejecucion = scope.ServiceProvider.GetRequiredService<EjecucionDbContext>();
+            ejecucion.Rendiciones.Add(Rendicion.Iniciar(DatosIniciales.OperadorDemoId, rutaId, DatosIniciales.RepartidorDemoId,
+                Guid.CreateVersion7(), ahora, null, lineas));
+            await ejecucion.SaveChangesAsync();
+        }
+        using var client = await OperarioAsync();
+
+        var respuesta = await ConfirmarAsync(client, rutaId, parcialVuelto.Bultos[0].Codigo);
+
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        using var verificacion = Scope();
+        var db = verificacion.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        Assert.Equal(EstadoEnvio.EnDeposito, await EstadoAsync(db, noCargado.Id));
+        Assert.Equal(EstadoEnvio.EnDeposito, await EstadoAsync(db, parcialVuelto.Id));
+        Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(db, parcialFaltante.Id));
+        Assert.All((await db.Envios.AsNoTracking().SingleAsync(e => e.Id == noCargado.Id)).Bultos,
+            b => Assert.Equal(EstadoEnvio.EnDeposito, b.Estado));
+        var desasignados = await db.Outbox.Where(m => m.Tipo == EnvioDesasignadoDeRuta.Tipo).ToListAsync();
+        Assert.Single(desasignados, m => m.Contenido.Contains(noCargado.Id.ToString()));
+        Assert.Single(desasignados, m => m.Contenido.Contains(parcialVuelto.Id.ToString()));
+        Assert.DoesNotContain(desasignados, m => m.Contenido.Contains(parcialFaltante.Id.ToString()));
+        Assert.Contains(parcialFaltante.Bultos[0].Codigo,
+            Assert.Single(await db.Incidencias.Where(i => i.EnvioId == parcialFaltante.Id).ToListAsync()).Descripcion);
+    }
+
+    private async Task<Escenario> PrepararAsync(bool todosEntregados = false, bool noCargado = false, bool cargaLegacy = false,
+        bool revisita = false)
     {
         using var inicial = factory.CreateClient();
         await inicial.GetAsync("/health");
@@ -488,6 +589,16 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
             envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
             envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
             if (!noCargado || i != 0) envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora);
+            if (revisita && i == 0)
+            {
+                envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora);
+                var lugar = new Ubicacion(-34.9m, -56.1m);
+                var motivo = new MotivoNoEntrega(Guid.NewGuid(), "AUSENTE", true, false);
+                envio.RegistrarVisita([new(envio.Bultos[0].Id), new(envio.Bultos[1].Id, motivo)],
+                    new PruebaEntrega(Guid.NewGuid(), null, null, null, lugar, ahora), null, null, lugar,
+                    new ReglasEntrega(false, false, 3, TimeSpan.Zero, admiteEntregaParcial:true), null, ahora);
+                envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
+            }
             return envio;
         }).ToArray();
         envios[2].Transicionar(EstadoEnvio.Entregado, OrigenEvento.AppRepartidor, null, ahora);
@@ -511,7 +622,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         // Lo que declaró el repartidor en CU-54.
         DeclaracionRendicion[] lineas =
         [
-            .. envios[0].Bultos.Select((b, i) => new DeclaracionRendicion(envios[0].Id, b.Id,
+            .. envios[0].Bultos.Where(b => !revisita || b.Estado == EstadoEnvio.AsignadoARuta).Select((b, i) => new DeclaracionRendicion(envios[0].Id, b.Id,
                 noCargado ? cargaLegacy && i == 0 ? "CargaParcial" : "NoCargado" : todosEntregados ? "EntregadoEnCalle" : "NoIntentado",
                 noCargado ? cargaLegacy && i == 0 : !todosEntregados, null)),
             .. envios[1].Bultos.Select(b => new DeclaracionRendicion(envios[1].Id, b.Id, todosEntregados ? "EntregadoEnCalle" : "NoIntentado", !todosEntregados, null)),

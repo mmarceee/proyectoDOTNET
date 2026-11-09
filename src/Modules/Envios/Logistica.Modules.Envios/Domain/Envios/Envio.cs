@@ -353,6 +353,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             ValidarPrueba(prueba, reglas);
         if (fallidos.FirstOrDefault(r => r.Motivo!.ExigeEvidencia && evidencia?.FotoArchivoId is null) is { } sinFoto)
             throw new DomainException($"El motivo {sinFoto.Motivo!.Codigo} exige una foto como evidencia.");
+        // El envío tiene que poder pasar al estado de la visita antes de tocar sus bultos, como en los demás cambios.
+        ExigirTransicion(fallidos.Count == 0 ? EstadoEnvio.Entregado : EstadoEnvio.NoEntregado);
 
         // RF 33: una visita adicional (el envío ya tuvo otra) se cobra una sola vez, salga bien o mal, si la versión de
         // reglas del envío lo indica. No se cobra por bulto; un reenvío de la sincronización no llega hasta acá (CU-52).

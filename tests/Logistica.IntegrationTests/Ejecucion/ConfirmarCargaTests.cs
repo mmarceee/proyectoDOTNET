@@ -155,6 +155,15 @@ public sealed class ConfirmarCargaTests(PostgresApiFactory factory) : IClassFixt
         Assert.All(bloqueado.Bultos,b=>Assert.Equal(EstadoEnvio.AsignadoARuta,b.Estado));
         var completo=await db.Envios.SingleAsync(e=>e.Id==d.Envios[1].Id);
         Assert.All(completo.Bultos,b=>Assert.Equal(EstadoEnvio.EnTransito,b.Estado));
+        // Se escaneó un bulto del bloqueado, pero ninguno viajó. No exige recibirlo en la rendición nueva.
+        var rendicion = await scope.ServiceProvider.GetRequiredService<Logistica.Modules.Ejecucion.Application.Features.IniciarRendicion.PrepararRendicion>()
+            .ConsultarAsync(d.Ruta, d.Envios.Select(e => e.Id).ToArray(), default);
+        Assert.All(rendicion.Bultos.Where(b => b.EnvioId == bloqueado.Id), b =>
+        {
+            Assert.Equal("NoCargado", b.Situacion);
+            Assert.False(b.RequiereDeclaracion);
+        });
+        Assert.All(rendicion.Bultos.Where(b => b.EnvioId == completo.Id), b => Assert.Equal("NoIntentado", b.Situacion));
     }
     [Fact]
     public async Task Por_bulto_sin_ningun_envio_cargable_se_rechaza_aunque_acepte_faltantes()

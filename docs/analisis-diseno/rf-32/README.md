@@ -118,3 +118,13 @@ Después de corregir el acceso desde Depósito: compilación con 0 errores y 0 a
 ### Inicio explícito y revisión de carga (08/11/2026)
 
 Se separó la carga de la salida con **Comenzar ruta** y se corrigió el borrador con una revisión anterior de la hoja. El inicio se conserva sin conexión y va antes de las visitas en la cola; bloquea cargas posteriores. Las confirmaciones de carga pendientes mantienen identidad y payload al actualizar la hoja. [Flujo, compatibilidad y verificación](../cu-51/README.md#inicio-de-recorrido-separado-de-la-carga--ajuste-del-08112026): 72 pruebas JavaScript, 458 unitarias, 56 de arquitectura, 99 de integración dirigidas y comprobación de la PWA compilada en Chrome con API simulada.
+
+### Integración de main y la rendición por bulto (09/11/2026)
+
+Se integran la consulta `ConsultarParaRendicionAsync` con todos los bultos y estados, la identificación de los bultos de cada ruta y los avisos v1/v2 de main. La preparación de rendición, comparación de códigos y recuperación de no cargados utilizan esa consulta separada. Se conservan `BultoParaCarga.Estado`, `AdmiteEntregaParcial` y la interpretación de cargas nuevas: un bulto escaneado que finalmente no salió no exige recepción física al rendir.
+
+La hoja HTTP se construye con el mismo manifiesto de la rendición: omite entregados de rutas anteriores y mantiene los asignados pendientes de cargar. La PWA conserva su validación estricta de que ambos conjuntos coincidan. No se incorpora todavía el filtro de la rama de Cristian en las consultas de planificación, carga y hoja; su integración debe contemplar la carga que continúa antes de Comenzar ruta.
+
+El contrato nuevo `ReintegrarNoCargadosAsync` se invoca después de la confirmación explícita de ubicación y la comprobación de que no existe otra ruta activa. Se elimina la segunda liberación automática al cerrar, que habría eludido la casilla. En una revisita sólo se liberan los bultos asignados de esa ruta; los entregados anteriormente se preservan.
+
+Verificación del merge: solución Release compilada sin errores ni advertencias; 143 pruebas de integración dirigidas, 489 unitarias, 56 de arquitectura y 72 de JavaScript aprobadas. Incluye la hoja HTTP de la revisita alineada con su rendición, recuperación con y sin confirmación física, conservación del entregado anterior, carga nueva bloqueada sin devolución ficticia y las pruebas incorporadas de avisos/devoluciones. El primer intento de integración no pudo iniciar por Docker detenido; se inició el motor y la ejecución posterior pasó. No se ejecutó en esta integración la suite completa de CI.
