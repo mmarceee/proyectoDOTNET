@@ -2,7 +2,7 @@
 
 | Estado | Aceptado |
 | :---- | :---- |
-| **Fecha** | 25 de septiembre de 2026 (actualizado el 5 de noviembre de 2026) |
+| **Fecha** | 25 de septiembre de 2026 (actualizado el 9 de noviembre de 2026) |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Alcance** | Entrega de análisis y diseño del 4 de octubre de 2026 |
 
@@ -186,9 +186,9 @@ CI en verde -> job deploy -> imágenes promovidas a latest y Azure Container App
 Terraform -> creación, actualización y destrucción de la infraestructura
 ```
 
-La rama main permanecerá protegida y solamente recibirá cambios mediante pull requests con verificaciones exitosas. Azure Container Apps ejecutará la API, que sirve también el Backoffice y las aplicaciones WebAssembly, el worker, Valkey y RabbitMQ, cada uno con una réplica siempre encendida, en la región Chile Central (São Paulo no está entre las regiones que permite la suscripción de estudiante). PostgreSQL será un servidor administrado (Flexible Server B1ms). RabbitMQ empezó en CloudAMQP, pero su plan gratuito admite 150 colas y el sistema declara más (cada suscripción tiene su cola y tres de espera, ADR-0003), así que corre como contenedor, sin disco persistente: un reinicio pierde los mensajes en cola, no los eventos del outbox. El job `deploy` del CI actualiza las aplicaciones sólo cuando las pruebas pasan y las imágenes compilan. Terraform (`infra/terraform`) definirá los recursos de Azure y CloudAMQP, sus variables por ambiente y las operaciones reproducibles de plan, aplicación y destrucción; su README detalla los requisitos, el costo y los secretos.
+La rama main permanecerá protegida y solamente recibirá cambios mediante pull requests con verificaciones exitosas. Azure Container Apps ejecutará la API, que sirve también el Backoffice y las aplicaciones WebAssembly, el worker, Valkey y RabbitMQ, cada uno con una réplica siempre encendida, en la región Chile Central (São Paulo no está entre las regiones que permite la suscripción de estudiante). PostgreSQL será un servidor administrado (Flexible Server B1ms). RabbitMQ empezó en CloudAMQP, pero su plan gratuito admite 150 colas y el sistema declara más (cada suscripción tiene su cola y tres de espera, ADR-0003), así que corre como contenedor, sin disco persistente: un reinicio pierde los mensajes en cola, no los eventos del outbox. El job `deploy` del CI actualiza las aplicaciones sólo cuando las pruebas pasan y las imágenes compilan. Terraform (`infra/terraform`) define los recursos de Azure, sus variables por ambiente y las operaciones reproducibles de plan, aplicación y destrucción; su README detalla los requisitos, el costo y los secretos.
 
-Container Apps administrará el enrutamiento público y HTTPS con certificado propio, por lo que no se incorporará Caddy. El equipo de tres integrantes está eximido del requisito de ejecutar dos instancias balanceadas de la API.
+Container Apps administrará el enrutamiento público y HTTPS con certificado propio, por lo que no se incorporará Caddy (sólo va delante de Aspire Dashboard, sección 7). El job `deploy` entra con una entidad de servicio que tiene permiso sólo sobre el grupo de recursos; ese permiso lo asigna Terraform en cada `apply`. La decisión completa, con sus alternativas y consecuencias, está en el ADR-0008. El equipo de tres integrantes está eximido del requisito de ejecutar dos instancias balanceadas de la API.
 
 **Cambio de proveedor (05/11).** El diseño del 03/11 usaba DigitalOcean App Platform con el crédito de estudiante del GitHub Student Developer Pack. DigitalOcean retiró ese beneficio el 01/08/2026, y el equipo decidió no pagar el ambiente. Se descartaron Vercel y Netlify (no ejecutan .NET como proceso permanente, ni el worker, ni SignalR) y el plan gratuito de Render (sin workers, apaga la API sin tráfico y borra la base a los 30 días). Se eligió Azure for Students, 100 USD de crédito sin tarjeta, porque conserva la forma del diseño: componentes administrados con HTTPS y PostgreSQL administrado. La alternativa era una máquina virtual gratuita de Oracle Cloud con Docker Compose, que exige tarjeta y administrar el servidor. La caché administrada de Azure no tiene plan gratuito, así que Valkey corre como un contenedor dentro del entorno: es una caché y perderla no rompe nada (ADR-0006).
 
@@ -209,10 +209,11 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 
 | Decisión | Estado |
 | :---- | :---- |
-| Modo de renderizado de Blazor WebAssembly y sus consecuencias sobre escalado, estado, latencia y recursos (obligatorio, letra 6.2 y 8.2) | Pendiente |
+| Modo de renderizado de Blazor WebAssembly y sus consecuencias sobre escalado, estado, latencia y recursos (obligatorio, letra 6.2 y 8.2) | Propuesto: ADR-0005 |
 | Política de resolución de conflictos de sincronización de la PWA (obligatorio, letra 8.2) | Aceptado: ADR-0004 |
-| Casos de uso almacenados en caché y reglas de expiración e invalidación (obligatorio, letra 8.2) | Pendiente |
+| Casos de uso almacenados en caché y reglas de expiración e invalidación (obligatorio, letra 8.2) | Aceptado: ADR-0006 |
 | Garantía de consistencia entre persistencia y publicación de eventos mediante Outbox (obligatorio, letra 8.2) | Aceptado: ADR-0003 |
+| Despliegue en la nube, infraestructura como código y entrega continua (letra 6.14 y 8.2) | Propuesto: ADR-0008 |
 
 # **9 Referencias**
 
@@ -238,3 +239,4 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | 1.5 | 03/11/2026 | Despliegue: el CI despliega en App Platform después de las pruebas (sección 6) y se cierran las decisiones operativas de RabbitMQ, PostgreSQL y Valkey, observabilidad, datos de demostración y estado de Terraform (sección 7). |
 | 1.6 | 05/11/2026 | Cambio de proveedor: Azure Container Apps y PostgreSQL Flexible Server con Azure for Students en lugar de DigitalOcean, que retiró el crédito de estudiante; alternativas descartadas (secciones 2, 4, 6 y 7). Región Chile Central y RabbitMQ en un contenedor, por el límite de colas de CloudAMQP. |
 | 1.7 | 05/11/2026 | Aspire Dashboard desplegado en Azure, protegido con token y clave OTLP (sección 7). |
+| 1.8 | 09/11/2026 | ADR-0008 (despliegue) en la sección 8, que además se actualiza con el ADR-0005 y el ADR-0006; Terraform ya no define CloudAMQP; permiso del job `deploy` asignado por Terraform (sección 6). |

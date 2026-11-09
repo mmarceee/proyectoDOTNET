@@ -1398,6 +1398,20 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Descartado** | `allow-no-subscriptions` en `azure/login`: no se pudo confirmar si la acción igual intenta seleccionar la suscripción del JSON. Dar el rol sobre toda la suscripción: le da al CI más permiso del necesario. |
 | **Verificación** | `terraform fmt -check` y `terraform validate` pasan; `actionlint` no marca errores nuevos en el workflow. Falta verlo en GitHub Actions (el próximo push a `main` tiene que quedar en verde con el aviso) y el `apply` con `ci_principal_id`. |
 
+## **3.94 ADR-0008 · Despliegue e infraestructura como código**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 09/11/2026 |
+| **Archivos** | `ADR-0008-despliegue-e-infraestructura.md` (v0.1); propuesta de stack (v1.8, secciones 6 y 8); README de `infra/terraform`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Completar los ocho registros que pide el documento de cambio de requerimientos con la decisión de despliegue, que ya estaba tomada y aplicada desde el 05/11. |
+| **Cómo se trabajó** | La IA comprobó primero que hubiera material suficiente: Terraform, el README, el CI, las entradas 3.58, 3.61 y 3.62 y la letra (6.14, 6.15 y 8.2). Me preguntó por el costo real, el despliegue continuo y el estado del ambiente, y revisó las ejecuciones del CI (así apareció el problema de la entrada 3.93). Después escribió el borrador a mi pedido. |
+| **Aceptado sin modificaciones** | Un solo registro para plataforma, Terraform y entrega continua, escrito después de aplicar la decisión y aclarándolo. Como alternativas, sólo las que se evaluaron de verdad (DigitalOcean, Vercel, Netlify, Render, Oracle, CloudAMQP, la caché administrada, São Paulo, Aspire sólo local y el permiso asignado a mano). |
+| **Modificado** | El borrador decía que escalar la API necesitaba un backplane de SignalR y revisar el Outbox con varias instancias. Al verificarlo en el código, el backplane sobre Valkey ya existe (CU-66) y el publicador usa `FOR UPDATE SKIP LOCKED`; lo que realmente falta son las migraciones al arrancar. |
+| **Verificación** | Cada dato del ADR se contrastó con `main.tf`, `ci.yml`, `PublicadorOutbox`, `Program.cs` de la API y las ejecuciones de GitHub Actions del 05/11 y el 09/11. Queda abierta la evidencia de costo, que se toma en la próxima puesta en marcha. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -1446,3 +1460,4 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.41 | 05/11/2026 | Entrada del tablero de observabilidad en producción (3.62). | Ezequiel Marcenal |
 | 0.42 | 08/11/2026 | Registro retrospectivo de las entradas de Cristian Reyes (3.63 a 3.92), del 06/10 al 08/11, y su herramienta en la sección 2. Reconstruido con las conversaciones con el asistente, Git y la documentación de estudio, para revisión del responsable. | Cristian Reyes |
 | 0.43 | 09/11/2026 | Entrada del job de despliegue con el ambiente destruido (3.93). | Ezequiel Marcenal |
+| 0.44 | 09/11/2026 | Entrada del ADR-0008, despliegue e infraestructura como código (3.94). | Ezequiel Marcenal |
