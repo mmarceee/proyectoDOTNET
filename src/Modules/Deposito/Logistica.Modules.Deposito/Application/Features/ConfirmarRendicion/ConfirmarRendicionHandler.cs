@@ -100,6 +100,14 @@ internal sealed class ConfirmarRendicionHandler(
                 .Select(g => g.Key).ToArray();
             await envios.ReintegrarADepositoAsync(reintegrados, responsableId: null, ct);
 
+            // T4: un envío que no salió (no se cargó, o se cargó incompleto y quedó AsignadoARuta) vuelve a estar en el
+            // depósito para otra ruta, siempre que hayan vuelto los bultos que se llegaron a cargar.
+            var noSalieron = cerrada.Lineas.GroupBy(l => l.EnvioId)
+                .Where(g => g.All(l => l.Situacion is "NoCargado" or "CargaParcial")
+                    && g.All(l => l.Situacion != "CargaParcial" || l.Recibida == true))
+                .Select(g => g.Key).ToArray();
+            await envios.ReintegrarNoCargadosAsync(rutaId, noSalieron, ct);
+
             // A1: los faltantes quedan como incidencia del envío; el extravío lo decide el despachador (CU-21).
             var faltantes = cerrada.Lineas.Where(l => l.Recibida == false).Select(l => l.BultoId).ToArray();
             await envios.RegistrarFaltantesAsync(faltantes, ct);

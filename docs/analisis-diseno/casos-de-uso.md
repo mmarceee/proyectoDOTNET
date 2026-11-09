@@ -368,6 +368,7 @@ Se detalla como **CU-81** en la sección 2.7 (API pública para comercios).
 * CU-55 deja la devolución *RecibidaEnDeposito* cuando vuelve algún bulto del envío (`Devolucion.MarcarRecibida`). Sólo una devolución recibida se puede cerrar (A1).
 * El operario desmarca los bultos que no se entregan; si falta alguno, confirma la entrega parcial y se abre una incidencia del envío con sus códigos (A2), como en CU-55.
 * El nombre y el documento de quien recibe son obligatorios y quedan en la devolución, con la fecha, y en el detalle del evento del envío. El evento `EnvioDevuelto` llega a Seguimiento: avisa al comercio (CU-64, tipo *Devolución*) y borra el seguimiento público de la caché (CU-60).
+* **Entrega parcial (RF 31, 09/11/2026):** la devolución tiene sólo los bultos *EnDevolucion* (o *Devuelto*, una vez entregada). Los que ya recibió el destinatario no se muestran, no se pueden marcar y no cuentan como faltantes de A2. El envío queda *Devuelto* con su resumen *Entregado parcialmente* y terminado. Sigue pendiente la devolución de un bulto suelto mientras otro del envío se reprograma (decisiones-entrega-parcial.md, pendiente 2): esa visita no crea la devolución.
 
 ### **CU-32 · Generar la liquidación de un comercio**
 
@@ -620,7 +621,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 * T8 se aplica a un envío no intentado sólo si volvieron todos sus bultos, y publica `EnvioReintegradoADeposito` por Outbox (el seguimiento público invalida su caché con ese evento).
 * **A1:** un faltante no bloquea el cierre. La línea queda con *recibida* en falso y sin estado final, y se abre una incidencia de tipo extravío por envío con los códigos que faltan. El envío no cambia de estado: el extravío lo declara el despachador (CU-21).
 * **A2:** un sobrante (un código que no tenía que volver en esta rendición, o que no existe) impide confirmar hasta que el operario lo saque de la lista. No se guarda.
-* Fuera del nivel mínimo: registrar los sobrantes, el responsable de la confirmación y la conciliación de una carga parcial con una transición del envío.
+* **T4 al cerrar (09/11/2026):** un envío que no salió, porque no se cargó o se cargó incompleto y quedó *AsignadoARuta*, vuelve a *EnDeposito* para otra ruta (`IEnviosModuleApi.ReintegrarNoCargadosAsync`), siempre que hayan vuelto los bultos que se llegaron a cargar. Publica `EnvioDesasignadoDeRuta`. Si falta un bulto cargado, el envío queda *AsignadoARuta* con la incidencia de A1.
+* Fuera del nivel mínimo: registrar los sobrantes y el responsable de la confirmación.
 
 ## **2.6 Seguimiento y notificaciones**
 
@@ -868,3 +870,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 2.0 | 05/11/2026 | CU-06: ampliación por RF 33 (entrega parcial, política para los bultos pendientes y recargo de la nueva visita). | Cristian Reyes |
 | 2.1 | 07/11/2026 | CU-60: ampliación por RF 35 (avance de la entrega por bulto); se resume la ampliación de RF 33 en CU-06. | Cristian Reyes |
 | 2.2 | 07/11/2026 | CU-06: registro del recargo de cada visita adicional (RF 33). | Cristian Reyes |
+| 2.3 | 09/11/2026 | CU-31: la devolución de un envío entregado en parte tiene sólo los bultos que vuelven. CU-55: T4 para los envíos que no salieron. | Ezequiel Marcenal |

@@ -328,6 +328,29 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         await envios.GuardarCambiosAsync(ct);
     }
 
+    // CU-55 (T4): lo que no salió vuelve a estar disponible para planificar. Los bultos ya entregados de una revisita no
+    // se mueven, porque Transicionar sólo mueve los que están en el estado del envío.
+    public async Task<int> ReintegrarNoCargadosAsync(Guid rutaId, IReadOnlyCollection<Guid> envioIds, CancellationToken ct)
+    {
+        if (envioIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var ahora = reloj.GetUtcNow();
+        var noCargados = (await envios.ObtenerParaPlanificacionAsync(envioIds, ct))
+            .Where(e => e.Estado == EstadoEnvio.AsignadoARuta).ToList();
+        foreach (var envio in noCargados)
+        {
+            envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora,
+                detalle: $"Volvió en la rendición de la ruta {rutaId} sin haber salido.");
+            envios.RegistrarDesasignacion(envio.Id, rutaId, null, ahora);
+        }
+
+        await envios.GuardarCambiosAsync(ct);
+        return noCargados.Count;
+    }
+
     // CU-55, A1: una incidencia por envío, con los códigos de los bultos que no volvieron. El envío no cambia de estado:
     // el extravío lo declara el despachador (CU-21).
     public async Task RegistrarFaltantesAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct)
@@ -385,10 +408,15 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             return null;
         }
 
+        // RF 31: sólo los bultos que vuelven al comercio. Los que ya recibió el destinatario no se entregan ni faltan.
         return new DevolucionParaEntrega(envio.Id, envio.Numero, envio.Estado.ToString(), devolucion.Motivo,
             devolucion.Estado == EstadoDevolucion.RecibidaEnDeposito, devolucion.Estado == EstadoDevolucion.Cerrada,
-            envio.Bultos.OrderBy(b => b.Codigo).Select(b => new BultoDevuelto(b.Id, b.Codigo)).ToList());
+            BultosDeLaDevolucion(envio).OrderBy(b => b.Codigo).Select(b => new BultoDevuelto(b.Id, b.Codigo)).ToList());
     }
+
+    // Los bultos de la devolución: en devolución mientras está abierta, Devuelto una vez entregada al comercio.
+    private static IEnumerable<Bulto> BultosDeLaDevolucion(Envio envio) =>
+        envio.Bultos.Where(b => b.Estado is EstadoEnvio.EnDevolucion or EstadoEnvio.Devuelto);
 
     public async Task ConfirmarDevolucionAsync(DevolucionAConfirmar confirmacion, CancellationToken ct)
     {
@@ -407,9 +435,11 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             throw new DomainException("Marcá los bultos que se entregan al comercio.");
         }
 
-        if (!entregados.IsSubsetOf(envio.Bultos.Select(b => b.Id)))
+        // RF 31: un bulto que ya recibió el destinatario no es parte de la devolución.
+        var enDevolucion = BultosDeLaDevolucion(envio).ToList();
+        if (!entregados.IsSubsetOf(enDevolucion.Select(b => b.Id)))
         {
-            throw new DomainException("Uno de los bultos marcados no es de este envío.");
+            throw new DomainException("Uno de los bultos marcados no es de esta devolución.");
         }
 
         var ahora = reloj.GetUtcNow();
@@ -418,7 +448,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             detalle: $"Lo recibió {devolucion.NombreReceptor} (documento {devolucion.DocumentoReceptor}) por el comercio.");
 
         // A2: la entrega parcial queda registrada como incidencia del envío, con los códigos que faltaron.
-        var faltantes = envio.Bultos.Where(b => !entregados.Contains(b.Id)).Select(b => b.Codigo).Order().ToArray();
+        var faltantes = enDevolucion.Where(b => !entregados.Contains(b.Id)).Select(b => b.Codigo).Order().ToArray();
         if (faltantes.Length > 0)
         {
             envios.Agregar(Incidencia.Crear(envio, TipoIncidencia.Extravio,
