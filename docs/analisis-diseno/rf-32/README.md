@@ -128,3 +128,15 @@ La hoja HTTP se construye con el mismo manifiesto de la rendición: omite entreg
 El contrato nuevo `ReintegrarNoCargadosAsync` se invoca después de la confirmación explícita de ubicación y la comprobación de que no existe otra ruta activa. Se elimina la segunda liberación automática al cerrar, que habría eludido la casilla. En una revisita sólo se liberan los bultos asignados de esa ruta; los entregados anteriormente se preservan.
 
 Verificación del merge: solución Release compilada sin errores ni advertencias; 143 pruebas de integración dirigidas, 489 unitarias, 56 de arquitectura y 72 de JavaScript aprobadas. Incluye la hoja HTTP de la revisita alineada con su rendición, recuperación con y sin confirmación física, conservación del entregado anterior, carga nueva bloqueada sin devolución ficticia y las pruebas incorporadas de avisos/devoluciones. El primer intento de integración no pudo iniciar por Docker detenido; se inició el motor y la ejecución posterior pasó. No se ejecutó en esta integración la suite completa de CI.
+
+### Integración de consumidores de Cristian (PR #90, 09/11/2026)
+
+Se incorpora `BultosQueAcompanan` para planificación/capacidad. La consulta de carga conserva el estado y `AdmiteEntregaParcial` y usa `BultosParaCarga`: excluye entregados anteriores y mantiene los todavía asignados cuando el envío ya quedó EnTransito por un primer lote. El comienzo explícito de ruta sigue cerrando nuevas cargas; esta selección no lo elude.
+
+`IEnviosHojaRuta` sigue proporcionando los datos y estados completos como contexto. El filtro de pertenencia se aplica en el manifiesto HTTP de Ejecución, donde se conoce la ruta y sus escaneos: así no desaparecen los bultos entregados en la visita actual ni los que todavía se pueden cargar. La prueba de Cristian conserva las verificaciones de capacidad y carga del único pendiente; la selección final de la hoja HTTP se comprueba en `IniciarRendicionTests` y `Rf32PwaTests`.
+
+La regresión de RF 32 ahora incluye confirmar un primer lote, actualizar la hoja, cargar el resto, comenzar, entregar parcialmente y volver por el último bulto. Verifica que la primera hoja conserve los resultados de esta visita, la segunda muestre únicamente el pendiente y el reenvío no duplique el recargo.
+
+La integración detectó además una excepción al entregar el último reprogramado cuando otro bulto ya estaba EnDevolucion: esa visita no aporta un motivo fallido y se intentaba leer el primero de una lista vacía. Se evita iniciar una devolución desde un motivo inexistente y se comprueban los estados y avisos resultantes. El circuito de devolución individual sigue pendiente (punto 2 de la decisión).
+
+Verificación final: compilación Release sin errores ni advertencias; 388 pruebas de integración de Envíos, Planificación, Ejecución y Depósito aprobadas, además de 490 unitarias, 56 de arquitectura y 72 de JavaScript. No se ejecutó la suite completa de CI en este merge.

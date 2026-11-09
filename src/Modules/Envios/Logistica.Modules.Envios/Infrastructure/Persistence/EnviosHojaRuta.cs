@@ -16,6 +16,7 @@ internal sealed class EnviosHojaRuta(EnviosDbContext db, IReglasDeEntrega reglas
             var d = e.Direccion;
             resultado.Add(new(e.Id, e.Numero, e.Estado.ToString(), e.Destinatario.Nombre, e.Destinatario.Telefono,
                 d.Calle, d.Numero, d.Localidad, d.Departamento, d.CodigoPostal, d.Referencia, e.ZonaId, e.FranjaHorariaId,
+                // Ejecución aplica el manifiesto de esta ruta antes de enviarlo a la PWA.
                 e.Bultos.OrderBy(b => b.Codigo).Select(b => new BultoParaHoja(b.Id, b.Codigo, b.Estado.ToString())).ToArray(),
                 await reglas.ParaHojaAsync(e, ct)));
         }

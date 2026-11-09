@@ -65,6 +65,15 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public IReadOnlyList<IntentoEntrega> Intentos => _intentos;
     // RF 33: los cargos de las visitas adicionales, para la liquidación (CU-32).
     public IReadOnlyList<RecargoNuevaVisita> Recargos => _recargos;
+    // Consumidores de EstadoEnvio (decisiones-entrega-parcial.md, sección 6, punto 8): los bultos que acompañan al envío,
+    // los que están en su mismo estado. Son los que mueve el puente de Transicionar y cuentan para planificar.
+    // En una nueva visita (RF 34) deja afuera los bultos ya entregados; carga y hoja conservan además su contexto de ruta.
+    public IReadOnlyList<Bulto> BultosQueAcompanan => _bultos.Where(b => b.Estado == Estado).ToList();
+
+    // Confirmar parte de la carga puede dejar el envío EnTransito con otros bultos AsignadoARuta.
+    // Siguen disponibles hasta Comenzar ruta; los ya entregados no vuelven a cargarse.
+    public IReadOnlyList<Bulto> BultosParaCarga => _bultos.Where(b => b.Estado == Estado
+        || Estado == EstadoEnvio.EnTransito && b.Estado == EstadoEnvio.AsignadoARuta).ToList();
 
     private Envio() { } // para EF Core
 

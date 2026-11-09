@@ -2,6 +2,8 @@ namespace Logistica.Modules.Envios.Contracts;
 
 public interface IEnviosHojaRuta
 {
+    // Datos y estados completos del envío. Ejecución selecciona el manifiesto de la ruta:
+    // así conserva entregados de esta visita y excluye los de rutas anteriores.
     Task<IReadOnlyList<EnvioParaHoja>> ConsultarAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
 }
 public sealed record EnvioParaHoja(Guid Id, string Numero, string Estado, string Nombre, string Telefono,

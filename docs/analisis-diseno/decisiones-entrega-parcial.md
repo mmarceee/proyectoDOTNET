@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptada: decisión funcional cerrada. Implementación pendiente.** |
-| Versión y fecha | 1.4 · 09/11/2026 (RF 32 y pendiente 6 integrado) |
+| Versión y fecha | 1.5 · 09/11/2026 (RF 32, avisos y consumidores de revisita integrados) |
 | Responsable del registro | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas. La ampliación del 08/11 sobre alcance de visita, foto compartida, faltantes y reservas fue confirmada por Lucas en el chat; no registra aprobaciones individuales adicionales de otros integrantes. |
@@ -135,6 +135,8 @@ La decisión funcional anterior está cerrada. **No equivale a declarar terminad
    - Contrato en [integracion-cu64.md](cu-63/integracion-cu64.md#mensaje-v2-rf-36).
 7. Invalidación de seguimiento y actualización del tablero por cambios de bulto, incluso cuando el resumen siga siendo Entregado parcialmente (por ejemplo, de 1/3 a 2/3).
 8. Migración de consultas y consumidores que hoy deciden por EstadoEnvio: retirar esa dependencia de las decisiones operativas. Actualizar dominio, casos de uso y ADR-0004/0006 con la implementación real.
+   - **Avance del 09/11/2026 (nueva visita, RF 34):** planificación y capacidad usan los bultos que acompañan al envío (`Envio.BultosQueAcompanan`, la regla del puente de `Transicionar`), excluyendo los ya entregados. Carga usa `BultosParaCarga`: además conserva los todavía AsignadoARuta si el primer lote dejó el envío EnTransito, para permitir continuar antes de Comenzar ruta. La lectura base de la hoja conserva todos los estados y Ejecución selecciona el manifiesto de la ruta, compartido con la rendición: mantiene entregados en esta visita y omite entregados anteriores. La rendición conserva su consulta separada completa. Se comprueba con `NuevaVisitaTests`, `IniciarRendicionTests` y `Rf32PwaTests`, incluida carga en dos etapas y revisita con recargo idempotente.
+   - **Para el 15/11:** envíos activos de un comercio (`EnviosDeComercio`, por `Terminado`), envíos liquidables (CU-32), reprogramación desde el seguimiento (CU-61) y textos de la PWA.
 
 ## 7. Referencias y vigencia
 
@@ -151,3 +153,4 @@ Este documento reemplaza las propuestas anteriores de derivar el envío con todo
 | 1.2 | 03/11/2026 | Decisiones del equipo: tabla por bulto aprobada y ejemplo de cancelación después de recibir declarado inalcanzable (pendiente 1 y sección 3); extravío del envío entero para el 12/11 (pendiente 4); migración y traducción de las operaciones antiguas (pendiente 5); política de intentos agotados y `AdmiteEntregaParcial` falso en las versiones publicadas (sección 5). | Ezequiel Marcenal |
 | 1.3 | 08/11/2026 | Confirmación de Lucas: alcance de visita sobre bultos que viajaron, una foto compartida por visita, firma de los entregados, faltantes de carga según custodia y exclusividad/liberación de reservas. Se conserva como pendiente la especificación técnica e implementación. | Lucas Ottonello |
 | 1.4 | 09/11/2026 | Integración de avisos v1/v2 (pendiente 6) y lectura de rendición por bulto; conserva los acuerdos de RF 32 sobre inicio de ruta, escaneos que no salieron y confirmación de custodia antes de liberar una asignación. | Lucas Ottonello |
+| 1.5 | 09/11/2026 | Pendiente 8: avance para la nueva visita (bultos que acompañan al envío en planificar, hoja de ruta y carga) y lo que queda para el 15/11. | Cristian Reyes |

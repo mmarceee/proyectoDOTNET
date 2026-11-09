@@ -44,10 +44,12 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
+        // La nueva visita excluye los ya entregados; una carga en preparación conserva los todavía asignados
+        // aunque el primer lote cargado ya haya dejado el estado de compatibilidad EnTransito.
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
         var resultado = new List<EnvioParaCarga>();
         foreach (var e in lista)
-            resultado.Add(new(e.Id, e.Estado.ToString(), e.Bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo, b.Estado.ToString())).ToArray())
+            resultado.Add(new(e.Id, e.Estado.ToString(), e.BultosParaCarga.Select(b => new BultoParaCarga(b.Id, b.Codigo, b.Estado.ToString())).ToArray())
             { Numero = e.Numero, AdmiteEntregaParcial = (await reglasDeEntrega.ParaHojaAsync(e, ct)).AdmiteEntregaParcial });
         return resultado;
     }
@@ -153,7 +155,9 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
             // Con todos sus pendientes devueltos, el envío queda EnDevolucion e inicia la Devolucion (CU-20), como antes.
             // Un bulto devuelto mientras otros se reprograman espera la devolución por bulto (pendiente 2 de la decisión).
-            if (envio.Estado == EstadoEnvio.EnDevolucion)
+            // Una revisita exitosa puede dejar sólo un bulto en devolución de una visita anterior. No tiene un
+            // motivo fallido nuevo: ese caso sigue pendiente de la devolución por bulto (pendiente 2).
+            if (envio.Estado == EstadoEnvio.EnDevolucion && motivos.Count > 0)
             {
                 var motivo = motivos.Values.First();
                 envios.Agregar(Devolucion.Crear(envio, $"Intento fallido: {motivo.Codigo}.", visita.OcurridoEn));
@@ -273,7 +277,8 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         var lista = await envios.ObtenerParaPlanificacionAsync(envioIds, ct);
         return lista.Select(e => new EnvioPlanificable(e.Id, e.OperadorId, e.Numero, e.Estado.ToString(), e.ZonaId,
             e.FranjaHorariaId, e.FechaEntregaProgramada, $"{e.Direccion.Calle} {e.Direccion.Numero}, {e.Direccion.Localidad}",
-            e.Direccion.CodigoPostal, e.Bultos.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
+            // Sólo los bultos que acompañan al envío: la capacidad del vehículo no cuenta los ya entregados (RF 34).
+            e.Direccion.CodigoPostal, e.BultosQueAcompanan.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
             new PuntoEntregaPlanificable(e.Direccion.Calle, e.Direccion.Numero, e.Direccion.Localidad, e.Direccion.Departamento, e.Direccion.CodigoPostal),
             e.ReintentoDesde, e.Modalidad.ToString())).ToList();
     }

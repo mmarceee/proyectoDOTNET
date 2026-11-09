@@ -21,9 +21,10 @@ public sealed class Rf32PwaTests(PostgresApiFactory factory) : IClassFixture<Pos
     private const string Png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD8kAAAAASUVORK5CYII=";
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task La_carga_y_visita_por_bulto_conservan_el_tercero_y_no_duplican_efectos(bool todosCargados)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task La_carga_y_visita_por_bulto_conservan_el_tercero_y_no_duplican_efectos(bool todosCargados, bool cargaEnEtapas)
     {
         using var scope = factory.Services.CreateScope();
         await using var admin = Contexto<AdministracionDbContext>(scope);
@@ -53,13 +54,29 @@ public sealed class Rf32PwaTests(PostgresApiFactory factory) : IClassFixture<Pos
         await Sesion.IngresarAsync(cliente, "repartidor@operador-demo.uy");
         var codigos = envio.Bultos.Select(b => b.Codigo).ToArray();
         var cargados = todosCargados ? codigos : codigos.Take(2).ToArray();
+        var primeraCarga = cargaEnEtapas ? codigos.Take(1).ToArray() : cargados;
         var dispositivo = Guid.NewGuid();
         var carga = new OperacionDispositivoRequest(Guid.CreateVersion7(), dispositivo, 1, "ConfirmarCarga", ruta.Id, null,
-            ahora, null, null, Carga:new(ruta.Revision, cargados.Select(c => new LecturaCargaRequest(c, ahora)).ToArray(), !todosCargados,
-                PorBulto:true, Faltantes:todosCargados ? [] : [new(codigos[2], "NoLocalizado")]));
+            ahora, null, null, Carga:new(ruta.Revision, primeraCarga.Select(c => new LecturaCargaRequest(c, ahora)).ToArray(), !todosCargados || cargaEnEtapas,
+                PorBulto:true, Faltantes:codigos.Except(primeraCarga).Select(c => new FaltanteCargaRequest(c, "NoLocalizado")).ToArray()));
         Assert.Equal("Aplicada", (await Enviar(cliente,carga)).Resultado);
         Assert.Equal("YaAplicada", (await Enviar(cliente,carga)).Resultado);
-        var inicio = new OperacionDispositivoRequest(Guid.CreateVersion7(), dispositivo, 2, "IniciarRuta", ruta.Id, null,
+        if (cargaEnEtapas)
+        {
+            var intermedia = await cliente.GetFromJsonAsync<HojaDeRutaResponse>($"/api/repartidor/rutas/{ruta.Id}/hoja-de-ruta");
+            Assert.NotNull(intermedia);
+            Assert.Equal("Despachada", intermedia.EstadoRuta);
+            var bultosIntermedios = Assert.Single(Assert.Single(intermedia.Paradas).Envios).Bultos;
+            Assert.Equal(3, bultosIntermedios.Count);
+            Assert.Equal(2, bultosIntermedios.Count(b => b.Estado == "AsignadoARuta"));
+            Assert.Single(bultosIntermedios, b => b.Estado == "EnTransito");
+            var segundaCarga = carga with { OperacionId = Guid.CreateVersion7(), Secuencia = 2,
+                Carga = new(intermedia.RevisionRuta, codigos.Skip(1).Select(c => new LecturaCargaRequest(c, ahora)).ToArray(),
+                    PorBulto:true, Faltantes:[]) };
+            Assert.Equal("Aplicada", (await Enviar(cliente,segundaCarga)).Resultado);
+            Assert.Equal("YaAplicada", (await Enviar(cliente,segundaCarga)).Resultado);
+        }
+        var inicio = new OperacionDispositivoRequest(Guid.CreateVersion7(), dispositivo, cargaEnEtapas ? 3 : 2, "IniciarRuta", ruta.Id, null,
             ahora, null, null);
         Assert.Equal("Aplicada", (await Enviar(cliente,inicio)).Resultado);
         Assert.Equal("YaAplicada", (await Enviar(cliente,inicio)).Resultado);
@@ -70,7 +87,7 @@ public sealed class Rf32PwaTests(PostgresApiFactory factory) : IClassFixture<Pos
         var foto = new ArchivoRequest("image/png", Png);
         var motivo = version.Motivos.First(m => m.Codigo == "AUSENTE").Id;
         var resultados = cargados.Select((c,i) => new ResultadoBultoRequest(c, i == 2 ? motivo : null)).ToArray();
-        var visita = new OperacionDispositivoRequest(Guid.CreateVersion7(),dispositivo,3,"RegistrarVisita",ruta.Id,envio.Id,
+        var visita = new OperacionDispositivoRequest(Guid.CreateVersion7(),dispositivo,cargaEnEtapas ? 4 : 3,"RegistrarVisita",ruta.Id,envio.Id,
             ahora.AddSeconds(1),-34.9m,-56.16m,Visita:new(resultados,foto,foto));
         Assert.Equal("Aplicada",(await Enviar(cliente,visita)).Resultado);
         Assert.Equal("YaAplicada",(await Enviar(cliente,visita)).Resultado);
@@ -91,6 +108,8 @@ public sealed class Rf32PwaTests(PostgresApiFactory factory) : IClassFixture<Pos
         var hoja=await cliente.GetFromJsonAsync<HojaDeRutaResponse>($"/api/repartidor/rutas/{ruta.Id}/hoja-de-ruta");
         Assert.Equal(3,hoja!.SchemaVersion);var fila=Assert.Single(Assert.Single(hoja.Paradas).Envios);
         Assert.True(fila.ReglasEntrega.AdmiteEntregaParcial); Assert.All(fila.Bultos,b=>Assert.NotEmpty(b.Estado));
+        Assert.Equal(codigos.Order(), fila.Bultos.Select(b => b.Codigo).Order());
+        Assert.Equal(fila.Bultos.Select(b => b.Id).Order(), hoja.Rendicion!.Bultos.Select(b => b.BultoId).Order());
         await using var ejecucion=Contexto<EjecucionDbContext>(scope);
         Assert.Equal(1,await ejecucion.Operaciones.CountAsync(o=>o.Id==visita.OperacionId));
         plan.ChangeTracker.Clear();
@@ -105,7 +124,10 @@ public sealed class Rf32PwaTests(PostgresApiFactory factory) : IClassFixture<Pos
             var revisita = Ruta.Crear(Operador,fecha,DatosIniciales.RepartidorDemoId,Guid.Parse("51111111-1111-1111-1111-111111111111"),
                 [new EnvioRuta(envio.Id,envio.Numero,null,null,null,false,[])],ahora.AddSeconds(2));
             revisita.Despachar(ahora.AddSeconds(2));revisita.Iniciar();plan.Rutas.Add(revisita);await plan.SaveChangesAsync();
-            var otra = visita with { OperacionId=Guid.CreateVersion7(), Secuencia=3, RutaId=revisita.Id,
+            var hojaRevisita = await cliente.GetFromJsonAsync<HojaDeRutaResponse>($"/api/repartidor/rutas/{revisita.Id}/hoja-de-ruta");
+            Assert.NotNull(hojaRevisita);
+            Assert.Equal(codigos[2], Assert.Single(Assert.Single(Assert.Single(hojaRevisita.Paradas).Envios).Bultos).Codigo);
+            var otra = visita with { OperacionId=Guid.CreateVersion7(), Secuencia=visita.Secuencia + 1, RutaId=revisita.Id,
                 OcurridoEn=ahora.AddSeconds(3), Visita=new([new(codigos[2])],foto,foto) };
             Assert.Equal("Aplicada",(await Enviar(cliente,otra)).Resultado);
             Assert.Equal("YaAplicada",(await Enviar(cliente,otra)).Resultado);
