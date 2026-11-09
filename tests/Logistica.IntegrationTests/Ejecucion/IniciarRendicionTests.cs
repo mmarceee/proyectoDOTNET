@@ -4,6 +4,7 @@ using System.Security.Claims;
 using Logistica.Http.Contracts.Repartidor;
 using Logistica.IntegrationTests.Identidad;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
+using Logistica.Modules.Deposito.Application.Features.ConfirmarRendicion;
 using Logistica.Modules.Ejecucion.Application.Features.IniciarRendicion;
 using Logistica.Modules.Ejecucion.Contracts;
 using Logistica.Modules.Ejecucion.Domain.Operaciones;
@@ -18,6 +19,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using DatosMotivo = Logistica.Modules.Administracion.Domain.Reglas.DatosMotivo;
+using ReglasEntregaParcial = Logistica.Modules.Administracion.Domain.Reglas.ReglasEntregaParcial;
+using VersionReglas = Logistica.Modules.Administracion.Domain.Reglas.VersionReglas;
+using PoliticaPendientes = Logistica.Modules.Administracion.Contracts.PoliticaPendientes;
 
 namespace Logistica.IntegrationTests.Ejecucion;
 
@@ -32,7 +37,7 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("operador_id", (operador ?? DatosIniciales.OperadorDemoId).ToString())], "Prueba")) };
         return scope;
     }
-    private async Task<Datos> PrepararAsync(bool cargada = true)
+    private async Task<Datos> PrepararAsync(bool cargada = true, Guid? reglas = null)
     {
         using var inicial = factory.CreateClient(); await inicial.GetAsync("/health");
         using var scope = Scope();
@@ -42,7 +47,8 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         {
             var e = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId, $"CU54-{Guid.NewGuid():N}",
                 new Destinatario("Prueba Rendición", "099123456"), new Direccion("Calle", "10", "Montevideo", "Montevideo", "11300"),
-                [new DatosBulto(1, 10, 10, 10, 0), new DatosBulto(1, 10, 10, 10, 0)], OrigenEvento.PortalComercio, null, ahora);
+                [new DatosBulto(1, 10, 10, 10, 0), new DatosBulto(1, 10, 10, 10, 0)], OrigenEvento.PortalComercio, null, ahora,
+                versionReglasId: reglas);
             e.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
             e.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
             if (cargada) e.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora);
@@ -244,6 +250,132 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         using var scope = Scope(); var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         var fallido = await db.Envios.Include(e => e.Intentos).SingleAsync(e => e.Id == d.Envios[0].Id);
         Assert.Equal(EstadoEnvio.Reprogramado, fallido.Estado); Assert.Single(fallido.Intentos);
+    }
+
+    // RF 31: la rendición mira el estado de cada bulto. Después de una visita parcial el envío queda Reprogramado, pero el
+    // bulto entregado en esta ruta se rinde como entregado en la calle y el pendiente como intento fallido. En la ruta
+    // siguiente del envío sólo aparece el pendiente: el entregado antes no se escaneó en esa carga.
+    [Fact]
+    public async Task Una_visita_parcial_rinde_cada_bulto_por_su_estado_y_la_ruta_siguiente_no_repite_el_entregado()
+    {
+        var reglas = await PublicarEntregaParcialAsync();
+        var d = await PrepararAsync(reglas: reglas);
+        await EscanearAsync(d.Ruta, d.Envios.SelectMany(e => e.Bultos));
+        var envio = d.Envios[0];
+        var (entregado, pendiente) = (envio.Bultos[0], envio.Bultos[1]);
+        using var client = Cliente(); await Sesion.IngresarAsync(client, "repartidor@operador-demo.uy");
+        var visita = new OperacionDispositivoRequest(Guid.CreateVersion7(), Guid.NewGuid(), 1, "RegistrarVisita", d.Ruta,
+            envio.Id, DateTimeOffset.UtcNow.AddMinutes(-1), -34.9m, -56.16m,
+            Visita: new VisitaRequest([new ResultadoBultoRequest(entregado.Codigo),
+                new ResultadoBultoRequest(pendiente.Codigo, await MotivoAsync(reglas, "AUSENTE"))],
+                new ArchivoRequest("image/png", Png)));
+        Assert.Equal("Aplicada", (await Enviar(client, visita)).Resultado);
+
+        var op = await OperacionAsync(d);
+        var situaciones = op.Rendicion!.Bultos.ToDictionary(b => b.BultoId, b => (b.Situacion, b.Devuelve));
+        Assert.Equal(4, situaciones.Count);
+        Assert.Equal(("EntregadoEnCalle", false), situaciones[entregado.Id]);
+        Assert.Equal(("IntentoFallido", true), situaciones[pendiente.Id]);
+        Assert.All(d.Envios[1].Bultos, b => Assert.Equal(("NoIntentado", true), situaciones[b.Id]));
+        Assert.Equal("Aplicada", (await Enviar(client, op)).Resultado);
+
+        // Depósito reconoce el código del bulto que vuelve, aunque ya no esté en el estado del envío entero.
+        using (var s = Scope())
+        {
+            var deposito = s.ServiceProvider.GetRequiredService<ConfirmarRendicionHandler>();
+            var comparacion = (await deposito.CompararAsync(d.Ruta,
+                [pendiente.Codigo, .. d.Envios[1].Bultos.Select(b => b.Codigo)], default))!;
+            Assert.Empty(comparacion.Sobrantes);
+            Assert.Equal(0, comparacion.Faltantes);
+            Assert.Equal(entregado.Codigo, comparacion.Lineas.Single(l => l.Linea.BultoId == entregado.Id).Codigo);
+        }
+
+        // La ruta siguiente: sin cargar, sólo el pendiente (NoCargado); cargado, sólo el pendiente (NoIntentado).
+        var siguiente = await RutaSiguienteAsync(d.Ruta, envio.Id, d.Fecha.AddDays(400));
+        using (var s = Scope())
+        {
+            var preparar = s.ServiceProvider.GetRequiredService<PrepararRendicion>();
+            var sinCargar = await preparar.ConsultarAsync(siguiente, [envio.Id], default);
+            Assert.Equal((pendiente.Id, "NoCargado"), (Assert.Single(sinCargar.Bultos).BultoId, sinCargar.Bultos[0].Situacion));
+        }
+        await EscanearAsync(siguiente, [pendiente]);
+        await TransicionarAsync(envio.Id, EstadoEnvio.EnTransito);
+        using (var s = Scope())
+        {
+            var cargada = await s.ServiceProvider.GetRequiredService<PrepararRendicion>()
+                .ConsultarAsync(siguiente, [envio.Id], default);
+            Assert.Equal((pendiente.Id, "NoIntentado"), (Assert.Single(cargada.Bultos).BultoId, cargada.Bultos[0].Situacion));
+        }
+    }
+
+    private const string Png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD8kAAAAASUVORK5CYII=";
+
+    // Lo que la carga de la ruta registra por cada bulto leído (CU-51).
+    private async Task EscanearAsync(Guid rutaId, IEnumerable<Bulto> bultos)
+    {
+        using var scope = Scope();
+        var db = scope.ServiceProvider.GetRequiredService<EjecucionDbContext>();
+        db.EscaneosCarga.AddRange(bultos.Select(b =>
+            EscaneoCarga.Crear(DatosIniciales.OperadorDemoId, Guid.NewGuid(), rutaId, b.Id, b.Codigo, true, DateTimeOffset.UtcNow)));
+        await db.SaveChangesAsync();
+    }
+
+    private async Task TransicionarAsync(Guid envioId, EstadoEnvio estado)
+    {
+        using var scope = Scope();
+        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var envio = await db.Envios.SingleAsync(e => e.Id == envioId);
+        envio.Transicionar(estado, OrigenEvento.Backoffice, null, DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+    }
+
+    // La revisita (RF 34): el envío reprogramado vuelve a una ruta nueva, despachada y sin cargar todavía. Sólo su bulto
+    // pendiente pasa a AsignadoARuta; el entregado sigue Entregado.
+    private async Task<Guid> RutaSiguienteAsync(Guid anterior, Guid envioId, DateOnly fecha)
+    {
+        await TransicionarAsync(envioId, EstadoEnvio.AsignadoARuta);
+        using var scope = Scope();
+        // La ruta anterior se cerró con su rendición: el envío ya no tiene una parada pendiente en ella.
+        await scope.ServiceProvider.GetRequiredService<Logistica.Modules.Planificacion.Contracts.IPlanificacionModuleApi>()
+            .FinalizarRutaAsync(anterior, [], default);
+        var envio = await scope.ServiceProvider.GetRequiredService<EnviosDbContext>().Envios.AsNoTracking()
+            .SingleAsync(e => e.Id == envioId);
+        var ahora = DateTimeOffset.UtcNow;
+        var ruta = Ruta.Crear(DatosIniciales.OperadorDemoId, fecha, DatosIniciales.RepartidorDemoId,
+            Guid.Parse("51111111-1111-1111-1111-111111111111"), [new EnvioRuta(envio.Id, envio.Numero, fecha,
+                Guid.Parse("61111111-1111-1111-1111-111111111111"), null, false,
+                envio.Bultos.Where(b => b.Estado == EstadoEnvio.AsignadoARuta)
+                    .Select(b => new CargaBulto(envio.Id, b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToArray(),
+                new PuntoEntrega("Calle", "10", "Montevideo", "Montevideo", "11300"))], ahora);
+        ruta.Despachar(ahora);
+        var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+        plan.Rutas.Add(ruta); await plan.SaveChangesAsync();
+        return ruta.Id;
+    }
+
+    // Una versión 2 de las reglas de Demo que admite la entrega parcial. Rige recién en 2099, así no cambia las reglas de
+    // las otras pruebas de la clase; los envíos de la prueba la guardan como su versión.
+    private async Task<Guid> PublicarEntregaParcialAsync()
+    {
+        using var inicial = factory.CreateClient(); await inicial.GetAsync("/health");
+        using var scope = Scope();
+        var db = scope.ServiceProvider.GetRequiredService<AdministracionDbContext>();
+        var anterior = await db.VersionesReglas.SingleAsync(v => v.Numero == 1);
+        var nueva = VersionReglas.CrearBorrador(DatosIniciales.OperadorDemoId, 2, anterior.Valores() with
+        {
+            EntregaParcial = new ReglasEntregaParcial(true, PoliticaPendientes.NuevaVisitaSinRecargo, 0),
+        }, [new DatosMotivo("AUSENTE", "Destinatario ausente", Reprogramable: true, ExigeEvidencia: false)]);
+        nueva.Publicar(new DateTimeOffset(2099, 1, 1, 0, 0, 0, TimeSpan.Zero), DateTimeOffset.UtcNow, anterior);
+        db.VersionesReglas.Add(nueva);
+        await db.SaveChangesAsync();
+        return nueva.Id;
+    }
+
+    private async Task<Guid> MotivoAsync(Guid versionReglasId, string codigo)
+    {
+        using var scope = Scope();
+        return await scope.ServiceProvider.GetRequiredService<AdministracionDbContext>().MotivosNoEntrega
+            .Where(m => m.VersionReglasId == versionReglasId && m.Codigo == codigo).Select(m => m.Id).SingleAsync();
     }
 
     private sealed class OperacionQueFallaAlGuardar(EjecucionDbContext db) : IOperacionRepository

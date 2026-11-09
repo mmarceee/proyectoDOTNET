@@ -133,7 +133,9 @@ internal sealed class ConfirmarRendicionHandler(
         IReadOnlyCollection<string> codigos, CancellationToken ct)
     {
         var envioIds = rendicion.Lineas.Select(l => l.EnvioId).Distinct().ToArray();
-        var codigoDe = (await envios.ConsultarCargaAsync(envioIds, ct))
+        // Todos los bultos, no sólo los que acompañan al envío (RF 31): un bulto que quedó en devolución mientras el envío
+        // sigue Reprogramado también vuelve en la rendición.
+        var codigoDe = (await envios.ConsultarParaRendicionAsync(envioIds, ct))
             .SelectMany(e => e.Bultos).ToDictionary(b => b.Id, b => b.Codigo);
         var escaneados = codigos.Select(c => c.Trim()).Where(c => c.Length > 0)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

@@ -602,6 +602,8 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 
 **Implementación de CU-54 (19/10/2026):** la PWA permite declarar por bulto, observar los que no vuelven y confirmar sin conexión. IniciarRendicion se sincroniza en orden, con aislamiento, idempotencia y persistencia transaccional. La hoja distingue carga parcial y bultos nunca cargados; recepción y resultado final quedan pendientes. No aplica T8 ni finaliza o libera la ruta. Ejecución expone las consultas para CU-55. Véase [alcance, contrato y verificación](cu-54/README.md).
 
+**Entrega parcial (RF 31, 09/11/2026):** la situación de cada línea sale del estado de su bulto, no del envío: después de una visita parcial, el bulto entregado se rinde como *entregado en la calle* y el pendiente como *intento fallido*, aunque el envío quede *Reprogramado*. Son de la ruta los bultos escaneados en su carga y los que siguen asignados sin cargar; sin escaneos del envío, los de su mismo estado. Un bulto entregado en una ruta anterior no aparece. Envíos los entrega con su estado por un contrato propio (`ConsultarParaRendicionAsync`), separado del de la carga; Depósito lo usa también para reconocer los códigos al confirmar (CU-55).
+
 ### **CU-55 · Confirmar la rendición**
 
 | Campo | Contenido |
@@ -880,3 +882,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 2.2 | 07/11/2026 | CU-06: registro del recargo de cada visita adicional (RF 33). | Cristian Reyes |
 | 2.3 | 09/11/2026 | CU-31: la devolución de un envío entregado en parte tiene sólo los bultos que vuelven. CU-55: T4 para los envíos que no salieron. | Ezequiel Marcenal |
 | 2.4 | 09/11/2026 | CU-64: avisos versionados v1 y v2 con los eventos de bulto (RF 36). | Ezequiel Marcenal |
+| 2.5 | 09/11/2026 | CU-54: la rendición mira el estado de cada bulto (RF 31). | Ezequiel Marcenal |

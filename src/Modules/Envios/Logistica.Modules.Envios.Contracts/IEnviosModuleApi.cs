@@ -61,6 +61,10 @@ public interface IEnviosModuleApi
     // AsignadoARuta (el despachador pudo quitarlos antes). Devuelve cuántos volvieron.
     Task<int> ReintegrarNoCargadosAsync(Guid rutaId, IReadOnlyCollection<Guid> envioIds, CancellationToken ct);
 
+    // CU-54 y CU-55 (RF 31): los envíos con todos sus bultos y el estado de cada uno, para armar y confirmar la rendición.
+    // Los que no son del operador actual no vuelven.
+    Task<IReadOnlyList<EnvioParaRendicion>> ConsultarParaRendicionAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
+
     // CU-55, A1: los bultos que tenían que volver en una rendición y no llegaron. Abre una incidencia por envío con sus
     // códigos; el despachador decide si declara el extravío (CU-21).
     Task RegistrarFaltantesAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct);

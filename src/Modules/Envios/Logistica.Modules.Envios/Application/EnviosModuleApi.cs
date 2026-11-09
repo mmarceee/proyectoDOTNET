@@ -373,6 +373,19 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         return noCargados.Count;
     }
 
+    public async Task<IReadOnlyList<EnvioParaRendicion>> ConsultarParaRendicionAsync(IReadOnlyCollection<Guid> ids,
+        CancellationToken ct)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
+        return lista.Select(e => new EnvioParaRendicion(e.Id, e.Numero, e.Estado.ToString(),
+            e.Bultos.Select(b => new BultoParaRendicion(b.Id, b.Codigo, b.Estado.ToString())).ToArray())).ToArray();
+    }
+
     // CU-55, A1: una incidencia por envío, con los códigos de los bultos que no volvieron. El envío no cambia de estado:
     // el extravío lo declara el despachador (CU-21).
     public async Task RegistrarFaltantesAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct)
