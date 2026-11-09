@@ -309,6 +309,78 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
             .AnyAsync(i => i.EnvioId == e.NoIntentado.Id || i.EnvioId == e.ConFaltante.Id));
     }
 
+    // T4 en la rendición: lo que no salió vuelve a estar en el depósito para otra ruta. Un envío no se cargó; otro se
+    // cargó incompleto y su bulto cargado volvió; al tercero, cargado incompleto, no le volvió el bulto cargado, así que
+    // queda AsignadoARuta con la incidencia del faltante, igual que un no intentado incompleto.
+    [Fact]
+    public async Task Los_envios_que_no_salieron_vuelven_al_deposito_si_volvio_lo_que_se_cargo()
+    {
+        using var inicial = factory.CreateClient();
+        await inicial.GetAsync("/health");
+        var ahora = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var fecha = new DateOnly(2024, 6, 1).AddDays(Interlocked.Increment(ref dia));
+        var envios = Enumerable.Range(0, 3).Select(_ =>
+        {
+            var envio = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId, $"CU55-{Guid.NewGuid():N}",
+                new Destinatario("Prueba Rendición", "099123456"), new Direccion("Calle", "10", "Montevideo", "Montevideo", "11300"),
+                [new DatosBulto(1, 10, 10, 10, 0), new DatosBulto(1, 10, 10, 10, 0)], OrigenEvento.PortalComercio, null, ahora);
+            envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
+            envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
+            return envio;
+        }).ToArray();
+        var (noCargado, parcialVuelto, parcialFaltante) = (envios[0], envios[1], envios[2]);
+        Guid rutaId;
+        using (var scope = Scope())
+        {
+            var enviosDb = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+            enviosDb.Envios.AddRange(envios);
+            await enviosDb.SaveChangesAsync();
+            var ruta = Ruta.Crear(DatosIniciales.OperadorDemoId, fecha, DatosIniciales.RepartidorDemoId,
+                Guid.Parse("51111111-1111-1111-1111-111111111111"), envios.Select(e => new EnvioRuta(e.Id, e.Numero, fecha,
+                    Guid.Parse("61111111-1111-1111-1111-111111111111"), null, false,
+                    e.Bultos.Select(b => new CargaBulto(e.Id, b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToArray(),
+                    new PuntoEntrega("Calle", "10", "Montevideo", "Montevideo", "11300"))).ToArray(), ahora);
+            ruta.Despachar(ahora);
+            var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+            plan.Rutas.Add(ruta);
+            await plan.SaveChangesAsync();
+            rutaId = ruta.Id;
+
+            // Lo que declaró el repartidor en CU-54: el primer bulto de los dos incompletos se escaneó en la carga.
+            DeclaracionRendicion[] lineas =
+            [
+                .. noCargado.Bultos.Select(b => new DeclaracionRendicion(noCargado.Id, b.Id, "NoCargado", false, null)),
+                .. new[] { parcialVuelto, parcialFaltante }.SelectMany(e => new[]
+                {
+                    new DeclaracionRendicion(e.Id, e.Bultos[0].Id, "CargaParcial", true, null),
+                    new DeclaracionRendicion(e.Id, e.Bultos[1].Id, "NoCargado", false, null),
+                }),
+            ];
+            var ejecucion = scope.ServiceProvider.GetRequiredService<EjecucionDbContext>();
+            ejecucion.Rendiciones.Add(Rendicion.Iniciar(DatosIniciales.OperadorDemoId, rutaId, DatosIniciales.RepartidorDemoId,
+                Guid.CreateVersion7(), ahora, null, lineas));
+            await ejecucion.SaveChangesAsync();
+        }
+        using var client = await OperarioAsync();
+
+        var respuesta = await ConfirmarAsync(client, rutaId, parcialVuelto.Bultos[0].Codigo);
+
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        using var verificacion = Scope();
+        var db = verificacion.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        Assert.Equal(EstadoEnvio.EnDeposito, await EstadoAsync(db, noCargado.Id));
+        Assert.Equal(EstadoEnvio.EnDeposito, await EstadoAsync(db, parcialVuelto.Id));
+        Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(db, parcialFaltante.Id));
+        Assert.All((await db.Envios.AsNoTracking().SingleAsync(e => e.Id == noCargado.Id)).Bultos,
+            b => Assert.Equal(EstadoEnvio.EnDeposito, b.Estado));
+        var desasignados = await db.Outbox.Where(m => m.Tipo == EnvioDesasignadoDeRuta.Tipo).ToListAsync();
+        Assert.Single(desasignados, m => m.Contenido.Contains(noCargado.Id.ToString()));
+        Assert.Single(desasignados, m => m.Contenido.Contains(parcialVuelto.Id.ToString()));
+        Assert.DoesNotContain(desasignados, m => m.Contenido.Contains(parcialFaltante.Id.ToString()));
+        Assert.Contains(parcialFaltante.Bultos[0].Codigo,
+            Assert.Single(await db.Incidencias.Where(i => i.EnvioId == parcialFaltante.Id).ToListAsync()).Descripcion);
+    }
+
     private async Task<Escenario> PrepararAsync(bool todosEntregados = false)
     {
         using var inicial = factory.CreateClient();

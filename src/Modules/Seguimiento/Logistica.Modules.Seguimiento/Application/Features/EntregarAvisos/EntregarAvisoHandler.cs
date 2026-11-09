@@ -27,8 +27,10 @@ internal sealed class EntregarAvisoHandler(IEntregasAvisoRepository entregas, IS
 
         // El secreto se descifra en cada intento: una regeneración rige desde el próximo (guía de integración de CU-63).
         var secreto = secretos.Descifrar(suscripcion.SecretoFirma, entrega.OperadorId, entrega.ComercioId);
+        // RF 36: la versión y el bulto salen de la entrega, no de la suscripción: un reintento o un reenvío manda el
+        // mismo contenido con que se preparó.
         var mensaje = new MensajeAviso(entrega.Id, entrega.Tipo.ToString(), entrega.FechaEvento,
-            entrega.NumeroEnvio, entrega.EstadoEnvio, Prueba: entrega.EsPrueba);
+            entrega.NumeroEnvio, entrega.EstadoEnvio, Prueba: entrega.EsPrueba, entrega.Version, entrega.Bulto);
         var resultado = await emisor.EnviarAsync(suscripcion.UrlDestino, secreto, mensaje, ct);
 
         entrega.RegistrarIntento(reloj.GetUtcNow(), resultado.Exitosa, resultado.CodigoRespuesta, resultado.Error, ultimoIntento);

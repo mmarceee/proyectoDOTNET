@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text.Json;
 using Logistica.IntegrationTests.Identidad;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Logistica.Modules.Ejecucion.Domain.Rendiciones;
@@ -116,6 +117,44 @@ public sealed class ConfirmarDevolucionTests(PostgresApiFactory factory) : IClas
         Assert.Contains("No hay una devolución", await operario.GetStringAsync($"{Pagina}?Buscar=ENV-INEXISTENTE"));
     }
 
+    // RF 31: de un envío entregado en parte, vuelve al comercio sólo lo que no se entregó. Los bultos que recibió el
+    // destinatario no se ofrecen, no se pueden marcar y no cuentan como faltantes.
+    [Fact]
+    public async Task Con_bultos_ya_entregados_se_devuelve_solo_el_resto_sin_registrar_faltantes()
+    {
+        var envio = await EnDevolucionAsync(entregados: 2);
+        var (entregado, devuelto) = (envio.Bultos[0], envio.Bultos[2]);
+        using var operario = await OperarioAsync();
+
+        var pagina = await operario.GetStringAsync($"{Pagina}?Buscar={envio.Numero}");
+        Assert.Contains($"value=\"{devuelto.Id}\"", pagina);
+        Assert.DoesNotContain($"value=\"{entregado.Id}\"", pagina);
+
+        var ajeno = await ConfirmarAsync(operario, envio.Numero, [entregado.Id, devuelto.Id], "María Gómez", "12345678");
+        Assert.Contains("no es de esta devolución", await SeguirAsync(operario, ajeno));
+        Assert.Equal(EstadoEnvio.EnDevolucion, await EstadoAsync(envio.Id));
+
+        var respuesta = await ConfirmarAsync(operario, envio.Numero, [devuelto.Id], "María Gómez", "12345678");
+
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        Assert.Equal(Pagina, respuesta.Headers.Location?.OriginalString);
+        using var scope = Scope();
+        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var guardado = await db.Envios.AsNoTracking().SingleAsync(e => e.Id == envio.Id);
+        Assert.Equal(EstadoEnvio.Devuelto, guardado.Estado);
+        Assert.Equal([EstadoEnvio.Entregado, EstadoEnvio.Entregado, EstadoEnvio.Devuelto],
+            guardado.Bultos.OrderBy(b => b.Codigo).Select(b => b.Estado));
+        Assert.Equal((ResumenEnvio.EntregadoParcialmente, true), (guardado.Resumen, guardado.Terminado));
+        Assert.Empty(await db.Incidencias.Where(i => i.EnvioId == envio.Id).ToListAsync());
+
+        // RF 36: el cierre es mixto (los avisos v1 no lo reciben) y sólo el bulto devuelto tiene su evento.
+        var eventos = (await db.Outbox.AsNoTracking().ToListAsync()).Where(m => m.Contenido.Contains(envio.Id.ToString())).ToList();
+        var cierre = JsonSerializer.Deserialize<EnvioDevuelto>(Assert.Single(eventos, m => m.Tipo == EnvioDevuelto.Tipo).Contenido)!;
+        Assert.Equal(2, cierre.BultosEntregados);
+        var bulto = JsonSerializer.Deserialize<BultoDevuelto>(Assert.Single(eventos, m => m.Tipo == BultoDevuelto.Tipo).Contenido)!;
+        Assert.Equal((devuelto.Codigo, "Devuelto"), (bulto.CodigoBulto, bulto.EstadoEnvio));
+    }
+
     [Fact]
     public async Task Sin_el_nombre_o_el_documento_de_quien_recibe_no_cambia_nada()
     {
@@ -145,20 +184,27 @@ public sealed class ConfirmarDevolucionTests(PostgresApiFactory factory) : IClas
     }
 
     // Un envío del operador de demostración en devolución (T7 y T10, CU-18), con su devolución. recibida: sus bultos
-    // ya volvieron en la rendición (CU-55).
-    private async Task<Envio> EnDevolucionAsync(bool recibida = true)
+    // ya volvieron en la rendición (CU-55). entregados: con entrega parcial, cuántos bultos (de un total de uno más) ya
+    // recibió el destinatario; sólo el último vuelve.
+    private async Task<Envio> EnDevolucionAsync(bool recibida = true, int entregados = 0)
     {
         using var inicial = factory.CreateClient();
         await inicial.GetAsync("/health");
         using var scope = Scope();
         var ahora = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var bultos = Enumerable.Repeat(new DatosBulto(1, 10, 10, 10, 0), entregados == 0 ? 2 : entregados + 1).ToList();
         var envio = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId,
             $"CU31-{Guid.NewGuid():N}".ToUpperInvariant(), new Destinatario("Prueba Devolución", "099123456"),
-            new Direccion("Calle", "10", "Montevideo", "Montevideo", "11300"),
-            [new DatosBulto(1, 10, 10, 10, 0), new DatosBulto(1, 10, 10, 10, 0)], OrigenEvento.PortalComercio, null, ahora);
+            new Direccion("Calle", "10", "Montevideo", "Montevideo", "11300"), bultos, OrigenEvento.PortalComercio, null, ahora);
         envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
         envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
         envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora);
+        // La parte entregada de la visita (T6 por bulto); el resto sigue con el envío a NoEntregado y EnDevolucion.
+        foreach (var bulto in envio.Bultos.OrderBy(b => b.Codigo).Take(entregados))
+        {
+            bulto.Transicionar(EstadoEnvio.Entregado);
+        }
+
         envio.Transicionar(EstadoEnvio.NoEntregado, OrigenEvento.AppRepartidor, null, ahora);
         envio.Transicionar(EstadoEnvio.EnDevolucion, OrigenEvento.Sistema, null, ahora);
         var devolucion = Devolucion.Crear(envio, "Intento fallido: RECHAZADO.", ahora);

@@ -100,6 +100,14 @@ internal sealed class ConfirmarRendicionHandler(
                 .Select(g => g.Key).ToArray();
             await envios.ReintegrarADepositoAsync(reintegrados, responsableId: null, ct);
 
+            // T4: un envío que no salió (no se cargó, o se cargó incompleto y quedó AsignadoARuta) vuelve a estar en el
+            // depósito para otra ruta, siempre que hayan vuelto los bultos que se llegaron a cargar.
+            var noSalieron = cerrada.Lineas.GroupBy(l => l.EnvioId)
+                .Where(g => g.All(l => l.Situacion is "NoCargado" or "CargaParcial")
+                    && g.All(l => l.Situacion != "CargaParcial" || l.Recibida == true))
+                .Select(g => g.Key).ToArray();
+            await envios.ReintegrarNoCargadosAsync(rutaId, noSalieron, ct);
+
             // A1: los faltantes quedan como incidencia del envío; el extravío lo decide el despachador (CU-21).
             var faltantes = cerrada.Lineas.Where(l => l.Recibida == false).Select(l => l.BultoId).ToArray();
             await envios.RegistrarFaltantesAsync(faltantes, ct);
@@ -125,7 +133,9 @@ internal sealed class ConfirmarRendicionHandler(
         IReadOnlyCollection<string> codigos, CancellationToken ct)
     {
         var envioIds = rendicion.Lineas.Select(l => l.EnvioId).Distinct().ToArray();
-        var codigoDe = (await envios.ConsultarCargaAsync(envioIds, ct))
+        // Todos los bultos, no sólo los que acompañan al envío (RF 31): un bulto que quedó en devolución mientras el envío
+        // sigue Reprogramado también vuelve en la rendición.
+        var codigoDe = (await envios.ConsultarParaRendicionAsync(envioIds, ct))
             .SelectMany(e => e.Bultos).ToDictionary(b => b.Id, b => b.Codigo);
         var escaneados = codigos.Select(c => c.Trim()).Where(c => c.Length > 0)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

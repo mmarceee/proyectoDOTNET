@@ -102,6 +102,12 @@
                             <label for="evento-devolucion" class="form-check-label">Devolución</label>
                         </div>
                     </fieldset>
+                    <div class="form-check mb-3">
+                        <InputCheckbox id="eventos-bulto" class="form-check-input" @bind-Value="_formulario.EventosDeBulto"
+                                       aria-describedby="ayuda-eventos-bulto" />
+                        <label for="eventos-bulto" class="form-check-label">Recibir también los eventos de cada bulto (versión 2)</label>
+                        <div id="ayuda-eventos-bulto" class="form-text">Elegila sólo si tu sistema ya procesa la versión 2: suma los campos <code>version</code> y <code>bulto</code>. La versión se elige al crear la suscripción y no cambia.</div>
+                    </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">@(_ocupado ? "Guardando…" : "Crear suscripción")</button>
                         <button type="button" class="btn btn-outline-secondary" @onclick="CancelarFormulario">Cancelar</button>
@@ -182,13 +188,14 @@ else if (_suscripciones is not null)
         <div class="table-responsive">
             <table class="table align-middle">
                 <caption>Suscripciones de avisos del operador seleccionado</caption>
-                <thead><tr><th scope="col">Dirección</th><th scope="col">Eventos</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
+                <thead><tr><th scope="col">Dirección</th><th scope="col">Eventos</th><th scope="col">Versión</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
                 <tbody>
                     @foreach (var suscripcion in _suscripciones)
                     {
                         <tr @key="suscripcion.Id">
                             <th scope="row" class="text-break">@suscripcion.UrlDestino</th>
                             <td>@string.Join(", ", suscripcion.TiposEvento.Select(NombreEvento))</td>
+                            <td>v@(suscripcion.Version)</td>
                             <td><span class="badge @(suscripcion.Activa ? "text-bg-success" : "text-bg-secondary")">@(suscripcion.Activa ? "Activa" : "Inactiva")</span></td>
                             <td>
                                 <div class="d-flex flex-wrap gap-2">

@@ -5,7 +5,9 @@ using Logistica.SharedKernel;
 
 namespace Logistica.Modules.Seguimiento.Application.Features.ConfigurarSuscripcionesAviso;
 
-internal sealed record CrearSuscripcionAvisoCommand(string UrlDestino, IReadOnlyCollection<TipoEventoAviso> TiposEvento);
+// RF 36: Version 1 (la de siempre) o 2 (con los eventos de bulto).
+internal sealed record CrearSuscripcionAvisoCommand(string UrlDestino, IReadOnlyCollection<TipoEventoAviso> TiposEvento,
+    int Version = SuscripcionAviso.VersionInicial);
 
 internal sealed class CrearSuscripcionAvisoHandler(ISuscripcionesAvisoRepository suscripciones,
     IAdministracionModuleApi administracion, ISecretosAviso secretos, ICurrentTenant tenant, IUnidadDeTrabajo unidad)
@@ -21,7 +23,7 @@ internal sealed class CrearSuscripcionAvisoHandler(ISuscripcionesAvisoRepository
                 ?? throw new DomainException("Tu comercio no tiene una relación comercial con el operador seleccionado.");
             var secreto = secretos.Generar();
             var suscripcion = SuscripcionAviso.Crear(operadorId, comercioId, relacionId,
-                command.UrlDestino, command.TiposEvento, secretos.Cifrar(secreto, operadorId, comercioId));
+                command.UrlDestino, command.TiposEvento, secretos.Cifrar(secreto, operadorId, comercioId), command.Version);
             suscripciones.Agregar(suscripcion);
             await suscripciones.GuardarAsync(ct);
             resultado = new(suscripcion.Id, secreto);

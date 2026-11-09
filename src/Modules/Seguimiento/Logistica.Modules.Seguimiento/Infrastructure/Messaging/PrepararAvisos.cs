@@ -16,6 +16,8 @@ internal sealed class PrepararAvisos(SeguimientoDbContext db, PrepararAvisosHand
         IntentoFallidoRegistrado.Tipo, EnvioReprogramado.Tipo, EnvioCancelado.Tipo, EnvioReintegradoADeposito.Tipo,
         EnvioRecibidoEnDeposito.Tipo, EnvioDevuelto.Tipo,
         DevolucionIniciada.Tipo, EnvioExtraviado.Tipo,
+        // RF 36: los hechos de bulto, sólo para las suscripciones v2.
+        BultoEntregado.Tipo, BultoNoEntregado.Tipo, BultoDevuelto.Tipo,
     ];
 
     public static string Cola(string tipo) => $"seguimiento.preparar-avisos.{tipo}";

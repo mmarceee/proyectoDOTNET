@@ -7,10 +7,11 @@ namespace Logistica.Modules.Seguimiento.Application.HechosEnvio;
 // destinatario (CU-62). EsAlta: es EnvioAdmitido, el único con el comercio en el sobre y los datos del destinatario.
 // Para los indicadores (CU-71): la zona y la ventana comprometida vienen del alta; el repartidor de la flota, de la
 // entrega y del intento fallido; el motivo, del intento fallido.
+// RF 36: Bulto, en los hechos de un bulto (sólo para avisos v2); CierreMixto, en una devolución con bultos ya entregados.
 internal sealed record HechoEnvio(Guid EventoId, Guid EnvioId, string? Numero, string EstadoEnvio, bool IntentoFallido,
     DateTimeOffset FechaEvento, bool EsAlta, string? NombreDestinatario = null, string? EmailDestinatario = null,
     DateOnly? NuevaFecha = null, bool EsPrueba = false, Guid? ZonaId = null, DateTimeOffset? EntregaComprometidaHasta = null,
-    Guid? RepartidorId = null, string? Motivo = null);
+    Guid? RepartidorId = null, string? Motivo = null, BultoAviso? Bulto = null, bool CierreMixto = false);
 
 // El alta del envío todavía no llegó: el orden entre colas no está garantizado (ADR-0003, sección 2.4), así que
 // el mensaje se reintenta con la espera creciente hasta que llegue.

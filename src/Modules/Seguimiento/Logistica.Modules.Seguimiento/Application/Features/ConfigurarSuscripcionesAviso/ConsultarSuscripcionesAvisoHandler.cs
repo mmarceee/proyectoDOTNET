@@ -4,7 +4,7 @@ using Logistica.SharedKernel;
 namespace Logistica.Modules.Seguimiento.Application.Features.ConfigurarSuscripcionesAviso;
 
 internal sealed record SuscripcionAvisoVista(Guid Id, string UrlDestino,
-    IReadOnlyList<TipoEventoAviso> TiposEvento, bool Activa);
+    IReadOnlyList<TipoEventoAviso> TiposEvento, bool Activa, int Version);
 
 internal interface ISuscripcionesAvisoReader
 {
