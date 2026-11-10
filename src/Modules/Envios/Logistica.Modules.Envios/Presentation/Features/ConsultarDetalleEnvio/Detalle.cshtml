@@ -15,6 +15,8 @@
     // CU-20: sólo el despachador, y sólo desde los estados de T12 y T14.
     var puedeIniciarDevolucion = (await Autorizacion.AuthorizeAsync(User, Politicas.Despachador)).Succeeded
         && envio.Estado is "EnDeposito" or "Reprogramado";
+    // CU-22: el administrador o el despachador, en cualquier estado: una incidencia no cambia el estado del envío.
+    var puedeGestionarIncidencias = User.IsInRole("Administrador") || User.IsInRole("Despachador");
 }
 
 <div class="mb-4">
@@ -37,6 +39,10 @@
         @if (puedeDeclararExtravio)
         {
             <a href="/backoffice/envios/@Uri.EscapeDataString(envio.Numero)/extravio" class="btn btn-outline-danger btn-sm">Declarar extravío</a>
+        }
+        @if (puedeGestionarIncidencias)
+        {
+            <a href="/backoffice/envios/@Uri.EscapeDataString(envio.Numero)/incidencias/nueva" class="btn btn-outline-primary btn-sm">Nueva incidencia</a>
         }
         <a href="@Model.UrlVolver" class="btn btn-outline-secondary btn-sm">Volver al listado</a>
     </div>
@@ -229,7 +235,13 @@
     <div class="col-12 col-lg-6">
 <section class="card h-100" aria-labelledby="incidencias-titulo">
     <div class="card-body p-4">
-    <h2 id="incidencias-titulo" class="h5 mb-3">Incidencias</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 id="incidencias-titulo" class="h5 mb-0">Incidencias</h2>
+        @if (puedeGestionarIncidencias && envio.Incidencias.Count > 0)
+        {
+            <a href="/backoffice/incidencias" class="small">Atenderlas en Incidencias</a>
+        }
+    </div>
     @if (envio.Incidencias.Count == 0)
     {
         <p>No hay incidencias registradas.</p>
@@ -238,7 +250,7 @@
     {
         <article class="card mb-3">
             <div class="card-body">
-                <h3 class="h5">@incidencia.Tipo · @incidencia.Estado</h3>
+                <h3 class="h5">@IncidenciaTexto.Tipo(incidencia.Tipo) · <span class="badge @IncidenciaTexto.ClaseEstado(incidencia.Estado)">@IncidenciaTexto.Estado(incidencia.Estado)</span></h3>
                 <p>@incidencia.Descripcion</p>
                 <p>Creada: @Model.MostrarFecha(incidencia.CreadaEn)</p>
                 @if (incidencia.ResueltaEn is { } resuelta)

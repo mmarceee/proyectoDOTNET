@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 8 de noviembre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 10 de noviembre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal, Lucas Ottonello y Cristian Reyes |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -1464,6 +1464,38 @@ La primera ejecución dirigida detectó una excepción al entregar el último re
 
 En la aceptación final, Lucas mantuvo una visita offline mientras Codex provocó un extravío del envío completo desde Backoffice: rechazo por bulto, evidencia conservada y cero efectos de entrega. Otro envío se confirmó offline y sincronizó, con 2/3 visibles en Backoffice y público. Por autorización expresa, Codex inició el receptor demo existente con túnel HTTPS temporal y suscripciones v1/v2; verificó recepción y HMAC, tres avisos de bulto v2 y ausencia de falsa entrega completa v1. Reenvío del mismo OperacionId, datos y archivos reconstruidos de registros aplicados: YaAplicada, sin nuevos resultados, evidencias, eventos ni avisos; no se presenta como captura byte a byte del JSON original. Se desactivaron las suscripciones y retiraron receptor/túnel conservando historial. Se aceptó el alcance original de RF 32; la recuperación completa antes de confirmar de D9 sigue como decisión interna posterior pendiente, sin atribuirla a la letra docente. No se acreditó GPS nuevo offline ni recargo positivo. Evidencias y límites: [ensayo Android](analisis-diseno/rf-32/ensayo-android-2026-11-10.md) y [aceptación integrada](analisis-diseno/rf-32/aceptacion-integrada-2026-11-10.md).
 
+## **3.97 CU-22 · Gestionar incidencias (nivel básico)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 10/11/2026 |
+| **Archivos** | `Incidencia` (`PasarAEnProceso` y `Resolver`); `IEnvioRepository` y `EnvioRepository` (`ObtenerIncidenciaAsync`); `Application/Features/GestionarIncidencias/`; `IncidenciasListadoReader`; páginas `Nueva` e `Index` en `Presentation/Features/GestionarIncidencias/`; `IncidenciaTexto`; botón en `Detalle.cshtml`; ítem en `SeccionesBackoffice`; pruebas `IncidenciaTests` y `GestionarIncidenciasTests`; `casos-de-uso.md` (v2.6) y `modelo-de-dominio.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-22 en nivel B, aprovechando lo que ya había de CU-21: la entidad, su tabla y la sección del detalle del envío. |
+| **Cómo se trabajó** | Le pedí a la IA dividir el caso en cuatro partes (reglas, handlers, pantallas y prueba con documentación) y hacerlas ella, explicándome cada una. Corrí yo las pruebas unitarias y la reconstrucción con Docker, y probé el flujo en la web con los dos operadores. |
+| **Aceptado sin modificaciones** | Se puede resolver sin pasar por *En proceso*, porque las incidencias que abre el sistema (faltantes de CU-55) a veces se resuelven enseguida. El historial de la post-condición son las fechas y la resolución, sin columnas nuevas ni migración. La incidencia sigue siendo del envío, no de un bulto: el bulto se nombra en la descripción, como hacen CU-31 y CU-55 (lo consultó Ezequiel). |
+| **Modificado** | La reconstrucción de la API falló: la vista del listado llamaba a `IndexModel.MostrarFecha`, que Razor no encuentra desde la vista. Se cambió por `Model.MostrarFecha`. El modelo de dominio sólo tenía `resolver()`; se agregó `pasarAEnProceso()`, que pide el paso 4 de la ficha. |
+| **Descartado** | Guardar cada cambio de estado en una tabla de historial: no lo exige el nivel B y necesitaba una migración. Atar la incidencia a un bulto: ningún documento lo pide. |
+| **Verificación** | `IncidenciaTests` (8) y `GestionarIncidenciasTests` (3: flujo completo con A2, filtros de A1 y aislamiento entre operadores con el perfil de depósito) pasan. Todas las de Envíos (160 unitarias y 122 de integración) y las 56 de arquitectura pasan. En la web: registrar, pasar a en proceso, el aviso al resolver sin texto, resolver y filtrar, y que Envíos del Este no vea la incidencia. |
+
+## **3.98 Opcional 7.2 · Pruebas de extremo a extremo con Playwright**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 10/11/2026 |
+| **Archivos** | `tests/Logistica.E2ETests` (`AplicacionE2E`, `Ingreso`, `Pasos` y tres clases con cuatro flujos); `scripts/e2e-en-docker.sh`; `Directory.Packages.props` (`Microsoft.Playwright`); job `e2e` en `.github/workflows/ci.yml`; `plan-casos-de-uso-por-hito.md` (v0.5) y `README.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cumplir el opcional de pruebas de extremo a extremo, que nadie había empezado. Sin él, el equipo queda con 7 puntos y no alcanza el mínimo de 8 (plan por hito, sección 4). |
+| **Cómo se trabajó** | Le pedí a la IA dividirlo en cuatro secciones (laboratorio, flujos, CI y documentación) y le dejé hacer las dos primeras mientras yo trabajaba. Las corrió en Docker y me dejó una guía de estudio (`repaso/34`). A la noche seguimos con el CI y la documentación. |
+| **Aceptado sin modificaciones** | La API completa en un puerto real con `UseKestrel` de .NET 10 y un PostgreSQL de Testcontainers, en lugar de depender de `docker compose`, así la prueba es autónoma. `localhost` en lugar de `127.0.0.1`, porque Chromium sólo acepta la cookie `Secure` sin HTTPS en `localhost`. La contraseña de demostración la fija la prueba (`Demo:Contrasena`): mira la aplicación sólo desde afuera. Cada usuario en su propio contexto de navegador, lo que permite probar el aislamiento entre operadores. El proyecto fuera de `Logistica.slnx`, en un job propio. |
+| **Modificado** | La primera compilación falló porque `GetRequiredFeature` no existe para `IFeatureCollection`; se usó `Get<IServerAddressesFeature>()`. El registro de la API mostraba cada consulta SQL (unas 3200 líneas): se bajó a avisos y errores. Se agregó la traza de cada ventana, para ver qué hizo el robot si una prueba falla en el CI. |
+| **Descartado** | Correr las pruebas contra `docker compose`: el CI tendría que levantar los seis servicios y depender de un `.env`. Incluir el Worker y RabbitMQ: los flujos elegidos no dependen de mensajes, y la caída de esas dependencias la cubre el opcional de resiliencia. Agregar el proyecto a `Logistica.slnx`: rompería `dotnet test` y `test-en-docker.sh` en las máquinas sin Chromium. |
+| **Verificación** | `scripts/e2e-en-docker.sh`: 4 aprobadas y 0 fallidas en dos corridas seguidas, en unos 2 minutos, con las trazas guardadas. `actionlint` no marca errores en el job nuevo. Falta ver el job `e2e` en verde en GitHub Actions, en el próximo PR. |
+
+**Integración de main del 10/11/2026.** Lucas pidió traer main y resolver los dos conflictos documentales. Codex conservó el cierre y decisiones de ADR-0007 con el aporte retrospectivo de Cristian, y unió las entradas de CU-15/RF-32 con las nuevas de CU-22 y Playwright, renumerando estas últimas a 3.97/3.98 y ajustando su historial. Se preservaron los cambios de código entrantes y las fuentes de RF 32; la verificación de integración se registra en el resultado del merge, sin atribuir a esta tarea las pruebas históricas descritas por cada responsable.
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -1516,3 +1548,6 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | 0.45 | 08/11/2026 | Registro retrospectivo de las entradas de Cristian Reyes (3.63 a 3.92), del 06/10 al 08/11, y su herramienta en la sección 2. Reconstruido con las conversaciones con el asistente, Git y la documentación de estudio, para revisión del responsable. | Cristian Reyes |
 | 0.46 | 09/11/2026 | Entrada del job de despliegue con el ambiente destruido (3.93). | Ezequiel Marcenal |
 | 0.47 | 09/11/2026 | Entrada del ADR-0008, despliegue e infraestructura como código (3.94). | Ezequiel Marcenal |
+| 0.48 | 10/11/2026 | Entrada de CU-22, gestionar incidencias (3.97). | Cristian Reyes |
+| 0.49 | 10/11/2026 | Entrada de las pruebas de extremo a extremo con Playwright (3.98). | Cristian Reyes |
+| 0.50 | 10/11/2026 | Integración de main: conservación de las entradas de RF 32/CU-15 y CU-22/Playwright, renumeración 3.97/3.98 y resolución de ADR-0007 manteniendo decisiones y aceptación RF 32. | Lucas Ottonello |

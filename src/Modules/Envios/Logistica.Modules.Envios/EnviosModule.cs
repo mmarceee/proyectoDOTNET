@@ -54,6 +54,9 @@ public static class EnviosModule
         services.AddScoped<CancelarEnvioHandler>();
         services.AddScoped<ReprogramarEnvioHandler>();
         services.AddScoped<DeclararExtravioHandler>();
+        services.AddScoped<Application.Features.GestionarIncidencias.GestionarIncidenciasHandler>();
+        services.AddScoped<Application.Features.GestionarIncidencias.IIncidenciasListadoReader, IncidenciasListadoReader>();
+        services.AddScoped<Application.Features.GestionarIncidencias.ConsultarIncidenciasHandler>();
         services.AddScoped<IniciarDevolucionHandler>();
         services.AddScoped<DevolverReprogramadosVencidosHandler>();
         services.AddScoped<Application.Features.ReprogramarPorDestinatario.ReprogramarPorDestinatarioHandler>();

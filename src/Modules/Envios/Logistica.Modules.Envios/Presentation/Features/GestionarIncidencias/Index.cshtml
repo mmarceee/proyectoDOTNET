@@ -1,0 +1,126 @@
+@page "/backoffice/incidencias"
+@model Logistica.Modules.Envios.Presentation.Features.GestionarIncidencias.IndexModel
+@using Logistica.Modules.Envios.Domain.Incidencias
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Incidencias";
+}
+
+<h1 class="mb-4">Incidencias</h1>
+@if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+}
+
+<form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-3">
+    <div>
+        <label asp-for="Estado" class="form-label">Estado</label>
+        <select asp-for="Estado" class="form-select" onchange="this.form.requestSubmit()">
+            <option value="">Todos los estados</option>
+            @foreach (var estado in Enum.GetValues<EstadoIncidencia>())
+            {
+                <option value="@estado">@IncidenciaTexto.Estado(estado.ToString())</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label asp-for="Tipo" class="form-label">Tipo</label>
+        <select asp-for="Tipo" class="form-select" onchange="this.form.requestSubmit()">
+            <option value="">Todos los tipos</option>
+            @foreach (var tipo in Enum.GetValues<TipoIncidencia>())
+            {
+                <option value="@tipo">@IncidenciaTexto.Tipo(tipo.ToString())</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label asp-for="FechaDesde" class="form-label">Creada desde</label>
+        <input asp-for="FechaDesde" type="date" class="form-control" onchange="this.form.requestSubmit()" />
+    </div>
+    <div>
+        <label asp-for="FechaHasta" class="form-label">Creada hasta</label>
+        <input asp-for="FechaHasta" type="date" class="form-control" onchange="this.form.requestSubmit()" />
+    </div>
+    <button type="submit" class="btn btn-primary">Buscar</button>
+    <a href="/backoffice/incidencias" class="btn btn-outline-secondary">Limpiar filtros</a>
+</form>
+
+<p>Total de incidencias: @Model.Resultado.TotalRegistros</p>
+
+@if (Model.Resultado.Incidencias.Count == 0)
+{
+    <p>No hay incidencias para mostrar.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Creada</th>
+                    <th scope="col">Envío</th>
+                    <th scope="col">Tipo</th>
+                    <th scope="col">Descripción</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Resolución</th>
+                    <th scope="col">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var incidencia in Model.Resultado.Incidencias)
+                {
+                    <tr>
+                        <td class="text-nowrap">@Model.MostrarFecha(incidencia.CreadaEn)</td>
+                        <td><a href="/backoffice/envios/@Uri.EscapeDataString(incidencia.NumeroEnvio)">@incidencia.NumeroEnvio</a></td>
+                        <td>@IncidenciaTexto.Tipo(incidencia.Tipo)</td>
+                        <td>@incidencia.Descripcion</td>
+                        <td><span class="badge @IncidenciaTexto.ClaseEstado(incidencia.Estado)">@IncidenciaTexto.Estado(incidencia.Estado)</span></td>
+                        <td>
+                            @if (incidencia.ResueltaEn is { } resuelta)
+                            {
+                                <div>@incidencia.Resolucion</div>
+                                <div class="small text-body-secondary text-nowrap">@Model.MostrarFecha(resuelta)</div>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </td>
+                        <td>
+                            @if (incidencia.Estado == nameof(EstadoIncidencia.Abierta))
+                            {
+                                <form method="post" asp-page-handler="EnProceso" asp-route-id="@incidencia.Id" class="mb-2">
+                                    <button type="submit" class="btn btn-outline-warning btn-sm text-nowrap">Pasar a en proceso</button>
+                                </form>
+                            }
+                            @if (incidencia.Estado != nameof(EstadoIncidencia.Resuelta))
+                            {
+                                <form method="post" asp-page-handler="Resolver" asp-route-id="@incidencia.Id" class="d-flex gap-2">
+                                    <input name="resolucion" class="form-control form-control-sm" maxlength="500"
+                                           placeholder="Cómo se resolvió" aria-label="Resolución de la incidencia del envío @incidencia.NumeroEnvio" />
+                                    <button type="submit" class="btn btn-outline-success btn-sm">Resolver</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Resultado.TotalPaginas > 1)
+    {
+        <nav aria-label="Paginación de incidencias" class="d-flex align-items-center gap-3">
+            @if (Model.Resultado.Pagina > 1)
+            {
+                <a class="btn btn-outline-primary" href="@Model.UrlPagina(Model.Resultado.Pagina - 1)">Anterior</a>
+            }
+            <span>Página @Model.Resultado.Pagina de @Model.Resultado.TotalPaginas</span>
+            @if (Model.Resultado.Pagina < Model.Resultado.TotalPaginas)
+            {
+                <a class="btn btn-outline-primary" href="@Model.UrlPagina(Model.Resultado.Pagina + 1)">Siguiente</a>
+            }
+        </nav>
+    }
+}

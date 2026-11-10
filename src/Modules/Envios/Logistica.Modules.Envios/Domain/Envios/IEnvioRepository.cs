@@ -40,8 +40,11 @@ internal interface IEnvioRepository
     void Agregar(ArchivoEvidencia archivo);
     void Agregar(Devoluciones.Devolucion devolucion);
 
-    // La incidencia de los bultos que no volvieron en una rendición (CU-55, A1).
+    // La incidencia de los bultos que no volvieron en una rendición (CU-55, A1) o la que registra el despachador (CU-22).
     void Agregar(Incidencias.Incidencia incidencia);
+
+    // CU-22: la incidencia, para pasarla a en proceso o resolverla. null si no existe o es de otro inquilino.
+    Task<Incidencias.Incidencia?> ObtenerIncidenciaAsync(Guid id, CancellationToken ct);
 
     // CU-55: los envíos, con sus bultos, a los que pertenecen estos bultos.
     Task<IReadOnlyList<Envio>> ObtenerPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct);

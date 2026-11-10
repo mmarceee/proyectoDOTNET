@@ -74,6 +74,11 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         db.Incidencias.Add(incidencia);
     }
 
+    public Task<Domain.Incidencias.Incidencia?> ObtenerIncidenciaAsync(Guid id, CancellationToken ct)
+    {
+        return db.Incidencias.SingleOrDefaultAsync(i => i.Id == id, ct);
+    }
+
     public async Task<IReadOnlyList<Envio>> ObtenerPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, CancellationToken ct)
     {
         await db.ParticiparEnTransaccionAsync(ct);
