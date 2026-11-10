@@ -1427,6 +1427,21 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Descartado** | Guardar cada cambio de estado en una tabla de historial: no lo exige el nivel B y necesitaba una migración. Atar la incidencia a un bulto: ningún documento lo pide. |
 | **Verificación** | `IncidenciaTests` (8) y `GestionarIncidenciasTests` (3: flujo completo con A2, filtros de A1 y aislamiento entre operadores con el perfil de depósito) pasan. Todas las de Envíos (160 unitarias y 122 de integración) y las 56 de arquitectura pasan. En la web: registrar, pasar a en proceso, el aviso al resolver sin texto, resolver y filtrar, y que Envíos del Este no vea la incidencia. |
 
+## **3.96 Opcional 7.2 · Pruebas de extremo a extremo con Playwright**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 10/11/2026 |
+| **Archivos** | `tests/Logistica.E2ETests` (`AplicacionE2E`, `Ingreso`, `Pasos` y tres clases con cuatro flujos); `scripts/e2e-en-docker.sh`; `Directory.Packages.props` (`Microsoft.Playwright`); job `e2e` en `.github/workflows/ci.yml`; `plan-casos-de-uso-por-hito.md` (v0.5) y `README.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cumplir el opcional de pruebas de extremo a extremo, que nadie había empezado. Sin él, el equipo queda con 7 puntos y no alcanza el mínimo de 8 (plan por hito, sección 4). |
+| **Cómo se trabajó** | Le pedí a la IA dividirlo en cuatro secciones (laboratorio, flujos, CI y documentación) y le dejé hacer las dos primeras mientras yo trabajaba. Las corrió en Docker y me dejó una guía de estudio (`repaso/34`). A la noche seguimos con el CI y la documentación. |
+| **Aceptado sin modificaciones** | La API completa en un puerto real con `UseKestrel` de .NET 10 y un PostgreSQL de Testcontainers, en lugar de depender de `docker compose`, así la prueba es autónoma. `localhost` en lugar de `127.0.0.1`, porque Chromium sólo acepta la cookie `Secure` sin HTTPS en `localhost`. La contraseña de demostración la fija la prueba (`Demo:Contrasena`): mira la aplicación sólo desde afuera. Cada usuario en su propio contexto de navegador, lo que permite probar el aislamiento entre operadores. El proyecto fuera de `Logistica.slnx`, en un job propio. |
+| **Modificado** | La primera compilación falló porque `GetRequiredFeature` no existe para `IFeatureCollection`; se usó `Get<IServerAddressesFeature>()`. El registro de la API mostraba cada consulta SQL (unas 3200 líneas): se bajó a avisos y errores. Se agregó la traza de cada ventana, para ver qué hizo el robot si una prueba falla en el CI. |
+| **Descartado** | Correr las pruebas contra `docker compose`: el CI tendría que levantar los seis servicios y depender de un `.env`. Incluir el Worker y RabbitMQ: los flujos elegidos no dependen de mensajes, y la caída de esas dependencias la cubre el opcional de resiliencia. Agregar el proyecto a `Logistica.slnx`: rompería `dotnet test` y `test-en-docker.sh` en las máquinas sin Chromium. |
+| **Verificación** | `scripts/e2e-en-docker.sh`: 4 aprobadas y 0 fallidas en dos corridas seguidas, en unos 2 minutos, con las trazas guardadas. `actionlint` no marca errores en el job nuevo. Falta ver el job `e2e` en verde en GitHub Actions, en el próximo PR. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -1477,3 +1492,4 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.43 | 09/11/2026 | Entrada del job de despliegue con el ambiente destruido (3.93). | Ezequiel Marcenal |
 | 0.44 | 09/11/2026 | Entrada del ADR-0008, despliegue e infraestructura como código (3.94). | Ezequiel Marcenal |
 | 0.45 | 10/11/2026 | Entrada de CU-22, gestionar incidencias (3.95). | Cristian Reyes |
+| 0.46 | 10/11/2026 | Entrada de las pruebas de extremo a extremo con Playwright (3.96). | Cristian Reyes |

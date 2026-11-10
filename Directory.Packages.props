@@ -54,6 +54,8 @@
     <!-- CU-66: cliente SignalR para probar las salas por operador del tablero. -->
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.14" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <!-- Opcional 7.2: pruebas de extremo a extremo desde un navegador real (tests/Logistica.E2ETests). -->
+    <PackageVersion Include="Microsoft.Playwright" Version="1.64.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageVersion Include="TngTech.ArchUnitNET.xUnit" Version="0.13.4" />
     <PackageVersion Include="xunit" Version="2.9.3" />
