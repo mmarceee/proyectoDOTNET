@@ -186,6 +186,15 @@ Los equipos de 3 integrantes deben cubrir al menos **8 puntos** (letra, sección
 | **Pruebas de extremo a extremo** (7.2) | 2 | Playwright o equivalente sobre los flujos críticos, integradas al pipeline. | Cristian | 12/11 |
 | **Total** | **9** | | | |
 
+**Pruebas de extremo a extremo, implementación (10/11/2026, Cristian Reyes).** Proyecto `tests/Logistica.E2ETests` con Playwright para .NET. Arranca la API completa en un puerto real (Kestrel), sobre un PostgreSQL de Testcontainers con las migraciones y los datos iniciales, y Chromium recorre cuatro flujos críticos:
+
+1. El despachador inicia sesión y ve el listado de envíos.
+2. El comercio crea un envío en el Portal (CU-03 y CU-10); su operador lo ve en el Backoffice (CU-13) y el otro operador no (sección 6.5).
+3. El destinatario abre el enlace de seguimiento sin sesión (CU-60), y un enlace alterado no muestra el envío.
+4. El despachador registra, atiende y resuelve una incidencia, con la regla de A2 (CU-22).
+
+Corre en el job `e2e` del pipeline, que guarda la traza de cada ventana del navegador como artefacto, y el despliegue lo espera. En local se corre con `scripts/e2e-en-docker.sh`. No forma parte de `Logistica.slnx` porque necesita Chromium instalado.
+
 **Sin margen:** si cualquiera de los cuatro no cumple todas sus condiciones, el total baja a 7 o menos y no se alcanza el mínimo, que es condición de aprobación (sección 9.6). Cada opcional se da por terminado sólo cuando se verifica su lista de condiciones completa.
 
 **Por qué esta combinación:** la cobertura y la resiliencia aprovechan lo que ya existe (pruebas en el pipeline, Docker Compose con todas las dependencias); las pruebas de extremo a extremo con Playwright ya se usaron para verificar la PWA. Las banderas de funcionalidad (7.4, 2 puntos) quedan como reemplazo si alguno de los anteriores se complica.
@@ -205,3 +214,4 @@ Los equipos de 3 integrantes deben cubrir al menos **8 puntos** (letra, sección
 | 0.2 | 02/10/2026 | Responsable = dueño que responde por el caso, no único que lo programa. Reparto equilibrado por bloques (16, 16 y 17 casos), acordado con Lucas Ottonello. | Ezequiel Marcenal |
 | 0.3 | 02/10/2026 | Reglas de los niveles (condiciones de los RF y opcionales completos o nada). API pública pasa a nivel Completo. Nueva sección 4 con los opcionales elegidos (9 puntos). | Ezequiel Marcenal |
 | 0.4 | 02/10/2026 | CU-61: T18 y T19 confirmadas. | Ezequiel Marcenal |
+| 0.5 | 10/11/2026 | Sección 4: implementación de las pruebas de extremo a extremo (cuatro flujos críticos y el job `e2e` del pipeline). | Cristian Reyes |

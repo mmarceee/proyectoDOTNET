@@ -71,6 +71,18 @@ cobertura (por ejemplo, las de Depósito en unos 2 minutos):
 bash scripts/test-en-docker.sh Deposito
 ```
 
+Las pruebas de extremo a extremo (opcional 7.2, `tests/Logistica.E2ETests`) abren Chromium y recorren los flujos
+críticos sobre la aplicación completa: el ingreso al Backoffice, el alta de un envío en el Portal y su aislamiento entre
+operadores, el seguimiento público y una incidencia. Necesitan el navegador instalado, así que no forman parte de
+`Logistica.slnx`: corren en el job `e2e` del CI y, en local, en un contenedor que instala Chromium:
+
+```bash
+bash scripts/e2e-en-docker.sh
+```
+
+Cada ventana del navegador guarda su traza en `TestResults/e2e-*/trazas/`. Se ve paso a paso arrastrando el `.zip` a
+https://trace.playwright.dev.
+
 Las pruebas de integración usan un solo PostgreSQL para toda la suite: `PostgresApiFactory` migra y siembra una base
 plantilla una vez y cada clase recibe su propia base clonada (`CREATE DATABASE … TEMPLATE`). Las clases corren en
 paralelo, hasta cuatro a la vez (`ConfiguracionPruebas.cs`); las que levantan contenedores propios (RabbitMQ, Valkey,
@@ -133,6 +145,7 @@ tests/
   Logistica.UnitTests/
   Logistica.IntegrationTests/
   Logistica.ArchitectureTests/   Reglas de dependencia del ADR-0001 y sus addenda
-scripts/                         configurar-secretos.sh, test-en-docker.sh
+  Logistica.E2ETests/            Flujos críticos desde el navegador, con Playwright (fuera de Logistica.slnx)
+scripts/                         configurar-secretos.sh, test-en-docker.sh, e2e-en-docker.sh
 infra/terraform/
 ```
