@@ -61,7 +61,7 @@
     </table>
 }
 
-<form id="formulario-recepcion" method="post" class="row g-3 align-items-end">
+<form id="formulario-recepcion" method="post" class="row g-3 align-items-start">
     <input type="hidden" asp-for="Pagina" />
     <input type="hidden" asp-for="TamanoPagina" />
     <input type="hidden" asp-for="Estado" />
@@ -72,7 +72,6 @@
         <label asp-for="CodigoBulto" class="form-label">Código del bulto</label>
         <input asp-for="CodigoBulto" class="form-control" autofocus autocomplete="off" />
         <span asp-validation-for="CodigoBulto" class="text-danger"></span>
-        <button type="submit" asp-page-handler="Consultar" formnovalidate class="btn btn-outline-primary mt-2" data-consultar-bulto>Consultar</button>
     </div>
     <div class="col-md-2">
         <label asp-for="PesoKg" class="form-label">Peso (kg)</label>
@@ -114,7 +113,10 @@
                 </div>
             </div>
         }
-        <button type="submit" class="btn btn-primary" data-registrar-recepcion>@(Model.Diferencias.Count > 0 ? "Confirmar y registrar" : "Registrar")</button>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="submit" asp-page-handler="Consultar" formnovalidate class="btn btn-outline-primary" data-consultar-bulto>Consultar</button>
+            <button type="submit" class="btn btn-primary" data-registrar-recepcion>@(Model.Diferencias.Count > 0 ? "Confirmar y registrar" : "Registrar")</button>
+        </div>
     </div>
 </form>
 
