@@ -684,7 +684,9 @@ Produccion, Prueba
 
 **Métodos**
 
-* resolver(resolucion: string): void
+* pasarAEnProceso(): void — sólo desde Abierta (CU-22, paso 4)
+
+* resolver(resolucion: string): void — la resolución es obligatoria; desde Abierta o EnProceso (CU-22, paso 5 y A2)
 
 **Devolucion**
 
@@ -1401,6 +1403,7 @@ Puntos del modelo que dependen de una decisión del equipo (o, en algún caso, d
 
 * Referencia del comercio (03/11/2026, Ezequiel Marcenal): el índice único es (operadorId, comercioId, referenciaComercio), que identifica la relación comercial sin agregarle al envío un relacionComercialId. Los envíos sin referencia no chocan entre sí, porque PostgreSQL considera distintos los NULL de un índice único. La propuesta de API pública sugiere sumar el ambiente de pruebas a esa unicidad; se agrega al implementar CU-81.
 * Ambiente de la referencia del comercio (03/11/2026, Lucas Ottonello): CU-81 incorporó esPrueba al índice y a la búsqueda por referencia. CU-11 comparte el ámbito de producción con la API. Una misma referencia puede existir una vez por relación comercial en producción y otra en prueba.
+* Ciclo de Incidencia (10/11/2026, Cristian Reyes): se agrega pasarAEnProceso(), que pide el paso 4 de CU-22. Una incidencia se puede resolver sin pasar por EnProceso, porque las que abre el sistema (faltantes de CU-55) a veces se resuelven enseguida. El historial de la post-condición son creadaEn, resueltaEn y la resolución; no se guarda cada cambio de estado.
 
 **Abiertos**
 

@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 8 de noviembre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 10 de noviembre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal, Lucas Ottonello y Cristian Reyes |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -1412,6 +1412,21 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | **Modificado** | El borrador decía que escalar la API necesitaba un backplane de SignalR y revisar el Outbox con varias instancias. Al verificarlo en el código, el backplane sobre Valkey ya existe (CU-66) y el publicador usa `FOR UPDATE SKIP LOCKED`; lo que realmente falta son las migraciones al arrancar. |
 | **Verificación** | Cada dato del ADR se contrastó con `main.tf`, `ci.yml`, `PublicadorOutbox`, `Program.cs` de la API y las ejecuciones de GitHub Actions del 05/11 y el 09/11. Queda abierta la evidencia de costo, que se toma en la próxima puesta en marcha. |
 
+## **3.95 CU-22 · Gestionar incidencias (nivel básico)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 10/11/2026 |
+| **Archivos** | `Incidencia` (`PasarAEnProceso` y `Resolver`); `IEnvioRepository` y `EnvioRepository` (`ObtenerIncidenciaAsync`); `Application/Features/GestionarIncidencias/`; `IncidenciasListadoReader`; páginas `Nueva` e `Index` en `Presentation/Features/GestionarIncidencias/`; `IncidenciaTexto`; botón en `Detalle.cshtml`; ítem en `SeccionesBackoffice`; pruebas `IncidenciaTests` y `GestionarIncidenciasTests`; `casos-de-uso.md` (v2.6) y `modelo-de-dominio.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Implementar CU-22 en nivel B, aprovechando lo que ya había de CU-21: la entidad, su tabla y la sección del detalle del envío. |
+| **Cómo se trabajó** | Le pedí a la IA dividir el caso en cuatro partes (reglas, handlers, pantallas y prueba con documentación) y hacerlas ella, explicándome cada una. Corrí yo las pruebas unitarias y la reconstrucción con Docker, y probé el flujo en la web con los dos operadores. |
+| **Aceptado sin modificaciones** | Se puede resolver sin pasar por *En proceso*, porque las incidencias que abre el sistema (faltantes de CU-55) a veces se resuelven enseguida. El historial de la post-condición son las fechas y la resolución, sin columnas nuevas ni migración. La incidencia sigue siendo del envío, no de un bulto: el bulto se nombra en la descripción, como hacen CU-31 y CU-55 (lo consultó Ezequiel). |
+| **Modificado** | La reconstrucción de la API falló: la vista del listado llamaba a `IndexModel.MostrarFecha`, que Razor no encuentra desde la vista. Se cambió por `Model.MostrarFecha`. El modelo de dominio sólo tenía `resolver()`; se agregó `pasarAEnProceso()`, que pide el paso 4 de la ficha. |
+| **Descartado** | Guardar cada cambio de estado en una tabla de historial: no lo exige el nivel B y necesitaba una migración. Atar la incidencia a un bulto: ningún documento lo pide. |
+| **Verificación** | `IncidenciaTests` (8) y `GestionarIncidenciasTests` (3: flujo completo con A2, filtros de A1 y aislamiento entre operadores con el perfil de depósito) pasan. Todas las de Envíos (160 unitarias y 122 de integración) y las 56 de arquitectura pasan. En la web: registrar, pasar a en proceso, el aviso al resolver sin texto, resolver y filtrar, y que Envíos del Este no vea la incidencia. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -1461,3 +1476,4 @@ Pasaron 26 pruebas de integración en Release con PostgreSQL, incluidas las 7 de
 | 0.42 | 08/11/2026 | Registro retrospectivo de las entradas de Cristian Reyes (3.63 a 3.92), del 06/10 al 08/11, y su herramienta en la sección 2. Reconstruido con las conversaciones con el asistente, Git y la documentación de estudio, para revisión del responsable. | Cristian Reyes |
 | 0.43 | 09/11/2026 | Entrada del job de despliegue con el ambiente destruido (3.93). | Ezequiel Marcenal |
 | 0.44 | 09/11/2026 | Entrada del ADR-0008, despliegue e infraestructura como código (3.94). | Ezequiel Marcenal |
+| 0.45 | 10/11/2026 | Entrada de CU-22, gestionar incidencias (3.95). | Cristian Reyes |

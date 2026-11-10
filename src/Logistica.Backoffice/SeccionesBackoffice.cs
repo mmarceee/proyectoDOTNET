@@ -24,6 +24,8 @@ public static class SeccionesBackoffice
             "/backoffice/tablero", [Administrador, Despachador]),
         new("Operación", "Rutas", "Armá, ordená y despachá las rutas de reparto.",
             "/backoffice/rutas", [Despachador]),
+        new("Operación", "Incidencias", "Reclamos, daños y extravíos de los envíos, hasta resolverlos.",
+            "/backoffice/incidencias", [Administrador, Despachador]),
         new("Operación", "Reportes", "Cumplimiento, motivos de no entrega, volumen y liquidación por período.",
             "/backoffice/reportes", [Administrador, Despachador]),
 
