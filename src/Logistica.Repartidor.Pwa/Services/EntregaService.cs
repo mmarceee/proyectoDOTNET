@@ -58,10 +58,10 @@ public sealed class EntregaService(IJSRuntime js, CargaService cargas) : IAsyncD
         evidencia!.InvokeAsync<EstadoEnvioLocal>("confirmarVisita", borrador.RutaId, borrador.EnvioId, borrador.Revision,
             borrador.Bultos.Any(b => b.Entregado), firma, foto, nombre, documento, observaciones).AsTask());
 
-    public async Task IniciarFirmaAsync(ElementReference canvas)
+    public async Task IniciarFirmaAsync(ElementReference canvas, object? notificarCambios = null)
     {
         await InicializarAsync();
-        await evidencia!.InvokeVoidAsync("iniciarFirma", canvas);
+        await evidencia!.InvokeVoidAsync("iniciarFirma", canvas, notificarCambios);
     }
 
     public async Task LimpiarFirmaAsync(ElementReference canvas)

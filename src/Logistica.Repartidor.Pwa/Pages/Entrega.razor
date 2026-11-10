@@ -8,6 +8,7 @@
 @inject IJSRuntime JS
 
 <PageTitle>Registrar visita</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@(HayCapturaSinConfirmar || ocupado)" OnBeforeInternalNavigation="ConfirmarSalida" />
 <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">
     <h1>Registrar visita</h1>
     <a class="btn btn-outline-secondary" href="@($"hoja-de-ruta?rutaId={RutaId}")">Volver a la ruta</a>
@@ -38,6 +39,8 @@
 }
 else if (borrador is not null && envio is not null)
 {
+    <p class="small text-muted">Los resultados por bulto se guardan al modificarlos. La firma, foto y textos se guardan al confirmar la visita; si salís antes, tendrás que volver a capturarlos.</p>
+    @if (HayCapturaSinConfirmar) { <p class="text-warning" role="status">Tenés captura sin confirmar. Confirmá la visita para guardar la firma, foto y textos.</p> }
     <p><strong>@borrador.Bultos.Count(b => b.Entregado) de @borrador.Bultos.Count bultos de esta visita entregados</strong></p>
     <form @onsubmit="EscanearManual" @onsubmit:preventDefault class="d-flex gap-2 mb-2">
         <div class="flex-grow-1"><label for="codigo-entrega" class="form-label">Código del bulto entregado</label><input id="codigo-entrega" class="form-control" @bind="codigo" autocomplete="off" /></div>
@@ -78,16 +81,16 @@ else if (borrador is not null && envio is not null)
         <canvas id="firma" @key="FirmaKey" @ref="firma" class="border rounded w-100 d-block mb-2" style="height:200px;background:white"></canvas>
         <button class="btn btn-sm btn-outline-secondary mb-3" @onclick="LimpiarFirma">Borrar firma</button>
         <div class="row g-2 mb-3">
-            <div class="col-sm"><label for="nombre" class="form-label">Nombre de quien recibe</label><input id="nombre" class="form-control" maxlength="200" @bind="nombre" /></div>
-            <div class="col-sm"><label for="documento" class="form-label">Documento de quien recibe</label><input id="documento" class="form-control" maxlength="50" @bind="documento" /></div>
+            <div class="col-sm"><label for="nombre" class="form-label">Nombre de quien recibe</label><input id="nombre" class="form-control" maxlength="200" @bind="nombre" @bind:event="oninput" /></div>
+            <div class="col-sm"><label for="documento" class="form-label">Documento de quien recibe</label><input id="documento" class="form-control" maxlength="50" @bind="documento" @bind:event="oninput" /></div>
         </div>
         @if (envio.ReglasEntrega.ExigeNombreYDocumento) { <p>Este envío exige nombre y documento de quien recibe.</p> }
     }
     <label for="foto-visita" class="form-label">Foto de presencia en el lugar @(ExigeFoto ? "(obligatoria)" : "(opcional)")</label>
-    <input id="foto-visita" type="file" accept="image/*" capture="environment" class="form-control mb-2" @ref="foto" />
+    <input id="foto-visita" type="file" accept="image/*" capture="environment" class="form-control mb-2" @ref="foto" @onchange="FotoModificada" />
     <p class="small text-muted">Una sola foto respalda los resultados de esta visita, incluidos los no entregados.</p>
     <label for="observaciones" class="form-label">Observaciones (opcional)</label>
-    <textarea id="observaciones" class="form-control mb-3" maxlength="1000" @bind="observaciones"></textarea>
+    <textarea id="observaciones" class="form-control mb-3" maxlength="1000" @bind="observaciones" @bind:event="oninput"></textarea>
     <button class="btn btn-primary" disabled="@(ocupado || borrador.Bultos.Any(b => !b.Entregado && b.MotivoId is null))" @onclick="Confirmar">Confirmar visita</button>
 }
 else if (error is null) { <p role="status">Abriendo la visita guardada…</p> }
@@ -99,7 +102,7 @@ else if (error is null) { <p role="status">Abriendo la visita guardada…</p> }
     private EnvioHojaResponse? envio;
     private BorradorVisitaLocal? borrador;
     private EstadoEnvioLocal? estado;
-    private bool abierta, ocupado, camaraActiva, disposed;
+    private bool abierta, ocupado, camaraActiva, disposed, firmaSinConfirmar, fotoSeleccionada;
     private string? error, nombre, documento, observaciones, grupoIniciado;
     private string codigo = "";
     private ElementReference firma, foto, video;
@@ -108,15 +111,21 @@ else if (error is null) { <p role="status">Abriendo la visita guardada…</p> }
     private readonly SemaphoreSlim actualizando = new(1, 1);
     private string GrupoFirma => string.Join("|", borrador?.Bultos.Where(b => b.Entregado).Select(b => b.CodigoBulto) ?? []);
     private string FirmaKey => "firma:" + GrupoFirma;
+    private bool HayCapturaSinConfirmar => estado is null && borrador is not null && (firmaSinConfirmar && grupoIniciado == GrupoFirma || fotoSeleccionada
+        || !string.IsNullOrEmpty(nombre) || !string.IsNullOrEmpty(documento) || !string.IsNullOrEmpty(observaciones));
     private bool ExigeFoto => borrador is not null && envio is not null && (borrador.Bultos.Any(b => b.Entregado) && envio.ReglasEntrega.ExigeFoto
         || borrador.Bultos.Any(b => envio.ReglasEntrega.MotivosNoEntrega.Any(m => m.Id == b.MotivoId && m.ExigeEvidencia)));
     protected override void OnInitialized() { Hoja.Cambio += Cambio; Cargas.Cambio += Cambio; }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!abierta) { abierta = true; await Hoja.SeleccionarAsync(RutaId); await Actualizar(); }
-        if (estado is null && borrador is not null && GrupoFirma.Length == 0) grupoIniciado = null;
+        if (estado is null && borrador is not null && GrupoFirma.Length == 0) { grupoIniciado = null; firmaSinConfirmar = false; }
         if (estado is null && GrupoFirma.Length > 0 && grupoIniciado != GrupoFirma)
-        { grupoIniciado = GrupoFirma; await Entregas.IniciarFirmaAsync(firma); }
+        {
+            grupoIniciado = GrupoFirma; firmaSinConfirmar = false;
+            referencia ??= DotNetObjectReference.Create(this);
+            await Entregas.IniciarFirmaAsync(firma, referencia);
+        }
     }
     private void Cambio() { if (!disposed) _ = InvokeAsync(Actualizar); }
     private async Task Actualizar()
@@ -144,7 +153,18 @@ else if (error is null) { <p role="status">Abriendo la visita guardada…</p> }
         catch (JSException e) { error = e.Message.Split('\n')[0]; }
         finally { ocupado = false; }
     }
-    private Task LimpiarFirma() => Entregas.LimpiarFirmaAsync(firma);
+    [JSInvokable] public Task FirmaModificada() => InvokeAsync(() => {
+        if (!disposed && estado is null) { firmaSinConfirmar = true; StateHasChanged(); }
+    });
+    private void FotoModificada(ChangeEventArgs e) => fotoSeleccionada = !string.IsNullOrEmpty(e.Value?.ToString());
+    private async Task LimpiarFirma() { await Entregas.LimpiarFirmaAsync(firma); firmaSinConfirmar = false; }
+    private async Task ConfirmarSalida(LocationChangingContext contexto)
+    {
+        if (ocupado) { contexto.PreventNavigation(); error = "Esperá a que termine el guardado de la visita."; return; }
+        if (HayCapturaSinConfirmar && !await JS.InvokeAsync<bool>("confirm",
+            "La firma, foto y textos todavía no están confirmados y se perderán al salir. Los resultados por bulto quedan guardados. ¿Querés salir de la visita?"))
+            contexto.PreventNavigation();
+    }
     private async Task Confirmar()
     {
         if (ocupado || borrador is null) return;

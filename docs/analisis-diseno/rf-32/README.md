@@ -2,6 +2,10 @@
 
 Fecha: 08/11/2026. Responsable del trabajo: Lucas Ottonello. Implementación asistida por Codex.
 
+Revisión del 09/11/2026: [análisis de alcance y faltantes antes de nuevos cambios](analisis-de-cierre.md), con cobertura observada, contradicciones documentales, límites de recuperación y criterios de aceptación conjunta. Esta revisión no agrega funcionalidad.
+
+Continuación autorizada del 09/11/2026: [especificación técnica consolidada](especificacion-tecnica.md) y [registro de verificación](verificacion-cierre.md). La revisión anterior conservaba la captura sin confirmar en pantalla y advertía antes de salir. Al cerrar ADR-0007, Lucas confirmó posteriormente persistir toda la captura cifrada (firma/foto/textos) y recuperarla al reabrir; D9 del [cierre técnico](../cierre-tecnico-entrega-parcial.md) es la decisión vigente. La implementación y pruebas de advertencia descritas aquí no acreditan todavía esa recuperación completa.
+
 Base funcional: [decisiones de entrega parcial, secciones 4.1 y 4.2](../decisiones-entrega-parcial.md), [ADR-0004, 2.11](../ADR-0004-resolucion-de-conflictos-de-sincronizacion.md) y [ADR-0007](../ADR-0007-adaptacion-a-entrega-parcial.md). La letra docente de cambio, 2.1, contempla que un bulto no se haya cargado en el vehículo. Las decisiones de foto compartida y custodia fueron confirmadas por Lucas; no se presentan como citas literales del docente.
 
 ## Recorrido implementado
@@ -27,7 +31,7 @@ La confirmación genera sólo `RegistrarVisita`, nunca nuevas `RegistrarEntrega`
 
 En hoja-ruta.js, abrirVisita/resultadoVisita guardan un borrador cifrado separado por ruta y envío. Se reutilizan IndexedDB, AES-GCM, identidad local y token del espacio. No se crea otra base ni se migra borrando la anterior.
 
-Al confirmar, borrador confirmado y operación se escriben en una única transacción de IndexedDB. La revisión del borrador impide que dos pestañas creen dos confirmaciones de la misma visita. Se comprueba también que la rendición no se haya confirmado en paralelo. La firma y foto se incorporan a la operación cifrada antes de informar guardado correcto. Mientras se completa el formulario, los resultados se conservan; la firma, foto y textos aún no confirmados permanecen en la pantalla y se deben volver a capturar si se la abandona.
+Al confirmar, borrador confirmado y operación se escriben en una única transacción de IndexedDB. La revisión del borrador impide que dos pestañas creen dos confirmaciones de la misma visita. Se comprueba también que la rendición no se haya confirmado en paralelo. La firma y foto se incorporan a la operación cifrada antes de informar guardado correcto. Mientras se completa el formulario, los resultados se conservan; la firma, foto y textos aún no confirmados permanecen en la pantalla y se deben volver a capturar si se la abandona. En la revisión anterior del 09/11 se mantuvo ese comportamiento con advertencia antes de salir o recargar; D9 lo sustituye como objetivo por captura completa persistida y cifrada, pendiente de implementar/verificar; una visita completamente guardada deja de advertir. El navegador puede omitir la advertencia en un cierre forzado.
 
 La cola conserva OperacionId, dispositivo, secuencia, fecha y ubicación. Una pérdida de red o de respuesta reenvía el mismo payload. Aplicada/YaAplicada se convierten en recibos; Conflicto/Invalida conservan la operación y su evidencia. Detalle y diagnóstico por bulto se guardan dentro del contenido cifrado, no como códigos personales en metadatos sin cifrar. Los rechazos no se convierten automáticamente en nuevas visitas.
 

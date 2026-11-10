@@ -36,6 +36,62 @@ public class CacheSeguimientoTests(PostgresApiFactory factory) : IClassFixture<P
         Assert.Equal("Operador Demo", actual.Marca.Operador);
     }
 
+    // RF 35: el resumen conserva EntregadoParcialmente entre visitas; el evento del bulto debe renovar el avance.
+    [Fact]
+    public async Task Un_evento_de_bulto_actualiza_de_uno_a_dos_de_tres_aunque_el_resumen_no_cambie()
+    {
+        factory.CreateClient();
+        var ahora = DateTimeOffset.UtcNow;
+        var lugar = new Ubicacion(-34.9m, -56.16m);
+        var ausente = new MotivoNoEntrega(Guid.NewGuid(), "AUSENTE", reprogramable: true, exigeEvidencia: false);
+        var reglas = new ReglasEntrega(false, false, 3, TimeSpan.FromHours(24), admiteEntregaParcial: true);
+        var envio = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId, $"ENV-C-{Guid.NewGuid():N}",
+            new Destinatario("Ana Pérez", "099123456"),
+            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "11300"),
+            Enumerable.Repeat(new DatosBulto(2, 30, 20, 10, 150), 3).ToList(), OrigenEvento.PortalComercio, null, ahora);
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
+        envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
+        envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora);
+        var b = envio.Bultos;
+        envio.RegistrarVisita([new(b[0].Id), new(b[1].Id, ausente), new(b[2].Id, ausente)],
+            new PruebaEntrega(Guid.NewGuid(), null, null, null, lugar, ahora), null, null, lugar, reglas, null, ahora);
+        using (var scope = factory.Services.CreateScope())
+        {
+            await using var db = Contexto(scope);
+            db.Envios.Add(envio);
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal("1 de 3 bultos entregados", (await ConsultarAsync(envio.Id))!.Avance);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            await using var db = Contexto(scope);
+            var siguiente = await db.Envios.Include(e => e.Eventos).Include(e => e.Intentos).SingleAsync(e => e.Id == envio.Id);
+            siguiente.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora.AddDays(1));
+            siguiente.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora.AddDays(1));
+            siguiente.RegistrarVisita([new(b[1].Id), new(b[2].Id, ausente)],
+                new PruebaEntrega(Guid.NewGuid(), null, null, null, lugar, ahora.AddDays(1)), null, null, lugar, reglas,
+                null, ahora.AddDays(1));
+            Assert.Equal(ResumenEnvio.EntregadoParcialmente, siguiente.Resumen);
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal("1 de 3 bultos entregados", (await ConsultarAsync(envio.Id))!.Avance);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var consumidor = scope.ServiceProvider.GetRequiredKeyedService<IConsumidorIntegracion>(
+                InvalidarSeguimiento.Cola(BultoEntregado.Tipo));
+            var contenido = JsonSerializer.Serialize(new BultoEntregado(envio.Id, envio.Numero, b[1].Codigo,
+                "Reprogramado", ahora.AddDays(1)));
+            await consumidor.ProcesarAsync(new MensajeIntegracion(Guid.NewGuid(), BultoEntregado.Tipo,
+                DatosIniciales.OperadorDemoId, null, ahora.AddDays(1), null, contenido), CancellationToken.None);
+        }
+        var actualizado = await ConsultarAsync(envio.Id);
+        Assert.Equal("Entregado parcialmente", actualizado!.Estado);
+        Assert.Equal("2 de 3 bultos entregados", actualizado.Avance);
+        Assert.Equal(2, actualizado.Bultos.Count(bulto => bulto.Estado == "Entregado"));
+    }
+
     private async Task<Logistica.Http.Contracts.Seguimiento.SeguimientoPublicoResponse?> ConsultarAsync(Guid envioId)
     {
         using var scope = factory.Services.CreateScope();

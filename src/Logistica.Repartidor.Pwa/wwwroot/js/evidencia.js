@@ -6,7 +6,7 @@ const MAX_BYTES = 1024 * 1024;
 const firmas = new WeakMap();
 
 // El recuadro de la firma: se dibuja con el dedo, el lápiz o el mouse, sobre fondo blanco para que el PNG se lea.
-export function iniciarFirma(canvas) {
+export function iniciarFirma(canvas, notificarCambios = null) {
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
@@ -28,6 +28,7 @@ export function iniciarFirma(canvas) {
     canvas.addEventListener('pointermove', e => {
         if (!estado.dibujando) return;
         const [x, y] = punto(e); ctx.lineTo(x, y); ctx.stroke(); estado.trazos++; e.preventDefault();
+        if (estado.trazos === 1) notificarCambios?.invokeMethodAsync('FirmaModificada').catch(() => {});
     });
     const terminar = () => { estado.dibujando = false; };
     canvas.addEventListener('pointerup', terminar);
