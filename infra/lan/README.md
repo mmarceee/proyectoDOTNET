@@ -36,6 +36,16 @@ Lucas confirmó descarga del certificado después de aplicar la regla de firewal
 
 La carga y la visita permanecen sin registrar para realizarlas físicamente desde el teléfono. El manifiesto de la preparación queda en `TestResults/lan/escenario-rf32.json`; `scripts/preparar-escenario-rf32.cjs` conserva los pasos creados para reanudar sin volver a dar de alta el envío. No borra datos ni fuerza estados por SQL. Si el escenario pertenece a otra fecha operativa, se detiene para revisar la ruta.
 
+### Continuación del ensayo del 10/11
+
+El 10/11 se creó `ENV-000002` con los bultos `ENV-000002-1`, `ENV-000002-2` y `ENV-000002-3`, recibidos en depósito y con las reglas de parcial ya publicadas. La primera planificación detectó correctamente que el despacho del día anterior todavía reservaba al repartidor y al vehículo.
+
+Lucas actualizó Mis rutas en Android y confirmó **Pendiente de resolución por despacho** para la ruta del 09/11. El servidor también mostraba esa ruta Despachada y sus tres bultos AsignadoARuta. Con esa comprobación se anuló el despacho por la operación normal de CU-43, conservando la ruta anterior Planificada y su historial; no se forzaron estados ni se borraron operaciones.
+
+La ruta del 10/11 es `01a1c6c7-7441-72ce-a79d-c952a2d8e8c9`, despachada al mismo repartidor demo. Carga: `https://192.168.1.7:8443/repartidor/carga?rutaId=01a1c6c7-7441-72ce-a79d-c952a2d8e8c9`. Etiquetas: `TestResults/lan/etiquetas-rf32-2026-11-10.pdf`. El manifiesto del 09/11 se conserva en `TestResults/lan/escenario-rf32-2026-11-09.json`; el actual permanece en `escenario-rf32.json`.
+
+Para preparar otro día, `node scripts/preparar-escenario-rf32.cjs --nuevo-dia` archiva el manifiesto anterior y crea otro escenario. No anula ni cierra rutas anteriores automáticamente; si hay reservas o actividad pendiente, se deben revisar antes. El escenario del 10/11 completó escaneo físico, carga/inicio, visita offline, reapertura, sincronización y declaración desde Android. Se confirmó después la recepción simulada del tercer bulto desde depósito: ruta Finalizada, sin reserva activa y dos bultos entregados. Resultados y límites en el [registro del ensayo](../../docs/analisis-diseno/rf-32/ensayo-android-2026-11-10.md).
+
 La CA se llama **proyectoDOTNET LAN Test CA**. Huella SHA-256 del certificado preparado en este equipo:
 
 ```text
@@ -45,6 +55,20 @@ DCAD39D859EA9BC8C7CFF25F85DE00AA90625C6ADFCEAE36BA45E8E7579917B9
 Sólo se descarga el certificado público. La clave privada del servidor y las contraseñas permanecen en `TestResults/lan`, ignorado por Git; la clave privada de la CA no se conserva después de emitir el certificado del servidor. No se instaló esta CA en Windows. Al terminar se puede quitar únicamente esta CA desde las credenciales de usuario de Android.
 
 ## Preparación y reinicio
+
+### Arranque diario y defensa
+
+Con Docker Desktop abierto, ejecutar desde la raíz, tanto en Windows PowerShell como en CMD o PowerShell 7:
+
+```powershell
+.\iniciar-demo.cmd
+```
+
+El lanzador usa directamente Docker Compose y la IP guardada en `TestResults/lan/ambiente.env`. Inicia las imágenes ya compiladas en segundo plano, conserva los datos y muestra la URL. No ejecuta scripts PowerShell, no requiere PowerShell 7 y no modifica la política de ejecución de Windows. También se puede ejecutar desde otra carpeta usando la ruta completa del `.cmd`.
+
+El entorno debe estar preparado previamente. Este arranque no actualiza las imágenes con cambios del repositorio, no genera otro certificado y no crea una ruta para la fecha del día. Para actualizar las imágenes o preparar el entorno por primera vez se usa el procedimiento siguiente.
+
+### Preparación inicial o actualización de imágenes
 
 Requiere Windows, PowerShell 7, Node.js y Docker Desktop. Desde la raíz:
 
@@ -82,7 +106,11 @@ docker compose --env-file TestResults/lan/ambiente.env -f infra/lan/compose.yml 
 
 ## Verificación realizada y diagnóstico
 
+El 10/11 se completó además la [aceptación integrada de RF 32](../../docs/analisis-diseno/rf-32/aceptacion-integrada-2026-11-10.md), con ENV-000003 para conflicto y ENV-000004 para entrega parcial, Backoffice/público y receptor HTTPS de avisos v1/v2. Las dos suscripciones temporales quedaron desactivadas y se detuvieron receptor y túnel después de guardar el resultado. La ruta de ese segundo ensayo permanece EnCurso, pendiente de declaración/rendición del repartidor; no se libera automáticamente por cerrar la verificación.
+
 Se compilaron API y Worker desde las fuentes actuales. Se verificaron `/health`, login con antiforgery, sesión real de repartidor, shell publicado, service worker de producción y módulo de evidencia con el callback nuevo. La comprobación Node usó la CA pública con validación de nombre y cadena TLS, sin desactivar errores de certificado. Resultado en `TestResults/lan/verificacion.log`. La salud del entorno anterior en el puerto 8080 siguió respondiendo 200.
+
+El 10/11 se verificó además el arranque con `powershell.exe -NoProfile -ExecutionPolicy Restricted -Command "& '.\iniciar-demo.cmd'"`: el lanzador terminó con código 0 y los servicios quedaron en ejecución. Evita el error de scripts deshabilitados sin modificar políticas del equipo; la preparación avanzada sigue requiriendo PowerShell 7. Referencia: [políticas de ejecución de PowerShell](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies).
 
 En Windows, curl con Schannel puede exigir revocación que esta CA de ensayo no publica. Para comprobar la cadena/nombre con curl sin instalar la CA en Windows:
 
@@ -98,6 +126,6 @@ Para retirar únicamente esa regla al terminar, ejecutar en PowerShell como admi
 Remove-NetFirewallRule -Name proyectoDOTNET-LAN-RF32
 ```
 
-Si el certificado descarga pero HTTPS sigue mostrando error, revisar que se instaló como CA, fecha/hora del teléfono y que se está usando exactamente la IP del certificado. La prueba en el teléfono continúa pendiente hasta que Lucas confirme el acceso y complete los escenarios.
+Si el certificado descarga pero HTTPS sigue mostrando error, revisar que se instaló como CA, fecha/hora del teléfono y que se está usando exactamente la IP del certificado. Lucas confirmó acceso y completó el circuito principal el 10/11; los escenarios adicionales pendientes constan en el registro del ensayo.
 
 Referencias: [certificados en Android](https://support.google.com/pixelphone/answer/2844832?hl=es), [endpoints HTTPS de Kestrel](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/endpoints?view=aspnetcore-10.0), [CertificateRequest](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.certificaterequest?view=net-10.0).

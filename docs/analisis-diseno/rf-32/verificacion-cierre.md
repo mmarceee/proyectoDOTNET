@@ -2,6 +2,8 @@
 
 Fecha: 09/11/2026. Revisión sobre `549c1ae` con cambios locales de RF 32. Sin commit nuevo ni despliegue desde esta tarea. [Especificación vigente](especificacion-tecnica.md).
 
+**Cierre posterior del 10/11:** completados los [dos ensayos integrados](aceptacion-integrada-2026-11-10.md): conflicto y recepción externa, con Backoffice, público y reenvío sin duplicados. Aceptación del alcance original de RF 32 completada. Los pasos y avances anteriores de este registro son históricos; D9 y las pruebas adicionales se mantienen separados de ese cierre.
+
 > **Actualización posterior al cerrar ADR-0007:** Lucas confirmó persistir toda la captura cifrada antes de confirmar (D9 del [cierre técnico](../cierre-tecnico-entrega-parcial.md)). Este registro conserva la verificación histórica de la alternativa de advertencia, que no acredita la nueva recuperación. El paso 4 de aceptación debe sustituirse por reabrir sin red y recuperar firma/foto/textos persistidos, comprobar que un cambio de entregados elimina la firma y que errores de cuota/concurrencia no informan guardado correcto. Implementación y aceptación de D9 pendientes.
 
 ## Cambio autorizado
@@ -58,11 +60,17 @@ También comprueba cancelación/aceptación de salida con texto, firma sola, bor
 
 ## Aceptación física que requiere dispositivo
 
-Pendiente de ejecución en teléfono. El resultado automatizado de Chrome no se registra como una prueba de cámara física, GPS real, Worker o recepción externa de avisos.
+El circuito principal se ejecutó en Android el 10/11 con Lucas: carga/inicio, visita confirmada offline, reapertura sin red y sincronización. Se verificaron estado aplicado, evidencia, reenvío y preparación de rendición; ver [ensayo físico](ensayo-android-2026-11-10.md). Siguen pendientes D9 y los escenarios adicionales indicados allí. El resultado automatizado de Chrome no se registra como una prueba física ni acredita recepción externa de avisos.
 
 **Preparación posterior del 09/11:** Lucas confirmó Android y eligió un entorno separado con datos demo. Se levantó `voluptasexpress-lan` con API/Worker actuales, base y mensajería independientes y HTTPS en `https://192.168.1.7:8443`. La CA pública se descarga en `http://192.168.1.7:8081/proyectoDOTNET-LAN.cer`. Se verificaron cadena/nombre TLS, login, sesión de repartidor y archivos publicados. La [guía LAN](../../../infra/lan/README.md) registra acceso, credenciales de demo, reinicio y certificado; esto prepara la prueba física, sin darla por ejecutada.
 
 **Avance físico confirmado por Lucas:** Android `192.168.1.5` descargó la CA después de habilitar el firewall; Lucas confirmó su instalación y el acceso HTTPS. Se prepararon `ENV-000001`, sus tres bultos recibidos y una ruta despachada para el 09/11 mediante operaciones normales y autenticadas, sin SQL. Las etiquetas están en `TestResults/lan/etiquetas-rf32.pdf`. Escaneo físico, carga/inicio, captura offline, sincronización y reenvío todavía requieren ejecutar y registrar sus pasos; no se dan por aprobados por el mero ingreso al sitio.
+
+**Reanudación del 10/11:** Lucas confirmó tras actualizar Android que la ruta del 09/11 figuraba Pendiente de resolución por despacho. El servidor no había recibido carga ni inicio. Se anuló ese despacho mediante CU-43 y se preparó la ruta de hoy `01a1c6c7-7441-72ce-a79d-c952a2d8e8c9` con `ENV-000002`, tres bultos y parcial habilitada. La anulación conserva el historial; la carga y la visita de hoy quedan reservadas al ensayo físico. Etiquetas actuales: `TestResults/lan/etiquetas-rf32-2026-11-10.pdf`.
+
+**Hallazgo del lector en Android, 10/11:** Lucas informó códigos deformados que se registraban como sobrantes. Se renderizaron las tres etiquetas emitidas por la aplicación y se decodificaron con el mismo lector: todas devolvieron los códigos esperados en CODE-128. No se reprodujo la deformación física del teléfono. Se restringió la cámara a CODE-128 y se descartan resultados de otros formatos, conservando como sobrantes los códigos CODE-128 válidos ajenos a la hoja. Se agregó «Quitar lectura incorrecta» al borrador de carga; no modifica una operación confirmada y conserva las demás lecturas, con control de revisión entre pestañas.
+
+Verificación de esta corrección: 75/75 pruebas JavaScript aprobadas, publicación de la API demo correcta y cámara simulada alimentada con una etiqueta real: capturó `ENV-000002-1`, quitó una lectura errónea y conservó la correcta, sin confirmar carga ni generar entregas. Evidencia local: `TestResults/lan/lector-tests.log`, `lector-build.log`, `lector-ui.log` y `lector-correcto.png`. Falta repetir el escaneo físico tras actualizar la PWA. Lucas confirmó además que en PC usaba `localhost:5221`, otro entorno; para comparar con el teléfono se debe usar el mismo HTTPS `192.168.1.7:8443`. Los borradores sin confirmar siguen siendo locales a cada dispositivo.
 
 Preparar un ambiente de prueba HTTPS accesible desde el teléfono, con versión de reglas nueva que admita parcial, un envío de tres bultos y una ruta asignada a un repartidor de prueba. Disponer de códigos físicos legibles, un receptor de avisos v2 de prueba y acceso al Backoffice. Evitar usar envíos reales para declarar entregas/extravíos de ensayo.
 
@@ -81,4 +89,4 @@ Preparar un ambiente de prueba HTTPS accesible desde el teléfono, con versión 
 | 11. Compatibilidad | Actualizar el shell con una cola pendiente sin borrar datos; comprobar que OperacionId, contenido y evidencia se conservan. |
 | 12. Rendición | Entregados no se solicitan como retorno físico. En una variante con dos cargados, el tercero no cargado queda fuera de visita y no consume intento. |
 
-Registrar resultado por paso y adjuntar evidencia de prueba en el repositorio o la tarjeta, sin copiar firma/documento reales a documentación pública. La implementación y verificación automatizada descritas corresponden al alcance anterior de advertencia; **la recuperación completa de D9 y la aceptación física/integrada están pendientes**. RF 34, tablero y liquidación continúan en sus tarjetas.
+Registrar resultado por paso y adjuntar evidencia de prueba en el repositorio o la tarjeta, sin copiar firma/documento reales a documentación pública. La implementación descrita corresponde al alcance anterior de advertencia. **Al cierre del 10/11, operación offline, conflicto y aceptación integrada con avisos externos están validados; D9 y escenarios físicos adicionales no se acreditan con este resultado.** RF 34, tablero y liquidación continúan en sus tarjetas.

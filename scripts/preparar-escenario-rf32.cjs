@@ -11,7 +11,7 @@ const settings = Object.fromEntries(fs.readFileSync(path.join(lan, 'ambiente.env
 const base = `https://${settings.LAN_IP}:8443`;
 const ca = fs.readFileSync(path.join(lan, 'public/root.crt'));
 const file = path.join(lan, 'escenario-rf32.json');
-const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+let state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
 const save = () => fs.writeFileSync(file, JSON.stringify(state, null, 2));
 const operator = '11111111-1111-1111-1111-111111111111';
 function client() {
@@ -55,7 +55,13 @@ async function main() {
     const driver=client(); await driver.login('repartidor@operador-demo.uy','/repartidor/ingresar');
     const session = await driver.json('/api/repartidor/sesion');
     assert.equal(session.operadorId, operator);
-    if (state.fecha && state.fecha !== session.fechaOperativa) throw new Error('El escenario pertenece a otra fecha; revisar su ruta antes de preparar uno nuevo.');
+    if (state.fecha && state.fecha !== session.fechaOperativa) {
+        if (!process.argv.includes('--nuevo-dia')) throw new Error('El escenario pertenece a otra fecha; usar --nuevo-dia para crear otro sin modificar la ruta anterior.');
+        const previousFile=path.join(lan,`escenario-rf32-${state.fecha}.json`);
+        if (!fs.existsSync(previousFile)) fs.copyFileSync(file,previousFile);
+        state={reglasPublicadas:state.reglasPublicadas === true};
+        console.log('Se conserva el escenario anterior; se prepara uno para la fecha operativa actual.');
+    }
     state.fecha = session.fechaOperativa; save();
 
     if (!state.reglasPublicadas) {
@@ -77,10 +83,11 @@ async function main() {
     const commerce=client(); await commerce.login('comercio@tiendademo.uy','/portal/ingresar');
     await commerce.postForm('/cuenta/operador', { operadorId:operator });
     if (!state.envioId) {
-        const existing=await commerce.json('/api/envios/portal?texto=RF32%20ANDROID');
+        const marker='RF32 ANDROID '+state.fecha;
+        const existing=await commerce.json('/api/envios/portal?texto='+encodeURIComponent(marker));
         assert.equal(existing.totalRegistros,0,'Hay un envío de ensayo sin manifiesto local; revisar antes de duplicarlo.');
         const created = await commerce.json('/api/envios/', {
-            destinatario:{nombre:'RF32 ANDROID · Prueba',telefono:'099123456',email:null,documento:null},
+            destinatario:{nombre:marker+' · Prueba',telefono:'099123456',email:null,documento:null},
             direccion:{calle:'Av. Italia',numero:'1234',localidad:'Montevideo',departamento:'Montevideo',codigoPostal:'11300',referencia:'Ensayo RF32 con datos ficticios'},
             bultos:[1,2,3].map(() => ({pesoKg:1,largoCm:10,anchoCm:10,altoCm:10})),modalidad:'Estandar'
         });
@@ -113,9 +120,10 @@ async function main() {
     state.urlHoja=base+'/repartidor/hoja-de-ruta?rutaId='+state.rutaId;
     const labels=await commerce.request('/api/envios/portal/'+state.numero+'/etiquetas');
     assert.equal(labels.bytes.subarray(0,4).toString(),'%PDF');
-    state.etiquetas=path.join(lan,'etiquetas-rf32.pdf');
+    state.etiquetas=path.join(lan,`etiquetas-rf32-${state.fecha}.pdf`);
     fs.writeFileSync(state.etiquetas,labels.bytes);
     save();
     console.log(JSON.stringify(state,null,2));
 }
-main().catch(e => { console.error(e); process.exitCode=1; });
+if (require.main === module) main().catch(e => { console.error(e); process.exitCode=1; });
+module.exports = { client };

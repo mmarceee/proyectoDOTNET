@@ -8,7 +8,11 @@ Continuación autorizada del 09/11/2026: [especificación técnica consolidada](
 
 Base funcional: [decisiones de entrega parcial, secciones 4.1 y 4.2](../decisiones-entrega-parcial.md), [ADR-0004, 2.11](../ADR-0004-resolucion-de-conflictos-de-sincronizacion.md) y [ADR-0007](../ADR-0007-adaptacion-a-entrega-parcial.md). La letra docente de cambio, 2.1, contempla que un bulto no se haya cargado en el vehículo. Las decisiones de foto compartida y custodia fueron confirmadas por Lucas; no se presentan como citas literales del docente.
 
+**Ensayo físico del 10/11/2026:** [resultado en Android](ensayo-android-2026-11-10.md): tres cargados, dos entregados offline, tercero con motivo, reapertura sin red, sincronización a 2/3 y reenvío YaAplicada sin nuevos efectos. Se detallan el límite de ubicación, la preparación de rendición y los pendientes. No acredita D9 ni recepción externa de avisos.
+
 ## Recorrido implementado
+
+**Cierre de aceptación del 10/11/2026:** [ensayos integrados aprobados](aceptacion-integrada-2026-11-10.md). Se verificaron conflicto con diagnóstico por bulto y evidencia conservada, entrega independiente offline, resultado en Backoffice/público, recepción HTTPS de avisos v1/v2 y reenvío sin duplicados. Se completa la aceptación del alcance original de RF 32. D9 sigue registrada como decisión interna posterior pendiente; no se declara implementada ni se extiende este cierre al resto de RF 31 a 36.
 
 Después de confirmar la carga y pulsar **Comenzar ruta**, desde Hoja de ruta cada envío abre Registrar visita. El inicio puede quedar pendiente de sincronizar y cierra nuevas cargas en ese dispositivo. El servidor exige EnCurso para registrar las visitas. Se escanean los entregados por cámara o ingresando el código del lector. Cada otro bulto de la visita requiere un motivo individual del catálogo versionado del envío. No hay un motivo implícito para un paquete sin escanear. Los no cargados y ya resueltos se muestran fuera del alcance.
 
@@ -34,6 +38,8 @@ En hoja-ruta.js, abrirVisita/resultadoVisita guardan un borrador cifrado separad
 Al confirmar, borrador confirmado y operación se escriben en una única transacción de IndexedDB. La revisión del borrador impide que dos pestañas creen dos confirmaciones de la misma visita. Se comprueba también que la rendición no se haya confirmado en paralelo. La firma y foto se incorporan a la operación cifrada antes de informar guardado correcto. Mientras se completa el formulario, los resultados se conservan; la firma, foto y textos aún no confirmados permanecen en la pantalla y se deben volver a capturar si se la abandona. En la revisión anterior del 09/11 se mantuvo ese comportamiento con advertencia antes de salir o recargar; D9 lo sustituye como objetivo por captura completa persistida y cifrada, pendiente de implementar/verificar; una visita completamente guardada deja de advertir. El navegador puede omitir la advertencia en un cierre forzado.
 
 La cola conserva OperacionId, dispositivo, secuencia, fecha y ubicación. Una pérdida de red o de respuesta reenvía el mismo payload. Aplicada/YaAplicada se convierten en recibos; Conflicto/Invalida conservan la operación y su evidencia. Detalle y diagnóstico por bulto se guardan dentro del contenido cifrado, no como códigos personales en metadatos sin cifrar. Los rechazos no se convierten automáticamente en nuevas visitas.
+
+El lector de cámara se limita a CODE-128, el formato emitido por las etiquetas de la aplicación. Antes de confirmar una carga se puede quitar una lectura errónea de la lista de sobrantes; se conservan las demás lecturas y se comprueba la revisión del borrador. Esta edición no permite alterar una confirmación ni su payload. El avance sin confirmar pertenece al dispositivo: iniciar sesión con el mismo usuario en otra PC no transfiere ese borrador.
 
 ## Carga parcial y rendición
 

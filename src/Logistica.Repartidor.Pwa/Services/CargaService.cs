@@ -57,6 +57,12 @@ public sealed class CargaService(IJSRuntime js, HojaDeRutaService hoja) : IAsync
             .Any(e => e.Bultos.Any(b => b.Codigo == codigo.Trim() && (b.Estado.Length == 0 ? e.Estado : b.Estado) == "AsignadoARuta")) == true;
         Mensaje = esperado ? "Bulto registrado y guardado." : "Bulto sobrante: separalo de la carga. Quedó registrado.";
     });
+    public Task QuitarLecturaAsync(string codigo) => Ejecutar(async () =>
+    {
+        if (Borrador is null) return;
+        Borrador = await modulo!.InvokeAsync<BorradorCarga>("quitarLecturaCarga",Borrador.RutaId,Borrador.Revision,codigo);
+        Mensaje = "Lectura quitada del borrador. La carga todavía no está confirmada.";
+    });
     public async Task ConfirmarAsync(bool aceptaFaltantes)
     {
         await Ejecutar(async () =>

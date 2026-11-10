@@ -74,8 +74,9 @@ else if (envios.Length == 0) { <div class="alert alert-success">No quedan envío
             <button class="btn btn-outline-primary" @onclick="IniciarCamara" disabled="@(camaraActiva || Cargas.Ocupado)">Escanear con cámara</button>
             @if (camaraActiva) { <button class="btn btn-outline-secondary" @onclick="DetenerCamara">Detener cámara</button> }
         </div>
+        <video @ref="video" playsinline muted class="mb-3" style="width:100%;max-height:320px;display:@(camaraActiva ? "block" : "none")" aria-label="Vista de la cámara para escanear bultos"></video>
         <p class="small text-muted">Tu avance se guarda automáticamente en este dispositivo.</p>
-        <button class="btn btn-outline-secondary mb-3" disabled="@Cargas.Ocupado" @onclick="Cargas.ActualizarYRevisarAsync">Actualizar hoja y revisar carga</button>
+        <button class="btn btn-outline-secondary mb-3" disabled="@Cargas.Ocupado" @onclick="RevisarCarga">Actualizar hoja y revisar carga</button>
         @foreach (var envio in envios)
         {
             var bloqueado = bloqueados.Any(e => e.Id == envio.Id);
@@ -108,7 +109,11 @@ else if (envios.Length == 0) { <div class="alert alert-success">No quedan envío
         }
         @if (sobrantes.Length > 0)
         {
-            <div class="alert alert-warning"><strong>Sobrantes: separalos del vehículo.</strong><ul class="mb-0">@foreach (var s in sobrantes) { <li>@s</li> }</ul></div>
+            <div class="alert alert-warning"><strong>Sobrantes: separalos del vehículo.</strong>
+                <ul class="mb-0">@foreach (var s in sobrantes) {
+                    <li class="mb-2">@s <button class="btn btn-sm btn-outline-secondary ms-2" disabled="@Cargas.Ocupado" @onclick="() => QuitarLectura(s)">Quitar lectura incorrecta</button></li>
+                }</ul>
+            </div>
         }
         @if (faltantesParciales.Length > 0)
         {
@@ -160,7 +165,6 @@ else if (envios.Length == 0) { <div class="alert alert-success">No quedan envío
 }
 else if (Cargas.Ocupado || Hoja.Cargando) { <p role="status">Abriendo la carga guardada…</p> }
 else { <p>@(Hoja.Copia is null ? "Descargá tu hoja de ruta antes de comenzar." : "No hay una carga habilitada para esta ruta.")</p> }
-<video @ref="video" playsinline muted style="width:100%;max-height:320px;display:@(camaraActiva ? "block" : "none")" aria-label="Vista de la cámara para escanear bultos"></video>
 
 @code {
     private Task ElegirMotivoCarga(string codigo, ChangeEventArgs e) => Cargas.MotivoFaltanteAsync(codigo, e.Value?.ToString() ?? "");
@@ -191,6 +195,8 @@ else { <p>@(Hoja.Copia is null ? "Descargá tu hoja de ruta antes de comenzar." 
     private async Task LeerManual() { await Cargas.LeerAsync(codigo); codigo=""; aceptaFaltantes=false; }
     [JSInvokable] public async Task CodigoDetectado(string valor) { await Cargas.LeerAsync(valor); aceptaFaltantes=false; await InvokeAsync(StateHasChanged); }
     private async Task Confirmar(bool omiteNoParciales) { await DetenerCamara(); await Cargas.ConfirmarAsync(aceptaFaltantes || omiteNoParciales); }
+    private async Task RevisarCarga() { await DetenerCamara(); await Cargas.ActualizarYRevisarAsync(); }
+    private async Task QuitarLectura(string valor) { await DetenerCamara(); await Cargas.QuitarLecturaAsync(valor); }
     private async Task IniciarCamara()
     {
         errorCamara=null;

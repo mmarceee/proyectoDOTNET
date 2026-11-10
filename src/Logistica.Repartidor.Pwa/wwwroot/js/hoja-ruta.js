@@ -419,6 +419,17 @@ export async function escanearCarga(ruta, revision, codigo) {
     return escribirBorrador({ ...actual, revision:revision+1,
         lecturas:[...actual.lecturas, { codigoBulto:codigo, escaneadoEn:new Date().toISOString() }] }, revision, s);
 }
+export async function quitarLecturaCarga(ruta, revision, codigo) {
+    await exigirFechaDeCarga(ruta);
+    await exigirCargaAbierta(ruta);
+    await exigirJornadaAbierta(ruta);
+    const s = await activo(), actual = await borradorCarga(ruta);
+    if (!actual || actual.revision !== revision) throw new Error('La carga cambió. Actualizá antes de continuar.');
+    if (actual.operacionId) throw new Error('Esta carga ya fue confirmada.');
+    if (!actual.lecturas.some(l => l.codigoBulto === codigo)) throw new Error('Esa lectura ya no está en el borrador.');
+    return escribirBorrador({ ...actual, revision:revision+1,
+        lecturas:actual.lecturas.filter(l => l.codigoBulto !== codigo) }, revision, s);
+}
 async function instalacion() {
     const db = await open();
     try {

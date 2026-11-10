@@ -37,6 +37,32 @@ async function resultados() {
     if(b.bultos.some(x=>x.codigoBulto==='ENV-001-3')) b=await store.resultadoVisita(id(10),id(14),b.revision,'ENV-001-3',false,id(31));
     return b;
 }
+
+test('RF32 quitar una lectura errónea conserva las demás y no modifica una carga confirmada',async()=>{
+    await preparar({cargado:false});let c=await store.abrirCarga(id(10));
+    for(const codigo of ['ENV-001-1',"ENV#.##'1'1",'ENV-001-2','ENV-001-3']) c=await store.escanearCarga(id(10),c.revision,codigo);
+    const expected=c.lecturas.filter(l=>l.codigoBulto!=="ENV#.##'1'1");
+    const oldRevision=c.revision;
+    c=await store.quitarLecturaCarga(id(10),c.revision,"ENV#.##'1'1");
+    assert.deepEqual(c.lecturas,expected);assert.equal(c.revision,oldRevision+1);
+    assert.deepEqual((await store.abrirCarga(id(10))).lecturas,expected);
+    assert.equal((await store.pendientesCarga()).length,0);
+    await assert.rejects(store.quitarLecturaCarga(id(10),oldRevision,'ENV-001-1'),/cambió/);
+    await store.confirmarCarga(id(10),c.revision,false);
+    const operations=await store.pendientesCarga(),confirmed=await store.borradorCarga(id(10));
+    await assert.rejects(store.quitarLecturaCarga(id(10),confirmed.revision,'ENV-001-1'),/ya fue confirmada/);
+    assert.deepEqual(await store.pendientesCarga(),operations);
+});
+
+test('RF32 dos pestañas no eliminan lecturas sobre una misma revisión',async()=>{
+    await preparar({cargado:false});let c=await store.abrirCarga(id(10));
+    for(const codigo of ['ENV-001-1','ERROR-A','ERROR-B'])c=await store.escanearCarga(id(10),c.revision,codigo);
+    const removed=await Promise.allSettled(['ERROR-A','ERROR-B'].map(code=>store.quitarLecturaCarga(id(10),c.revision,code)));
+    assert.equal(removed.filter(r=>r.status==='fulfilled').length,1);
+    const actual=await store.borradorCarga(id(10));
+    assert.equal(actual.lecturas.length,2);assert.ok(actual.lecturas.some(l=>l.codigoBulto==='ENV-001-1'));
+    assert.equal((await store.pendientesCarga()).length,0);
+});
 test('RF32 dos entregados y un motivo se guardan juntos cifrados con una sola foto y la misma operación al reintentar',async()=>{
     await preparar(); const b=await resultados();
     await store.registrarVisita(id(10),id(14),b.revision,{firma,foto,...posicion});
