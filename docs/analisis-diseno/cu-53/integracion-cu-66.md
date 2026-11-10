@@ -28,10 +28,18 @@ Para comparar puntos usar `CapturadaEn` y, en caso de empate, `Id` como desempat
 
 El consumidor de CU-66 debe enviar al grupo SignalR del `OperadorId` del evento. La pertenencia de cada conexión a ese grupo debe proceder de su sesión autorizada. Para evitar perder una actualización entre la carga inicial y la suscripción, conectar primero y reconciliar después con la consulta de últimas posiciones, comparando siempre por captura.
 
+## Comprobación de la suscripción en las pruebas del hub
+
+`TableroEnVivoTests` espera a que termine el `OnConnectedAsync` real de `TableroHub` antes de publicar una posición o una novedad. `HubConnection.StartAsync` puede terminar con el handshake antes de que el servidor agregue la conexión al grupo del operador: si la prueba publica en ese intervalo, el mensaje efímero se pierde y termina en timeout, aunque la autorización y el consumidor sean correctos.
+
+La espera usa un `IHubFilter` registrado sólo en esa fábrica de pruebas y una señal por ConnectionId. No sustituye el hub, su selección del operador ni el consumidor. Se mantiene el límite de cinco segundos; no se agregan reintentos del mensaje ni pausas para ocultar la carrera. Una variante de la prueba demora explícitamente la suscripción, verifica que el handshake ya terminó y que el helper todavía no devuelve la conexión, libera la suscripción y comprueba la recepción de la posición. También se conserva la verificación de aislamiento entre operadores y de perfiles no autorizados (ADR-0002).
+
 ## Aviso durable de conflictos
 
 ADR-0004 §2.5 exige `ConflictoSincronizacionRegistrado` por Outbox. El contrato está en Ejecución.Contracts/Events, con el nombre versionado `ConflictoSincronizacionRegistrado.v1`, el OperacionId, la ruta, el envío opcional, el repartidor, el resultado y el motivo. El sobre usa el operador y la correlación del contexto original mediante `AgregarAlOutbox`, como exige ADR-0003. Se registra una sola vez por rechazo nuevo; retransmitirlo no duplica el aviso. CU-66 debe declarar su suscripción/consumidor con Inbox y resolver el operador desde el sobre. El contenido de la operación rechazada permanece en Ejecución hasta su revisión; no se transmite su evidencia en este aviso.
 
-## Verificación pendiente compartida
+## Verificación
 
-Las pruebas de integración de CU-53 están en `ReportarPosicionTests`: comprueban persistencia, idempotencia, evento posterior al commit mediante otra conexión, recepción de historial tras rendir, aislamiento y depuración entre operadores, evidencia conservada y aviso de rechazo en Outbox. Están pendientes de ejecución por indisponibilidad del motor de Docker en el entorno local del 21/10/2026. CU-66 debe agregar las pruebas del hub, los grupos por operador, la reconexión y el descarte de actualizaciones antiguas en el tablero. Los pendientes transversales detectados en CU-52 constan en la [auditoría](revision-arquitectura.md).
+`ReportarPosicionTests` cubre persistencia, idempotencia, publicación posterior al commit mediante otra conexión, recepción de historial tras rendir, aislamiento y depuración entre operadores, evidencia conservada y aviso de rechazo en Outbox. `TableroEnVivoTests` verifica recepción de novedades y posiciones, grupos por operador, perfiles autorizados y la suscripción demorada de forma controlada. No constituye una prueba física del GPS ni de la interfaz del mapa.
+
+Tras la corrección de la carrera, las cuatro pruebas del hub pasaron en Release con cobertura. La suite completa local, con las opciones de cobertura, TRX y detección de bloqueos de CI, terminó con 625 pruebas de integración, 475 unitarias y 56 de arquitectura aprobadas, sin omisiones. La integración duró 8 min 41 s. Esta ejecución fue en Windows; la validación del runner Linux requiere subir la corrección y repetir CI. Los pendientes transversales detectados en CU-52 constan en la [auditoría](revision-arquitectura.md).

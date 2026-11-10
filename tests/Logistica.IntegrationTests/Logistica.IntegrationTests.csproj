@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <!-- Evidencias previas pueden contener obj y fuentes generadas; nunca compilarlas como pruebas. -->
+    <Compile Remove="TestResults/**/*.cs" />
     <None Update="staticassets.vacio.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

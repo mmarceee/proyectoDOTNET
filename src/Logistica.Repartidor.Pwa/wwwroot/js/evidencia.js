@@ -1,12 +1,12 @@
 // CU-17 y CU-18: la firma en pantalla, la foto comprimida y la posición del dispositivo. Este módulo sólo arma la
 // evidencia; guardarla cifrada y encolarla es de hoja-ruta.js, que también valida las reglas del envío.
-import { registrarEntrega, registrarIntentoFallido } from './hoja-ruta.js';
+import { registrarEntrega, registrarIntentoFallido, registrarVisita } from './hoja-ruta.js';
 
 const MAX_BYTES = 1024 * 1024;
 const firmas = new WeakMap();
 
 // El recuadro de la firma: se dibuja con el dedo, el lápiz o el mouse, sobre fondo blanco para que el PNG se lea.
-export function iniciarFirma(canvas) {
+export function iniciarFirma(canvas, notificarCambios = null) {
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
@@ -28,6 +28,7 @@ export function iniciarFirma(canvas) {
     canvas.addEventListener('pointermove', e => {
         if (!estado.dibujando) return;
         const [x, y] = punto(e); ctx.lineTo(x, y); ctx.stroke(); estado.trazos++; e.preventDefault();
+        if (estado.trazos === 1) notificarCambios?.invokeMethodAsync('FirmaModificada').catch(() => {});
     });
     const terminar = () => { estado.dibujando = false; };
     canvas.addEventListener('pointerup', terminar);
@@ -50,7 +51,9 @@ async function comprimirFoto(input, ladoMaximo = 1600) {
     const archivo = input?.files?.[0];
     if (!archivo) return null;
     if (!archivo.type.startsWith('image/')) throw new Error('Elegí una imagen.');
-    const imagen = await createImageBitmap(archivo);
+    let imagen;
+    try { imagen = await createImageBitmap(archivo); }
+    catch { throw new Error('No pudimos leer la foto. Elegí otra imagen o sacá una nueva.'); }
     const escala = Math.min(1, ladoMaximo / Math.max(imagen.width, imagen.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(imagen.width * escala);
@@ -92,4 +95,11 @@ export async function confirmarEntrega(ruta, envioId, canvas, inputFoto, nombreR
 export async function confirmarIntento(ruta, envioId, motivoId, inputFoto, observaciones) {
     const foto = await comprimirFoto(inputFoto);
     return registrarIntentoFallido(ruta, envioId, { motivoId, foto, observaciones, ...await posicion() });
+}
+
+export async function confirmarVisita(ruta, envioId, revision, hayEntregados, canvas, inputFoto, nombreReceptor, documentoReceptor, observaciones) {
+    const firma = hayEntregados ? firmaPng(canvas) : null;
+    if (hayEntregados && !firma) throw new Error('Pedí la firma de quien recibe los bultos entregados.');
+    const foto = await comprimirFoto(inputFoto);
+    return registrarVisita(ruta, envioId, revision, { firma, foto, nombreReceptor, documentoReceptor, observaciones, ...await posicion() });
 }

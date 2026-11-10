@@ -55,10 +55,15 @@ La PWA no envía "el envío X quedó *Entregado*", sino **la operación que hizo
 | Tipo de operación | Caso de uso | Efecto en el servidor |
 | :---- | :---- | :---- |
 | `ConfirmarCarga` | CU-51 | T5 de los envíos de la ruta |
+| `IniciarRuta` | CU-51 · ajuste del 08/11/2026 | Despachada → EnCurso; cierra la carga y habilita visitas y GPS |
 | `RegistrarEntrega` | CU-17 | T6, con su `IntentoEntrega` y su `PruebaEntrega` |
 | `RegistrarIntentoFallido` | CU-18 | T7 y, en la misma transacción, T9 o T10 |
 | `ReportarPosicion` | CU-53 | Una `PosicionVehiculo`; no cambia estados |
 | `IniciarRendicion` | CU-54 | Una `Rendicion` |
+
+**Inicio explícito acordado con Lucas (08/11/2026).** La carga por bulto nueva aplica T5 sin comenzar automáticamente el recorrido. `IniciarRuta` es una operación sin `EnvioId` ni payload adicional: se guarda cifrada y atómicamente con su borrador separado, y se envía después de las cargas y antes de las visitas/posiciones, por `Secuencia`. Antes del inicio no se permite registrar entregas o intentos; después no se admiten cargas nuevas. El servidor exige ruta propia Despachada, fecha operativa de la ruta y bultos efectivamente cargados; inicio, cambio de estado y registro idempotente comparten el bloqueo por operador y la transacción. Un rechazo de carga o inicio bloquea las operaciones siguientes de esa ruta; también se revisan cargas rechazadas no resueltas de lotes anteriores. No genera entregas, intentos ni recargos. La rendición incluye el inicio entre sus dependencias.
+
+El dispositivo permite continuar sin conexión después de guardar el inicio, mostrando que está pendiente; eso no sustituye la validación del servidor. Cerrar carga e iniciar se serializan en IndexedDB entre pestañas. Un rechazo conserva la operación y su motivo e impide continuar con nuevas visitas. Las cargas antiguas sin `PorBulto` conservan su interpretación de salida implícita para no romper operaciones ya guardadas; las rutas que ya estaban EnCurso se consideran iniciadas. No se reescriben datos históricos ni se borra IndexedDB. Véase [CU-51](cu-51/README.md).
 
 Cada operación lleva:
 
@@ -336,7 +341,7 @@ Con la entrega parcial (sección 2.11):
 | 22/10 | Cola local cifrada, disparadores, lotes y pantalla de rechazos en la PWA | Lucas |
 | 22/10 | Autenticación del repartidor. **Hecho el 15/10** (claim `repartidor_id`). | Cristian |
 | 29/10 | Conflictos en el tablero en tiempo real (CU-66) | Cristian |
-| Entrega parcial | Visita con resultados por bulto, conflictos de la sección 2.11 y pruebas 10 a 15, junto con el estado por bulto de Envíos (ADR-0007, sección 2.4). **Servidor hecho el 03/11**: operación `RegistrarVisita`, `DiagnosticoVisita` en Ejecución, `ConsultarParaVisitaAsync` y `RegistrarVisitaAsync` en el contrato de Envíos sobre `Envio.RegistrarVisita` (Cristian), diagnóstico guardado en `operaciones_dispositivo` y traducción de las operaciones anteriores. El 09/11, pruebas 14 y 15 (reenvío de una visita aplicada con recargo, y atomicidad dentro del lote). Falta la PWA. | Ezequiel (servidor), Lucas (PWA) y Cristian (Envíos) |
+| Entrega parcial | Visita con resultados por bulto, conflictos de la sección 2.11 y pruebas 10 a 15, junto con el estado por bulto de Envíos (ADR-0007, sección 2.4). **Servidor hecho el 03/11**: operación `RegistrarVisita`, `DiagnosticoVisita` en Ejecución, `ConsultarParaVisitaAsync` y `RegistrarVisitaAsync` en el contrato de Envíos sobre `Envio.RegistrarVisita` (Cristian), diagnóstico guardado en `operaciones_dispositivo` y traducción de las operaciones anteriores. El 09/11, pruebas 14 y 15 (reenvío de una visita aplicada con recargo, y atomicidad dentro del lote). La PWA está implementada e integrada al 09/11: visita por bulto, cola cifrada, diagnóstico y reenvío (`Rf32PwaTests` y pruebas JavaScript); ver [RF 32](rf-32/README.md). La aceptación del circuito publicado sigue pendiente según [ADR-0007, secciones 4.4 a 4.7](ADR-0007-adaptacion-a-entrega-parcial.md). | Ezequiel (servidor), Lucas (PWA) y Cristian (Envíos) |
 
 # **8\. Historial de versiones**
 

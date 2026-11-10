@@ -15,6 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="QuestPDF" />
+    <PackageReference Include="ZXing.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Logistica.Modules.Envios.Contracts\Logistica.Modules.Envios.Contracts.csproj" />
     <ProjectReference Include="..\..\Administracion\Logistica.Modules.Administracion.Contracts\Logistica.Modules.Administracion.Contracts.csproj" />
     <ProjectReference Include="..\..\Deposito\Logistica.Modules.Deposito.Contracts\Logistica.Modules.Deposito.Contracts.csproj" />

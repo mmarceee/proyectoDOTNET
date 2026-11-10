@@ -20,9 +20,29 @@
     <div class="alert alert-danger" asp-validation-summary="All" role="alert"></div>
 }
 
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+
 @if (confirmada)
 {
     <div class="alert alert-info" role="status">Esta rendición ya se confirmó el @rendicion.FinalizadaEn?.ToString("dd/MM/yyyy HH:mm") UTC.</div>
+}
+
+@if (Model.NoCargadosRecuperables > 0)
+{
+    <div class="alert alert-warning" role="status">
+        Hay @Model.NoCargadosRecuperables envíos que no salieron y conservan la asignación de esta ruta cerrada.
+        Podés dejarlos disponibles para planificar nuevamente.
+        <form method="post" class="mt-2">
+            <div class="form-check mb-2">
+                <input asp-for="ConfirmarNoCargadosEnDeposito" class="form-check-input" />
+                <label asp-for="ConfirmarNoCargadosEnDeposito" class="form-check-label">Verifiqué que todos los bultos de estos envíos están en depósito.</label>
+            </div>
+            <button type="submit" asp-page-handler="RecuperarNoCargados" class="btn btn-warning">Liberar envíos no cargados</button>
+        </form>
+    </div>
 }
 
 @if (rendicion.Observaciones is not null)
@@ -89,6 +109,7 @@
             incidencias por los envíos afectados. La ruta quedará finalizada. ¿Querés confirmar igualmente?</p>
         <form method="post">
             <input type="hidden" asp-for="Escaneados" />
+            <input type="hidden" asp-for="ConfirmarNoCargadosEnDeposito" />
             <button type="submit" asp-page-handler="Confirmar" name="ConfirmarFaltantes" value="true" class="btn btn-warning">Confirmar con faltantes</button>
             <button type="submit" asp-page-handler="Comparar" class="btn btn-outline-secondary">Volver y revisar bultos</button>
         </form>
@@ -97,6 +118,16 @@
 else if (!confirmada)
 {
     <form method="post" class="mt-3">
+        @if (rendicion.Lineas.GroupBy(l => l.EnvioId).Any(g => g.All(l => l.Situacion is "NoCargado" or "CargaParcial")))
+        {
+            <div class="alert alert-warning">
+                <div class="form-check">
+                    <input asp-for="ConfirmarNoCargadosEnDeposito" class="form-check-input" />
+                    <label asp-for="ConfirmarNoCargadosEnDeposito" class="form-check-label">Verifiqué que todos los bultos de los envíos que no salieron están en depósito. Liberarlos para otra ruta.</label>
+                </div>
+                Si falta localizar algún bulto, dejá la casilla sin marcar: esos envíos seguirán bloqueados hasta su conciliación.
+            </div>
+        }
         @if (requiereRecepcion)
         {
         <div class="mb-3">

@@ -298,6 +298,12 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
             var sinCargar = await preparar.ConsultarAsync(siguiente, [envio.Id], default);
             Assert.Equal((pendiente.Id, "NoCargado"), (Assert.Single(sinCargar.Bultos).BultoId, sinCargar.Bultos[0].Situacion));
         }
+        var hojaSiguiente = await client.GetFromJsonAsync<HojaDeRutaResponse>($"/api/repartidor/rutas/{siguiente}/hoja-de-ruta");
+        Assert.NotNull(hojaSiguiente);
+        var bultoEnHoja = Assert.Single(Assert.Single(Assert.Single(hojaSiguiente.Paradas).Envios).Bultos);
+        Assert.Equal(pendiente.Id, bultoEnHoja.Id);
+        Assert.Equal(EstadoEnvio.AsignadoARuta.ToString(), bultoEnHoja.Estado);
+        Assert.Equal(bultoEnHoja.Id, Assert.Single(hojaSiguiente.Rendicion!.Bultos).BultoId);
         await EscanearAsync(siguiente, [pendiente]);
         await TransicionarAsync(envio.Id, EstadoEnvio.EnTransito);
         using (var s = Scope())

@@ -44,10 +44,33 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
-        // Sólo los bultos que acompañan al envío: en una nueva visita (RF 34) no se cargan los ya entregados.
+        // La nueva visita excluye los ya entregados; una carga en preparación conserva los todavía asignados
+        // aunque el primer lote cargado ya haya dejado el estado de compatibilidad EnTransito.
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
-        return lista.Select(e => new EnvioParaCarga(e.Id, e.Estado.ToString(),
-            e.BultosQueAcompanan.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray()) { Numero = e.Numero }).ToArray();
+        var resultado = new List<EnvioParaCarga>();
+        foreach (var e in lista)
+            resultado.Add(new(e.Id, e.Estado.ToString(), e.BultosParaCarga.Select(b => new BultoParaCarga(b.Id, b.Codigo, b.Estado.ToString())).ToArray())
+            { Numero = e.Numero, AdmiteEntregaParcial = (await reglasDeEntrega.ParaHojaAsync(e, ct)).AdmiteEntregaParcial });
+        return resultado;
+    }
+
+    public async Task<bool> RegistrarCargaPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, Guid? responsable, DateTimeOffset ocurridoEn, CancellationToken ct)
+    {
+        var lista = await envios.ObtenerPorBultosAsync(bultoIds, ct);
+        if (bultoIds.Distinct().Count() != bultoIds.Count || lista.Sum(e => e.Bultos.Count(b => bultoIds.Contains(b.Id))) != bultoIds.Count) return false;
+        foreach (var envio in lista)
+        {
+            var ids = envio.Bultos.Where(b => bultoIds.Contains(b.Id)).Select(b => b.Id).ToArray();
+            var reglas = await reglasDeEntrega.ParaHojaAsync(envio, ct);
+            if (!envio.PuedeCargarBultos(ids, reglas.AdmiteEntregaParcial)) return false;
+        }
+        foreach (var envio in lista)
+        {
+            envio.CargarBultos(envio.Bultos.Where(b => bultoIds.Contains(b.Id)).Select(b => b.Id).ToArray(), responsable, ocurridoEn);
+            eventos.Registrar(EnvioEnTransito.Tipo, new EnvioEnTransito(envio.Id, envio.Numero, ocurridoEn, responsable), ocurridoEn);
+        }
+        await envios.GuardarCambiosAsync(ct);
+        return true;
     }
 
     public async Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct)
@@ -132,7 +155,9 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
             // Con todos sus pendientes devueltos, el envío queda EnDevolucion e inicia la Devolucion (CU-20), como antes.
             // Un bulto devuelto mientras otros se reprograman espera la devolución por bulto (pendiente 2 de la decisión).
-            if (envio.Estado == EstadoEnvio.EnDevolucion)
+            // Una revisita exitosa puede dejar sólo un bulto en devolución de una visita anterior. No tiene un
+            // motivo fallido nuevo: ese caso sigue pendiente de la devolución por bulto (pendiente 2).
+            if (envio.Estado == EstadoEnvio.EnDevolucion && motivos.Count > 0)
             {
                 var motivo = motivos.Values.First();
                 envios.Agregar(Devolucion.Crear(envio, $"Intento fallido: {motivo.Codigo}.", visita.OcurridoEn));

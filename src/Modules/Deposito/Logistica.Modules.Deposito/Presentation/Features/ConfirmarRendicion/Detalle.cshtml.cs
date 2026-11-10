@@ -23,6 +23,9 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
     [BindProperty]
     public bool ConfirmarFaltantes { get; set; }
 
+    [BindProperty]
+    public bool ConfirmarNoCargadosEnDeposito { get; set; }
+
     public bool RequiereConfirmacion { get; private set; }
 
     public ComparacionRendicion Comparacion { get; private set; } = null!;
@@ -30,8 +33,29 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
     // Recién después de comparar se muestran faltantes y sobrantes.
     public bool Comparada { get; private set; }
 
+    public string? Mensaje { get; private set; }
+
+    public int NoCargadosRecuperables { get; private set; }
+
+    public async Task<IActionResult> OnPostRecuperarNoCargadosAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (!ConfirmarNoCargadosEnDeposito)
+                throw new DomainException("Confirmá que todos los bultos de los envíos no cargados están en depósito antes de liberarlos.");
+            if (await handler.RecuperarNoCargadosAsync(RutaId, ct) is not { } cantidad) return NotFound();
+            TempData["Mensaje"] = $"{cantidad} envíos no cargados quedaron disponibles en depósito para asignarlos a otra ruta.";
+        }
+        catch (DomainException e)
+        {
+            TempData["Error"] = e.Message;
+        }
+        return LocalRedirect($"/backoffice/rendiciones/{RutaId}");
+    }
+
     public async Task<IActionResult> OnGetAsync(CancellationToken ct)
     {
+        Mensaje = TempData["Mensaje"] as string;
         if (TempData["Error"] is string error)
         {
             ModelState.AddModelError(string.Empty, error);
@@ -63,7 +87,7 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
                 return Page();
             }
 
-            if (await handler.ConfirmarAsync(RutaId, Codigos(), ct) is not { } confirmada)
+            if (await handler.ConfirmarAsync(RutaId, Codigos(), ct, ConfirmarNoCargadosEnDeposito) is not { } confirmada)
             {
                 return NotFound();
             }
@@ -91,6 +115,7 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
         }
 
         Comparacion = comparacion;
+        NoCargadosRecuperables = (await handler.NoCargadosRecuperablesAsync(comparacion.Rendicion, ct)).Count;
         return Page();
     }
 

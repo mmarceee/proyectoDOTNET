@@ -79,11 +79,19 @@ internal sealed class PlanificacionModuleApi(IRutaRepository rutas, IAdministrac
             ? null : new(ruta.Revision, ruta.Estado.ToString(), ruta.EnvioIds.ToArray(), ruta.Fecha);
     }
 
-    public async Task RegistrarCargaAsync(Guid rutaId, bool tieneEnviosCargados, CancellationToken ct)
+    public async Task RegistrarCargaAsync(Guid rutaId, bool tieneEnviosCargados, CancellationToken ct, bool inicioExplicito = false)
     {
         var ruta = await rutas.ObtenerAsync(rutaId, ct)
             ?? throw new Logistica.SharedKernel.DomainException("La ruta no está disponible.");
-        ruta.RegistrarCarga(tieneEnviosCargados);
+        ruta.RegistrarCarga(tieneEnviosCargados, inicioExplicito);
+        await rutas.GuardarAsync(ct);
+    }
+
+    public async Task IniciarRutaAsync(Guid rutaId, CancellationToken ct)
+    {
+        var ruta = await rutas.ObtenerAsync(rutaId, ct)
+            ?? throw new Logistica.SharedKernel.DomainException("La ruta no está disponible.");
+        ruta.Iniciar();
         await rutas.GuardarAsync(ct);
     }
 
