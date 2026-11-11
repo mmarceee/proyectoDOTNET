@@ -375,7 +375,8 @@ Se detalla como **CU-81** en la sección 2.7 (API pública para comercios).
 * CU-55 deja la devolución *RecibidaEnDeposito* cuando vuelve algún bulto del envío (`Devolucion.MarcarRecibida`). Sólo una devolución recibida se puede cerrar (A1).
 * El operario desmarca los bultos que no se entregan; si falta alguno, confirma la entrega parcial y se abre una incidencia del envío con sus códigos (A2), como en CU-55.
 * El nombre y el documento de quien recibe son obligatorios y quedan en la devolución, con la fecha, y en el detalle del evento del envío. El evento `EnvioDevuelto` llega a Seguimiento: avisa al comercio (CU-64, tipo *Devolución*) y borra el seguimiento público de la caché (CU-60).
-* **Entrega parcial (RF 31, 09/11/2026):** la devolución tiene sólo los bultos *EnDevolucion* (o *Devuelto*, una vez entregada). Los que ya recibió el destinatario no se muestran, no se pueden marcar y no cuentan como faltantes de A2. El envío queda *Devuelto* con su resumen *Entregado parcialmente* y terminado. Sigue pendiente la devolución de un bulto suelto mientras otro del envío se reprograma (decisiones-entrega-parcial.md, pendiente 2): esa visita no crea la devolución.
+* **Entrega parcial (RF 31, 09/11/2026):** la devolución tiene sólo los bultos *EnDevolucion* (o *Devuelto*, una vez entregada). Los que ya recibió el destinatario no se muestran, no se pueden marcar y no cuentan como faltantes de A2. El envío queda *Devuelto* con su resumen *Entregado parcialmente* y terminado.
+* **Bulto suelto (RF 31, 10/11/2026):** un bulto que queda en devolución mientras otro del envío se reprograma abre la devolución en la misma visita. Vuelve en la rendición y el operario lo entrega al comercio solo: pasa a *Devuelto* únicamente ese bulto, el envío no cambia de estado y no se publica `EnvioDevuelto` (sí `BultoDevuelto`, para los avisos v2). Quién lo recibió queda en la devolución. Un envío puede tener varias devoluciones, pero una sola abierta: si después se devuelve el resto (CU-18, CU-20 o CU-70), se abre otra, y ésa cierra el envío como siempre. Un bulto suelto que falta al entregar queda con su incidencia y en devolución; el extravío de un bulto suelto sigue fuera de alcance (pendiente 4).
 
 ### **CU-32 · Generar la liquidación de un comercio**
 
@@ -893,3 +894,4 @@ Diseño técnico para implementar: [contratos, esquema, concurrencia, pantallas 
 | 2.4 | 09/11/2026 | CU-64: avisos versionados v1 y v2 con los eventos de bulto (RF 36). | Ezequiel Marcenal |
 | 2.5 | 09/11/2026 | CU-54: la rendición mira el estado de cada bulto (RF 31). | Ezequiel Marcenal |
 | 2.6 | 10/11/2026 | CU-22: implementación en nivel básico; resolver sin pasar por *En proceso* y el historial con las fechas y la resolución. | Cristian Reyes |
+| 2.7 | 10/11/2026 | CU-31: devolución de un bulto suelto mientras otro del envío se reprograma (RF 31). | Ezequiel Marcenal |

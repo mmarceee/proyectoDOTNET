@@ -50,6 +50,13 @@ public sealed class EventosDeBultoTests(PostgresApiFactory factory) : IClassFixt
         Assert.Equal(
             [(codigos[reprogramado], "AUSENTE", "Reprogramado"), (codigos[devuelto], "RECHAZADO", "EnDevolucion")],
             noEntregados.Select(e => (e.CodigoBulto, e.Motivo, e.EstadoBulto)).OrderBy(e => e.Item1));
+        // CU-31 por bulto: el bulto en devolución abre la devolución aunque el envío siga Reprogramado.
+        await using (var db = Contexto<EnviosDbContext>(Demo))
+        {
+            var devolucion = await db.Devoluciones.AsNoTracking().SingleAsync(d => d.EnvioId == envio.Id);
+            Assert.Equal(("Intento fallido: RECHAZADO.", Logistica.Modules.Envios.Domain.Devoluciones.EstadoDevolucion.Pendiente),
+                (devolucion.Motivo, devolucion.Estado));
+        }
 
         await VolverATransitoAsync(envio.Id);
         var revisita = await RegistrarAsync(envio.Id, [new(reprogramado, null)], minutosAntes: 5);

@@ -2,6 +2,9 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {readFile}=require('node:fs/promises');
 const ZXing=require('@zxing/library');
+// Desde @zxing/browser 0.2 el paquete UMD lee window al cargarse. En la PWA lo carga un <script> de la página
+// (camara-carga.js), donde window existe; en Node se simula el global del navegador.
+globalThis.window??=globalThis;
 const incluido=require('../../src/Logistica.Repartidor.Pwa/wwwroot/lib/zxing/zxing-browser.min.js');
 
 test('el lector incluido en la PWA decodifica un código CODE-128 de bulto sin CDN',()=>{

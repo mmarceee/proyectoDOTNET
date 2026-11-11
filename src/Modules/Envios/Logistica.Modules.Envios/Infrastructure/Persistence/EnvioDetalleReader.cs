@@ -92,9 +92,10 @@ internal sealed class EnvioDetalleReader(EnviosDbContext db) : IEnvioDetalleRead
             Incidencias = await incidencias.OrderBy(i => i.CreadaEn).ThenBy(i => i.Id)
                 .Select(i => new IncidenciaDetalleDto(i.Tipo.ToString(), i.Descripcion, i.Estado.ToString(),
                     i.CreadaEn, i.ResueltaEn, i.Resolucion)).ToListAsync(ct),
-            Devolucion = await devoluciones.Select(d => new DevolucionDetalleDto(d.Motivo, d.Estado.ToString(),
+            // RF 31: con varias (un bulto suelto y después el resto), la última.
+            Devolucion = await devoluciones.OrderByDescending(d => d.IniciadaEn).ThenByDescending(d => d.Id).Select(d => new DevolucionDetalleDto(d.Motivo, d.Estado.ToString(),
                 d.IniciadaEn, d.RecibidaEnDepositoEn, d.NombreReceptor, d.DocumentoReceptor,
-                d.EntregadaAlComercioEn)).SingleOrDefaultAsync(ct),
+                d.EntregadaAlComercioEn)).FirstOrDefaultAsync(ct),
         };
     }
 }

@@ -25,8 +25,11 @@ internal sealed class IniciarDevolucionHandler(IEnvioRepository envios, IPlanifi
         // Motivo vacío, A1 (estado que no lo permite) y A2 (el comercio fuera del depósito) lanzan DomainException.
         envio.IniciarDevolucion(command.Motivo, command.Origen, command.ResponsableId, ahora);
 
-        // Requerimiento especial 1: la Devolucion es otro agregado y se crea en la misma transacción.
-        var devolucion = Devolucion.Crear(envio, command.Motivo, ahora);
+        // Requerimiento especial 1: la Devolucion es otro agregado y se crea en la misma transacción. RF 31: si un bulto
+        // suelto ya tenía su devolución abierta, el resto se suma a ella (una sola abierta por envío).
+        var abierta = await envios.ObtenerDevolucionAsync(envio.Id, ct) is { Estado: not EstadoDevolucion.Cerrada } existente
+            ? existente : null;
+        var devolucion = abierta ?? Devolucion.Crear(envio, command.Motivo, ahora);
 
         // CU-31 sólo entrega al comercio una devolución recibida en el depósito. En T12 el paquete ya está ahí; en T14
         // también, salvo que siga arriba del vehículo: en ese caso la marca la rendición (CU-55) cuando vuelve, como en
@@ -36,7 +39,10 @@ internal sealed class IniciarDevolucionHandler(IEnvioRepository envios, IPlanifi
             devolucion.MarcarRecibida(ahora);
         }
 
-        envios.Agregar(devolucion);
+        if (abierta is null)
+        {
+            envios.Agregar(devolucion);
+        }
 
         // DevolucionIniciada va al Outbox, también en la misma transacción (ADR-0003).
         envios.RegistrarDevolucion(envio, devolucion, anterior, command.ResponsableId, command.Origen, ahora);
