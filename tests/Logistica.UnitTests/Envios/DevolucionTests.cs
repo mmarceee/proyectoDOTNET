@@ -67,4 +67,35 @@ public class DevolucionTests
         Assert.Throws<DomainException>(() => devolucion.Cerrar("María Gómez", new string('1', Devolucion.LargoDocumento + 1), Ahora));
         Assert.Equal(EstadoDevolucion.RecibidaEnDeposito, devolucion.Estado);
     }
+
+    // RF 31 (pendiente 2 de la decisión): sólo los bultos en devolución que recibió el comercio pasan a Devuelto; el
+    // envío y su otro bulto, reprogramado, no cambian.
+    [Fact]
+    public void Devolver_bultos_sueltos_cambia_solo_esos_bultos()
+    {
+        var envio = Envio.Crear(Guid.NewGuid(), Guid.NewGuid(), "ENV-2", new Destinatario("Ana Pérez", "099123456"),
+            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo", "11300"),
+            [new DatosBulto(2, 30, 20, 10, 150), new DatosBulto(2, 30, 20, 10, 150)], OrigenEvento.PortalComercio, null,
+            Ahora.AddDays(-2));
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, Ahora);
+        envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, Ahora);
+        envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, Ahora);
+        var (reprogramado, devuelto) = (envio.Bultos[0], envio.Bultos[1]);
+        reprogramado.Transicionar(EstadoEnvio.NoEntregado);
+        reprogramado.Transicionar(EstadoEnvio.Reprogramado);
+        devuelto.Transicionar(EstadoEnvio.NoEntregado);
+        devuelto.Transicionar(EstadoEnvio.EnDevolucion);
+        envio.Transicionar(EstadoEnvio.NoEntregado, OrigenEvento.AppRepartidor, null, Ahora);
+        envio.Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.Sistema, null, Ahora);
+
+        Assert.Throws<DomainException>(() => envio.DevolverBultos([reprogramado.Id]));
+        Assert.Throws<DomainException>(() => envio.DevolverBultos([Guid.NewGuid()]));
+        Assert.Throws<DomainException>(() => envio.DevolverBultos([]));
+
+        envio.DevolverBultos([devuelto.Id]);
+
+        Assert.Equal((EstadoEnvio.Reprogramado, EstadoEnvio.Reprogramado, EstadoEnvio.Devuelto),
+            (envio.Estado, reprogramado.Estado, devuelto.Estado));
+        Assert.False(envio.Terminado);
+    }
 }

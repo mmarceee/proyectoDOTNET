@@ -5,6 +5,7 @@ using Logistica.IntegrationTests.Identidad;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Logistica.Modules.Ejecucion.Domain.Rendiciones;
 using Logistica.Modules.Ejecucion.Infrastructure.Persistence;
+using Logistica.Modules.Envios.Application.Features.IniciarDevolucion;
 using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Domain.Devoluciones;
 using Logistica.Modules.Envios.Domain.Envios;
@@ -120,6 +121,70 @@ public sealed class ConfirmarDevolucionTests(PostgresApiFactory factory) : IClas
         Assert.Contains("No hay una devolución", await operario.GetStringAsync($"{Pagina}?Buscar=ENV-INEXISTENTE"));
     }
 
+    // RF 31 (pendiente 2 de la decisión): un bulto vuelve al comercio solo mientras el otro del envío sigue reprogramado.
+    // Sólo el bulto que recibió el comercio pasa a Devuelto; el envío no cambia y no publica EnvioDevuelto. Cuando
+    // después se devuelve el resto, el envío abre otra devolución y ésa sí lo cierra.
+    [Fact]
+    public async Task Un_bulto_suelto_se_devuelve_solo_y_el_otro_sigue_reprogramado()
+    {
+        var envio = await BultoSueltoEnDevolucionAsync();
+        var (reprogramado, devuelto) = (envio.Bultos.OrderBy(b => b.Codigo).First(), envio.Bultos.OrderBy(b => b.Codigo).Last());
+        using var operario = await OperarioAsync();
+
+        var pagina = await operario.GetStringAsync($"{Pagina}?Buscar={devuelto.Codigo}");
+        Assert.Contains($"value=\"{devuelto.Id}\"", pagina);
+        Assert.DoesNotContain($"value=\"{reprogramado.Id}\"", pagina);
+        Assert.DoesNotContain("no está en devolución", WebUtility.HtmlDecode(pagina));
+
+        // Sin el bulto devuelto falta uno: se confirma la entrega parcial (A2) y Envíos rechaza el bulto reprogramado.
+        var ajeno = await ConfirmarAsync(operario, envio.Numero, [reprogramado.Id], "María Gómez", "12345678", parcial: true);
+        Assert.Contains("no es de esta devolución", await SeguirAsync(operario, ajeno));
+
+        var respuesta = await ConfirmarAsync(operario, envio.Numero, [devuelto.Id], "María Gómez", "12345678");
+
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        Assert.Equal(Pagina, respuesta.Headers.Location?.OriginalString);
+        using (var scope = Scope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+            var guardado = await db.Envios.AsNoTracking().SingleAsync(e => e.Id == envio.Id);
+            Assert.Equal(EstadoEnvio.Reprogramado, guardado.Estado);
+            Assert.Equal([EstadoEnvio.Reprogramado, EstadoEnvio.Devuelto], guardado.Bultos.OrderBy(b => b.Codigo).Select(b => b.Estado));
+            Assert.False(guardado.Terminado);
+            var cerrada = await db.Devoluciones.AsNoTracking().SingleAsync(d => d.EnvioId == envio.Id);
+            Assert.Equal((EstadoDevolucion.Cerrada, "María Gómez"), (cerrada.Estado, cerrada.NombreReceptor));
+            var eventos = (await db.Outbox.AsNoTracking().ToListAsync()).Where(m => m.Contenido.Contains(envio.Id.ToString())).ToList();
+            Assert.DoesNotContain(eventos, m => m.Tipo == EnvioDevuelto.Tipo);
+            Assert.Equal(devuelto.Codigo, JsonSerializer.Deserialize<BultoDevuelto>(
+                Assert.Single(eventos, m => m.Tipo == BultoDevuelto.Tipo).Contenido)!.CodigoBulto);
+        }
+
+        // El despachador devuelve el resto (CU-20, T14): otra devolución, abierta, sólo con el bulto que faltaba.
+        using (var scope = Scope())
+        {
+            Assert.True(await scope.ServiceProvider.GetRequiredService<IniciarDevolucionHandler>().HandleAsync(
+                new IniciarDevolucionCommand(envio.Id, "El comercio pidió el resto", OrigenEvento.Backoffice, null), default));
+        }
+        pagina = await operario.GetStringAsync($"{Pagina}?Buscar={envio.Numero}");
+        Assert.Contains($"value=\"{reprogramado.Id}\"", pagina);
+        Assert.DoesNotContain($"value=\"{devuelto.Id}\"", pagina);
+
+        respuesta = await ConfirmarAsync(operario, envio.Numero, [reprogramado.Id], "Juan Pérez", "87654321");
+
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        using (var scope = Scope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+            var guardado = await db.Envios.AsNoTracking().SingleAsync(e => e.Id == envio.Id);
+            Assert.Equal((EstadoEnvio.Devuelto, true), (guardado.Estado, guardado.Terminado));
+            Assert.All(guardado.Bultos, b => Assert.Equal(EstadoEnvio.Devuelto, b.Estado));
+            Assert.Equal(["Juan Pérez", "María Gómez"], (await db.Devoluciones.AsNoTracking()
+                .Where(d => d.EnvioId == envio.Id && d.Estado == EstadoDevolucion.Cerrada).ToListAsync())
+                .Select(d => d.NombreReceptor!).Order());
+            Assert.Empty(await db.Incidencias.Where(i => i.EnvioId == envio.Id).ToListAsync());
+        }
+    }
+
     // RF 31: de un envío entregado en parte, vuelve al comercio sólo lo que no se entregó. Los bultos que recibió el
     // destinatario no se ofrecen, no se pueden marcar y no cuentan como faltantes.
     [Fact]
@@ -212,6 +277,38 @@ public sealed class ConfirmarDevolucionTests(PostgresApiFactory factory) : IClas
         envio.Transicionar(EstadoEnvio.EnDevolucion, OrigenEvento.Sistema, null, ahora);
         var devolucion = Devolucion.Crear(envio, "Intento fallido: RECHAZADO.", ahora);
         if (recibida) devolucion.MarcarRecibida(ahora);
+
+        var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        db.Envios.Add(envio);
+        db.Devoluciones.Add(devolucion);
+        await db.SaveChangesAsync();
+        return envio;
+    }
+
+    // Lo que deja una visita mixta (RF 31): un bulto Reprogramado y el otro EnDevolucion, que ya volvió al depósito en la
+    // rendición. El envío queda Reprogramado y la devolución, abierta y recibida.
+    private async Task<Envio> BultoSueltoEnDevolucionAsync()
+    {
+        using var inicial = factory.CreateClient();
+        await inicial.GetAsync("/health");
+        using var scope = Scope();
+        var ahora = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var envio = Envio.Crear(DatosIniciales.OperadorDemoId, DatosIniciales.ComercioDemoId,
+            $"CU31-{Guid.NewGuid():N}".ToUpperInvariant(), new Destinatario("Prueba Devolución", "099123456"),
+            new Direccion("Calle", "10", "Montevideo", "Montevideo", "11300"),
+            [new DatosBulto(1, 10, 10, 10, 0), new DatosBulto(1, 10, 10, 10, 0)], OrigenEvento.PortalComercio, null, ahora);
+        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora);
+        envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, ahora);
+        envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, ahora);
+        var (primero, segundo) = (envio.Bultos.OrderBy(b => b.Codigo).First(), envio.Bultos.OrderBy(b => b.Codigo).Last());
+        primero.Transicionar(EstadoEnvio.NoEntregado);
+        primero.Transicionar(EstadoEnvio.Reprogramado);
+        segundo.Transicionar(EstadoEnvio.NoEntregado);
+        segundo.Transicionar(EstadoEnvio.EnDevolucion);
+        envio.Transicionar(EstadoEnvio.NoEntregado, OrigenEvento.AppRepartidor, null, ahora);
+        envio.Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.Sistema, null, ahora);
+        var devolucion = Devolucion.Crear(envio, "Intento fallido: RECHAZADO.", ahora);
+        devolucion.MarcarRecibida(ahora);
 
         var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         db.Envios.Add(envio);

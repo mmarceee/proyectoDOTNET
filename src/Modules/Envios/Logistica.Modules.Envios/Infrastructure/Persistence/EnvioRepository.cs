@@ -39,7 +39,10 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
     public async Task<Domain.Devoluciones.Devolucion?> ObtenerDevolucionAsync(Guid envioId, CancellationToken ct)
     {
         await db.ParticiparEnTransaccionAsync(ct);
-        return await db.Devoluciones.SingleOrDefaultAsync(d => d.EnvioId == envioId, ct);
+        // RF 31: la abierta, si hay; si no, la última que se entregó al comercio.
+        return await db.Devoluciones.Where(d => d.EnvioId == envioId)
+            .OrderBy(d => d.Estado == Domain.Devoluciones.EstadoDevolucion.Cerrada).ThenByDescending(d => d.IniciadaEn).ThenByDescending(d => d.Id)
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task<IReadOnlyList<Domain.Devoluciones.Devolucion>> ObtenerDevolucionesAsync(

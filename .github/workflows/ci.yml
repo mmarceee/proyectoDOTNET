@@ -86,9 +86,12 @@ jobs:
       - name: Release build servers
         run: dotnet build-server shutdown
 
-      # El script lo genera Playwright al compilar; --with-deps instala también las bibliotecas del sistema.
+      # El script lo genera Playwright al compilar. Sin --with-deps: la imagen del runner ya trae las bibliotecas que
+      # necesita Chromium, y --with-deps sólo agregaba fuentes opcionales por apt, que falló el 11/11/2026 porque el
+      # runner no resolvía los servidores de Ubuntu. Así el paso no depende de apt. scripts/e2e-en-docker.sh sí lo usa:
+      # su contenedor del SDK no trae esas bibliotecas.
       - name: Install Chromium
-        run: pwsh tests/Logistica.E2ETests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+        run: pwsh tests/Logistica.E2ETests/bin/Release/net10.0/playwright.ps1 install chromium
 
       - name: Test
         id: test
