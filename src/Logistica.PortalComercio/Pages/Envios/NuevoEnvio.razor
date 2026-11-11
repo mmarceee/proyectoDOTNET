@@ -14,6 +14,7 @@
     </div>
 
     <button type="button" class="btn btn-primary" @onclick="NuevoFormulario">Crear otro envío</button>
+    <DescargarEtiquetas Numeros="@(new[] { _creado.Numero })" />
 }
 else
 {

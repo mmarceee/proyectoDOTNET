@@ -71,7 +71,13 @@
                 <li>@bulto.Codigo: @bulto.Estado</li>
             }
         </ul>
-        <div><button type="button" class="btn btn-outline-secondary" @onclick="CerrarDetalle">Cerrar detalle</button></div>
+        <div>
+            @if (detalle.PuedeImprimirEtiquetas)
+            {
+                <DescargarEtiquetas Numeros="@(new[] { detalle.Numero })" />
+            }
+            <button type="button" class="btn btn-outline-secondary" @onclick="CerrarDetalle">Cerrar detalle</button>
+        </div>
     </section>
 }
 @if (_resultado is { } resultado)
@@ -83,11 +89,16 @@
     }
     else
     {
+        <div class="mb-3">
+            <DescargarEtiquetas Numeros="@_seleccionados.ToArray()" Texto="Descargar etiquetas de los seleccionados" />
+            <span class="ms-2">@_seleccionados.Count seleccionados · máximo 200 etiquetas</span>
+            <p class="text-muted small">La selección corresponde a esta página y se limpia al cambiar de página o filtros.</p>
+        </div>
         <div class="table-responsive">
             <table class="table table-striped">
                 <thead>
                     <tr>
-                        <th scope="col">Número</th><th scope="col">Referencia</th><th scope="col">Destinatario</th>
+                        <th scope="col">Seleccionar</th><th scope="col">Número</th><th scope="col">Referencia</th><th scope="col">Destinatario</th>
                         <th scope="col">Localidad</th><th scope="col">Zona</th><th scope="col">Modalidad</th>
                         <th scope="col">Resumen</th><th scope="col">Fecha de alta</th><th scope="col">Monto</th>
                         <th scope="col">Acciones</th>
@@ -97,6 +108,9 @@
                     @foreach (var envio in resultado.Envios)
                     {
                         <tr>
+                            <td><input type="checkbox" aria-label="Seleccionar envío @envio.Numero"
+                                disabled="@(!envio.PuedeImprimirEtiquetas || _ocupado)" checked="@_seleccionados.Contains(envio.Numero)"
+                                @onchange="e => Seleccionar(envio.Numero, e.Value is true)" /></td>
                             <td>@envio.Numero</td><td>@(envio.Referencia ?? "—")</td><td>@envio.Destinatario</td>
                             <td>@envio.Localidad</td><td>@(envio.Zona ?? "—")</td><td>@envio.Modalidad</td>
                             <td><strong>@envio.Resumen</strong><div>@envio.Entregados de @envio.TotalBultos entregados · @Cierre(envio.Terminado)</div></td>
@@ -120,6 +134,12 @@
 
 @code {
     private const string Ruta = "/api/envios/portal";
+    private readonly HashSet<string> _seleccionados = new(StringComparer.Ordinal);
+    private void Seleccionar(string numero, bool seleccionado)
+    {
+        if (seleccionado) _seleccionados.Add(numero);
+        else _seleccionados.Remove(numero);
+    }
     private string? _texto, _resumen, _modalidad, _zona, _error;
     private DateOnly? _desde, _hasta;
     private bool _ocupado;
@@ -153,6 +173,7 @@
 
     private async Task CargarAsync(int pagina)
     {
+        _seleccionados.Clear();
         var filtros = new Dictionary<string, string?>
         {
             ["pagina"] = pagina.ToString(CultureInfo.InvariantCulture),

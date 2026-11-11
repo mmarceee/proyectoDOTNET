@@ -50,6 +50,7 @@ internal sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         builder.HasMany(e => e.Recargos).WithOne().HasForeignKey(r => r.EnvioId);
         // Se calcula con los bultos en memoria (los que están en el estado del envío); no es una relación propia.
         builder.Ignore(e => e.BultosQueAcompanan);
+        builder.Ignore(e => e.BultosParaCarga);
 
         // Índices para el listado y los filtros de CU-13.
         builder.HasIndex(e => new { e.OperadorId, e.CreadoEn });

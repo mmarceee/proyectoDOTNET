@@ -1,15 +1,18 @@
 using System.Net;
+using System.Collections.Concurrent;
 using Logistica.Http.Contracts.Seguimiento;
 using Logistica.IntegrationTests.Identidad;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Logistica.Modules.Ejecucion.Contracts.Events;
 using Logistica.Modules.Ejecucion.Contracts.Results;
 using Logistica.Modules.Seguimiento.Application.Features.VerTablero;
+using Logistica.Modules.Seguimiento.Presentation.Features.VerTablero;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Logistica.IntegrationTests.Seguimiento;
@@ -20,8 +23,16 @@ public class TableroEnVivoTests(PostgresApiFactory factory) : IClassFixture<Post
 {
     private static readonly TimeSpan Espera = TimeSpan.FromSeconds(5);
 
-    private WebApplicationFactory<Program> Api() => factory
-        .WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false"));
+    private WebApplicationFactory<Program> Api(SuscripcionesDelHub? suscripciones = null) => factory
+        .WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Identity:PermitirTenantProvisorio", "false");
+            b.ConfigureServices(services =>
+            {
+                services.AddSingleton(suscripciones ?? new SuscripcionesDelHub());
+                services.AddSignalR().AddHubOptions<TableroHub>(o => o.AddFilter<SuscripcionesDelHub>());
+            });
+        });
 
     [Fact]
     public async Task Una_novedad_de_demo_llega_solo_al_despachador_de_demo()
@@ -44,11 +55,26 @@ public class TableroEnVivoTests(PostgresApiFactory factory) : IClassFixture<Post
     }
 
     // CU-53 → CU-66: la posición reportada en la API llega al tablero de su operador por el consumidor en memoria.
-    [Fact]
-    public async Task Una_posicion_reportada_llega_al_tablero_de_su_operador()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Una_posicion_reportada_llega_al_tablero_de_su_operador(bool demorarSuscripcion)
     {
-        var api = Api();
-        await using var demo = await ConectarAsync(api, "despacho@operador-demo.uy");
+        var suscripciones = new SuscripcionesDelHub(demorarSuscripcion);
+        var api = Api(suscripciones);
+        var conectando = ConectarAsync(api, "despacho@operador-demo.uy");
+        try
+        {
+            if (demorarSuscripcion)
+            {
+                // Reproduce la carrera sin sleeps: SignalR completó el handshake, pero OnConnectedAsync
+                // todavía no agregó esta conexión al grupo. Publicar ahora perdería el único mensaje.
+                await suscripciones.HandshakeCompletado.Task.WaitAsync(Espera);
+                Assert.False(conectando.IsCompleted);
+            }
+        }
+        finally { suscripciones.PermitirSuscripcion.TrySetResult(); }
+        await using var demo = await conectando;
         var recibida = Recibir<PosicionTableroResponse>(demo, "posicion");
         var posicion = new PosicionVehiculoResult(Guid.NewGuid(), DatosIniciales.OperadorDemoId, Guid.NewGuid(), Guid.NewGuid(),
             -34.9m, -56.16m, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
@@ -103,7 +129,43 @@ public class TableroEnVivoTests(PostgresApiFactory factory) : IClassFixture<Post
                 opciones.Transports = HttpTransportType.LongPolling;
             })
             .Build();
-        await conexion.StartAsync();
-        return conexion;
+        try
+        {
+            await conexion.StartAsync();
+            var suscripciones = api.Services.GetRequiredService<SuscripcionesDelHub>();
+            suscripciones.HandshakeCompletado.TrySetResult();
+            await suscripciones.EsperarAsync(conexion.ConnectionId!).WaitAsync(Espera);
+            return conexion;
+        }
+        catch
+        {
+            await conexion.DisposeAsync();
+            throw;
+        }
+    }
+
+    // Barrera exclusiva de estas pruebas: StartAsync confirma el transporte, no que terminó el alta en la sala.
+    // El filtro observa el OnConnectedAsync real del hub; no sustituye SignalR ni la selección del operador.
+    private sealed class SuscripcionesDelHub : IHubFilter
+    {
+        private readonly ConcurrentDictionary<string, TaskCompletionSource> altas = new();
+        public TaskCompletionSource HandshakeCompletado { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource PermitirSuscripcion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public SuscripcionesDelHub(bool demorar = false)
+        {
+            if (!demorar) PermitirSuscripcion.TrySetResult();
+        }
+
+        public Task EsperarAsync(string conexionId) => Alta(conexionId).Task;
+        private TaskCompletionSource Alta(string id) => altas.GetOrAdd(id,
+            _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+
+        public async Task OnConnectedAsync(HubLifetimeContext contexto, Func<HubLifetimeContext, Task> siguiente)
+        {
+            await PermitirSuscripcion.Task;
+            await siguiente(contexto);
+            Alta(contexto.Context.ConnectionId).TrySetResult();
+        }
     }
 }

@@ -11,14 +11,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Logistica.IntegrationTests.Envios;
 
 // Consumidores de EstadoEnvio para la nueva visita (RF 34; decisiones-entrega-parcial.md, sección 6, punto 8), contra la
-// base real: después de entregar 2 de 3 bultos, las consultas que usan Planificación (capacidad), la PWA (hoja de ruta) y
-// Ejecución (carga) sólo ven el bulto pendiente. Antes pedían cargar los 3 y el envío nunca salía.
+// base real: después de entregar 2 de 3 bultos, Planificación y carga sólo ven el pendiente. La lectura base de la hoja
+// conserva los estados y Ejecución filtra el manifiesto HTTP por ruta (IniciarRendicionTests y Rf32PwaTests).
 public sealed class NuevaVisitaTests(PostgresApiFactory factory) : IClassFixture<PostgresApiFactory>
 {
     private static readonly Guid Demo = DatosIniciales.OperadorDemoId;
 
     [Fact]
-    public async Task En_la_nueva_visita_planificar_la_hoja_y_la_carga_ven_solo_el_bulto_pendiente()
+    public async Task La_nueva_visita_planifica_y_carga_el_pendiente_y_conserva_el_contexto_para_la_hoja()
     {
         var (envioId, pendiente) = await EntregadoParcialmenteAsync();
 
@@ -41,7 +41,11 @@ public sealed class NuevaVisitaTests(PostgresApiFactory factory) : IClassFixture
 
             var hoja = Assert.Single(await scope.ServiceProvider.GetRequiredService<IEnviosHojaRuta>()
                 .ConsultarAsync([envioId], CancellationToken.None));
-            Assert.Equal([pendiente.Codigo], hoja.Bultos.Select(b => b.Codigo));
+            // Esta lectura base conserva los estados. La hoja HTTP se filtra por el manifiesto de la ruta
+            // (IniciarRendicionTests), evitando perder las entregas que ocurrieron en la visita actual.
+            Assert.Equal(3, hoja.Bultos.Count);
+            Assert.Equal("AsignadoARuta", Assert.Single(hoja.Bultos, b => b.Id == pendiente.Id).Estado);
+            Assert.All(hoja.Bultos.Where(b => b.Id != pendiente.Id), b => Assert.Equal("Entregado", b.Estado));
         }
     }
 

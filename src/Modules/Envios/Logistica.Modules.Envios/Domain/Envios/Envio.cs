@@ -66,9 +66,14 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // RF 33: los cargos de las visitas adicionales, para la liquidación (CU-32).
     public IReadOnlyList<RecargoNuevaVisita> Recargos => _recargos;
     // Consumidores de EstadoEnvio (decisiones-entrega-parcial.md, sección 6, punto 8): los bultos que acompañan al envío,
-    // los que están en su mismo estado. Son los que mueve el puente de Transicionar y los únicos que cuentan para operar
-    // una ruta (planificar, hoja de ruta, carga). En una nueva visita (RF 34) deja afuera los bultos ya entregados.
+    // los que están en su mismo estado. Son los que mueve el puente de Transicionar y cuentan para planificar.
+    // En una nueva visita (RF 34) deja afuera los bultos ya entregados; carga y hoja conservan además su contexto de ruta.
     public IReadOnlyList<Bulto> BultosQueAcompanan => _bultos.Where(b => b.Estado == Estado).ToList();
+
+    // Confirmar parte de la carga puede dejar el envío EnTransito con otros bultos AsignadoARuta.
+    // Siguen disponibles hasta Comenzar ruta; los ya entregados no vuelven a cargarse.
+    public IReadOnlyList<Bulto> BultosParaCarga => _bultos.Where(b => b.Estado == Estado
+        || Estado == EstadoEnvio.EnTransito && b.Estado == EstadoEnvio.AsignadoARuta).ToList();
 
     private Envio() { } // para EF Core
 
@@ -230,6 +235,21 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     }
 
     // Se llama una sola vez, al final de cada operación que cambia bultos.
+    internal bool PuedeCargarBultos(IReadOnlyCollection<Guid> ids, bool admiteParcial) => ids.Count > 0
+        && ids.Distinct().Count() == ids.Count
+        && ids.All(id => _bultos.Any(b => b.Id == id && b.Estado == EstadoEnvio.AsignadoARuta))
+        && (admiteParcial || _bultos.Where(b => !EstadosTerminales.Contains(b.Estado)).All(b => ids.Contains(b.Id)));
+
+    internal void CargarBultos(IReadOnlyCollection<Guid> ids, Guid? responsable, DateTimeOffset ocurridoEn)
+    {
+        if (!PuedeCargarBultos(ids, true)) throw new DomainException("Los bultos no están disponibles para cargar.");
+        foreach (var b in _bultos.Where(b => ids.Contains(b.Id))) b.Transicionar(EstadoEnvio.EnTransito);
+        if (Estado == EstadoEnvio.AsignadoARuta)
+            CambiarEstado(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, responsable, ocurridoEn, null,
+                $"Carga: {ids.Count} bultos.", moverBultos: false);
+        RecalcularResumen();
+    }
+
     private void RecalcularResumen()
     {
         var estados = _bultos.Select(b => b.Estado).ToList();
@@ -335,7 +355,8 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         var fallidos = resultados.Where(r => r.Motivo is not null).ToList();
 
         // RF 33: sin entrega parcial, todos o ninguno.
-        if (entregados.Count > 0 && fallidos.Count > 0 && !reglas.AdmiteEntregaParcial)
+        if (entregados.Count > 0 && !reglas.AdmiteEntregaParcial && (fallidos.Count > 0
+            || _bultos.Any(b => !EstadosTerminales.Contains(b.Estado) && !enTransito.ContainsKey(b.Id))))
             throw new DomainException("Las reglas del envío no admiten la entrega parcial: se entregan todos los bultos o ninguno.");
         if (entregados.Count > 0)
             ValidarPrueba(prueba, reglas);
@@ -380,7 +401,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         // Estado de compatibilidad: con pendientes, sigue el camino de un intento fallido para que planificación y
         // devoluciones los encuentren como hasta ahora; sin pendientes, queda Entregado.
         var detalle = $"Visita: {entregados.Count} de {resultados.Count} bultos entregados.";
-        if (fallidos.Count == 0)
+        if (fallidos.Count == 0 && _bultos.All(b => EstadosTerminales.Contains(b.Estado)))
         {
             CambiarEstado(EstadoEnvio.Entregado, OrigenEvento.AppRepartidor, responsableId, ocurridoEn, ubicacion, detalle,
                 moverBultos: false);
@@ -389,7 +410,9 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         {
             CambiarEstado(EstadoEnvio.NoEntregado, OrigenEvento.AppRepartidor, responsableId, ocurridoEn, ubicacion, detalle,
                 moverBultos: false);
-            CambiarEstado(reprogramados > 0 ? EstadoEnvio.Reprogramado : EstadoEnvio.EnDevolucion, OrigenEvento.Sistema,
+            var quedanPendientes = _bultos.Any(b => b.Estado is EstadoEnvio.Admitido or EstadoEnvio.EnDeposito
+                or EstadoEnvio.AsignadoARuta or EstadoEnvio.EnTransito or EstadoEnvio.Reprogramado);
+            CambiarEstado(reprogramados > 0 || quedanPendientes ? EstadoEnvio.Reprogramado : EstadoEnvio.EnDevolucion, OrigenEvento.Sistema,
                 null, ocurridoEn, null, null, moverBultos: false);
         }
 

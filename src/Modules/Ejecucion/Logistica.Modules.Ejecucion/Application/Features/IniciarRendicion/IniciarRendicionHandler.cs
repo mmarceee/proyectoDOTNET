@@ -41,7 +41,7 @@ internal sealed class IniciarRendicionHandler(IPlanificacionModuleApi rutas, ICo
         var evidencia = await rendiciones.EvidenciaAsync(op.RutaId, ct);
         // También cubre rechazos de lotes anteriores. Revisarlos corresponde al flujo de conflictos de CU-66.
         if (evidencia.Operaciones.Any(o => o.Resultado != ResultadoOperacion.Aplicada && !o.Revisada
-                && o.Tipo is "ConfirmarCarga" or "RegistrarVisita" or "RegistrarEntrega" or "RegistrarIntentoFallido"))
+                && o.Tipo is "ConfirmarCarga" or "IniciarRuta" or "RegistrarVisita" or "RegistrarEntrega" or "RegistrarIntentoFallido"))
             return await Rechazar("DependeDeOperacionRechazada");
         if (declaracion.Dependencias.Any(id => !evidencia.Operaciones.Any(o => o.Id == id
                 && o.RepartidorId == command.RepartidorId && o.Resultado == ResultadoOperacion.Aplicada)))

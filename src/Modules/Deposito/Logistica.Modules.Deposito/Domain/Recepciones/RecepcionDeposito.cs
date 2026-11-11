@@ -50,7 +50,7 @@ internal sealed class RecepcionDeposito : Entity, IOperadorOwned
 
     private static void Comparar(string medida, string unidad, decimal? declarado, decimal? medido, List<string> diferencias)
     {
-        if (declarado is not decimal valorDeclarado || medido is not decimal valorMedido)
+        if (medido is not decimal valorMedido)
         {
             return;
         }
@@ -59,6 +59,8 @@ internal sealed class RecepcionDeposito : Entity, IOperadorOwned
         {
             throw new DomainException($"El {medida} medido debe ser mayor que cero.");
         }
+
+        if (declarado is not decimal valorDeclarado) return;
 
         if (Math.Abs(valorMedido - valorDeclarado) > valorDeclarado * Tolerancia)
         {

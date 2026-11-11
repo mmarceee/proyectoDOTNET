@@ -40,11 +40,16 @@ internal sealed class DescargarHojaDeRutaHandler(IConsultaConsistente lectura, I
                 throw new HojaIncompletaException();
             var lista = await envios.ConsultarAsync(ids, ct);
             if (!lista.Select(e => e.Id).Order().SequenceEqual(ids.Order())) throw new HojaIncompletaException();
+            // Hoja y rendición comparten el manifiesto de esta ruta: no se incluyen entregas de una ruta
+            // anterior y sí los bultos todavía asignados durante la preparación de una carga parcial.
+            var preparacion = await rendiciones.ConsultarAsync(ruta.Id, ids, ct);
+            var bultosDeRuta = preparacion.Bultos.ToDictionary(b => b.BultoId, b => b.EnvioId);
             var porId = lista.ToDictionary(e => e.Id);
             var zonas = new Dictionary<Guid, ZonaHojaResponse>();
             var bultos = new HashSet<Guid>();
             EnvioHojaResponse Mapear(EnvioParaHoja e)
             {
+                e = e with { Bultos = e.Bultos.Where(b => bultosDeRuta.TryGetValue(b.Id, out var envioId) && envioId == e.Id).ToArray() };
                 var coincidencias = contexto.Zonas.Where(z => e.ZonaId is Guid zonaId
                     ? z.Id == zonaId : z.CodigosPostales.Contains(e.CodigoPostal)).ToArray();
                 if (coincidencias.Length != 1 || e.Bultos.Count == 0 || e.Bultos.Any(b => !bultos.Add(b.Id))
@@ -70,16 +75,17 @@ internal sealed class DescargarHojaDeRutaHandler(IConsultaConsistente lectura, I
                 var r = e.Reglas;
                 return new(e.Id, e.Numero, e.Estado, e.Nombre, e.Telefono,
                     new(e.Calle, e.NumeroPuerta, e.Localidad, e.Departamento, e.CodigoPostal, e.Referencia),
-                    franja, e.Bultos.Select(b => new BultoHojaResponse(b.Id, b.Codigo)).ToArray(),
+                    franja, e.Bultos.Select(b => new BultoHojaResponse(b.Id, b.Codigo, b.Estado)).ToArray(),
                     new(r.Origen, r.VersionId, true, r.ExigeFoto, r.ExigeNombreYDocumento, r.MaxIntentos, r.PlazoEntreIntentos,
-                        r.Motivos.Select(m => new MotivoHojaResponse(m.Id, m.Codigo, m.Nombre, m.Reprogramable, m.ExigeEvidencia)).ToArray()));
+                        r.Motivos.Select(m => new MotivoHojaResponse(m.Id, m.Codigo, m.Nombre, m.Reprogramable, m.ExigeEvidencia)).ToArray(), r.AdmiteEntregaParcial));
             }
             var paradas = ruta.Paradas.OrderBy(p => p.Orden).Select(p => new ParadaHojaResponse(p.Id, p.Orden, p.Estado,
                 p.Direccion, p.Desde, p.Hasta, p.Envios.Select(id => Mapear(porId[id])).ToArray())).ToArray();
-            return new HojaDeRutaResponse(2, usuario, contexto.OperadorId, repartidor, ruta.Id, ruta.Revision, ruta.Fecha, sesion.FechaOperativa,
+            if (!bultos.SetEquals(bultosDeRuta.Keys)) throw new HojaIncompletaException();
+            return new HojaDeRutaResponse(3, usuario, contexto.OperadorId, repartidor, ruta.Id, ruta.Revision, ruta.Fecha, sesion.FechaOperativa,
                 contexto.ZonaHoraria, ruta.Estado, reloj.GetUtcNow(), new(ruta.VehiculoId, contexto.Matricula),
                 zonas.Values.OrderBy(z => z.Nombre).ToArray(), paradas)
-            { Rendicion = await rendiciones.ConsultarAsync(ruta.Id, ids, ct) };
+            { Rendicion = preparacion };
         }, ct);
 
     private SesionRepartidorResponse CrearSesion(Guid usuario, Guid repartidor, ContextoHojaRuta contexto)

@@ -26,7 +26,7 @@ internal sealed class SincronizarOperacionesHandler(IProcesadorDeOperacion proce
             }
 
             resultados.Add(resultado);
-            if (operacion.Tipo == "ConfirmarCarga" && resultado.Resultado is Resultados.Conflicto or Resultados.Invalida)
+            if (operacion.Tipo is "ConfirmarCarga" or "IniciarRuta" && resultado.Resultado is Resultados.Conflicto or Resultados.Invalida)
                 rutasConCargaRechazada.Add(operacion.RutaId);
         }
 

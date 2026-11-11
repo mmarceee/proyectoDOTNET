@@ -6,6 +6,7 @@ public sealed record SincronizacionRequest(IReadOnlyList<OperacionDispositivoReq
 
 // Una operación de la PWA. OperacionId lo genera el dispositivo al confirmarla y la hace idempotente. La hora y la
 // posición son las del dispositivo. Según el Tipo, viaja Visita, Entrega, IntentoFallido, Carga o Rendicion.
+// "IniciarRuta" no tiene payload adicional ni EnvioId: confirma la salida después de las cargas de la cola.
 public sealed record OperacionDispositivoRequest(
     Guid OperacionId,
     Guid DispositivoId,
@@ -30,7 +31,9 @@ public sealed record VisitaRequest(IReadOnlyList<ResultadoBultoRequest> Bultos, 
     ArchivoRequest? Foto = null, string? NombreReceptor = null, string? DocumentoReceptor = null, string? Observaciones = null);
 public sealed record ResultadoBultoRequest(string CodigoBulto, Guid? MotivoId = null);
 
-public sealed record CargaRequest(long RevisionRuta, IReadOnlyList<LecturaCargaRequest> Lecturas, bool AceptaFaltantes = false);
+public sealed record CargaRequest(long RevisionRuta, IReadOnlyList<LecturaCargaRequest> Lecturas, bool AceptaFaltantes = false,
+    bool PorBulto = false, IReadOnlyList<FaltanteCargaRequest>? Faltantes = null);
+public sealed record FaltanteCargaRequest(string CodigoBulto, string Motivo);
 public sealed record LecturaCargaRequest(string CodigoBulto, DateTimeOffset EscaneadoEn);
 
 // Tipo "RegistrarEntrega" (CU-17), anterior a la entrega parcial: el servidor la traduce a una visita que entrega todos

@@ -49,6 +49,11 @@ internal sealed class EjecucionModuleApi(IRendicionRepository rendiciones, TimeP
         if (pagina is < 1 or > 10000) throw new DomainException("La página no es válida.");
         return (await rendiciones.PendientesAsync(pagina, ct)).Select(Mapear).ToArray();
     }
+    public async Task<IReadOnlyList<RendicionPendiente>> ListarRendicionesConfirmadasAsync(int pagina, CancellationToken ct)
+    {
+        if (pagina is < 1 or > 10000) throw new DomainException("La página no es válida.");
+        return (await rendiciones.ConfirmadasAsync(pagina, ct)).Select(Mapear).ToArray();
+    }
     // CU-55: la regla de cada línea está en Rendicion.Confirmar; acá sólo se guarda.
     public async Task<RendicionPendiente?> ConfirmarRendicionAsync(Guid rutaId, IReadOnlyCollection<Guid> bultosRecibidos,
         CancellationToken ct)

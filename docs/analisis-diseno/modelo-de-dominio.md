@@ -1,6 +1,6 @@
 # **Modelo de dominio**
 
-> **Actualización de diseño · 02/11/2026:** los estados operativos por bulto y el resumen del envío se rigen por la [decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). Las definiciones anteriores que siguen en este documento describen el modelo previo; su actualización detallada y su implementación están pendientes.
+> **Actualización · 09/11/2026:** los estados operativos por bulto y el resumen del envío se rigen por la [decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). Dominio, visitas, reglas, PWA y avisos tienen implementación; el ADR registra evidencia y límites. Las definiciones históricas que siguen aquí requieren actualización donde todavía describen el flujo por envío; no implican que toda RF 31 a 36 esté pendiente ni que esté aceptada integralmente.
 
 *Plataforma Multioperador de Distribución de Última Milla — Taller de Sistemas de Información .NET (UTEC), edición 2026*
 

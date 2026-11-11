@@ -146,7 +146,7 @@ Cada integrante responde por bloques coherentes, alineados con su área del plan
 | CU | Caso de uso | Nivel | Responsable | Nota |
 | :---- | :---- | :---- | :---- | :---- |
 | CU-80 a CU-83 | API pública para comercios | C | Lucas | Opcional 7.4 (3 puntos): completo o no suma. Ver sección 4. |
-| CU-15 | Imprimir las etiquetas | B | Lucas | |
+| CU-15 | Imprimir las etiquetas | B | Lucas | Implementado el 07/11: Portal individual/lote y reimpresión desde depósito. Pendiente validar impresora y lectores físicos. [Detalle](cu-15/README.md). |
 | CU-22 | Gestionar incidencias | B | Cristian | |
 | CU-70 | Ejecutar el cierre diario | B | Ezequiel | |
 | CU-71 | Recalcular los indicadores de cumplimiento | B | Ezequiel | |

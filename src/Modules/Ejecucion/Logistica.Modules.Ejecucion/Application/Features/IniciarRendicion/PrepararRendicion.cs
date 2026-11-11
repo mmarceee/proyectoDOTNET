@@ -23,8 +23,9 @@ internal sealed class PrepararRendicion(IRendicionRepository rendiciones, IEnvio
                 "Extraviado" => "Extraviado",
                 "EnTransito" => "NoIntentado",
                 "Reprogramado" or "EnDevolucion" when evidencia.Intentados.Contains(e.Id) => "IntentoFallido",
-                "AsignadoARuta" when evidencia.BultosEscaneados.Contains(b.Id) => "CargaParcial",
+                "AsignadoARuta" when !evidencia.CargaPorBulto && evidencia.BultosEscaneados.Contains(b.Id) => "CargaParcial",
                 "AsignadoARuta" => "NoCargado",
+                "EnDeposito" => "NoCargado",
                 _ => "Revisar"
             };
             return new BultoRendicionResponse(e.Id, e.Numero, b.Id, b.Codigo, situacion,

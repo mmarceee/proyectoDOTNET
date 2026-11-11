@@ -1,0 +1,54 @@
+@using Logistica.Http.Contracts.Envios
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<button type="button" class="btn btn-outline-primary" disabled="@(_ocupado || Numeros.Count == 0)" @onclick="DescargarAsync">
+    @(_ocupado ? "Generando etiquetas…" : Texto)
+</button>
+@if (_error is not null)
+{
+    <p class="alert alert-danger mt-2" role="alert">@_error</p>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<string> Numeros { get; set; } = [];
+    [Parameter] public string Texto { get; set; } = "Descargar etiquetas";
+    private bool _ocupado;
+    private string? _error;
+
+    private async Task DescargarAsync()
+    {
+        if (_ocupado || Numeros.Count == 0) return;
+        _ocupado = true;
+        _error = null;
+        try
+        {
+            using var respuesta = Numeros.Count == 1
+                ? await Http.GetAsync($"/api/envios/portal/{Uri.EscapeDataString(Numeros[0])}/etiquetas")
+                : await Http.PostAsJsonAsync("/api/envios/portal/etiquetas", new ImprimirEtiquetasRequest(Numeros));
+            if (!respuesta.IsSuccessStatusCode)
+            {
+                _error = respuesta.StatusCode switch
+                {
+                    System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => "Ingresá al Portal y seleccioná un operador para descargar las etiquetas.",
+                    System.Net.HttpStatusCode.NotFound => "No se encontró alguno de los envíos seleccionados.",
+                    System.Net.HttpStatusCode.BadRequest => (await respuesta.Content.ReadFromJsonAsync<ErrorEtiquetas>())?.Mensaje,
+                    _ => "No se pudieron generar las etiquetas. Intentá nuevamente.",
+                };
+                return;
+            }
+            await using var stream = await respuesta.Content.ReadAsStreamAsync();
+            using var referencia = new DotNetStreamReference(stream);
+            var modulo = await JS.InvokeAsync<IJSObjectReference>("import", "/portal/js/etiquetas.js");
+            await using (modulo)
+                await modulo.InvokeVoidAsync("descargar", referencia);
+        }
+        catch (Exception e) when (e is HttpRequestException or JSException or System.Text.Json.JsonException)
+        {
+            _error = "No se pudieron descargar las etiquetas. Intentá nuevamente.";
+        }
+        finally { _ocupado = false; }
+    }
+
+    private sealed record ErrorEtiquetas(string Mensaje);
+}

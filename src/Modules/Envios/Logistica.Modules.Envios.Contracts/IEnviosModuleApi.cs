@@ -10,6 +10,7 @@ public interface IEnviosModuleApi
     Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
     Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct);
     Task<bool> RegistrarCargaAsync(IReadOnlyCollection<Guid> ids, Guid? responsable, DateTimeOffset ocurridoEn, CancellationToken ct);
+    Task<bool> RegistrarCargaPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, Guid? responsable, DateTimeOffset ocurridoEn, CancellationToken ct);
 
     // null si el código no es de un bulto del operador actual (CU-30, A1).
     Task<EnvioParaRecepcion?> ObtenerParaRecepcionAsync(string codigoBulto, CancellationToken ct);
@@ -58,7 +59,8 @@ public interface IEnviosModuleApi
     Task ReintegrarADepositoAsync(IReadOnlyCollection<Guid> envioIds, Guid? responsableId, CancellationToken ct);
     // CU-55 (T4): los envíos de la ruta que no salieron, porque no se cargaron o se cargaron incompletos, quedan otra vez
     // en el depósito al cerrar la rendición, y cada uno publica EnvioDesasignadoDeRuta. Se omiten los que ya no están
-    // AsignadoARuta (el despachador pudo quitarlos antes). Devuelve cuántos volvieron.
+    // AsignadoARuta (el despachador pudo quitarlos antes). El coordinador confirma antes su ubicación física
+    // y comprueba la reserva de ruta bajo el bloqueo del operador. Devuelve cuántos volvieron.
     Task<int> ReintegrarNoCargadosAsync(Guid rutaId, IReadOnlyCollection<Guid> envioIds, CancellationToken ct);
 
     // CU-54 y CU-55 (RF 31): los envíos con todos sus bultos y el estado de cada uno, para armar y confirmar la rendición.

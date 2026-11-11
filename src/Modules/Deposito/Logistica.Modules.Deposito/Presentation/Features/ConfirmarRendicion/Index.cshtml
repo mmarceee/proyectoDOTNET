@@ -6,9 +6,15 @@
     ViewData["Title"] = "Rendiciones";
 }
 
-<h1 class="mb-4">Rendiciones pendientes</h1>
+<h1 class="mb-4">Rendiciones @(Model.Confirmadas ? "confirmadas" : "pendientes")</h1>
+<nav class="nav nav-pills gap-2 mb-3" aria-label="Estado de rendiciones">
+    <a href="/backoffice/rendiciones" class="nav-link @(!Model.Confirmadas ? "active" : "")" aria-current="@(!Model.Confirmadas ? "page" : null)">Pendientes</a>
+    <a href="/backoffice/rendiciones?estado=confirmadas" class="nav-link @(Model.Confirmadas ? "active" : "")" aria-current="@(Model.Confirmadas ? "page" : null)">Confirmadas</a>
+</nav>
 <p class="text-muted">
-    Los repartidores declararon qué vuelve al depósito. Elegí una ruta, escaneá lo que llegó y confirmá.
+    @(Model.Confirmadas
+        ? "Consultá los cierres anteriores. Desde su detalle podés liberar los envíos no cargados después de verificar que todos sus bultos están en depósito."
+        : "Los repartidores declararon qué vuelve al depósito. Elegí una rendición, escaneá lo que llegó y confirmá.")
 </p>
 
 @if (Model.Mensaje is not null)
@@ -18,7 +24,7 @@
 
 @if (Model.Rendiciones.Count == 0)
 {
-    <p class="text-muted">No hay rendiciones pendientes.</p>
+    <p class="text-muted">No hay rendiciones @(Model.Confirmadas ? "confirmadas" : "pendientes") en esta página.</p>
 }
 else
 {
@@ -27,6 +33,7 @@ else
             <thead>
                 <tr>
                     <th scope="col">Iniciada</th>
+                    @if (Model.Confirmadas) { <th scope="col">Confirmada</th> }
                     <th scope="col">Chofer</th>
                     <th scope="col">Vehículo</th>
                     <th scope="col">Bultos que vuelven</th>
@@ -39,13 +46,25 @@ else
                     var rendicion = fila.Rendicion;
                     <tr>
                         <td>@rendicion.IniciadaEn.ToString("dd/MM/yyyy HH:mm") UTC</td>
+                        @if (Model.Confirmadas) { <td>@rendicion.FinalizadaEn?.ToString("dd/MM/yyyy HH:mm") UTC</td> }
                         <td>@fila.Chofer</td>
                         <td class="text-nowrap">@fila.Vehiculo</td>
                         <td>@rendicion.Lineas.Count(l => l.DebeVolver)</td>
-                        <td><a href="/backoffice/rendiciones/@rendicion.RutaId" class="btn btn-sm btn-primary">Revisar</a></td>
+                        <td><a href="/backoffice/rendiciones/@rendicion.RutaId" class="btn btn-sm btn-primary">@(Model.Confirmadas ? "Ver detalle" : "Revisar")</a></td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
 }
+
+<nav class="d-flex gap-2 mt-3" aria-label="Páginas de rendiciones">
+    @if (Model.Pagina > 1)
+    {
+        <a href="/backoffice/rendiciones?estado=@Model.Estado&pagina=@(Model.Pagina - 1)" class="btn btn-outline-secondary">Anterior</a>
+    }
+    @if (Model.Rendiciones.Count == 20 && Model.Pagina < 10000)
+    {
+        <a href="/backoffice/rendiciones?estado=@Model.Estado&pagina=@(Model.Pagina + 1)" class="btn btn-outline-secondary">Siguiente</a>
+    }
+</nav>

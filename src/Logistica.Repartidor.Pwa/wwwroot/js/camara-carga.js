@@ -6,7 +6,11 @@ async function lector() {
         script.onload=resolve; script.onerror=() => reject(new Error('No se pudo abrir el lector de cámara.'));
         document.head.append(script);
     });
-    return new ZXingBrowser.BrowserMultiFormatReader();
+    // Las etiquetas de la aplicación se emiten en CODE-128. Otros lectores 1D pueden
+    // reconocer patrones falsos al apuntar a una pantalla y devolver otro texto.
+    const reader=new ZXingBrowser.BrowserMultiFormatReader();
+    reader.possibleFormats=[ZXingBrowser.BarcodeFormat.CODE_128];
+    return reader;
 }
 export async function iniciar(video,ref) {
     detener(); const version=generacion;
@@ -18,7 +22,8 @@ export async function iniciar(video,ref) {
     let ultimo='', procesando=false;
     const nuevos=await reader.decodeFromConstraints({ audio:false, video:{ facingMode:{ ideal:'environment' } } },video,
         async result => {
-            if (!result || procesando || version!==generacion) return;
+            if (!result || procesando || version!==generacion
+                || result.getBarcodeFormat()!==ZXingBrowser.BarcodeFormat.CODE_128) return;
             const texto=result.getText();
             if (texto===ultimo) return;
             ultimo=texto; procesando=true;

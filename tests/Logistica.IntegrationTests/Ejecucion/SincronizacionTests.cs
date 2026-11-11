@@ -317,6 +317,7 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
         var ruta = Ruta.Crear(Operador, fecha, repartidorId ?? DatosIniciales.RepartidorDemoId, Guid.NewGuid(),
             envios.Select(e => new EnvioRuta(e.Id, e.Numero, null, null, null, false, [])).ToList(), ahora);
         ruta.Despachar(ahora);
+        ruta.Iniciar();
 
         await using (var db = Contexto<PlanificacionDbContext>())
         {

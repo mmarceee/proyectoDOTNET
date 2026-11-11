@@ -496,7 +496,7 @@ test('CU-51 guarda borrador cifrado, avisa repetidos y conserva traceparent/UUID
     const disco=JSON.stringify([await registros('borradores'),await registros('operaciones')]);
     assert.equal(disco.includes('ENV-001-1'),false);
     assert.equal(disco.includes(op.correlacionId),false);
-    await assert.rejects(store.confirmarCarga(b.rutaId,b.revision,false),/Revisá el avance/);
+    await assert.rejects(store.confirmarCarga(b.rutaId,b.revision,false),/La ruta ya comenzó/);
 });
 test('CU-51 dos pestañas no pierden lecturas ni confirman dos veces el mismo borrador',async()=>{
     let b=await prepararCarga();
@@ -685,7 +685,7 @@ test('CU-17 sin conexión acepta un envío que la hoja muestra asignado si este 
     const token = await store.activar(sesion()), h = hoja();
     await store.guardar(h, token);
     const ruta = h.rutaId, envio = h.paradas[0].envios[0].id;
-    await assert.rejects(store.registrarEntrega(ruta, envio, { firma:FIRMA, ...AQUI }), /no salió en el vehículo/);
+    await assert.rejects(store.registrarEntrega(ruta, envio, { firma:FIRMA, ...AQUI }), /Comenzar ruta/);
     let c = await store.abrirCarga(ruta); c = await store.escanearCarga(ruta, c.revision, 'ENV-001-1');
     await store.confirmarCarga(ruta, c.revision, false);
     await store.registrarEntrega(ruta, envio, { firma:FIRMA, ...AQUI });

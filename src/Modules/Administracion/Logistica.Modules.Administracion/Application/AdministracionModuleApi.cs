@@ -39,6 +39,11 @@ internal sealed class AdministracionModuleApi(IRecursosPlanificacionReader lecto
                 marca.TelefonoContacto)
             : null;
 
+    public async Task<LogoParaEtiqueta?> LogoParaEtiquetaAsync(CancellationToken ct) =>
+        await identidad.LogoAsync(ct) is { } logo
+            ? new LogoParaEtiqueta(logo.TipoContenido, logo.Contenido)
+            : null;
+
     // CU-06: las reglas con que se admitió un envío, y las que rigen ahora para el alta. Las dos, desde la caché.
     public Task<ReglasOperativas?> ReglasDeEntregaAsync(Guid versionReglasId, CancellationToken ct) =>
         reglas.DeVersionAsync(versionReglasId, ct);

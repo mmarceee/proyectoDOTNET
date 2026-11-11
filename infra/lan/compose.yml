@@ -1,0 +1,85 @@
+# Entorno de demostración independiente. Usar scripts/preparar-lan.ps1.
+name: voluptasexpress-lan
+
+x-environment: &environment
+  ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=logistica_lan;Username=logistica_lan;Password=${LAN_POSTGRES_PASSWORD:?}
+  ConnectionStrings__Valkey: valkey:6379
+  ConnectionStrings__RabbitMQ: amqp://lan:${LAN_RABBIT_PASSWORD:?}@rabbitmq:5672/
+  ConnectionStrings__Smtp: smtp://mailpit:1025
+  Seguimiento__ClaveToken: ${LAN_TOKEN_KEY:?}
+  Seguimiento__Avisos__ClaveCifrado: ${LAN_AVISOS_KEY:?}
+  Aplicacion__UrlPublica: https://${LAN_IP:?}:8443
+  Seguimiento__Correo__Remitente: avisos@logistica.local
+  CierreDiario__Habilitado: "false"
+
+services:
+  postgres:
+    image: postgres:17.6
+    environment:
+      POSTGRES_DB: logistica_lan
+      POSTGRES_USER: logistica_lan
+      POSTGRES_PASSWORD: ${LAN_POSTGRES_PASSWORD:?}
+    volumes:
+      - postgres-lan:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U logistica_lan -d logistica_lan"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+  valkey:
+    image: valkey/valkey:8.1
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: lan
+      RABBITMQ_DEFAULT_PASS: ${LAN_RABBIT_PASSWORD:?}
+    volumes:
+      - rabbitmq-lan:/var/lib/rabbitmq
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+  mailpit:
+    image: axllent/mailpit:v1.28
+    ports:
+      - "${LAN_IP:?}:18025:8025"
+  api:
+    build:
+      context: ../../TestResults/lan/context
+      dockerfile: src/Logistica.Api/Dockerfile
+    environment:
+      <<: *environment
+      Database__MigrateOnStartup: "true"
+      Demo__Contrasena: ${LAN_DEMO_PASSWORD:?}
+      Kestrel__Endpoints__Lan__Url: https://0.0.0.0:8443
+      Kestrel__Endpoints__Lan__Certificate__Path: /https/server.pfx
+      Kestrel__Endpoints__Lan__Certificate__Password: ${LAN_CERT_PASSWORD:?}
+    volumes:
+      - ../../TestResults/lan/certs/server.pfx:/https/server.pfx:ro
+    ports:
+      - "${LAN_IP:?}:8443:8443"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+  worker:
+    build:
+      context: ../../TestResults/lan/context
+      dockerfile: src/Logistica.Worker/Dockerfile
+    environment: *environment
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  postgres-lan:
+  rabbitmq-lan:
