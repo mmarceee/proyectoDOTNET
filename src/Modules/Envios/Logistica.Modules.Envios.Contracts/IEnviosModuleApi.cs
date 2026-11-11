@@ -80,7 +80,8 @@ public interface IEnviosModuleApi
     Task<DevolucionParaEntrega?> ConsultarDevolucionAsync(string numeroOCodigo, CancellationToken ct);
 
     // CU-31 (T15): cierra la devolución con quién la recibió, pasa el envío a Devuelto, abre una incidencia por los
-    // bultos que no se entregaron (A2) y publica EnvioDevuelto por Outbox. DomainException si el envío no está en
+    // bultos que no se entregaron (A2) y publica EnvioDevuelto por Outbox. RF 31: si vuelven bultos sueltos mientras otros
+    // del envío siguen su camino, sólo esos bultos pasan a Devuelto y el envío no cambia. DomainException si el envío no está en
     // devolución o todavía no volvió al depósito (A1).
     Task ConfirmarDevolucionAsync(DevolucionAConfirmar confirmacion, CancellationToken ct);
 

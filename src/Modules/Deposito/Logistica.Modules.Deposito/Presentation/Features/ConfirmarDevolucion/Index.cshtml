@@ -45,7 +45,7 @@ else if (Model.Devolucion is { } devolucion)
     {
         <div class="alert alert-info" role="status">Esta devolución ya se entregó al comercio.</div>
     }
-    else if (devolucion.EstadoEnvio != "EnDevolucion")
+    else if (devolucion.Bultos.Count == 0)
     {
         <div class="alert alert-warning" role="status">El envío no está en devolución.</div>
     }
