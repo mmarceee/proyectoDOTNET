@@ -327,7 +327,7 @@ internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvi
         return new EnvioParaRecepcion(
             envio.Id,
             envio.Numero,
-            PendienteDeRecepcion: envio.Estado == EstadoEnvio.Admitido,
+            PendienteDeRecepcion: envio.Bultos.Single(b => b.Codigo == codigoBulto).Estado == EstadoEnvio.Admitido,
             Cancelado: envio.Estado == EstadoEnvio.Cancelado,
             envio.Bultos
                 .OrderBy(b => b.Codigo)
@@ -359,7 +359,6 @@ internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvi
         var envio = await envios.ObtenerAsync(envioId, ct)
             ?? throw new DomainException("El envío no existe.");
 
-        // T2 por bulto. Si el envío ya no está Admitido (por ejemplo, lo cancelaron), el dominio lo rechaza.
         var ahora = reloj.GetUtcNow();
         var completo = envio.RecibirBulto(bultoId, responsableId, ahora);
         envio.Bultos.Single(b => b.Id == bultoId).ConfirmarCustodia(UbicacionCustodia.Deposito, null,

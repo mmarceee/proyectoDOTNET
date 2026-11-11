@@ -199,13 +199,18 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // compatibilidad pasa a EnDeposito recién con el último, como hasta ahora. Devuelve si ya llegaron todos.
     public bool RecibirBulto(Guid bultoId, Guid? responsableId, DateTimeOffset ahora)
     {
-        if (Estado != EstadoEnvio.Admitido)
+        if (Estado == EstadoEnvio.Cancelado)
         {
             throw new DomainException($"El envío {Numero} ya no está pendiente de recepción.");
         }
 
         var bulto = _bultos.SingleOrDefault(b => b.Id == bultoId)
             ?? throw new DomainException("El bulto no pertenece a este envío.");
+        if (bulto.Estado != EstadoEnvio.Admitido)
+        {
+            throw new TransicionInvalidaException(bulto.Estado, EstadoEnvio.EnDeposito);
+        }
+
         bulto.Transicionar(EstadoEnvio.EnDeposito);
 
         if (_bultos.All(b => b.Estado == EstadoEnvio.EnDeposito))

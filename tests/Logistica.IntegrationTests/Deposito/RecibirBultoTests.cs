@@ -75,11 +75,13 @@ public class RecibirBultoTests(PostgresApiFactory factory) : IClassFixture<Postg
         Assert.True(recepcion.EnvioEnDeposito);
     }
 
-    [Fact]
-    public async Task Un_bulto_ya_recibido_responde_400()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Un_bulto_ya_recibido_responde_400_aunque_el_envio_este_completo(int bultos)
     {
         var client = factory.CreateClient();
-        var envio = await CrearEnvioAsync(client, bultos: 2);
+        var envio = await CrearEnvioAsync(client, bultos);
         await RecibirAsync(client, new RecibirBultoRequest($"{envio.Numero}-1"));
 
         var response = await client.PostAsJsonAsync("/api/deposito/recepciones", new RecibirBultoRequest($"{envio.Numero}-1"));
@@ -87,6 +89,8 @@ public class RecibirBultoTests(PostgresApiFactory factory) : IClassFixture<Postg
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problema = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.Equal($"El bulto {envio.Numero}-1 ya se escaneó.", problema?.Detail);
+        Assert.Equal(1L, await ContarAsync("""SELECT count(*) FROM deposito."Recepciones" WHERE "EnvioId" = @id""", envio.Id));
+        Assert.Equal(bultos == 1 ? 1L : 0L, await ContarAsync(EventoRecibido, envio.Id));
     }
 
     [Fact]

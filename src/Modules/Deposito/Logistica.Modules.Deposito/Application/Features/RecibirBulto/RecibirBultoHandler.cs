@@ -32,11 +32,6 @@ internal sealed class RecibirBultoHandler(
                 $"El envío {envio.Numero} fue cancelado: separá el bulto para devolverlo al comercio.");
         }
 
-        if (!envio.PendienteDeRecepcion)
-        {
-            throw new DomainException($"El envío {envio.Numero} ya no está pendiente de recepción.");
-        }
-
         var bulto = envio.Bultos.Single(b => b.Codigo == codigo);
         var recibidos = (await recepciones.BultosRecibidosAsync(envio.EnvioId, ct)).ToHashSet();
 
@@ -44,6 +39,11 @@ internal sealed class RecibirBultoHandler(
         {
             // A2
             throw new DomainException($"El bulto {codigo} ya se escaneó.");
+        }
+
+        if (!envio.PendienteDeRecepcion)
+        {
+            throw new DomainException($"El bulto {codigo} ya no está pendiente de recepción.");
         }
 
         var recepcion = RecepcionDeposito.Registrar(

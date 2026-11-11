@@ -23,7 +23,7 @@ public interface IEnviosModuleApi
     Task<EnvioParaRecepcion?> ObtenerParaRecepcionAsync(string codigoBulto, CancellationToken ct);
 
     // Aplica T2 a un bulto (RF 31): con el primero el envío queda En operación. Devuelve true cuando ya llegaron todos
-    // los bultos y el envío quedó EnDeposito. Lanza una DomainException si el envío no está pendiente de recepción.
+    // los bultos y el envío quedó EnDeposito. Rechaza bultos que no estén Admitidos y envíos cancelados.
     Task<bool> RecibirBultoAsync(Guid envioId, Guid bultoId, Guid? responsableId, CancellationToken ct, Guid? operacionId = null);
     Task<IReadOnlyList<EnvioPlanificable>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct);
     Task AsignarARutaAsync(Guid rutaId, IReadOnlyList<AsignacionEnvioRuta> asignaciones, Guid? responsableId, CancellationToken ct);

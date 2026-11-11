@@ -1,6 +1,6 @@
 namespace Logistica.Modules.Envios.Contracts.Results;
 
-// Lo que Depósito necesita saber de un envío para recibir sus bultos (CU-30).
+// Lo que Depósito necesita saber para recibir sus bultos (CU-30). PendienteDeRecepcion se refiere al bulto consultado.
 public sealed record EnvioParaRecepcion(
     Guid EnvioId,
     string Numero,
