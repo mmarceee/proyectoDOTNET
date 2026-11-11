@@ -2,7 +2,7 @@
     <section class="card mb-4" aria-labelledby="envios-disponibles">
     <div class="card-body p-4">
     <h2 id="envios-disponibles" class="h5">Envíos disponibles</h2>
-    <p class="text-muted">Seleccioná los envíos que querés agregar a la ruta. Los filtros se actualizan al cambiarlos.</p>
+    <p class="text-muted">Seleccioná los envíos y sus bultos disponibles. Sólo se ofrecen bultos confirmados en depósito y sin reserva activa.</p>
     <div class="row g-2 mb-3">
         <div class="col-md-3"><label asp-for="ZonaId" class="form-label">Zona</label><select asp-for="ZonaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var z in Model.Recursos.Zonas) { <option value="@z.Id">@z.Nombre</option> }</select></div>
         <div class="col-md-3"><label asp-for="FranjaId" class="form-label">Franja</label><select asp-for="FranjaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var f in Model.Recursos.Franjas) { <option value="@f.Id">@f.Desde.ToString("HH:mm")–@f.Hasta.ToString("HH:mm")</option> }</select></div>
@@ -23,6 +23,16 @@
         <tr><td><input type="checkbox" name="Seleccion" value="@e.Id" checked="@(e.DisponibleParaFecha && Model.Seleccion.Contains(e.Id))" disabled="@(!e.DisponibleParaFecha)" aria-label="Seleccionar @e.Numero" /></td>
             <td>
                 @e.Numero
+                <div class="mt-2">
+                @foreach (var b in e.Bultos)
+                {
+                    var marcado = Model.BultosPorEnvio.TryGetValue(e.Id, out var elegidos) ? elegidos.Contains(b.Id)
+                        : !Model.SeleccionPorBulto || !Model.Seleccion.Contains(e.Id);
+                    <label class="d-block small"><input type="checkbox" name="BultosPorEnvio[@e.Id]" value="@b.Id"
+                        checked="@marcado" disabled="@(!e.DisponibleParaFecha)" /> @b.Codigo · @b.Estado</label>
+                    <input type="hidden" name="RevisionesBultos[@b.Id]" value="@b.RevisionCustodia" />
+                }
+                </div>
                 @if (e.Modalidad == "Urgente")
                 {
                     <span class="badge text-bg-warning text-nowrap ms-2">Urgente</span>

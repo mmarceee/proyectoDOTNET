@@ -13,13 +13,15 @@ using Logistica.Modules.Planificacion.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Xunit.Abstractions;
 
 namespace Logistica.IntegrationTests.Ejecucion;
 
 // CU-52 de punta a punta, con la sesión real del repartidor y sin el respaldo provisorio: HTTP, Ejecución, Planificación,
 // Envíos y PostgreSQL. Verifica la política del ADR-0004: idempotencia, conflictos, operaciones inválidas, pertenencia,
 // dependencias dentro del lote y la hora del dispositivo.
-public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixture<PostgresApiFactory>
+public sealed class SincronizacionTests(PostgresApiFactory factory, ITestOutputHelper salida) : IClassFixture<PostgresApiFactory>
 {
     private const string Url = "/api/repartidor/sincronizacion";
     private static readonly Guid Operador = DatosIniciales.OperadorDemoId;
@@ -27,7 +29,8 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
     private static int _dias;
 
     private HttpClient Cliente() => factory
-        .WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false"))
+        .WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false")
+            .ConfigureLogging(l => l.AddProvider(new ErroresDePrueba(salida))))
         .CreateClient(Sesion.Opciones);
 
     private async Task<HttpClient> RepartidorAsync()
@@ -274,6 +277,19 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
 
     // ---- Ayudas ----
 
+    private sealed class ErroresDePrueba(ITestOutputHelper salida) : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoria) => new Registro(salida);
+        public void Dispose() { }
+        private sealed class Registro(ITestOutputHelper salida) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel nivel) => nivel >= LogLevel.Error;
+            public void Log<TState>(LogLevel nivel, EventId id, TState estado, Exception? error, Func<TState, Exception?, string> formato)
+            { if (nivel >= LogLevel.Error && error is not null) salida.WriteLine(error.ToString()); }
+        }
+    }
+
     private static OperacionDispositivoRequest Entrega(Guid rutaId, Guid envioId, long secuencia) =>
         new(Guid.CreateVersion7(), Guid.NewGuid(), secuencia, "RegistrarEntrega", rutaId, envioId,
             DateTimeOffset.UtcNow.AddMinutes(-30).ToOffset(TimeSpan.FromHours(-3)), -34.9m, -56.16m,
@@ -287,7 +303,7 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
     private static async Task<ResultadoOperacionResponse> SincronizarAsync(HttpClient client, OperacionDispositivoRequest operacion)
     {
         var respuesta = await client.PostAsJsonAsync(Url, new SincronizacionRequest([operacion]));
-        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.True(respuesta.StatusCode == HttpStatusCode.OK, await respuesta.Content.ReadAsStringAsync());
         return Assert.Single((await respuesta.Content.ReadFromJsonAsync<SincronizacionResponse>())!.Resultados);
     }
 
@@ -323,6 +339,9 @@ public sealed class SincronizacionTests(PostgresApiFactory factory) : IClassFixt
         {
             db.Rutas.Add(ruta);
             await db.SaveChangesAsync();
+            await using var enviosDb = Contexto<EnviosDbContext>();
+            var actuales = await enviosDb.Envios.Where(e => envios.Select(x => x.Id).Contains(e.Id)).ToListAsync();
+            await DatosFisicosRf34.AcreditarAsync(enviosDb, db, ruta, actuales, ahora);
         }
 
         return (ruta.Id, envios.Select(e => e.Id).ToArray());

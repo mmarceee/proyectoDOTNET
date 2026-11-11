@@ -118,7 +118,7 @@ internal sealed class ProcesarOperacionHandler(
             // aplican juntos o ninguno (sección 2.11).
             await unidadDeTrabajo.EjecutarAsync(async () =>
             {
-                if (await envios.ConsultarParaVisitaAsync(envioId, ct) is not { } envio)
+                if (await envios.ConsultarParaVisitaAsync(envioId, ct, op.RutaId) is not { } envio)
                 {
                     registro = new(ResultadoRegistro.EnvioNoEncontrado);
                     return;
@@ -135,6 +135,12 @@ internal sealed class ProcesarOperacionHandler(
                     command.UsuarioId), ct);
                 if (registro.Resultado == ResultadoRegistro.Aplicado)
                 {
+                    var entregados = visita.Bultos.Where(b => b.MotivoId is null)
+                        .Select(b => envio.Bultos.Single(x => x.Codigo.Equals(b.CodigoBulto.Trim(), StringComparison.OrdinalIgnoreCase)).BultoId).ToArray();
+                    await envios.RegistrarCustodiaVisitaAsync(op.RutaId, entregados, op.OperacionId, command.UsuarioId, datos.OcurridoEn, ct);
+                    var revision = await planificacion.RevisionAsync(op.RutaId, ct)
+                        ?? throw new DomainException("La ruta dejó de estar disponible.");
+                    await planificacion.RegistrarConciliacionAsync(op.RutaId, revision, ct);
                     operaciones.Agregar(OperacionDispositivo.Aplicada(op.OperacionId, datos));
                     await operaciones.GuardarCambiosAsync(ct);
                 }
@@ -273,7 +279,7 @@ internal sealed class ProcesarOperacionHandler(
         return new VisitaARegistrar(envioId, datos.OcurridoEn, latitud, longitud,
             visita.Bultos.Select(b => new ResultadoBultoARegistrar(porCodigo[b.CodigoBulto.Trim()], b.MotivoId)).ToList(),
             visita.Firma is null ? null : Archivo(visita.Firma), visita.Foto is null ? null : Archivo(visita.Foto),
-            visita.NombreReceptor, visita.DocumentoReceptor, visita.Observaciones, usuarioId, datos.RepartidorId);
+            visita.NombreReceptor, visita.DocumentoReceptor, visita.Observaciones, usuarioId, datos.RepartidorId, op.RutaId);
     }
 
     private static ArchivoRecibido Archivo(ArchivoRequest archivo)

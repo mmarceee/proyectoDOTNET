@@ -69,6 +69,7 @@ public class DescargarHojaDeRutaTests(PostgresApiFactory factory) : IClassFixtur
         if (estado == "Finalizada") ruta.Finalizar();
         plan.Rutas.Add(ruta);
         await plan.SaveChangesAsync();
+        await DatosFisicosRf34.AcreditarAsync(db, plan, ruta, lista, ahora);
         return ruta.Id;
     }
 

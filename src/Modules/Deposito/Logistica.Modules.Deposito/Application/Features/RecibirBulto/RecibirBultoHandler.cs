@@ -11,7 +11,7 @@ internal sealed class RecibirBultoHandler(
     IRecepcionRepository recepciones,
     IUnidadDeTrabajo unidadDeTrabajo,
     ICurrentTenant tenant,
-    TimeProvider reloj)
+    TimeProvider reloj, IResponsableDeposito responsable)
 {
     public async Task<RecepcionRegistrada> HandleAsync(RecibirBultoCommand command, CancellationToken ct)
     {
@@ -64,7 +64,7 @@ internal sealed class RecibirBultoHandler(
         await unidadDeTrabajo.EjecutarAsync(async () =>
         {
             await recepciones.GuardarCambiosAsync(ct);
-            envioCompleto = await envios.RecibirBultoAsync(envio.EnvioId, bulto.BultoId, responsableId: null, ct);
+            envioCompleto = await envios.RecibirBultoAsync(envio.EnvioId, bulto.BultoId, responsable.Id, ct, recepcion.Id);
         }, ct);
 
         return new RecepcionRegistrada(

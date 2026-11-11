@@ -13,6 +13,6 @@ internal static class QuitarEnvioDeRutaEndpoint
     {
         group.MapDelete("/rutas/{id:guid}/envios/{envioId:guid}", async (Guid id, Guid envioId,
             [FromBody] QuitarEnvioDeRutaRequest request, QuitarEnvioDeRutaHandler handler, CancellationToken ct)
-            => Results.Ok(await handler.HandleAsync(new(id, envioId, request.RevisionEsperada), ct)));
+            => Results.Ok(await handler.HandleAsync(new(id, envioId, request.RevisionEsperada, request.OperacionId), ct)));
     }
 }

@@ -6,6 +6,13 @@ namespace Logistica.Modules.Planificacion.Contracts;
 // tocan sus tablas ni sus entidades.
 public interface IPlanificacionModuleApi
 {
+    Task<IReadOnlyList<ReservaBultoRuta>> ConsultarReservasRutaAsync(Guid rutaId, CancellationToken ct);
+    Task<IReadOnlyList<ReservaBultoRuta>> ConsultarReservasActivasAsync(IReadOnlyCollection<Guid> bultos, CancellationToken ct);
+    Task<IReadOnlyList<Guid>> ConsultarBultosOcupadosAsync(IReadOnlyCollection<Guid> bultos, Guid? propia, CancellationToken ct);
+    // El coordinador confirma el hecho físico bajo el bloqueo del operador y la unidad de trabajo compartida.
+    Task CerrarReservasBultosAsync(Guid rutaId, IReadOnlyCollection<Guid> bultos, string causa, CancellationToken ct);
+    Task<long?> RevisionAsync(Guid rutaId, CancellationToken ct);
+    Task RegistrarConciliacionAsync(Guid rutaId, long revisionEsperada, CancellationToken ct);
     // Incluye Finalizada para recibir posiciones capturadas antes de rendir, pendientes de sincronización.
     Task<RutaParaPosicion?> ConsultarParaPosicionAsync(Guid rutaId, Guid repartidorId, CancellationToken ct);
     Task<IReadOnlyList<RutaDelRepartidor>> ListarDelRepartidorAsync(Guid repartidorId, int pagina, CancellationToken ct);

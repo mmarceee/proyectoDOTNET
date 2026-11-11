@@ -6,6 +6,8 @@
 }
 <form id="formulario-ruta" method="post" data-filtros-ruta data-resultado-ruta="@Model.SeccionResultado">
     <input asp-for="Id" type="hidden" /><input asp-for="RevisionEsperada" type="hidden" />
+    <input asp-for="OperacionId" type="hidden" />
+    <input type="hidden" name="SeleccionPorBulto" value="true" />
     <input asp-for="EditandoDatos" type="hidden" />
     <input asp-for="ModalEnvios" type="hidden" />
     <section id="datos-ruta" tabindex="-1" class="card mb-4" aria-labelledby="titulo-datos-ruta">
@@ -168,7 +170,7 @@
             actualizarEnvios(boton);
         });
         formulario.addEventListener('change', evento => {
-            if (evento.target.matches('[name="Seleccion"]')) {
+            if (evento.target.matches('[name="Seleccion"], [name^="BultosPorEnvio["]')) {
                 actualizarValidacion();
                 formulario.querySelectorAll('[data-confirmar-ruta]').forEach(boton => boton.disabled = true);
                 const aviso = formulario.querySelector('[data-validacion-pendiente]');

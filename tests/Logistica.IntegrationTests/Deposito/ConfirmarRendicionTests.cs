@@ -1,6 +1,9 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Logistica.IntegrationTests.Identidad;
+using Logistica.Modules.Deposito.Infrastructure.Persistence;
+using Logistica.Modules.Deposito.Domain.Recepciones;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
 using Logistica.Modules.Ejecucion.Domain.Rendiciones;
 using Logistica.Modules.Ejecucion.Infrastructure.Persistence;
@@ -27,6 +30,56 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
     // al que le va a faltar un bulto y uno que se entregó en la calle.
     private sealed record Escenario(Guid Ruta, Envio NoIntentado, Envio ConFaltante, Envio Entregado);
 
+    [Fact]
+    public async Task Reenviar_el_mismo_cierre_devuelve_el_resultado_sin_repetir_custodia_ni_revision()
+    {
+        var e = await PrepararAsync();
+        using var client = await OperarioAsync();
+        var pagina = $"/backoffice/rendiciones/{e.Ruta}";
+        var revision = await RevisionAsync(client, pagina);
+        var operacion = Guid.NewGuid();
+        var campos = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["RevisionEsperada"] = revision, ["OperacionId"] = operacion.ToString(),
+            ["Escaneados"] = string.Join("\n", e.NoIntentado.Bultos.Concat(e.ConFaltante.Bultos).Select(b => b.Codigo)),
+        };
+        for (var i = 0; i < 2; i++)
+            Assert.Equal("/backoffice/rendiciones", (await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(campos))).Headers.Location?.OriginalString);
+        using var scope = Scope();
+        var envios = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        Assert.Equal(4, await envios.Set<MovimientoCustodia>().CountAsync(m => m.OperacionId == operacion));
+        var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+        Assert.Equal(long.Parse(revision) + 1, (await plan.Rutas.SingleAsync(r => r.Id == e.Ruta)).Revision);
+        var deposito = scope.ServiceProvider.GetRequiredService<DepositoDbContext>();
+        Assert.Single(await deposito.Set<OperacionCustodia>().Where(o => o.OperacionId == operacion).ToListAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cierre_sin_revision_o_con_revision_obsoleta_no_confirma_custodia(bool obsoleta)
+    {
+        var e = await PrepararAsync();
+        using var client = await OperarioAsync();
+        var pagina = $"/backoffice/rendiciones/{e.Ruta}";
+        var campos = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["Escaneados"] = string.Join("\n", e.NoIntentado.Bultos.Concat(e.ConFaltante.Bultos).Select(b => b.Codigo)),
+        };
+        if (obsoleta) campos["RevisionEsperada"] = "1";
+        var respuesta = await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(campos));
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        Assert.Equal(pagina, respuesta.Headers.Location?.OriginalString);
+        using var scope = Scope();
+        var ejecucion = scope.ServiceProvider.GetRequiredService<EjecucionDbContext>();
+        Assert.Null((await ejecucion.Rendiciones.SingleAsync(r => r.RutaId == e.Ruta)).FinalizadaEn);
+        var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+        Assert.Equal(EstadoRuta.EnCurso, (await plan.Rutas.SingleAsync(r => r.Id == e.Ruta)).Estado);
+        Assert.Equal(4, await plan.ReservasBulto.CountAsync(r => r.RutaId == e.Ruta && r.CerradaEn == null));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -37,7 +90,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         var pagina = $"/backoffice/rendiciones/{e.Ruta}";
         var respuesta = await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["RevisionEsperada"] = await RevisionAsync(client, pagina), ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
             ["Escaneados"] = string.Join("\n", e.ConFaltante.Bultos.Select(b => b.Codigo)),
             ["ConfirmarNoCargadosEnDeposito"] = confirmar.ToString(),
         }));
@@ -86,7 +139,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         var pagina = $"/backoffice/rendiciones/{e.Ruta}";
         var respuesta = await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["RevisionEsperada"] = await RevisionAsync(client, pagina), ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
             ["Escaneados"] = string.Join("\n", e.ConFaltante.Bultos.Select(b => b.Codigo)),
         }));
         Assert.Equal("/backoffice/rendiciones", respuesta.Headers.Location?.OriginalString);
@@ -125,13 +178,13 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         using (var lectura = Scope())
             Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(lectura.ServiceProvider.GetRequiredService<EnviosDbContext>(), e.NoIntentado.Id));
         await client.PostAsync($"{pagina}?handler=RecuperarNoCargados", new FormUrlEncodedContent(new Dictionary<string, string>
-        { ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina) }));
+        { ["RevisionEsperada"] = await RevisionAsync(client, pagina), ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina) }));
         using (var sinConfirmacion = Scope())
             Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(sinConfirmacion.ServiceProvider.GetRequiredService<EnviosDbContext>(), e.NoIntentado.Id));
         for (var i = 0; i < 2; i++)
         {
             var respuesta = await client.PostAsync($"{pagina}?handler=RecuperarNoCargados", new FormUrlEncodedContent(new Dictionary<string, string>
-            { ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina), ["ConfirmarNoCargadosEnDeposito"] = "true" }));
+            { ["RevisionEsperada"] = await RevisionAsync(client, pagina), ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina), ["ConfirmarNoCargadosEnDeposito"] = "true" }));
             Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
         }
         using var final = Scope();
@@ -155,7 +208,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         planActual.Rutas.Add(nueva);
         await planActual.SaveChangesAsync();
         await client.PostAsync($"{pagina}?handler=RecuperarNoCargados", new FormUrlEncodedContent(new Dictionary<string, string>
-        { ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina), ["ConfirmarNoCargadosEnDeposito"] = "true" }));
+        { ["RevisionEsperada"] = await RevisionAsync(client, pagina), ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina), ["ConfirmarNoCargadosEnDeposito"] = "true" }));
         using var verificacion = Scope();
         Assert.Equal(EstadoEnvio.AsignadoARuta, await EstadoAsync(verificacion.ServiceProvider.GetRequiredService<EnviosDbContext>(), envio.Id));
     }
@@ -223,7 +276,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         // El formulario no envía Escaneados cuando no hay recepción física.
         var respuesta = await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["RevisionEsperada"] = await RevisionAsync(client, pagina), ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
         }));
         Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
         Assert.Equal("/backoffice/rendiciones", respuesta.Headers.Location?.OriginalString);
@@ -431,7 +484,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         var pagina = $"/backoffice/rendiciones/{e.Ruta}";
         var campos = new Dictionary<string, string>
         {
-            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["RevisionEsperada"] = await RevisionAsync(client, pagina), ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
         };
         if (escaneados is not null) campos["Escaneados"] = escaneados;
 
@@ -486,7 +539,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         var respuesta = await client.PostAsync($"{pagina}?handler=Confirmar", new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["Escaneados"] = string.Join("\n", e.NoIntentado.Bultos.Concat(e.ConFaltante.Bultos).Select(b => b.Codigo)),
-            ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
+            ["RevisionEsperada"] = await RevisionAsync(client, pagina), ["__RequestVerificationToken"] = await Sesion.TokenAsync(client, pagina),
         }));
 
         Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
@@ -533,6 +586,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
             var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
             plan.Rutas.Add(ruta);
             await plan.SaveChangesAsync();
+            await DatosFisicosRf34.AcreditarAsync(enviosDb, plan, ruta, envios, ahora);
             rutaId = ruta.Id;
 
             // Lo que declaró el repartidor en CU-54: el primer bulto de los dos incompletos se escaneó en la carga.
@@ -619,6 +673,9 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         plan.Rutas.Add(ruta);
         await plan.SaveChangesAsync();
 
+        await DatosFisicosRf34.AcreditarAsync(enviosDb, plan, ruta, envios, ahora,
+            envios.SelectMany(e => e.Bultos.Where(b => !revisita || e.Id != envios[0].Id || b.Estado != EstadoEnvio.Entregado)).Select(b => b.Id));
+
         // Lo que declaró el repartidor en CU-54.
         DeclaracionRendicion[] lineas =
         [
@@ -657,6 +714,14 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
     }
 
     // El formulario de la página: el token antifalsificación se lee de la misma página.
+    private static async Task<string> RevisionAsync(HttpClient client, string pagina)
+    {
+        var html = await client.GetStringAsync(pagina);
+        var revision = Regex.Match(html, "data-revision-ruta=\"([0-9]+)\"");
+        Assert.True(revision.Success, "La página debe mostrar la revisión esperada de la ruta.");
+        return revision.Groups[1].Value;
+    }
+
     private static async Task<HttpResponseMessage> ConfirmarAsync(HttpClient client, Guid ruta, params string[] codigos)
     {
         var pagina = $"/backoffice/rendiciones/{ruta}";
@@ -664,6 +729,7 @@ public sealed class ConfirmarRendicionTests(PostgresApiFactory factory) : IClass
         var campos = new Dictionary<string, string>
         {
             ["Escaneados"] = string.Join("\n", codigos),
+            ["RevisionEsperada"] = await RevisionAsync(client, pagina),
             ["ConfirmarNoCargadosEnDeposito"] = "true",
             ["__RequestVerificationToken"] = token,
         };

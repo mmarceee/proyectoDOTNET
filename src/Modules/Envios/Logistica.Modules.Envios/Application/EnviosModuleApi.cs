@@ -12,10 +12,11 @@ using EventoBultoDevuelto = Logistica.Modules.Envios.Contracts.Events.BultoDevue
 namespace Logistica.Modules.Envios.Application;
 
 // Implementación del contrato de Envíos. Es internal: los otros módulos sólo ven la interfaz.
-internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj, IReglasDeEntrega reglasDeEntrega,
+internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvider reloj, IReglasDeEntrega reglasDeEntrega,
     IIntegrationEventPublisher eventos, ConsultarEnviosHandler listado,
     Features.ReprogramarPorDestinatario.ReprogramarPorDestinatarioHandler reprogramar,
-    Features.IniciarDevolucion.DevolverReprogramadosVencidosHandler vencidos) : IEnviosModuleApi
+    Features.IniciarDevolucion.DevolverReprogramadosVencidosHandler vencidos,
+    Logistica.Modules.Planificacion.Contracts.IPlanificacionModuleApi reservas) : IEnviosModuleApi
 {
     public Task<int> DevolverReprogramadosVencidosAsync(DateOnly hoy, CancellationToken ct) => vencidos.HandleAsync(hoy, ct);
 
@@ -49,7 +50,8 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
         var resultado = new List<EnvioParaCarga>();
         foreach (var e in lista)
-            resultado.Add(new(e.Id, e.Estado.ToString(), e.BultosParaCarga.Select(b => new BultoParaCarga(b.Id, b.Codigo, b.Estado.ToString())).ToArray())
+            resultado.Add(new(e.Id, e.Estado.ToString(), e.Bultos.Where(b => b.Estado is EstadoEnvio.AsignadoARuta or EstadoEnvio.EnTransito)
+                .Select(b => new BultoParaCarga(b.Id, b.Codigo, b.Estado.ToString())).ToArray())
             { Numero = e.Numero, AdmiteEntregaParcial = (await reglasDeEntrega.ParaHojaAsync(e, ct)).AdmiteEntregaParcial });
         return resultado;
     }
@@ -95,7 +97,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
     }
 
     // ADR-0004, sección 2.11: Ejecución clasifica cada bulto de la visita con su estado actual antes de registrarla.
-    public async Task<EnvioParaVisita?> ConsultarParaVisitaAsync(Guid envioId, CancellationToken ct)
+    public async Task<EnvioParaVisita?> ConsultarParaVisitaAsync(Guid envioId, CancellationToken ct, Guid? rutaId = null)
     {
         if (await envios.ObtenerConBultosAsync(envioId, ct) is not { } envio)
         {
@@ -104,7 +106,9 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
         var reglas = await reglasDeEntrega.DelEnvioAsync(envio, ct);
         return new EnvioParaVisita(envio.Id,
-            envio.Bultos.Select(b => new BultoParaVisita(b.Id, b.Codigo, b.Estado.ToString())).ToList(),
+            envio.Bultos.Select(b => new BultoParaVisita(b.Id, b.Codigo,
+                rutaId is not null && b.Estado == EstadoEnvio.EnTransito && b.CustodiaRutaId != rutaId
+                    ? "FueraDeRuta" : b.Estado.ToString())).ToList(),
             reglas.AdmiteEntregaParcial);
     }
 
@@ -141,7 +145,8 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
             var intentos = envio.RegistrarVisita(
                 visita.Resultados.Select(r => new ResultadoBulto(r.BultoId, r.MotivoId is Guid id ? motivos[id] : null)).ToList(),
-                prueba, evidencia, visita.Observaciones, ubicacion, reglas, visita.ResponsableId, visita.OcurridoEn);
+                prueba, evidencia, visita.Observaciones, ubicacion, reglas, visita.ResponsableId, visita.OcurridoEn,
+                visita.RutaId);
 
             if (firma is not null)
             {
@@ -168,7 +173,7 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             // completa que no ocurrió. Con pendientes, el intento fallido, como antes.
             if (envio.Bultos.All(b => b.Estado == EstadoEnvio.Entregado))
             {
-                var entregadoEn = envio.Eventos[^1].OcurridoEn;
+                var entregadoEn = visita.OcurridoEn.ToUniversalTime();
                 eventos.Registrar(EnvioEntregado.Tipo,
                     new EnvioEntregado(envio.Id, envio.Numero, entregadoEn, visita.ResponsableId, visita.RepartidorId), entregadoEn);
             }
@@ -278,7 +283,10 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         return lista.Select(e => new EnvioPlanificable(e.Id, e.OperadorId, e.Numero, e.Estado.ToString(), e.ZonaId,
             e.FranjaHorariaId, e.FechaEntregaProgramada, $"{e.Direccion.Calle} {e.Direccion.Numero}, {e.Direccion.Localidad}",
             // Sólo los bultos que acompañan al envío: la capacidad del vehículo no cuenta los ya entregados (RF 34).
-            e.Direccion.CodigoPostal, e.BultosQueAcompanan.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
+            e.Direccion.CodigoPostal, e.Bultos.Where(b => b.Estado is EstadoEnvio.EnDeposito or EstadoEnvio.Reprogramado or EstadoEnvio.AsignadoARuta)
+                .Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)
+                { Codigo = b.Codigo, Estado = b.Estado.ToString(), Custodia = b.Custodia.ToString(), RevisionCustodia = b.RevisionCustodia,
+                    ReintentoDesde = b.ReintentoDesde }).ToList(),
             new PuntoEntregaPlanificable(e.Direccion.Calle, e.Direccion.Numero, e.Direccion.Localidad, e.Direccion.Departamento, e.Direccion.CodigoPostal),
             e.ReintentoDesde, e.Modalidad.ToString())).ToList();
     }
@@ -292,10 +300,18 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         foreach (var envio in encontrados)
         {
             var asignacion = asignaciones.Single(a => a.EnvioId == envio.Id);
-            envio.DefinirPlanificacion(envio.ZonaId, asignacion.FranjaId, envio.FechaEntregaProgramada);
-            envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, responsableId, ahora,
-                detalle: $"Asignado a la ruta {rutaId}.");
-            envios.RegistrarAsignacion(envio.Id, rutaId, responsableId, ahora);
+            var idsBultos = asignacion.BultoIds ?? envio.Bultos.Where(b => b.Estado is EstadoEnvio.EnDeposito or EstadoEnvio.Reprogramado)
+                .Select(b => b.Id).ToArray();
+            if (idsBultos.Count == 0 || idsBultos.Distinct().Count() != idsBultos.Count
+                || idsBultos.Any(id => !envio.Bultos.Any(b => b.Id == id && b.Custodia == UbicacionCustodia.Deposito
+                    && b.Estado is EstadoEnvio.EnDeposito or EstadoEnvio.Reprogramado)))
+                throw new DomainException("Los bultos deben estar disponibles y confirmados físicamente en depósito.");
+            envio.ResolverFranjaDeRuta(asignacion.FranjaId);
+            envio.CambiarBultosDeRuta(idsBultos, EstadoEnvio.AsignadoARuta, responsableId, ahora);
+            eventos.Registrar(PlanificacionBultosActualizada.Tipo,
+                new PlanificacionBultosActualizada(envio.Id, rutaId, idsBultos.ToArray(), "Asignacion", ahora), ahora);
+            if (envio.Bultos.Where(b => !Envio.EstadosTerminales.Contains(b.Estado)).All(b => b.Estado == EstadoEnvio.AsignadoARuta))
+                envios.RegistrarAsignacion(envio.Id, rutaId, responsableId, ahora);
         }
         await envios.GuardarCambiosAsync(ct);
     }
@@ -322,17 +338,23 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
     public async Task DesasignarDeRutaAsync(Guid rutaId, Guid envioId, Guid? responsableId, CancellationToken ct)
     {
         var envio = await envios.ObtenerAsync(envioId, ct) ?? throw new DomainException("El envío no está disponible.");
-        if (envio.Estado != EstadoEnvio.AsignadoARuta)
-            throw new DomainException("Sólo se puede desasignar un envío que esté AsignadoARuta.");
+        var ids = (await reservas.ConsultarReservasRutaAsync(rutaId, ct)).Where(r => r.EnvioId == envioId && r.CerradaEn == null)
+            .Select(r => r.BultoId).ToArray();
+        if (ids.Length == 0 || ids.Any(id => !envio.Bultos.Any(b => b.Id == id && b.Estado == EstadoEnvio.AsignadoARuta
+            && b.Custodia == UbicacionCustodia.Deposito)))
+            throw new DomainException("Sólo se pueden quitar bultos asignados a esta ruta y confirmados en depósito.");
         var ahora = reloj.GetUtcNow();
         // T4 conserva zona, franja y fecha programada; sólo cambia el estado y registra el hecho.
-        envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora,
-            detalle: $"Quitado de la ruta {rutaId}.");
-        envios.RegistrarDesasignacion(envio.Id, rutaId, responsableId, ahora);
+        envio.CambiarBultosDeRuta(ids, EstadoEnvio.EnDeposito, responsableId, ahora);
+        eventos.Registrar(PlanificacionBultosActualizada.Tipo,
+            new PlanificacionBultosActualizada(envio.Id, rutaId, ids, "RetiroDeRuta", ahora), ahora);
+        if (envio.Bultos.Where(b => !Envio.EstadosTerminales.Contains(b.Estado)).All(b => b.Estado == EstadoEnvio.EnDeposito))
+            envios.RegistrarDesasignacion(envio.Id, rutaId, responsableId, ahora);
         await envios.GuardarCambiosAsync(ct);
+        await reservas.CerrarReservasBultosAsync(rutaId, ids, "QuitadoDeRutaPlanificada", ct);
     }
 
-    public async Task<bool> RecibirBultoAsync(Guid envioId, Guid bultoId, Guid? responsableId, CancellationToken ct)
+    public async Task<bool> RecibirBultoAsync(Guid envioId, Guid bultoId, Guid? responsableId, CancellationToken ct, Guid? operacionId = null)
     {
         var envio = await envios.ObtenerAsync(envioId, ct)
             ?? throw new DomainException("El envío no existe.");
@@ -340,6 +362,8 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         // T2 por bulto. Si el envío ya no está Admitido (por ejemplo, lo cancelaron), el dominio lo rechaza.
         var ahora = reloj.GetUtcNow();
         var completo = envio.RecibirBulto(bultoId, responsableId, ahora);
+        envio.Bultos.Single(b => b.Id == bultoId).ConfirmarCustodia(UbicacionCustodia.Deposito, null,
+            responsableId, operacionId ?? Guid.NewGuid(), ahora, "Recepción física CU-30");
         if (completo)
         {
             eventos.Registrar(EnvioRecibidoEnDeposito.Tipo,
@@ -365,16 +389,11 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             throw new DomainException("Un envío de la rendición ya no existe.");
         }
 
-        var ahora = reloj.GetUtcNow();
-        foreach (var envio in lista)
-        {
-            envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, responsableId, ahora,
-                detalle: "Volvió en la rendición sin haberse intentado.");
-            eventos.Registrar(EnvioReintegradoADeposito.Tipo,
-                new EnvioReintegradoADeposito(envio.Id, envio.Numero, ahora, responsableId), ahora);
-        }
-
-        await envios.GuardarCambiosAsync(ct);
+        var ids = lista.SelectMany(e => e.Bultos).Where(b => b.Estado == EstadoEnvio.EnTransito).Select(b => b.Id).ToArray();
+        var activas = await reservas.ConsultarReservasActivasAsync(ids, ct);
+        if (activas.Count != ids.Length) throw new DomainException("El reintegro requiere reservas inequívocas y confirmación física.");
+        foreach (var grupo in activas.GroupBy(r => r.RutaId))
+            await ReintegrarBultosAsync(grupo.Key, grupo.Select(r => r.BultoId).ToArray(), responsableId, ct);
     }
 
     // CU-55 (T4): lo que no salió vuelve a estar disponible para planificar. Los bultos ya entregados de una revisita no
@@ -386,18 +405,12 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             return 0;
         }
 
-        var ahora = reloj.GetUtcNow();
-        var noCargados = (await envios.ObtenerParaPlanificacionAsync(envioIds, ct))
-            .Where(e => e.Estado == EstadoEnvio.AsignadoARuta).ToList();
-        foreach (var envio in noCargados)
-        {
-            envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, ahora,
-                detalle: $"Volvió en la rendición de la ruta {rutaId} sin haber salido.");
-            envios.RegistrarDesasignacion(envio.Id, rutaId, null, ahora);
-        }
-
-        await envios.GuardarCambiosAsync(ct);
-        return noCargados.Count;
+        var propias = (await reservas.ConsultarReservasRutaAsync(rutaId, ct)).Where(r => r.CerradaEn == null && envioIds.Contains(r.EnvioId)).ToArray();
+        var estados = await ConsultarCustodiaAsync(envioIds, ct);
+        var ids = propias.Where(r => estados.Any(b => b.BultoId == r.BultoId && b.Estado == "AsignadoARuta"
+            && b.Ubicacion == "Deposito")).Select(r => r.BultoId).ToArray();
+        await ReintegrarBultosAsync(rutaId, ids, null, ct);
+        return propias.Where(r => ids.Contains(r.BultoId)).Select(r => r.EnvioId).Distinct().Count();
     }
 
     public async Task<IReadOnlyList<EnvioParaRendicion>> ConsultarParaRendicionAsync(IReadOnlyCollection<Guid> ids,
@@ -442,9 +455,13 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         }
 
         var ahora = reloj.GetUtcNow();
+        var enviosDevueltos = await envios.ObtenerParaPlanificacionAsync(envioIds, ct);
         foreach (var devolucion in await envios.ObtenerDevolucionesAsync(envioIds, ct))
         {
-            if (devolucion.Estado != EstadoDevolucion.Cerrada)
+            var pendientes = enviosDevueltos.Single(e => e.Id == devolucion.EnvioId).Bultos
+                .Where(b => b.Estado == EstadoEnvio.EnDevolucion).ToArray();
+            if (devolucion.Estado != EstadoDevolucion.Cerrada && pendientes.Length > 0
+                && pendientes.All(b => b.Custodia == UbicacionCustodia.Deposito))
             {
                 devolucion.MarcarRecibida(ahora);
             }

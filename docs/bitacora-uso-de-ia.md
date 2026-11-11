@@ -1496,6 +1496,20 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 
 **Integración de main del 10/11/2026.** Lucas pidió traer main y resolver los dos conflictos documentales. Codex conservó el cierre y decisiones de ADR-0007 con el aporte retrospectivo de Cristian, y unió las entradas de CU-15/RF-32 con las nuevas de CU-22 y Playwright, renumerando estas últimas a 3.97/3.98 y ajustando su historial. Se preservaron los cambios de código entrantes y las fuentes de RF 32; la verificación de integración se registra en el resultado del merge, sin atribuir a esta tarea las pruebas históricas descritas por cada responsable.
 
+## **3.99 RF 34 · Reservas, custodia y nueva planificación por bulto**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Trabajo solicitado por Lucas; la asignación de responsable RF 34 se conserva como propuesta. |
+| **Fecha** | 10/11/2026 (America/Montevideo) |
+| **¿Se usó IA?** | Sí, Codex en la aplicación de escritorio. |
+| **Finalidad** | Contrastar letra/cambio del 29/10 y ADR, e implementar el alcance RF 34 conforme a D1/D2/D4/D6. |
+| **Cómo se trabajó** | Codex escribió modelos, contratos, coordinadores, pantallas, migraciones, pruebas y documentación. Se contrastó el resultado con escenarios de concurrencia, carga, visita, retorno, rendición y reprogramación. El diff permanece para revisión; las pruebas no se presentan como aprobación humana. |
+| **Propuesta implementada** | Reserva única abierta por operador/bulto, custodia auditable, selección y capacidad individuales, transacción compartida, revisiones e idempotencia. Conciliación física de depósito y conservación de reservas tras cierre administrativo. |
+| **Modificado durante la verificación** | Se corrigieron el enlace de diccionarios del formulario, instantes no UTC, preparación física de pruebas históricas y comprobación de pertenencia antes de revisar rutas ajenas. La prueba de arquitectura detectó APIs paralelas de escritura: se trasladaron sus acciones a ModuleApi y la idempotencia de depósito a su propio módulo, manteniendo intacta la regla del ADR-0001. |
+| **Descartado** | Liberar por Reprogramado/cierre/ausencia de escaneo, suponer custodia desde el estado, elegir una ruta histórica ambigua, relajar la prueba arquitectónica o reescribir colas offline. |
+| **Verificación** | Compilación sin advertencias/errores; 498 unitarias, 56 de arquitectura y 225 integraciones seleccionadas aprobadas, incluido API/Worker/RabbitMQ/Valkey reales. [Guía y límites RF 34](analisis-diseno/rf-34/verificacion.md). No se aplicaron migraciones a la base del usuario ni se realizó aceptación física del nuevo recorrido publicado. |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |

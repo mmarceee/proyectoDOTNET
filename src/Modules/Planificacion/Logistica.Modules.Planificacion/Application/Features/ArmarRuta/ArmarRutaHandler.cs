@@ -8,6 +8,8 @@ using Logistica.Modules.Planificacion.Application.Abstractions;
 using Logistica.Modules.Planificacion.Application.Exceptions;
 using Logistica.Modules.Planificacion.Application.Services;
 using Logistica.SharedKernel;
+using Logistica.Modules.Planificacion.Contracts;
+using System.Text.Json;
 using static Logistica.Modules.Planificacion.Application.Mapping.RutaResponseMapper;
 using static Logistica.Modules.Planificacion.Application.Services.EvaluadorRuta;
 
@@ -15,7 +17,8 @@ namespace Logistica.Modules.Planificacion.Application.Features.ArmarRuta;
 
 internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionModuleApi administracion,
     IEnviosModuleApi envios, EvaluadorRuta evaluador, IConfirmacionPlanificacion confirmacion,
-    ICurrentTenant tenant, IResponsablePlanificacion responsable, TimeProvider reloj, CalendarioPlanificacion calendario)
+    ICurrentTenant tenant, IResponsablePlanificacion responsable, TimeProvider reloj, CalendarioPlanificacion calendario,
+    IReservaBultoRepository reservas, IOperacionesBultos operaciones)
 {
     private Guid Operador => tenant.OperadorId ?? throw new DomainException("La sesión no tiene un operador.");
     public async Task<EvaluacionRutaResponse> PrevalidarAsync(PrevalidarRutaCommand pedido, CancellationToken ct)
@@ -25,47 +28,55 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
         ExigirEditable(ruta, pedido.RevisionEsperada);
         if (ruta is null || pedido.Fecha != ruta.Fecha)
             PlanificadorDeRuta.ExigirFechaVigente(pedido.Fecha, await calendario.HoyAsync(ct));
-        var todos = (ruta?.EnvioIds ?? []).Concat(pedido.EnvioIds).ToArray();
-        if (todos.Distinct().Count() != todos.Length) throw new DomainException("La selección incluye un envío ya presente o repetido.");
+        var todos = (ruta?.EnvioIds ?? []).Concat(pedido.EnvioIds).Distinct().ToArray();
         var datos = await evaluador.CargarAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, todos,
-            pedido.EnvioIds, ruta?.Id, ct);
+            pedido.EnvioIds, ruta?.Id, ct, pedido.BultoIds, pedido.RevisionesBultos);
         return Resumen(datos.Evaluacion, datos.Vehiculo, datos.Reglas);
     }
     public async Task<RutaResponse> CrearAsync(CrearRutaCommand pedido, CancellationToken ct)
     {
         ValidarSeleccion(pedido.EnvioIds, false);
+        var operacion = pedido.OperacionId ?? Guid.NewGuid();
+        var huella = JsonSerializer.Serialize(new { Tipo = "CrearRuta", Pedido = pedido, Actor = responsable.Id });
         RutaResponse? respuesta = null;
         await confirmacion.EjecutarAsync(async () =>
         {
             await administracion.BloquearPlanificacionAsync(ct);
+            if (await operaciones.ResultadoAsync(operacion, huella, ct) is { } anterior)
+            { respuesta = JsonSerializer.Deserialize<RutaResponse>(anterior)!; return; }
             PlanificadorDeRuta.ExigirFechaVigente(pedido.Fecha, await calendario.HoyAsync(ct));
             var datos = await evaluador.CargarAsync(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, pedido.EnvioIds,
-                pedido.EnvioIds, null, ct);
+                pedido.EnvioIds, null, ct, pedido.BultoIds, pedido.RevisionesBultos);
             ExigirValida(datos.Evaluacion);
             var ruta = Ruta.Crear(Operador, pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, datos.Envios, reloj.GetUtcNow());
             rutas.Agregar(ruta);
-            await AsignarAsync(ruta, pedido.EnvioIds, datos.Envios, ct);
+            await AsignarAsync(ruta, pedido.EnvioIds, datos.Envios, operacion, ct);
             await GuardarValidacionAsync(ruta, OperacionValidacionRuta.Creacion, datos, ct);
             respuesta = Mapear(ruta, Resumen(datos.Evaluacion, datos.Vehiculo, datos.Reglas));
+            await operaciones.RegistrarAsync(operacion, huella, JsonSerializer.Serialize(respuesta), ct);
         }, pedido.EnvioIds, ct);
         return respuesta!;
     }
     public async Task<RutaResponse> AgregarAsync(Guid id, AgregarEnviosRutaCommand pedido, CancellationToken ct)
     {
         ValidarSeleccion(pedido.EnvioIds, false);
+        var operacion = pedido.OperacionId ?? Guid.NewGuid();
+        var huella = JsonSerializer.Serialize(new { Tipo = "AgregarRuta", RutaId = id, Pedido = pedido, Actor = responsable.Id });
         RutaResponse? respuesta = null;
         await confirmacion.EjecutarAsync(async () =>
         {
             await administracion.BloquearPlanificacionAsync(ct);
+            if (await operaciones.ResultadoAsync(operacion, huella, ct) is { } anterior)
+            { respuesta = JsonSerializer.Deserialize<RutaResponse>(anterior)!; return; }
             var ruta = await ExigirRutaAsync(id, ct); ExigirEditable(ruta, pedido.RevisionEsperada);
-            var todos = ruta.EnvioIds.Concat(pedido.EnvioIds).ToArray();
-            if (todos.Distinct().Count() != todos.Length) throw new DomainException("Algún envío ya pertenece a la ruta.");
-            var datos = await evaluador.CargarAsync(ruta.Fecha, ruta.RepartidorId, ruta.VehiculoId, todos, pedido.EnvioIds, ruta.Id, ct);
+            var todos = ruta.EnvioIds.Concat(pedido.EnvioIds).Distinct().ToArray();
+            var datos = await evaluador.CargarAsync(ruta.Fecha, ruta.RepartidorId, ruta.VehiculoId, todos, pedido.EnvioIds, ruta.Id, ct, pedido.BultoIds, pedido.RevisionesBultos);
             ExigirValida(datos.Evaluacion);
             ruta.AgregarEnvios(datos.Envios);
-            await AsignarAsync(ruta, pedido.EnvioIds, datos.Envios, ct);
+            await AsignarAsync(ruta, pedido.EnvioIds, datos.Envios, operacion, ct);
             await GuardarValidacionAsync(ruta, OperacionValidacionRuta.Agregado, datos, ct);
             respuesta = Mapear(ruta, Resumen(datos.Evaluacion, datos.Vehiculo, datos.Reglas));
+            await operaciones.RegistrarAsync(operacion, huella, JsonSerializer.Serialize(respuesta), ct);
         }, pedido.EnvioIds, ct);
         return respuesta!;
     }
@@ -83,13 +94,29 @@ internal sealed class ArmarRutaHandler(IRutaRepository rutas, IAdministracionMod
             ExigirValida(datos.Evaluacion);
             var anterior = ruta.Revision;
             ruta.ModificarPlanificacion(pedido.Fecha, pedido.RepartidorId, pedido.VehiculoId, datos.Envios);
+            await ReagruparReservasAsync(ruta, ct);
             if (ruta.Revision != anterior) await GuardarValidacionAsync(ruta, OperacionValidacionRuta.Modificacion, datos, ct);
             respuesta = Mapear(ruta, Resumen(datos.Evaluacion, datos.Vehiculo, datos.Reglas));
         }, [], ct);
         return respuesta!;
     }
-    private Task AsignarAsync(Ruta ruta, IReadOnlyList<Guid> nuevos, IReadOnlyList<EnvioRuta> preparados, CancellationToken ct)
-        => envios.AsignarARutaAsync(ruta.Id, nuevos.Select(id => new AsignacionEnvioRuta(id, preparados.Single(e => e.Id == id).Franja?.Id)).ToList(), responsable.Id, ct);
+    private async Task AsignarAsync(Ruta ruta, IReadOnlyList<Guid> nuevos, IReadOnlyList<EnvioRuta> preparados, Guid operacion, CancellationToken ct)
+    {
+        var existentes = (await reservas.DeRutaAsync(ruta.Id, ct)).Where(r => r.CerradaEn == null).Select(r => r.BultoId).ToHashSet();
+        var asignaciones = nuevos.Select(id => new AsignacionEnvioRuta(id, preparados.Single(e => e.Id == id).Franja?.Id)
+            { BultoIds = preparados.Single(e => e.Id == id).Bultos.Select(b => b.BultoId).Where(id => !existentes.Contains(id)).ToArray() }).ToArray();
+        await envios.AsignarARutaAsync(ruta.Id, asignaciones, responsable.Id, ct);
+        foreach (var asignacion in asignaciones)
+            foreach (var bulto in asignacion.BultoIds!)
+                reservas.Agregar(ReservaBulto.Abrir(ruta, asignacion.EnvioId, bulto, operacion, responsable.Id, reloj.GetUtcNow()));
+        await ReagruparReservasAsync(ruta, ct);
+        await reservas.GuardarAsync(ct);
+    }
+    private async Task ReagruparReservasAsync(Ruta ruta, CancellationToken ct)
+    {
+        foreach (var reserva in (await reservas.DeRutaAsync(ruta.Id, ct)).Where(r => r.CerradaEn == null))
+            reserva.Reagrupar(ruta.Paradas.Single(p => p.Envios.Any(e => e.EnvioId == reserva.EnvioId)).Id);
+    }
     private async Task GuardarValidacionAsync(Ruta ruta, OperacionValidacionRuta operacion, DatosEvaluacion datos, CancellationToken ct)
     {
         rutas.Agregar(ValidacionRuta.Registrar(ruta, operacion, datos.Vehiculo, datos.Reglas.VersionId,

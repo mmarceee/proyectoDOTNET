@@ -1,5 +1,7 @@
 # **ADR-0006 · Estrategia de caché e invalidación**
 
+> **Ampliación de implementación RF 34 · 10/11/2026:** `PlanificacionBultosActualizada.v1` y `CustodiaBultosConciliada.v1` invalidan seguimiento y notifican al tablero por Outbox/Worker. Son hechos internos; no amplían los avisos externos. Se conservan clave por operador y TTL. El ensayo con API/Worker separados, RabbitMQ y Valkey reales comprobó asignación y retorno individuales con el mismo resumen, antes de expirar la caché; ver [verificación RF 34](rf-34/verificacion.md). No declara completadas las restantes proyecciones del tablero de D5.
+
 | Estado | Aceptado (revisado por Lucas Ottonello y Ezequiel Marcenal, 08/11/2026) |
 | :---- | :---- |
 | **Versión** | 1.0 |

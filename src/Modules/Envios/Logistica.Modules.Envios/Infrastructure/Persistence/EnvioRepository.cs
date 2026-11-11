@@ -140,7 +140,7 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
     {
         await db.ParticiparEnTransaccionAsync(ct);
         var consulta = db.Envios.Include(e => e.Bultos).AsQueryable();
-        consulta = envioIds is null ? consulta.Where(e => e.Estado == EstadoEnvio.EnDeposito || e.Estado == EstadoEnvio.Reprogramado)
+        consulta = envioIds is null ? consulta.Where(e => e.Bultos.Any(b => b.Estado == EstadoEnvio.EnDeposito || b.Estado == EstadoEnvio.Reprogramado))
             : consulta.Where(e => envioIds.Contains(e.Id));
         return await consulta.OrderBy(e => e.Numero).ToListAsync(ct);
     }

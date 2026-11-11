@@ -18,7 +18,7 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("planificacion")
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -170,10 +170,7 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EnvioId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Paradas_EnvioActivo")
-                        .HasFilter("\"Estado\" = 'Pendiente'");
+                    b.HasIndex("EnvioId");
 
                     b.HasIndex("RutaId", "EnvioId")
                         .IsUnique();
@@ -181,6 +178,34 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                     b.HasIndex("OperadorId", "RutaId", "ParadaId");
 
                     b.ToTable("EnviosParada", "planificacion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.OperacionBultos", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Huella")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("OperacionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Resultado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "OperacionId")
+                        .IsUnique();
+
+                    b.ToTable("OperacionesBultos", "planificacion");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.Parada", b =>
@@ -221,6 +246,58 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Paradas", "planificacion");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.ReservaBulto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AbiertaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("BultoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CausaCierre")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("CerradaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OperacionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ParadaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ResponsableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RutaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "BultoId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ReservasBulto_Activa")
+                        .HasFilter("\"CerradaEn\" IS NULL");
+
+                    b.HasIndex("OperadorId", "RutaId", "EnvioId");
+
+                    b.ToTable("ReservasBulto", "planificacion");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Planificacion.Domain.Rutas.RetiroEnvioRuta", b =>

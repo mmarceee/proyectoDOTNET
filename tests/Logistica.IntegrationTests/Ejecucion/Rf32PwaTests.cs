@@ -50,6 +50,7 @@ public sealed class Rf32PwaTests(PostgresApiFactory factory) : IClassFixture<Pos
         ruta.Despachar(ahora);
         await using var plan = Contexto<PlanificacionDbContext>(scope);
         plan.Rutas.Add(ruta); await plan.SaveChangesAsync();
+        await DatosFisicosRf34.AcreditarAsync(db, plan, ruta, [envio], ahora);
         using var cliente = factory.CreateClient(Sesion.Opciones);
         await Sesion.IngresarAsync(cliente, "repartidor@operador-demo.uy");
         var codigos = envio.Bultos.Select(b => b.Codigo).ToArray();
@@ -118,12 +119,18 @@ public sealed class Rf32PwaTests(PostgresApiFactory factory) : IClassFixture<Pos
         if (todosCargados)
         {
             // Una nueva visita real trae su propia foto y sólo respalda el tercero. Su reenvío no duplica el recargo.
+            var pendienteFinal = final.Bultos.Single(b => b.Codigo == codigos[2]);
+            var reservaAnterior = await plan.ReservasBulto.SingleAsync(r => r.RutaId == ruta.Id && r.BultoId == pendienteFinal.Id && r.CerradaEn == null);
+            pendienteFinal.ConfirmarCustodia(UbicacionCustodia.Deposito, null, null, Guid.NewGuid(), ahora.AddSeconds(2), "Retorno físico antes de la revisita");
+            reservaAnterior.Cerrar("RetornoConfirmado", ahora.AddSeconds(2));
+            await plan.SaveChangesAsync();
             final.Transicionar(EstadoEnvio.AsignadoARuta,OrigenEvento.Backoffice,null,ahora.AddSeconds(2));
             final.Transicionar(EstadoEnvio.EnTransito,OrigenEvento.AppRepartidor,null,ahora.AddSeconds(2));
             await db.SaveChangesAsync();
             var revisita = Ruta.Crear(Operador,fecha,DatosIniciales.RepartidorDemoId,Guid.Parse("51111111-1111-1111-1111-111111111111"),
                 [new EnvioRuta(envio.Id,envio.Numero,null,null,null,false,[])],ahora.AddSeconds(2));
             revisita.Despachar(ahora.AddSeconds(2));revisita.Iniciar();plan.Rutas.Add(revisita);await plan.SaveChangesAsync();
+            await DatosFisicosRf34.AcreditarAsync(db, plan, revisita, [final], ahora.AddSeconds(2), [pendienteFinal.Id]);
             var hojaRevisita = await cliente.GetFromJsonAsync<HojaDeRutaResponse>($"/api/repartidor/rutas/{revisita.Id}/hoja-de-ruta");
             Assert.NotNull(hojaRevisita);
             Assert.Equal(codigos[2], Assert.Single(Assert.Single(Assert.Single(hojaRevisita.Paradas).Envios).Bultos).Codigo);

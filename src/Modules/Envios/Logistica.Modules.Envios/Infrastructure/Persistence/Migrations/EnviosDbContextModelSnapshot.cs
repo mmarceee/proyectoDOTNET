@@ -158,6 +158,22 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ComercioId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Custodia")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("CustodiaConfirmadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CustodiaOperacionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CustodiaResponsableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CustodiaRutaId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("EnvioId")
                         .HasColumnType("uuid");
 
@@ -179,6 +195,13 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
                     b.Property<decimal>("PesoKg")
                         .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset?>("ReintentoDesde")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("RevisionCustodia")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
@@ -421,6 +444,54 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.ToTable("IntentosEntrega", "envios");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Envios.Domain.Envios.MovimientoCustodia", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BultoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ConfirmadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("OperacionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ResponsableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RutaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Ubicacion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BultoId");
+
+                    b.HasIndex("OperadorId", "BultoId", "OperacionId")
+                        .IsUnique();
+
+                    b.ToTable("MovimientosCustodia", "envios");
+                });
+
             modelBuilder.Entity("Logistica.Modules.Envios.Domain.Envios.RecargoNuevaVisita", b =>
                 {
                     b.Property<Guid>("Id")
@@ -575,6 +646,15 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.Navigation("Evidencia");
                 });
 
+            modelBuilder.Entity("Logistica.Modules.Envios.Domain.Envios.MovimientoCustodia", b =>
+                {
+                    b.HasOne("Logistica.Modules.Envios.Domain.Envios.Bulto", null)
+                        .WithMany("MovimientosCustodia")
+                        .HasForeignKey("BultoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Logistica.Modules.Envios.Domain.Envios.RecargoNuevaVisita", b =>
                 {
                     b.HasOne("Logistica.Modules.Envios.Domain.Envios.Envio", null)
@@ -591,6 +671,11 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                         .HasForeignKey("EnvioId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Envios.Domain.Envios.Bulto", b =>
+                {
+                    b.Navigation("MovimientosCustodia");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Envios.Domain.Envios.Envio", b =>

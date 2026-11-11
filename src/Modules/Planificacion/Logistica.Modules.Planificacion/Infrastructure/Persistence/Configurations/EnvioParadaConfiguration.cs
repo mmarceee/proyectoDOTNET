@@ -9,7 +9,8 @@ internal sealed class EnvioParadaConfiguration : IEntityTypeConfiguration<EnvioP
     public void Configure(EntityTypeBuilder<EnvioParada> b)
     {
         b.ToTable("EnviosParada"); b.Property(e => e.Estado).HasConversion<string>();
-        b.HasIndex(e => e.EnvioId).IsUnique().HasFilter("\"Estado\" = 'Pendiente'").HasDatabaseName("UX_Paradas_EnvioActivo");
+        // RF 34: la exclusividad es por bulto en ReservasBulto. Un envío puede tener subconjuntos independientes.
+        b.HasIndex(e => e.EnvioId);
         b.HasIndex(e => new { e.RutaId, e.EnvioId }).IsUnique();
     }
 }

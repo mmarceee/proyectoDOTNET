@@ -19,7 +19,7 @@ internal sealed class ConfirmacionPlanificacion(IUnidadDeTrabajo unidad, IServic
             throw new ConflictoRutaException(indisponibles.Count > 0 ? "EnvioNoDisponible" : "RutaModificada",
                 "Otra operación modificó los datos. Revisá y confirmá nuevamente.", indisponibles);
         }
-        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505", ConstraintName: "UX_Paradas_EnvioActivo" })
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505", ConstraintName: "UX_Paradas_EnvioActivo" or "UX_ReservasBulto_Activa" })
         {
             throw new ConflictoRutaException("EnvioNoDisponible", "Algunos envíos fueron asignados por otra operación.", await IndisponiblesAsync(envioIds, ct));
         }

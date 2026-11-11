@@ -3,13 +3,15 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptado. Decisiones y evaluación retrospectiva cerradas para este alcance al 09/11/2026. Implementación y aceptación pendientes identificadas en 4.6.** |
-| Versión y fecha | 2.3 · 09/11/2026 |
+| Versión y fecha | 2.5 · 10/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | Inicial: `586f630` (CU-42). Cierre documental: `549c1ae`, con la prueba de caché agregada en esta revisión. |
 | Decisión funcional | [Decisiones cerradas de entrega parcial](decisiones-entrega-parcial.md) |
 | Cierre técnico y estudio | [Decisiones técnicas](cierre-tecnico-entrega-parcial.md) · [Guía de estudio y defensa](guia-estudio-ADR-0007.md) |
 | Relacionados | ADR-0001 a ADR-0006; RF 31 a 36; CU-06, CU-17/18/20/21/30/31/40/41/42/43/50/51/52/54/55/60/64/65/66 y liquidaciones. |
+
+**Continuación RF 34 · 10/11/2026:** se implementan D1/D2 y los consumidores de planificación/carga/visita/retorno/rendición, con custodia individual, reservas, migración conservadora e idempotencia. Las acciones entre módulos se mantienen en ModuleApi (ADR-0001). [Alcance RF 34](rf-34/README.md) y [evidencia/aceptación](rf-34/verificacion.md): compilación correcta, 498 unitarias, 56 de arquitectura y 225 integraciones seleccionadas aprobadas, incluido el circuito real API/Worker/RabbitMQ/Valkey. No se aplicaron migraciones a la base del usuario ni se extiende la aceptación física RF 32 a este recorrido. D3/CU-31 individual, D8 y D9 conservan sus pendientes.
 
 ## 1. Contexto y restricciones
 
@@ -157,7 +159,8 @@ La adaptación confirma que los límites del monolito, los contratos y los mecan
 
 | Pendiente real | Condición verificable para cerrarlo | Referencia de coordinación |
 | --- | --- | --- |
-| Custodia y exclusividad individual (RF 34) | Confirmar ubicación de faltantes; reserva activa por bulto con concurrencia; liberar/reasignar sólo con custodia acreditada; devolución individual. La recuperación de envíos completos no cargados no cubre esto. | Decisión 4.2 y pendientes 2/3; Planificación, Depósito y Envíos. |
+| Aceptación publicada y actualización de RF 34 | Reserva/custodia y reasignación individuales implementadas y verificadas automáticamente el 10/11. Falta el ensayo manual del build publicado y la actualización de una copia de la base real conforme a D6. | [Verificación RF 34](rf-34/verificacion.md), decisión 4.2 y pendiente 3. |
+| Devolución individual final al comercio | Implementar/aceptar el alcance de orden y recepción de subconjuntos de D3/CU-31. El retorno individual al depósito de RF 34 no declara Devuelto ni completa este flujo. | D3 y decisión, pendiente 2. |
 | Consumidores de estado global | Migrar envíos activos a Terminado, liquidables a la dimensión de cierre correcta y reprogramación pública/textos pendientes. Retirar el puente sólo tras verificar cada consumidor. | Decisión, pendiente 8; alcance previsto para el 15/11. |
 | Cargo y liquidación | Implementar D8: UYU en pesos enteros/redondeo al peso más cercano (0,50 hacia arriba), base al cierre elegible y recargos separados, unicidad por visita y concepto imputado. El registro actual no resuelve aún todo ese contrato monetario. | Decisión 5 y D8; Depósito/Envíos. `GenerarLiquidacionHandler` aún no llama a `ListarRecargosAsync`. |
 | Tablero y circuito de mensajería | Mostrar/actualizar progreso por bulto aun si el resumen no cambia. Comprobar 1/3 → 2/3 con Worker, RabbitMQ y Valkey reales, además de la prueba de consumidor local. | Decisión, pendiente 7; Seguimiento. |
@@ -203,3 +206,4 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | 2.2 | 09/11/2026 | Lucas confirma UYU/redondeo, cobro de base al cierre mixto elegible y recargos separados, y persistencia completa cifrada antes de confirmar. D1 a D9 cierran las decisiones del alcance; implementación y aceptación conservan sus pendientes. D9 sustituye la elección anterior de captura sólo en memoria. | Lucas Ottonello, registro asistido por Codex |
 | 2.3 | 09/11/2026 | Lucas ajusta D8 a importes finales en pesos UYU enteros, sin centésimos. Se concreta redondeo al peso más cercano, con 0,50 hacia arriba y una sola normalización por concepto. Sustituye el criterio de dos decimales/redondeo al par. | Lucas Ottonello, registro asistido por Codex |
 | 2.4 | 10/11/2026 | Integración de main: se conserva el aporte retrospectivo RF 31/33/35 de Cristian junto con la revisión posterior y D1–D9. Se enlaza la aceptación integrada de RF 32 del 10/11, sin presentar D9 ni las demás deudas como implementadas. | Lucas Ottonello, integración asistida por Codex |
+| 2.5 | 10/11/2026 | Implementación y verificación automatizada RF 34 sobre el árbol de trabajo: reservas/custodia individuales, contratos por ModuleApi, consumidores, idempotencia, migraciones y circuito distribuido. Se separan aceptación publicada y devolución final individual pendientes. No modifica los acuerdos funcionales. | Implementación asistida por Codex, solicitada por Lucas |
