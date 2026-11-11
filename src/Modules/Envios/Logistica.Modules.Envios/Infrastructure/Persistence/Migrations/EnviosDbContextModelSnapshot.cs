@@ -104,7 +104,9 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EnvioId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("UX_Devoluciones_EnvioAbierta")
+                        .HasFilter("\"Estado\" <> 'Cerrada'");
 
                     b.ToTable("Devoluciones", "envios");
                 });
@@ -497,8 +499,8 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Logistica.Modules.Envios.Domain.Devoluciones.Devolucion", b =>
                 {
                     b.HasOne("Logistica.Modules.Envios.Domain.Envios.Envio", null)
-                        .WithOne()
-                        .HasForeignKey("Logistica.Modules.Envios.Domain.Devoluciones.Devolucion", "EnvioId")
+                        .WithMany()
+                        .HasForeignKey("EnvioId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

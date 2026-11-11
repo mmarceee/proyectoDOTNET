@@ -27,7 +27,7 @@ internal interface IEnvioRepository
     // CU-31: el envío con sus bultos, dentro de la transacción en curso.
     Task<Envio?> ObtenerConBultosAsync(Guid id, CancellationToken ct);
 
-    // CU-31 y CU-55: la devolución de cada envío, si tiene una.
+    // CU-31 y CU-55: la devolución abierta del envío o, si no hay, la última (RF 31: puede tener varias).
     Task<Devoluciones.Devolucion?> ObtenerDevolucionAsync(Guid envioId, CancellationToken ct);
     Task<IReadOnlyList<Devoluciones.Devolucion>> ObtenerDevolucionesAsync(IReadOnlyCollection<Guid> envioIds, CancellationToken ct);
 

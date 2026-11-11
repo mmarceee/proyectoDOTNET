@@ -209,6 +209,27 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         return false;
     }
 
+    // CU-31 por bulto (RF 31, pendiente 2 de la decisión): el comercio recibió bultos que volvieron solos, mientras otros
+    // del envío siguen su camino. Sólo esos bultos pasan a Devuelto (T15); el estado del envío no cambia. La devolución
+    // del envío entero sigue siendo Transicionar(Devuelto).
+    public void DevolverBultos(IReadOnlyCollection<Guid> bultoIds)
+    {
+        var bultos = bultoIds.Distinct().Select(id => _bultos.SingleOrDefault(b => b.Id == id)
+            ?? throw new DomainException("El bulto no pertenece a este envío.")).ToList();
+        if (bultos.Count == 0)
+        {
+            throw new DomainException("Marcá los bultos que se entregan al comercio.");
+        }
+
+        if (bultos.Any(b => b.Estado != EstadoEnvio.EnDevolucion))
+        {
+            throw new DomainException("Uno de los bultos marcados no es de esta devolución.");
+        }
+
+        bultos.ForEach(b => b.Transicionar(EstadoEnvio.Devuelto));
+        RecalcularResumen();
+    }
+
     // RF 31: las cuatro reglas del resumen, en orden; gana la primera que se cumple (tabla-de-transiciones, sección
     // "Entrega parcial", 3). Es una función pura para poder probar cada combinación sin armar un envío.
     public static ResumenEnvio CalcularResumen(IReadOnlyCollection<EstadoEnvio> bultos, ResumenEnvio anterior)

@@ -129,11 +129,15 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
                 envios.Agregar(foto);
             }
 
-            // Con todos sus pendientes devueltos, el envío queda EnDevolucion e inicia la Devolucion (CU-20), como antes.
-            // Un bulto devuelto mientras otros se reprograman espera la devolución por bulto (pendiente 2 de la decisión).
-            if (envio.Estado == EstadoEnvio.EnDevolucion)
+            // Un bulto que quedó en devolución inicia la Devolucion (CU-20), aunque otros del envío se reprogramen (RF 31,
+            // pendiente 2 de la decisión): ese bulto vuelve al comercio solo (CU-31). Si el envío ya tiene una devolución
+            // abierta, el bulto se suma a ella.
+            var devuelto = visita.Resultados.FirstOrDefault(r => r.MotivoId is not null
+                && envio.Bultos.Single(b => b.Id == r.BultoId).Estado == EstadoEnvio.EnDevolucion);
+            if (devuelto is not null
+                && await envios.ObtenerDevolucionAsync(envio.Id, ct) is not { Estado: not EstadoDevolucion.Cerrada })
             {
-                var motivo = motivos.Values.First();
+                var motivo = motivos[devuelto.MotivoId!.Value];
                 envios.Agregar(Devolucion.Crear(envio, $"Intento fallido: {motivo.Codigo}.", visita.OcurridoEn));
             }
 
@@ -446,20 +450,23 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         // RF 31: sólo los bultos que vuelven al comercio. Los que ya recibió el destinatario no se entregan ni faltan.
         return new DevolucionParaEntrega(envio.Id, envio.Numero, envio.Estado.ToString(), devolucion.Motivo,
             devolucion.Estado == EstadoDevolucion.RecibidaEnDeposito, devolucion.Estado == EstadoDevolucion.Cerrada,
-            BultosDeLaDevolucion(envio).OrderBy(b => b.Codigo).Select(b => new BultoDevuelto(b.Id, b.Codigo)).ToList());
+            BultosDeLaDevolucion(envio, devolucion).OrderBy(b => b.Codigo).Select(b => new BultoDevuelto(b.Id, b.Codigo)).ToList());
     }
 
-    // Los bultos de la devolución: en devolución mientras está abierta, Devuelto una vez entregada al comercio.
-    private static IEnumerable<Bulto> BultosDeLaDevolucion(Envio envio) =>
-        envio.Bultos.Where(b => b.Estado is EstadoEnvio.EnDevolucion or EstadoEnvio.Devuelto);
+    // Los bultos de la devolución: en devolución mientras está abierta, Devuelto una vez entregada al comercio. Con varias
+    // devoluciones (RF 31), los Devuelto de una anterior no son de la abierta.
+    private static IEnumerable<Bulto> BultosDeLaDevolucion(Envio envio, Devolucion devolucion) =>
+        envio.Bultos.Where(b => b.Estado == (devolucion.Estado == EstadoDevolucion.Cerrada ? EstadoEnvio.Devuelto : EstadoEnvio.EnDevolucion));
 
     public async Task ConfirmarDevolucionAsync(DevolucionAConfirmar confirmacion, CancellationToken ct)
     {
         var envio = await envios.ObtenerConBultosAsync(confirmacion.EnvioId, ct)
             ?? throw new DomainException("El envío no existe.");
 
-        // A1: sólo un envío en devolución, con su devolución abierta.
-        if (envio.Estado != EstadoEnvio.EnDevolucion || await envios.ObtenerDevolucionAsync(envio.Id, ct) is not { } devolucion)
+        // A1: una devolución abierta con bultos en devolución: el envío entero (EnDevolucion) o bultos sueltos mientras
+        // otros del envío siguen su camino (RF 31).
+        if (await envios.ObtenerDevolucionAsync(envio.Id, ct) is not { } devolucion
+            || !envio.Bultos.Any(b => b.Estado == EstadoEnvio.EnDevolucion))
         {
             throw new DomainException($"El envío {envio.Numero} no está en devolución.");
         }
@@ -470,8 +477,8 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
             throw new DomainException("Marcá los bultos que se entregan al comercio.");
         }
 
-        // RF 31: un bulto que ya recibió el destinatario no es parte de la devolución.
-        var enDevolucion = BultosDeLaDevolucion(envio).ToList();
+        // RF 31: un bulto que ya recibió el destinatario, o que sigue en otro camino, no es parte de la devolución.
+        var enDevolucion = BultosDeLaDevolucion(envio, devolucion).ToList();
         if (!entregados.IsSubsetOf(enDevolucion.Select(b => b.Id)))
         {
             throw new DomainException("Uno de los bultos marcados no es de esta devolución.");
@@ -479,8 +486,18 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
         var ahora = reloj.GetUtcNow();
         devolucion.Cerrar(confirmacion.NombreReceptor, confirmacion.DocumentoReceptor, ahora);
-        envio.Transicionar(EstadoEnvio.Devuelto, OrigenEvento.Backoffice, confirmacion.ResponsableId, ahora,
-            detalle: $"Lo recibió {devolucion.NombreReceptor} (documento {devolucion.DocumentoReceptor}) por el comercio.");
+        var devolucionDelEnvio = envio.Estado == EstadoEnvio.EnDevolucion;
+        if (devolucionDelEnvio)
+        {
+            envio.Transicionar(EstadoEnvio.Devuelto, OrigenEvento.Backoffice, confirmacion.ResponsableId, ahora,
+                detalle: $"Lo recibió {devolucion.NombreReceptor} (documento {devolucion.DocumentoReceptor}) por el comercio.");
+        }
+        else
+        {
+            // Bultos sueltos: sólo los que recibió el comercio pasan a Devuelto; el envío y sus demás bultos no cambian.
+            // Quién los recibió queda en la devolución.
+            envio.DevolverBultos(entregados);
+        }
 
         // A2: la entrega parcial queda registrada como incidencia del envío, con los códigos que faltaron.
         var faltantes = enDevolucion.Where(b => !entregados.Contains(b.Id)).Select(b => b.Codigo).Order().ToArray();
@@ -491,8 +508,12 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         }
 
         // RF 36: con bultos ya entregados el cierre es mixto; el evento lo indica para que los avisos v1 no lo reciban.
-        eventos.Registrar(EnvioDevuelto.Tipo,
-            new EnvioDevuelto(envio.Id, envio.Numero, ahora, confirmacion.ResponsableId, envio.BultosEntregados), ahora);
+        // Una devolución de bultos sueltos no cierra el envío: sólo publica los eventos de bulto (avisos v2).
+        if (devolucionDelEnvio)
+        {
+            eventos.Registrar(EnvioDevuelto.Tipo,
+                new EnvioDevuelto(envio.Id, envio.Numero, ahora, confirmacion.ResponsableId, envio.BultosEntregados), ahora);
+        }
         foreach (var bulto in enDevolucion.Where(b => entregados.Contains(b.Id)).OrderBy(b => b.Codigo))
         {
             eventos.Registrar(EventoBultoDevuelto.Tipo,

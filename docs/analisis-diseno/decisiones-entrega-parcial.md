@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptada: decisión funcional cerrada. Implementación pendiente.** |
-| Versión y fecha | 1.3 · 09/11/2026 (pendiente 6 resuelto) |
+| Versión y fecha | 1.4 · 10/11/2026 (pendiente 6 resuelto; avance del 2) |
 | Responsable del registro | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas en este intercambio. No registra firmas ni aprobaciones individuales adicionales. |
@@ -91,7 +91,7 @@ La estructura monetaria, moneda, redondeo, clave de unicidad del cargo y contrat
 La decisión funcional anterior está cerrada. **No equivale a declarar terminada la especificación técnica de RF 31 a 36.** Falta:
 
 1. ~~Tabla completa y verificable de transiciones por bulto y de cambios del resumen del envío, y sus guardas.~~ **Resuelto el 03/11/2026:** el equipo aprobó la [tabla por bulto](tabla-de-transiciones-de-estados.md#entrega-parcial-transiciones-por-bulto-y-resumen-del-envío) de Cristian, con sus pares inalcanzables y los hechos que no cambian el resumen. También aprobó mantener T17 y tratar como inalcanzable el ejemplo «Todos cancelados después de recibir alguno» (sección 3).
-2. Contratos de resultados por bulto, escaneo, faltantes no escaneables y evidencia por motivo. Política de carga incompleta para operadores que sí admiten parcial; custodia física, rendición y disponibilidad de faltantes.
+2. Contratos de resultados por bulto, escaneo, faltantes no escaneables y evidencia por motivo. Política de carga incompleta para operadores que sí admiten parcial; custodia física, rendición y disponibilidad de faltantes. **Avance al 10/11/2026:** la rendición usa el estado de cada bulto, y un bulto devuelto mientras otro del envío se reprograma vuelve solo al comercio (CU-31), con varias devoluciones por envío y una sola abierta.
 3. Exclusividad de asignación activa por bulto y liberación de reservas: decidir cuándo un pendiente puede entrar en otra ruta sin asignarlo simultáneamente a dos. CU-42 ordena las visitas resultantes y no decide esta pertenencia.
 4. ~~Confirmación del alcance de extravío individual y de sus autorizaciones.~~ **Resuelto el 03/11/2026:** para el 12/11 el extravío sigue siendo del envío entero (CU-21). Pasan a Extraviado los bultos que acompañan al envío, es decir, los que están en su mismo estado; los ya entregados no cambian. El extravío de un bulto suelto queda para después. Con eso, una visita sobre un envío extraviado cae entera en conflicto (ADR-0004, secciones 2.11 y 4.2).
 5. ~~Migración de datos existentes y operaciones offline antiguas.~~ **Resuelto el 03/11/2026:**
