@@ -123,6 +123,7 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                         "CustodiaOperacionId" = re."Id", "RevisionCustodia" = 1
                     FROM deposito."Recepciones" re
                     WHERE re."BultoId" = b."Id" AND re."OperadorId" = b."OperadorId" AND b."Estado" = 'EnDeposito'
+                        AND b."RevisionCustodia" = 0
                         AND NOT EXISTS (SELECT 1 FROM planificacion."EnviosParada" p WHERE p."EnvioId" = b."EnvioId" AND p."OperadorId" = b."OperadorId");
                 END IF;
                 IF to_regclass('ejecucion.escaneos_carga') IS NOT NULL THEN
@@ -131,6 +132,7 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                     FROM planificacion."ReservasBulto" r JOIN ejecucion.escaneos_carga s
                         ON s."BultoId" = r."BultoId" AND s."RutaId" = r."RutaId" AND s."OperadorId" = r."OperadorId"
                     WHERE b."Id" = r."BultoId" AND b."OperadorId" = r."OperadorId" AND s."Resultado" = 'Esperado'
+                        AND b."RevisionCustodia" = 0
                         AND b."Estado" IN ('EnTransito','Reprogramado','EnDevolucion')
                         AND NOT EXISTS (SELECT 1 FROM ejecucion.escaneos_carga otro WHERE otro."BultoId" = s."BultoId"
                             AND otro."OperadorId" = s."OperadorId" AND otro."EscaneadoEn" > s."EscaneadoEn");
@@ -141,7 +143,8 @@ namespace Logistica.Modules.Planificacion.Infrastructure.Persistence.Migrations
                     ("Id","OperadorId","ComercioId","BultoId","EnvioId","Ubicacion","RutaId","OperacionId","ConfirmadaEn","Motivo")
                 SELECT gen_random_uuid(), b."OperadorId", b."ComercioId", b."Id", b."EnvioId", b."Custodia", b."CustodiaRutaId",
                     b."CustodiaOperacionId", b."CustodiaConfirmadaEn", 'Migración RF34: reconstrucción desde confirmación física inequívoca'
-                FROM envios."Bultos" b WHERE b."RevisionCustodia" = 1;
+                FROM envios."Bultos" b WHERE b."RevisionCustodia" = 1
+                ON CONFLICT ("OperadorId", "BultoId", "OperacionId") DO NOTHING;
                 """);
         }
 

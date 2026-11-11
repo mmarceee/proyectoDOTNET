@@ -73,8 +73,8 @@ public sealed class Rf34MigracionTests(PostgresApiFactory factory) : IClassFixtu
         // Solamente esta base efímera de prueba vuelve al esquema anterior para ensayar una actualización real.
         var migradorPlan = plan.GetService<IMigrator>();
         var migradorEnvios = envios.GetService<IMigrator>();
-        await migradorPlan.MigrateAsync(plan.Database.GetMigrations().Reverse().Skip(1).First());
-        await migradorEnvios.MigrateAsync(envios.Database.GetMigrations().Reverse().Skip(1).First());
+        await migradorPlan.MigrateAsync("20261020130308_AnulacionDespachoCU43");
+        await migradorEnvios.MigrateAsync("20261107141523_RecargoNuevaVisita");
         await migradorEnvios.MigrateAsync();
         await migradorPlan.MigrateAsync();
         envios.ChangeTracker.Clear(); plan.ChangeTracker.Clear();
