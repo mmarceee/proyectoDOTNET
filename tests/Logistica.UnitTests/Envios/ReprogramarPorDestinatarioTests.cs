@@ -24,6 +24,7 @@ public class ReprogramarPorDestinatarioTests
         if (estado == "Admitido") return envio;
 
         envio.Transicionar(EstadoEnvio.EnDeposito, OrigenEvento.Backoffice, null, Ahora.AddDays(-1));      // T2
+        envio.Bultos[0].ConfirmarCustodia(UbicacionCustodia.Deposito, null, null, Guid.NewGuid(), Ahora.AddDays(-1), "Recepción física del escenario");
         if (estado == "EnDeposito") return envio;
 
         envio.Transicionar(EstadoEnvio.AsignadoARuta, OrigenEvento.Backoffice, null, Ahora.AddHours(-6));  // T3

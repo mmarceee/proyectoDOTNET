@@ -11,7 +11,7 @@ internal sealed class RecibirBultoHandler(
     IRecepcionRepository recepciones,
     IUnidadDeTrabajo unidadDeTrabajo,
     ICurrentTenant tenant,
-    TimeProvider reloj)
+    TimeProvider reloj, IResponsableDeposito responsable)
 {
     public async Task<RecepcionRegistrada> HandleAsync(RecibirBultoCommand command, CancellationToken ct)
     {
@@ -32,11 +32,6 @@ internal sealed class RecibirBultoHandler(
                 $"El envío {envio.Numero} fue cancelado: separá el bulto para devolverlo al comercio.");
         }
 
-        if (!envio.PendienteDeRecepcion)
-        {
-            throw new DomainException($"El envío {envio.Numero} ya no está pendiente de recepción.");
-        }
-
         var bulto = envio.Bultos.Single(b => b.Codigo == codigo);
         var recibidos = (await recepciones.BultosRecibidosAsync(envio.EnvioId, ct)).ToHashSet();
 
@@ -44,6 +39,11 @@ internal sealed class RecibirBultoHandler(
         {
             // A2
             throw new DomainException($"El bulto {codigo} ya se escaneó.");
+        }
+
+        if (!envio.PendienteDeRecepcion)
+        {
+            throw new DomainException($"El bulto {codigo} ya no está pendiente de recepción.");
         }
 
         var recepcion = RecepcionDeposito.Registrar(
@@ -64,7 +64,7 @@ internal sealed class RecibirBultoHandler(
         await unidadDeTrabajo.EjecutarAsync(async () =>
         {
             await recepciones.GuardarCambiosAsync(ct);
-            envioCompleto = await envios.RecibirBultoAsync(envio.EnvioId, bulto.BultoId, responsableId: null, ct);
+            envioCompleto = await envios.RecibirBultoAsync(envio.EnvioId, bulto.BultoId, responsable.Id, ct, recepcion.Id);
         }, ct);
 
         return new RecepcionRegistrada(

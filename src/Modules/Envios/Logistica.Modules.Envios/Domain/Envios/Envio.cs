@@ -199,13 +199,18 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // compatibilidad pasa a EnDeposito recién con el último, como hasta ahora. Devuelve si ya llegaron todos.
     public bool RecibirBulto(Guid bultoId, Guid? responsableId, DateTimeOffset ahora)
     {
-        if (Estado != EstadoEnvio.Admitido)
+        if (Estado == EstadoEnvio.Cancelado)
         {
             throw new DomainException($"El envío {Numero} ya no está pendiente de recepción.");
         }
 
         var bulto = _bultos.SingleOrDefault(b => b.Id == bultoId)
             ?? throw new DomainException("El bulto no pertenece a este envío.");
+        if (bulto.Estado != EstadoEnvio.Admitido)
+        {
+            throw new TransicionInvalidaException(bulto.Estado, EstadoEnvio.EnDeposito);
+        }
+
         bulto.Transicionar(EstadoEnvio.EnDeposito);
 
         if (_bultos.All(b => b.Estado == EstadoEnvio.EnDeposito))
@@ -269,6 +274,27 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             CambiarEstado(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, responsable, ocurridoEn, null,
                 $"Carga: {ids.Count} bultos.", moverBultos: false);
         RecalcularResumen();
+    }
+
+    // RF 34: valida el conjunto completo y utiliza la tabla declarativa por bulto.
+    internal void CambiarBultosDeRuta(IReadOnlyCollection<Guid> ids, EstadoEnvio nuevo, Guid? actor, DateTimeOffset ahora,
+        OrigenEvento origen = OrigenEvento.Backoffice)
+    {
+        if (ids.Count == 0 || ids.Distinct().Count() != ids.Count
+            || ids.Any(id => !_bultos.Any(b => b.Id == id && TablaTransiciones.Permite(b.Estado, nuevo))))
+            throw new DomainException("El conjunto de bultos no admite la transición de ruta.");
+        foreach (var b in _bultos.Where(b => ids.Contains(b.Id))) b.Transicionar(nuevo);
+        // Se conserva el puente para los consumidores antiguos, sin mover bultos ajenos al comando.
+        if (Estado != nuevo && !_bultos.Any(b => b.Estado == Estado) && TablaTransiciones.Permite(Estado, nuevo))
+            CambiarEstado(nuevo, origen, actor, ahora, null,
+                $"Planificación por bulto: {ids.Count}.", moverBultos: false);
+        RecalcularResumen();
+    }
+
+    internal void ResolverFranjaDeRuta(Guid? franja)
+    {
+        if (franja == Guid.Empty) throw new DomainException("La franja no es válida.");
+        FranjaHorariaId = franja;
     }
 
     private void RecalcularResumen()
@@ -352,6 +378,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
                 ? $"Se agotaron los {reglas.MaxIntentos} intentos: la política del operador no devuelve sola, decide el despachador."
                 : $"Intento {fallidos} de {reglas.MaxIntentos}. Nuevo intento desde {reintento:yyyy-MM-dd HH:mm} UTC.";
             Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.Sistema, null, ocurridoEn, detalle: detalle);
+            foreach (var bulto in _bultos.Where(b => b.Estado == EstadoEnvio.Reprogramado)) bulto.ProgramarReintento(reintento);
         }
 
         return intento;
@@ -363,9 +390,14 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // recalcula una sola vez, al final. Si un bulto queda EnDevolucion, quien llama inicia la Devolucion (CU-20).
     public IReadOnlyList<IntentoEntrega> RegistrarVisita(IReadOnlyList<ResultadoBulto> resultados, PruebaEntrega? prueba,
         PruebaEntrega? evidencia, string? observaciones, Ubicacion ubicacion, ReglasEntrega reglas, Guid? responsableId,
-        DateTimeOffset ocurridoEn)
+        DateTimeOffset ocurridoEn, Guid? rutaId = null)
     {
-        var enTransito = _bultos.Where(b => b.Estado == EstadoEnvio.EnTransito).ToDictionary(b => b.Id);
+        var enTransito = _bultos.Where(b => b.Estado == EstadoEnvio.EnTransito
+            && (rutaId is null || b.CustodiaRutaId == rutaId)).ToDictionary(b => b.Id);
+        // Un agregado uniforme debe conservar su estado de compatibilidad. Una discrepancia introducida
+        // fuera del dominio no autoriza a omitir guardas ni a inventar transiciones para aplicar una visita.
+        if (_bultos.All(b => b.Estado == _bultos[0].Estado) && Estado != _bultos[0].Estado)
+            throw new TransicionInvalidaException(Estado, EstadoEnvio.Entregado);
         if (enTransito.Count == 0)
             throw new DomainException($"El envío {Numero} no tiene bultos en tránsito.");
         if (resultados.Count != enTransito.Count || resultados.Select(r => r.BultoId).Distinct().Count() != resultados.Count
@@ -384,7 +416,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         if (fallidos.FirstOrDefault(r => r.Motivo!.ExigeEvidencia && evidencia?.FotoArchivoId is null) is { } sinFoto)
             throw new DomainException($"El motivo {sinFoto.Motivo!.Codigo} exige una foto como evidencia.");
         // El envío tiene que poder pasar al estado de la visita antes de tocar sus bultos, como en los demás cambios.
-        ExigirTransicion(fallidos.Count == 0 ? EstadoEnvio.Entregado : EstadoEnvio.NoEntregado);
+        if (rutaId is null) ExigirTransicion(fallidos.Count == 0 ? EstadoEnvio.Entregado : EstadoEnvio.NoEntregado);
 
         // RF 33: una visita adicional (el envío ya tuvo otra) se cobra una sola vez, salga bien o mal, si la versión de
         // reglas del envío lo indica. No se cobra por bulto; un reenvío de la sincronización no llega hasta acá (CU-52).
@@ -412,6 +444,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
                 // Intentos por bulto (RF 33): la misma regla que el intento del envío entero (ReglasEntrega.DebeDevolver).
                 var devolver = reglas.DebeDevolver(motivo, bulto.IntentosFallidos);
                 bulto.Transicionar(devolver ? EstadoEnvio.EnDevolucion : EstadoEnvio.Reprogramado);
+                if (!devolver) bulto.ProgramarReintento(ocurridoEn + reglas.PlazoEntreIntentos);
                 if (!devolver) reprogramados++;
             }
         }
@@ -424,17 +457,20 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         var detalle = $"Visita: {entregados.Count} de {resultados.Count} bultos entregados.";
         if (fallidos.Count == 0 && _bultos.All(b => EstadosTerminales.Contains(b.Estado)))
         {
-            CambiarEstado(EstadoEnvio.Entregado, OrigenEvento.AppRepartidor, responsableId, ocurridoEn, ubicacion, detalle,
-                moverBultos: false);
+            if (TablaTransiciones.Permite(Estado, EstadoEnvio.Entregado))
+                CambiarEstado(EstadoEnvio.Entregado, OrigenEvento.AppRepartidor, responsableId, ocurridoEn, ubicacion, detalle,
+                    moverBultos: false);
         }
         else
         {
-            CambiarEstado(EstadoEnvio.NoEntregado, OrigenEvento.AppRepartidor, responsableId, ocurridoEn, ubicacion, detalle,
-                moverBultos: false);
+            if (TablaTransiciones.Permite(Estado, EstadoEnvio.NoEntregado))
+                CambiarEstado(EstadoEnvio.NoEntregado, OrigenEvento.AppRepartidor, responsableId, ocurridoEn, ubicacion, detalle,
+                    moverBultos: false);
             var quedanPendientes = _bultos.Any(b => b.Estado is EstadoEnvio.Admitido or EstadoEnvio.EnDeposito
                 or EstadoEnvio.AsignadoARuta or EstadoEnvio.EnTransito or EstadoEnvio.Reprogramado);
-            CambiarEstado(reprogramados > 0 || quedanPendientes ? EstadoEnvio.Reprogramado : EstadoEnvio.EnDevolucion, OrigenEvento.Sistema,
-                null, ocurridoEn, null, null, moverBultos: false);
+            var compatible = reprogramados > 0 || quedanPendientes ? EstadoEnvio.Reprogramado : EstadoEnvio.EnDevolucion;
+            if (TablaTransiciones.Permite(Estado, compatible))
+                CambiarEstado(compatible, OrigenEvento.Sistema, null, ocurridoEn, null, null, moverBultos: false);
         }
 
         RecalcularResumen();
@@ -504,6 +540,13 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         EstadoEnvio.Admitido, EstadoEnvio.EnDeposito, EstadoEnvio.AsignadoARuta, EstadoEnvio.Reprogramado
     ];
 
+    internal IReadOnlyList<Bulto> PendientesDeEntrega => _bultos.Where(b => !EstadosTerminales.Contains(b.Estado)
+        && b.Estado != EstadoEnvio.EnDevolucion).ToArray();
+    internal bool PuedeReprogramarPendientes(int maxIntentos) => PendientesDeEntrega.Count > 0
+        && PendientesDeEntrega.All(b => EstadosReprogramablesPorDestinatario.Contains(b.Estado)
+            && (b.Estado == EstadoEnvio.Admitido || b.Custodia == UbicacionCustodia.Deposito)
+            && b.IntentosFallidos < maxIntentos);
+
     // CU-61 (RF 26): el destinatario elige desde el seguimiento público una nueva fecha y franja de entrega.
     // - Admitido: sólo se registra la nueva fecha y franja, sin cambiar de estado.
     // - EnDeposito (T18) o AsignadoARuta (T19): queda Reprogramado. Que la ruta no esté despachada y sacarlo de ella lo
@@ -515,7 +558,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         TimeSpan anticipacion, int maxIntentos, DateTimeOffset ahora)
     {
         // A1: ya salió a reparto o terminó.
-        if (!EstadosReprogramablesPorDestinatario.Contains(Estado))
+        if (!PuedeReprogramarPendientes(maxIntentos))
         {
             throw new DomainException("El envío ya no se puede reprogramar: salió a reparto o ya terminó.");
         }
@@ -532,27 +575,12 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             throw new DomainException("El envío todavía no tiene zona: no se puede elegir una franja.");
         }
 
-        if (Estado == EstadoEnvio.Reprogramado)
-        {
-            // A2: con los intentos agotados decide el despachador (CU-18 o CU-20), no el destinatario.
-            if (_intentos.Count(i => i.Resultado == ResultadoIntento.Fallido) >= maxIntentos)
-            {
-                throw new DomainException("Se agotaron los intentos de entrega: el envío ya no se puede reprogramar.");
-            }
-
-            // Respeta además el plazo entre intentos (CU-19, A1).
-            ElegirNuevoIntento(fecha, franjaId, comienzoFranja);
-            return;
-        }
-
-        if (Estado != EstadoEnvio.Admitido)
-        {
-            // T18 o T19. Después de la transición el envío ya acepta un nuevo compromiso.
-            Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.SeguimientoPublico, null, ahora,
-                detalle: $"El destinatario pidió la entrega para el {fecha:dd/MM/yyyy}.");
-        }
-
-        DefinirPlanificacion(ZonaId, franjaId, fecha);
+        var pendientes = PendientesDeEntrega;
+        if (pendientes.Any(b => b.ReintentoDesde is DateTimeOffset desde && comienzoFranja < desde))
+            throw new DomainException("La nueva franja comienza antes del plazo entre intentos.");
+        var mover = pendientes.Where(b => b.Estado is EstadoEnvio.EnDeposito or EstadoEnvio.AsignadoARuta).Select(b => b.Id).ToArray();
+        if (mover.Length > 0) CambiarBultosDeRuta(mover, EstadoEnvio.Reprogramado, null, ahora, OrigenEvento.SeguimientoPublico);
+        FranjaHorariaId = franjaId; FechaEntregaProgramada = fecha;
     }
 
     private List<Guid> BultosEn(EstadoEnvio estado) => _bultos.Where(b => b.Estado == estado).Select(b => b.Id).ToList();

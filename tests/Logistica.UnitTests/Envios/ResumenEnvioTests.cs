@@ -113,6 +113,22 @@ public class ResumenEnvioTests
         Assert.Throws<DomainException>(() => envio.RecibirBulto(Guid.NewGuid(), null, Ahora));
     }
 
+    [Fact]
+    public void Recibir_solo_aplica_T2_al_bulto_admitido_aunque_otro_ya_este_en_ruta()
+    {
+        var envio = CrearEnvio(2);
+        var primero = envio.Bultos[0];
+        var segundo = envio.Bultos[1];
+        envio.RecibirBulto(primero.Id, null, Ahora);
+        envio.CambiarBultosDeRuta([primero.Id], Asig, null, Ahora);
+        envio.CargarBultos([primero.Id], null, Ahora);
+
+        Assert.Equal(Adm, envio.Estado);
+        Assert.Throws<TransicionInvalidaException>(() => envio.RecibirBulto(primero.Id, null, Ahora));
+        Assert.False(envio.RecibirBulto(segundo.Id, null, Ahora));
+        Assert.Equal((Tra, Dep), (primero.Estado, segundo.Estado));
+    }
+
     // T17: con un bulto ya recibido, el envío no se cancela.
     [Fact]
     public void Un_envio_con_un_bulto_recibido_no_se_puede_cancelar()

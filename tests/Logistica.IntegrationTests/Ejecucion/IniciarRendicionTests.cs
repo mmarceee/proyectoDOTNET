@@ -64,6 +64,7 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         ruta.Despachar(ahora); if (cargada) ruta.RegistrarCarga(true);
         var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
         plan.Rutas.Add(ruta); await plan.SaveChangesAsync();
+        await DatosFisicosRf34.AcreditarAsync(db, plan, ruta, envios, ahora);
         return new(ruta.Id, ruta.Revision, envios, fecha);
     }
     private HttpClient Cliente() => factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false")).CreateClient(Sesion.Opciones);
@@ -344,7 +345,8 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
         // La ruta anterior se cerró con su rendición: el envío ya no tiene una parada pendiente en ella.
         await scope.ServiceProvider.GetRequiredService<Logistica.Modules.Planificacion.Contracts.IPlanificacionModuleApi>()
             .FinalizarRutaAsync(anterior, [], default);
-        var envio = await scope.ServiceProvider.GetRequiredService<EnviosDbContext>().Envios.AsNoTracking()
+        var enviosDb = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var envio = await enviosDb.Envios
             .SingleAsync(e => e.Id == envioId);
         var ahora = DateTimeOffset.UtcNow;
         var ruta = Ruta.Crear(DatosIniciales.OperadorDemoId, fecha, DatosIniciales.RepartidorDemoId,
@@ -355,7 +357,12 @@ public sealed class IniciarRendicionTests(PostgresApiFactory factory) : IClassFi
                 new PuntoEntrega("Calle", "10", "Montevideo", "Montevideo", "11300"))], ahora);
         ruta.Despachar(ahora);
         var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+        foreach (var reserva in await plan.ReservasBulto.Where(r => r.RutaId == anterior && r.EnvioId == envioId && r.CerradaEn == null).ToListAsync())
+            reserva.Cerrar("RetornoConfirmado", ahora);
+        await plan.SaveChangesAsync();
         plan.Rutas.Add(ruta); await plan.SaveChangesAsync();
+        await DatosFisicosRf34.AcreditarAsync(enviosDb, plan, ruta, [envio], ahora,
+            envio.Bultos.Where(b => b.Estado == EstadoEnvio.AsignadoARuta).Select(b => b.Id));
         return ruta.Id;
     }
 

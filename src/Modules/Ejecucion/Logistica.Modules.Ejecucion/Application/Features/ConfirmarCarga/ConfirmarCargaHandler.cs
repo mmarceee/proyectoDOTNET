@@ -58,6 +58,9 @@ internal sealed class ConfirmarCargaHandler(IUnidadDeTrabajo unidad, IAdministra
             if (ruta.Revision != carga.RevisionRuta) { await Rechazar("RutaModificada", true); return; }
             var lista = await envios.ConsultarCargaAsync(ruta.Envios.ToArray(), ct);
             if (lista.Count != ruta.Envios.Count) { await Rechazar("EnvioNoEncontrado", true); return; }
+            var manifiesto = (await rutas.ConsultarReservasRutaAsync(op.RutaId, ct)).Where(r => r.CerradaEn == null).Select(r => r.BultoId).ToHashSet();
+            lista = lista.Select(e => e with { Bultos = e.Bultos.Where(b => manifiesto.Contains(b.Id)).ToArray() }).ToArray();
+            var custodias = await envios.ConsultarCustodiaAsync(ruta.Envios.ToArray(), ct);
             var codigos = carga.Lecturas.Select(l => l.CodigoBulto).ToHashSet(StringComparer.Ordinal);
             if (lista.Any(e => e.Bultos.Any(b => codigos.Contains(b.Codigo) && (b.Estado.Length == 0 ? e.Estado : b.Estado) != "AsignadoARuta")))
             { await Rechazar("EstadoIncompatible", true); return; }
@@ -80,10 +83,12 @@ internal sealed class ConfirmarCargaHandler(IUnidadDeTrabajo unidad, IAdministra
             var reconocidos = (await envios.ReconocerBultosAsync(sobrantes, ct)).ToDictionary(b => b.Codigo, b => b.Id, StringComparer.Ordinal);
             var paraCargar = candidatos.Where(e => completos.Contains(e.Id) || carga.PorBulto && e.AdmiteEntregaParcial)
                 .SelectMany(e => e.Bultos).Where(b => codigos.Contains(b.Codigo)).Select(b => b.Id).ToArray();
+            if (paraCargar.Any(id => !custodias.Any(b => b.BultoId == id && b.Ubicacion == "Deposito")))
+            { await Rechazar("CustodiaNoConfirmada", true); return; }
             if (carga.PorBulto && paraCargar.Length == 0) { await Rechazar("CargaIncompletaNoAdmitida"); return; }
-            if (!(carga.PorBulto ? await envios.RegistrarCargaPorBultosAsync(paraCargar, command.UsuarioId, datos.OcurridoEn, ct)
-                : await envios.RegistrarCargaAsync(completos, command.UsuarioId, datos.OcurridoEn, ct)))
+            if (paraCargar.Length > 0 && !await envios.RegistrarCargaPorBultosAsync(paraCargar, command.UsuarioId, datos.OcurridoEn, ct))
             { await Rechazar("EstadoIncompatible", true); return; }
+            await envios.RegistrarCustodiaCargaAsync(op.RutaId, paraCargar, op.OperacionId, command.UsuarioId, datos.OcurridoEn, ct);
             var escaneos = carga.Lecturas.Select(l => EscaneoCarga.Crear(datos.OperadorId, op.OperacionId, op.RutaId,
                 esperados.TryGetValue(l.CodigoBulto, out var id) ? id : reconocidos.GetValueOrDefault(l.CodigoBulto) is var otro && otro != Guid.Empty ? otro : null,
                 l.CodigoBulto, esperados.ContainsKey(l.CodigoBulto),

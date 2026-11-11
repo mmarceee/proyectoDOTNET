@@ -1,3 +1,3 @@
 namespace Logistica.Http.Contracts.Planificacion;
 
-public sealed record QuitarEnvioDeRutaRequest(long RevisionEsperada);
+public sealed record QuitarEnvioDeRutaRequest(long RevisionEsperada, Guid? OperacionId = null);

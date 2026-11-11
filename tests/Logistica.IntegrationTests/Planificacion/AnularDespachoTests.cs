@@ -75,7 +75,8 @@ public sealed class AnularDespachoTests(PostgresApiFactory factory) : IClassFixt
         if (estado == EstadoRuta.EnCurso) ruta.Iniciar();
         if (estado == EstadoRuta.Finalizada) ruta.Finalizar();
         var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
-        plan.Rutas.Add(ruta); await plan.SaveChangesAsync();
+        plan.Rutas.Add(ruta);
+        await DatosFisicosRf34.AcreditarAsync(envios, plan, ruta, [envio], ahora);
         return new(ruta.Id, ruta.Revision, fecha, despacho, envio.Id, envio.Bultos.Single().Codigo, repartidor, vehiculo);
     }
     private static Task<HttpResponseMessage> AnularAsync(HttpClient client, Datos d, bool confirma = true,

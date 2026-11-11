@@ -15,5 +15,8 @@ internal sealed class BultoConfiguration : IEntityTypeConfiguration<Bulto>
 
         // RF 31: el estado operativo del bulto, como texto, igual que el del envío.
         builder.Property(b => b.Estado).HasConversion<string>();
+        builder.Property(b => b.Custodia).HasConversion<string>();
+        builder.Property(b => b.RevisionCustodia).IsConcurrencyToken();
+        builder.HasMany(b => b.MovimientosCustodia).WithOne().HasForeignKey(m => m.BultoId);
     }
 }

@@ -21,6 +21,8 @@ internal sealed class InvalidarSeguimiento(ICacheDistribuida cache) : IConsumido
         EnvioExtraviado.Tipo, DevolucionIniciada.Tipo,
         // RF 35 y 36: el avance por bulto cambia aunque el envío no publique un evento propio.
         BultoEntregado.Tipo, BultoNoEntregado.Tipo, BultoDevuelto.Tipo,
+        CustodiaBultosConciliada.Tipo,
+        PlanificacionBultosActualizada.Tipo,
     ];
 
     public static string Cola(string tipo) => $"seguimiento.invalidar.{tipo}";

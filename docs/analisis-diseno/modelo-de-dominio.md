@@ -2,6 +2,8 @@
 
 > **Actualización · 09/11/2026:** los estados operativos por bulto y el resumen del envío se rigen por la [decisión cerrada de entrega parcial](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md). Dominio, visitas, reglas, PWA y avisos tienen implementación; el ADR registra evidencia y límites. Las definiciones históricas que siguen aquí requieren actualización donde todavía describen el flujo por envío; no implican que toda RF 31 a 36 esté pendiente ni que esté aceptada integralmente.
 
+> **Implementación RF 34 · 10/11/2026:** [reservas y custodia por bulto](rf-34/README.md), conforme a D1/D2/D4/D6. Planificación es propietaria de las reservas; Envíos conserva estado y custodia; Depósito confirma ubicación/retorno. Una ruta cerrada no libera automáticamente un bulto. La aceptación publicada de este alcance se distingue de la evidencia automatizada.
+
 *Plataforma Multioperador de Distribución de Última Milla — Taller de Sistemas de Información .NET (UTEC), edición 2026*
 
 Este documento reúne el modelo de dominio completo como un único modelo, agrupado por tema para que se lea ordenado. Cada clase se define una sola vez, en la sección de su tema; el resto de las relaciones que la involucran se resuelven en la tabla de relaciones al final del documento, que cubre el modelo completo.
@@ -540,9 +542,29 @@ Produccion, Prueba
 
 * altoCm: decimal
 
+* estado: EstadoEnvio (estado operativo propio del bulto; transiciones declarativas)
+
+* intentosFallidos: int (sólo intentos reales aplicados)
+
+* reintentoDesde: DateTimeOffset (opcional, plazo individual)
+
+* custodia: UbicacionCustodia (Desconocida, Deposito, Repartidor, Destinatario o Comercio; no es otro estado operativo)
+
+* custodiaRutaId, custodiaResponsableId, custodiaOperacionId: Guid (opcionales)
+
+* custodiaConfirmadaEn: DateTimeOffset (opcional, UTC)
+
+* revisionCustodia: long
+
+* movimientosCustodia: MovimientoCustodia[] (hechos auditables; una reasignación no los sobrescribe)
+
 **Métodos**
 
 * volumenM3(): decimal
+
+**MovimientoCustodia (RF 34)**
+
+Entidad hija de Bulto, propiedad de Envíos. Conserva operador/comercio, envío/bulto, ubicación, ruta opcional, responsable de la confirmación, OperacionId, instante UTC y motivo. Una discrepancia de ubicación se registra como Desconocida y mantiene bloqueada la disponibilidad; no declara extravío. El retorno tras intento no cambia Reprogramado/EnDevolucion ni suma intentos.
 
 **Destinatario**
 
@@ -834,6 +856,14 @@ Entidad histórica de Planificación, inmutable después de confirmar (ampliaci�
 * paradaId: Guid
 * envioId: Guid
 * estado: EstadoParada (estado individual dentro de la visita; el estado del envío sigue en Envíos)
+
+**ReservaBulto (RF 34)**
+
+Entidad histórica de Planificación. Conserva operador, BultoId, EnvioId, RutaId, ParadaId, AbiertaEn, CerradaEn opcional, CausaCierre, OperacionId, ResponsableId y Revision. Como máximo una reserva permanece abierta por operador/bulto, protegida por índice único parcial y bloqueo/revalidación. Las referencias a bultos son identificadores de contrato; no son acceso a entidades ni DbContext ajenos.
+
+Cargar conserva la reserva; entregar la cierra con su confirmación física. Un intento fallido y el cierre administrativo de la ruta no la cierran: el retorno físico confirmado por depósito permite liberarla. Quitar/reagregar crea otra reserva y conserva el historial. EnvioParada mantiene agrupación/resultado de la visita y deja de ser la garantía de exclusividad del bulto. CU-42 ordena estas visitas, sin modificar pertenencia.
+
+`OperacionBultos` (Planificación) y `OperacionCustodia` (Depósito) son registros privados de idempotencia, con operador, identidad, huella y resultado. Se confirman en la misma unidad de trabajo que la acción; no constituyen APIs paralelas entre módulos.
 
 **ValidacionRuta**
 
@@ -1358,6 +1388,9 @@ Tabla única con todas las relaciones del modelo, sin importar en qué sección 
 | Ruta | 0..\* | asociación | 1 | Vehiculo |
 | Parada | 1 | composición | 1..\* | EnvioParada |
 | EnvioParada | 0..\* | asociación | 1 | Envio |
+| Ruta | 1 | asociación histórica | 0..\* | ReservaBulto |
+| ReservaBulto | 0..\* | referencia por contrato | 1 | Bulto |
+| Bulto | 1 | composición | 0..\* | MovimientoCustodia |
 | Rendicion | 1 | composición | 0..\* | LineaRendicion |
 | EscaneoCarga | 0..\* | asociación | 1 | Ruta |
 | EscaneoCarga | 0..\* | asociación | 1 | Bulto |
@@ -1391,7 +1424,7 @@ Puntos del modelo que dependen de una decisión del equipo (o, en algún caso, d
 
 * Orden de las paradas (RF 16): criterio fijo, sin ADR de despacho, y ajuste manual del despachador (CU-42). Se eliminó el enum CriterioOrden.
 
-* RF 15 (un envío sin dos paradas activas simultáneas): validación en la aplicación e índice único parcial de PostgreSQL (sección de Planificación).
+* RF 15 adaptado a RF 34 (10/11/2026): validación y reserva única activa por operador/bulto. El índice anterior por envío se sustituye por `UX_ReservasBulto_Activa`; conjuntos distintos del mismo envío pueden pertenecer a rutas distintas, sin compartir un bulto. Ver [RF 34](rf-34/README.md).
 
 * Coordinación entre agregados: misma transacción dentro de un módulo y Outbox entre módulos o hacia el Worker (ADR-0001, sección 2.5; ADR-0003).
 

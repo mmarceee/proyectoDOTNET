@@ -36,9 +36,12 @@ public sealed class ConfirmarDevolucionTests(PostgresApiFactory factory) : IClas
         using var operario = await OperarioAsync();
 
         var rendicion = $"/backoffice/rendiciones/{ruta}";
+        var revision = System.Text.RegularExpressions.Regex.Match(await operario.GetStringAsync(rendicion), "data-revision-ruta=\"([0-9]+)\"");
+        Assert.True(revision.Success);
         var respuesta = await operario.PostAsync($"{rendicion}?handler=Confirmar", new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["Escaneados"] = string.Join("\n", envio.Bultos.Select(b => b.Codigo)),
+            ["RevisionEsperada"] = revision.Groups[1].Value,
             ["__RequestVerificationToken"] = await Sesion.TokenAsync(operario, rendicion),
         }));
 
@@ -331,6 +334,9 @@ public sealed class ConfirmarDevolucionTests(PostgresApiFactory factory) : IClas
         var plan = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
         plan.Rutas.Add(ruta);
         await plan.SaveChangesAsync();
+        var enviosDb = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+        var actual = await enviosDb.Envios.SingleAsync(e => e.Id == envio.Id);
+        await DatosFisicosRf34.AcreditarAsync(enviosDb, plan, ruta, [actual], ahora);
 
         var ejecucion = scope.ServiceProvider.GetRequiredService<EjecucionDbContext>();
         ejecucion.Rendiciones.Add(Rendicion.Iniciar(DatosIniciales.OperadorDemoId, ruta.Id, DatosIniciales.RepartidorDemoId,

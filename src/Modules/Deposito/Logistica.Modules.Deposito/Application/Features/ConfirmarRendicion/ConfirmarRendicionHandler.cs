@@ -2,8 +2,10 @@ using Logistica.Modules.Administracion.Contracts;
 using Logistica.Modules.Ejecucion.Contracts;
 using Logistica.Modules.Ejecucion.Contracts.Results;
 using Logistica.Modules.Envios.Contracts;
+using Logistica.Modules.Envios.Contracts.Results;
 using Logistica.Modules.Planificacion.Contracts;
 using Logistica.SharedKernel;
+using System.Text.Json;
 
 namespace Logistica.Modules.Deposito.Application.Features.ConfirmarRendicion;
 
@@ -32,7 +34,7 @@ internal sealed class ConfirmarRendicionHandler(
     IEnviosModuleApi envios,
     IPlanificacionModuleApi planificacion,
     IAdministracionModuleApi administracion,
-    IUnidadDeTrabajo unidad)
+    IUnidadDeTrabajo unidad, IResponsableDeposito responsable, IOperacionesDeposito operaciones)
 {
     public async Task<IReadOnlyList<RendicionEnListado>> ListarAsync(int pagina, bool confirmadas, CancellationToken ct)
     {
@@ -64,20 +66,27 @@ internal sealed class ConfirmarRendicionHandler(
     }
 
     public async Task<RendicionConfirmada?> ConfirmarAsync(Guid rutaId, IReadOnlyCollection<string> codigos,
-        CancellationToken ct, bool confirmarNoCargadosEnDeposito = false)
+        CancellationToken ct, bool confirmarNoCargadosEnDeposito = false, long? revisionEsperada = null, Guid? operacionId = null)
     {
         RendicionConfirmada? resultado = null;
+        var operacion = operacionId ?? Guid.NewGuid();
+        var huella = JsonSerializer.Serialize(new { Tipo = "ConfirmarRendicion", RutaId = rutaId, Revision = revisionEsperada,
+            Codigos = codigos.Select(c => c.Trim().ToUpperInvariant()).Distinct().Order().ToArray(),
+            ConfirmarNoCargados = confirmarNoCargadosEnDeposito, Actor = responsable.Id });
 
         await unidad.EjecutarAsync(async () =>
         {
             // El mismo bloqueo por operador que toman la planificación y las operaciones del repartidor: nadie cambia
             // la ruta ni sus envíos mientras se cierra.
             await administracion.BloquearPlanificacionAsync(ct);
-
+            if (await operaciones.ResultadoAsync(operacion, huella, ct) is { } anterior)
+            { resultado = JsonSerializer.Deserialize<RendicionConfirmada>(anterior)!; return; }
             if (await ejecucion.ConsultarRendicionAsync(rutaId, ct) is not { } rendicion)
             {
                 return;
             }
+            if (revisionEsperada is not long esperada || await planificacion.RevisionAsync(rutaId, ct) != esperada)
+                throw new DomainException("La ruta cambió. Recargá antes de confirmar la rendición.");
 
             if (rendicion.FinalizadaEn is not null)
             {
@@ -96,16 +105,25 @@ internal sealed class ConfirmarRendicionHandler(
             var cerrada = await ejecucion.ConfirmarRendicionAsync(rutaId, recibidos, ct)
                 ?? throw new InvalidOperationException("La rendición dejó de existir mientras se confirmaba.");
 
-            // T8: un envío que no llegó a intentarse vuelve al depósito si volvieron todos sus bultos. Los de un intento
-            // fallido ya se resolvieron en CU-18: acá sólo se registra que volvieron (requerimiento especial 1).
-            var reintegrados = cerrada.Lineas.GroupBy(l => l.EnvioId)
-                .Where(g => g.All(l => l.Situacion == "NoIntentado" && l.Recibida == true))
-                .Select(g => g.Key).ToArray();
-            await envios.ReintegrarADepositoAsync(reintegrados, responsableId: null, ct);
+            // T8 por bulto sin intento. Un retorno tras intento sólo cambia custodia y cierra su reserva.
+            var recibidosFisicos = cerrada.Lineas.Where(l => l.Recibida == true && l.DebeVolver).Select(l => l.BultoId).ToArray();
+            await ConfirmarRetornoAsync(cerrada, recibidosFisicos, "Recepción física en rendición", ct, operacion);
+            var reintegrados = cerrada.Lineas.Where(l => recibidosFisicos.Contains(l.BultoId) && l.Situacion == "NoIntentado")
+                .Select(l => l.EnvioId).Distinct().ToArray();
 
             // A1: los faltantes quedan como incidencia del envío; el extravío lo decide el despachador (CU-21).
             var faltantes = cerrada.Lineas.Where(l => l.Recibida == false).Select(l => l.BultoId).ToArray();
             await envios.RegistrarFaltantesAsync(faltantes, ct);
+            if (faltantes.Length > 0)
+            {
+                var custodias = (await envios.ConsultarCustodiaAsync(cerrada.Lineas.Select(l => l.EnvioId).Distinct().ToArray(), ct))
+                    .Where(b => faltantes.Contains(b.BultoId)
+                        && b.Estado is "AsignadoARuta" or "EnTransito" or "Reprogramado" or "EnDevolucion").ToArray();
+                if (custodias.Length > 0)
+                    await envios.ConfirmarCustodiaAsync(new ConciliacionBultos(operacion, rutaId, null,
+                        custodias.Select(b => new ConfirmacionCustodiaBulto(b.BultoId, b.Revision)).ToArray(), false,
+                        "Bulto no localizado al confirmar rendición", responsable.Id), ct);
+            }
 
             // CU-31: un envío en devolución cuyos bultos volvieron ya está en el depósito, listo para entregar al
             // comercio. Envíos ignora los que no tienen devolución.
@@ -117,27 +135,36 @@ internal sealed class ConfirmarRendicionHandler(
                 .Select(g => g.Key).ToArray();
             await planificacion.FinalizarRutaAsync(rutaId, entregados, ct);
 
-            // T4: no salieron del depósito. Cerrar la ruta libera su reserva, pero también hay que
-            // desasignar el envío para que vuelva a estar disponible para planificar.
-            if (confirmarNoCargadosEnDeposito) await LiberarNoCargadosAsync(cerrada, ct);
+            // T4 sólo con confirmación física explícita; el cierre de ruta por sí mismo conserva las reservas.
+            if (confirmarNoCargadosEnDeposito) await LiberarNoCargadosAsync(cerrada, ct, operacion);
 
             resultado = new RendicionConfirmada(recibidos.Length, reintegrados.Length, faltantes.Length);
+            await operaciones.RegistrarAsync(operacion, huella, JsonSerializer.Serialize(resultado), ct);
         }, ct);
 
         return resultado;
     }
 
     // Recuperación explícita para cierres anteriores al arreglo. Nunca se escribe al consultar una página.
-    public async Task<int?> RecuperarNoCargadosAsync(Guid rutaId, CancellationToken ct)
+    public async Task<int?> RecuperarNoCargadosAsync(Guid rutaId, CancellationToken ct, long? revisionEsperada = null, Guid? operacionId = null)
     {
         int? cantidad = null;
+        var operacion = operacionId ?? Guid.NewGuid();
+        var huella = JsonSerializer.Serialize(new { Tipo = "RecuperarNoCargados", RutaId = rutaId, Revision = revisionEsperada, Actor = responsable.Id });
         await unidad.EjecutarAsync(async () =>
         {
             await administracion.BloquearPlanificacionAsync(ct);
+            if (await operaciones.ResultadoAsync(operacion, huella, ct) is { } anterior)
+            { cantidad = JsonSerializer.Deserialize<int>(anterior); return; }
             if (await ejecucion.ConsultarRendicionAsync(rutaId, ct) is not { } rendicion) return;
+            var revision = await planificacion.RevisionAsync(rutaId, ct);
+            if (revisionEsperada is not long esperada || revision != esperada)
+                throw new DomainException("La ruta cambió. Recargá antes de recuperar los no cargados.");
             if (rendicion.FinalizadaEn is null)
                 throw new DomainException("Primero confirmá la rendición de la ruta.");
-            cantidad = await LiberarNoCargadosAsync(rendicion, ct);
+            cantidad = await LiberarNoCargadosAsync(rendicion, ct, operacion);
+            if (cantidad > 0 && revision is long actual) await planificacion.RegistrarConciliacionAsync(rutaId, actual, ct);
+            await operaciones.RegistrarAsync(operacion, huella, JsonSerializer.Serialize(cantidad), ct);
         }, ct);
         return cantidad;
     }
@@ -145,31 +172,33 @@ internal sealed class ConfirmarRendicionHandler(
     public async Task<IReadOnlyList<Guid>> NoCargadosRecuperablesAsync(RendicionPendiente rendicion, CancellationToken ct)
     {
         if (rendicion.FinalizadaEn is null) return [];
-        // Una carga parcial del flujo antiguo requiere que depósito haya recibido las lecturas.
-        // Nunca se libera un envío que viajó, con bultos sin conciliar o reasignado a otra ruta.
-        var candidatos = rendicion.Lineas.GroupBy(l => l.EnvioId)
-            .Where(g => g.All(l => l.Situacion == "NoCargado"
-                || l.Situacion == "CargaParcial" && l.Recibida == true))
-            .ToDictionary(g => g.Key, g => g.Select(l => l.BultoId).ToHashSet());
-        if (candidatos.Count == 0) return [];
-        var recuperables = new List<Guid>();
-        foreach (var envio in await envios.ConsultarParaRendicionAsync(candidatos.Keys.ToArray(), ct))
-        {
-            // La revisita puede conservar otros bultos ya entregados. Sólo se libera el conjunto asignado
-            // de esta ruta, sin mover los resultados anteriores ni depender del filtro de carga.
-            var asignados = envio.Bultos.Where(b => b.Estado == "AsignadoARuta").Select(b => b.Id).ToArray();
-            if (envio.Estado != "AsignadoARuta" || asignados.Length == 0
-                || !candidatos[envio.Id].SetEquals(asignados)) continue;
-            if (!await planificacion.HayRutasActivasConEnviosAsync([envio.Id], DateOnly.MinValue, ct))
-                recuperables.Add(envio.Id);
-        }
-        return recuperables;
+        var manifiesto = (await planificacion.ConsultarReservasRutaAsync(rendicion.RutaId, ct)).Where(r => r.CerradaEn == null).ToArray();
+        var candidatos = rendicion.Lineas.Where(l => manifiesto.Any(r => r.BultoId == l.BultoId)
+            && (l.Situacion == "NoCargado" || l.Situacion == "CargaParcial" && l.Recibida == true)).ToArray();
+        if (candidatos.Length == 0) return [];
+        var custodias = await envios.ConsultarCustodiaAsync(candidatos.Select(l => l.EnvioId).Distinct().ToArray(), ct);
+        return candidatos.Where(l => custodias.Any(b => b.BultoId == l.BultoId && b.Estado == "AsignadoARuta"))
+            .Select(l => l.EnvioId).Distinct().ToArray();
     }
 
-    private async Task<int> LiberarNoCargadosAsync(RendicionPendiente rendicion, CancellationToken ct)
+    private async Task<int> LiberarNoCargadosAsync(RendicionPendiente rendicion, CancellationToken ct, Guid operacion)
     {
-        var ids = await NoCargadosRecuperablesAsync(rendicion, ct);
-        return await envios.ReintegrarNoCargadosAsync(rendicion.RutaId, ids, ct);
+        var manifiesto = (await planificacion.ConsultarReservasRutaAsync(rendicion.RutaId, ct)).Where(r => r.CerradaEn == null).ToArray();
+        var ids = rendicion.Lineas.Where(l => manifiesto.Any(r => r.BultoId == l.BultoId)
+            && (l.Situacion == "NoCargado" || l.Situacion == "CargaParcial" && l.Recibida == true))
+            .Select(l => l.BultoId).ToArray();
+        await ConfirmarRetornoAsync(rendicion, ids, "Presencia física de no cargados confirmada por depósito", ct, operacion);
+        return rendicion.Lineas.Where(l => ids.Contains(l.BultoId)).Select(l => l.EnvioId).Distinct().Count();
+    }
+
+    private async Task ConfirmarRetornoAsync(RendicionPendiente rendicion, IReadOnlyCollection<Guid> ids, string motivo, CancellationToken ct, Guid operacion)
+    {
+        if (ids.Count == 0) return;
+        var custodias = (await envios.ConsultarCustodiaAsync(rendicion.Lineas.Select(l => l.EnvioId).Distinct().ToArray(), ct))
+            .Where(b => ids.Contains(b.BultoId)).ToArray();
+        await envios.ConfirmarCustodiaAsync(new ConciliacionBultos(operacion, rendicion.RutaId, null,
+            custodias.Select(b => new ConfirmacionCustodiaBulto(b.BultoId, b.Revision)).ToArray(), true, motivo, responsable.Id), ct);
+        await envios.ReintegrarBultosAsync(rendicion.RutaId, ids, responsable.Id, ct);
     }
 
     // El lector escribe el código como un teclado: se compara sin espacios y sin distinguir mayúsculas.

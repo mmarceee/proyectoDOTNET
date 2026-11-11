@@ -1,0 +1,43 @@
+@page "/backoffice/custodia"
+@model Logistica.Modules.Deposito.Presentation.Features.ConciliarBultos.IndexModel
+@{ Layout = "/Pages/Shared/_Layout.cshtml"; ViewData["Title"] = "Conciliar ubicación de bultos"; }
+<h1 class="h3">Conciliar ubicación de bultos</h1>
+<p>Confirmá únicamente los bultos que verificaste físicamente. Los no localizados siguen bloqueados aunque su ruta esté cerrada.</p>
+<a href="/backoffice/rendiciones" class="btn btn-outline-secondary mb-3">Volver a rendiciones</a>
+@if (Model.Mensaje is { } mensaje) { <div class="alert alert-success" role="status">@mensaje</div> }
+@if (TempData["ErrorCustodia"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+<div asp-validation-summary="All" class="text-danger"></div>
+<form method="get" class="mb-4">
+    <label asp-for="CodigoBulto" class="form-label">Código de bulto</label>
+    <input asp-for="CodigoBulto" class="form-control" required maxlength="200" />
+    <button class="btn btn-primary mt-2">Consultar</button>
+</form>
+@if (Model.Numero is not null) { <h2 class="h5">@Model.Numero</h2> }
+@foreach (var grupo in Model.Grupos)
+{
+    <form method="post" class="card card-body mb-4">
+        <input type="hidden" name="CodigoBulto" value="@Model.CodigoBulto" />
+        <input type="hidden" name="OperacionId" value="@Guid.NewGuid()" />
+        <input type="hidden" name="RutaId" value="@grupo.RutaId" />
+        <input type="hidden" name="RevisionRuta" value="@grupo.Revision" />
+        <p>@(grupo.RutaId is null ? "Sin reserva activa" : $"Ruta {grupo.RutaId.ToString()![^8..]}")</p>
+        <table class="table"><thead><tr><th>Confirmar</th><th>Bulto</th><th>Estado</th><th>Ubicación registrada</th></tr></thead><tbody>
+        @for (var i = 0; i < grupo.Bultos.Count; i++)
+        {
+            var b = grupo.Bultos[i];
+            <tr><td><input type="checkbox" name="Lineas[@i].Seleccionado" value="true" aria-label="Seleccionar @b.Codigo" />
+                <input type="hidden" name="Lineas[@i].BultoId" value="@b.BultoId" />
+                <input type="hidden" name="Lineas[@i].Revision" value="@b.Revision" /></td>
+                <td>@b.Codigo</td><td>@b.Estado</td><td>@b.Ubicacion</td></tr>
+        }
+        </tbody></table>
+        <label class="form-label">Resultado de la verificación
+            <select name="EnDeposito" class="form-select"><option value="false">No localizado: mantener bloqueo</option>
+                <option value="true">Verifiqué físicamente su presencia en depósito</option></select>
+        </label>
+        <label class="form-label">Motivo u observación de la verificación
+            <textarea name="Motivo" class="form-control" required maxlength="500"></textarea>
+        </label>
+        <button class="btn btn-primary">Confirmar los bultos seleccionados</button>
+    </form>
+}

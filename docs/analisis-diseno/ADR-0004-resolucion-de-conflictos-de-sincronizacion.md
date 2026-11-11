@@ -1,5 +1,7 @@
 # **ADR-0004 · Resolución de conflictos de sincronización**
 
+> **Integración RF 34 · 10/11/2026:** la visita se valida contra reserva, manifiesto y custodia de su ruta. Los bultos en tránsito de otra ruta no forman parte de su alcance; intentar incluirlos produce conflicto. Entrega, cierre de reserva, custodia, revisión y operación se confirman juntos. Un intento fallido no libera reserva; retorno y faltantes se concilian individualmente por depósito, sin liberar desde la PWA ni reescribir operaciones pendientes. Se mantienen atomicidad por visita, traducción antigua, evidencia y diagnóstico de rechazos. [Implementación y verificación RF 34](rf-34/verificacion.md).
+
 > **Evolución por entrega parcial · 02/11/2026:** el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) y la [decisión cerrada](decisiones-entrega-parcial.md) extienden esta política con resultados por bulto y atomicidad por visita de un envío. Se conservan OperacionId, transacción y evidencia de rechazos. **La política por bulto (RF 32) está en la sección 2.11**, con su alternativa descartada (3.10), su riesgo (4.2) y sus pruebas (5, puntos 10 a 15). Las secciones 2.1 a 2.10 describen el contrato por envío y siguen valiendo en lo que la sección 2.11 no cambia. Las entregas e intentos por envío que todavía guarde la PWA se traducen a una visita (sección 2.11; decisión cerrada, pendiente 5).
 
 | Estado | Aceptado — aprobado por el equipo el 15/10/2026; la sección 2.11 (entrega parcial), el 03/11/2026 |

@@ -6,11 +6,14 @@ using Logistica.Modules.Planificacion.Application.Exceptions;
 using Logistica.Modules.Planificacion.Application.Mapping;
 using Logistica.Modules.Planificacion.Domain.Rutas;
 using Logistica.SharedKernel;
+using Logistica.Modules.Planificacion.Contracts;
+using System.Text.Json;
 
 namespace Logistica.Modules.Planificacion.Application.Features.QuitarEnvioDeRuta;
 
 internal sealed class QuitarEnvioDeRutaHandler(IRutaRepository rutas, IAdministracionModuleApi administracion,
-    IEnviosModuleApi envios, IConfirmacionPlanificacion confirmacion, IResponsablePlanificacion responsable, TimeProvider reloj)
+    IEnviosModuleApi envios, IConfirmacionPlanificacion confirmacion, IResponsablePlanificacion responsable, TimeProvider reloj,
+    IOperacionesBultos operaciones)
 {
     public async Task<RutaResponse> HandleAsync(QuitarEnvioDeRutaCommand command, CancellationToken ct)
     {
@@ -18,10 +21,14 @@ internal sealed class QuitarEnvioDeRutaHandler(IRutaRepository rutas, IAdministr
             throw new DomainException("La ruta, el envío y la revisión son obligatorios.");
 
         RutaResponse? respuesta = null;
+        var operacion = command.OperacionId ?? Guid.NewGuid();
+        var huella = JsonSerializer.Serialize(new { Tipo = "QuitarEnvioRuta", Pedido = command, Actor = responsable.Id });
         await confirmacion.EjecutarAsync(async () =>
         {
             // La misma exclusión que crear/agregar y, en CU-43, despachar.
             await administracion.BloquearPlanificacionAsync(ct);
+            if (await operaciones.ResultadoAsync(operacion, huella, ct) is { } anterior)
+            { respuesta = JsonSerializer.Deserialize<RutaResponse>(anterior)!; return; }
             var ruta = await rutas.ObtenerAsync(command.RutaId, ct) ?? throw new RutaNoEncontradaException();
             if (ruta.Estado != EstadoRuta.Planificada)
                 throw new ConflictoRutaException("RutaNoEditable", "Sólo se pueden quitar envíos de una ruta Planificada.");
@@ -39,6 +46,7 @@ internal sealed class QuitarEnvioDeRutaHandler(IRutaRepository rutas, IAdministr
                 responsable.Id, reloj.GetUtcNow()));
             await rutas.GuardarAsync(ct);
             respuesta = RutaResponseMapper.Mapear(ruta);
+            await operaciones.RegistrarAsync(operacion, huella, JsonSerializer.Serialize(respuesta), ct);
         }, [], ct);
         return respuesta!;
     }

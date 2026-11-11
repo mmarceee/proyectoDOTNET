@@ -18,7 +18,7 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("deposito")
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -153,6 +153,34 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
                     b.HasIndex("OperadorId", "ComercioId", "GeneradaEn");
 
                     b.ToTable("Liquidaciones", "deposito");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Deposito.Domain.Recepciones.OperacionCustodia", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Huella")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("OperacionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Resultado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "OperacionId")
+                        .IsUnique();
+
+                    b.ToTable("OperacionesCustodia", "deposito");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Deposito.Domain.Recepciones.RecepcionDeposito", b =>
