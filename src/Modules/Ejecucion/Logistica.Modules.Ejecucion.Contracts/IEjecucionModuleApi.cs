@@ -16,6 +16,7 @@ public interface IEjecucionModuleApi
     Task<bool> MarcarConflictoRevisadoAsync(Guid operacionId, CancellationToken ct);
     Task<RendicionPendiente?> ConsultarRendicionAsync(Guid rutaId, CancellationToken ct);
     Task<IReadOnlyList<RendicionPendiente>> ListarRendicionesPendientesAsync(int pagina, CancellationToken ct);
+    Task<IReadOnlyList<RendicionPendiente>> ListarRendicionesConfirmadasAsync(int pagina, CancellationToken ct);
 
     // CU-55: registra los bultos que recibió el operario y cierra la rendición. Devuelve cómo quedó cada línea, para que
     // Depósito reintegre los envíos (T8) y registre los faltantes en la misma transacción. null si la ruta no tiene

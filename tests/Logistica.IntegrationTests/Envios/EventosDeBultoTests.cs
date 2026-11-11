@@ -25,7 +25,7 @@ public sealed class EventosDeBultoTests(PostgresApiFactory factory) : IClassFixt
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD8kAAAAASUVORK5CYII="));
 
     // Un bulto entregado, uno reprogramado y uno en devolución. Para v1, el intento fallido de siempre y ningún
-    // EnvioEntregado. En la revisita se entrega el reprogramado: el envío queda Entregado por compatibilidad, pero un
+    // EnvioEntregado. En la revisita se entrega el reprogramado: el envío queda EnDevolucion, porque un
     // bulto sigue en devolución, así que v1 tampoco recibe una entrega completa que no ocurrió.
     [Fact]
     public async Task Una_visita_mixta_publica_cada_bulto_y_nunca_una_entrega_completa_que_no_ocurrio()
@@ -62,6 +62,13 @@ public sealed class EventosDeBultoTests(PostgresApiFactory factory) : IClassFixt
         var revisita = await RegistrarAsync(envio.Id, [new(reprogramado, null)], minutosAntes: 5);
 
         Assert.Equal(ResultadoRegistro.Aplicado, revisita.Resultado);
+        await using (var db = Contexto<EnviosDbContext>(Demo))
+        {
+            var actualizado = await db.Envios.SingleAsync(e => e.Id == envio.Id);
+            Assert.Equal(EstadoEnvio.EnDevolucion, actualizado.Estado);
+            Assert.Equal(EstadoEnvio.Entregado, actualizado.Bultos.Single(b => b.Id == reprogramado).Estado);
+            Assert.Equal(EstadoEnvio.EnDevolucion, actualizado.Bultos.Single(b => b.Id == devuelto).Estado);
+        }
         eventos = await EventosAsync(envio.Id);
         Assert.DoesNotContain(eventos, e => e.Tipo == EnvioEntregado.Tipo);
         Assert.Equal([codigos[entregado], codigos[reprogramado]],

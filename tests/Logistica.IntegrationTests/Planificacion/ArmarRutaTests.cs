@@ -247,6 +247,8 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         var envio = await RecibidoAsync(client);
         var fecha = new DateOnly(2035, 2, 1);
         await EjecutarSqlAsync("""UPDATE envios."Envios" SET "FechaEntregaProgramada"=@fecha, "Estado"='Reprogramado' WHERE "Id"=@id""", envio.Id, ("fecha", fecha));
+        // RF 31: los bultos acompañan al envío (el puente los mueve juntos); planificar sólo cuenta los que están en su estado.
+        await EjecutarSqlAsync("""UPDATE envios."Bultos" SET "Estado"='Reprogramado' WHERE "EnvioId"=@id""", envio.Id);
         var erronea = await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(fecha.AddDays(1), envio.Id));
         Assert.Equal(HttpStatusCode.BadRequest, erronea.StatusCode);
         Assert.Contains("FechaIncompatible", await erronea.Content.ReadAsStringAsync());

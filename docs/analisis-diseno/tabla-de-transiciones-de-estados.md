@@ -75,7 +75,7 @@ TABLA DE TRANSICIONES:
 | T1 | *(ninguno)* → Admitido | Todos, al crear el envío | Igual |
 | T2 | Admitido → EnDeposito | Cada bulto escaneado en la recepción | Antes el envío entero pasaba a EnDeposito con el primer escaneo, y el escaneo del segundo bulto se rechazaba |
 | T3 | EnDeposito → AsignadoARuta | Los bultos del envío disponibles para planificar | El bulto no puede estar en otra ruta activa (pendiente 3 de la decisión, con Planificación) |
-| T4 | AsignadoARuta → EnDeposito | Los bultos de esa ruta | Igual, por bulto. También se aplica a los bultos que no se cargaron al confirmar la carga (T5) |
+| T4 | AsignadoARuta → EnDeposito | Los bultos de esa ruta | Por bulto. En faltantes de carga exige presencia física confirmada por depósito y cierre transaccional de su reserva; confirmar carga o no escanear no lo libera automáticamente (cierre técnico del ADR-0007, D1/D2). |
 | T5 | AsignadoARuta → EnTransito | Los bultos escaneados en la carga | Si el operador **no admite** entrega parcial y falta un bulto del envío, no se carga ninguno de ese envío; los demás envíos de la ruta no se afectan (RF 33, sección 5 de la decisión) |
 | T6 | EnTransito → Entregado | Los bultos entregados en la visita | Firma obligatoria y las pruebas de la versión de reglas del envío, asociadas a esos bultos |
 | T7 | EnTransito → NoEntregado | Los bultos no entregados en la visita | Motivo del catálogo y evidencia. El contador de intentos es **por bulto** y sólo aumenta con un intento real |

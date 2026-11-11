@@ -34,4 +34,35 @@ internal sealed class Incidencia : Entity, IOperadorOwned, IComercioOwned
             Tipo = tipo, Descripcion = descripcion.Trim(), Estado = EstadoIncidencia.Abierta, CreadaEn = ahora,
         };
     }
+
+    // CU-22, paso 4: el despachador la está atendiendo. Sólo una incidencia abierta pasa a en proceso.
+    public void PasarAEnProceso()
+    {
+        if (Estado != EstadoIncidencia.Abierta)
+        {
+            throw new DomainException("Sólo una incidencia abierta puede pasar a en proceso.");
+        }
+
+        Estado = EstadoIncidencia.EnProceso;
+    }
+
+    // CU-22, paso 5: queda resuelta con la resolución y la fecha. Sin resolución no se puede (A2), y una incidencia
+    // resuelta no se vuelve a resolver. Una de los faltantes de una rendición (CU-55) puede resolverse sin pasar por
+    // en proceso.
+    public void Resolver(string resolucion, DateTimeOffset ahora)
+    {
+        if (string.IsNullOrWhiteSpace(resolucion))
+        {
+            throw new DomainException("Indicá cómo se resolvió la incidencia.");
+        }
+
+        if (Estado == EstadoIncidencia.Resuelta)
+        {
+            throw new DomainException("La incidencia ya está resuelta.");
+        }
+
+        Estado = EstadoIncidencia.Resuelta;
+        Resolucion = resolucion.Trim();
+        ResueltaEn = ahora;
+    }
 }

@@ -67,6 +67,49 @@ jobs:
           name: reporte-cobertura
           path: coverage
 
+  e2e:
+    # Pruebas de extremo a extremo (opcional 7.2): Chromium recorre los flujos críticos sobre la aplicación completa
+    # (tests/Logistica.E2ETests). Van en un job aparte porque necesitan el navegador instalado.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build tests/Logistica.E2ETests --configuration Release
+
+      - name: Release build servers
+        run: dotnet build-server shutdown
+
+      # El script lo genera Playwright al compilar; --with-deps instala también las bibliotecas del sistema.
+      - name: Install Chromium
+        run: pwsh tests/Logistica.E2ETests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Test
+        id: test
+        timeout-minutes: 15
+        env:
+          E2E_RESULTADOS: ${{ github.workspace }}/TestResults/e2e
+        run: >
+          dotnet test tests/Logistica.E2ETests --no-build --configuration Release
+          --logger trx --logger "console;verbosity=normal"
+          --results-directory TestResults/e2e
+
+      # Resultados y la traza de cada ventana del navegador (se abre en https://trace.playwright.dev).
+      - name: Upload E2E results
+        if: ${{ always() && steps.test.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-e2e
+          path: TestResults/e2e
+          retention-days: 7
+          if-no-files-found: warn
+
   docker-images:
     # Verifica que las imágenes de la API y el Worker sigan compilando. En un push a main, además las publica en GitHub
     # Container Registry con la etiqueta del commit; el job deploy las promueve a latest si pasan las pruebas.
@@ -101,7 +144,7 @@ jobs:
     # actualiza las Container Apps de Azure (infra/terraform). Sin el secreto AZURE_CREDENTIALS, o con el ambiente
     # destruido, sólo promueve las imágenes.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build-and-test, docker-images]
+    needs: [build-and-test, e2e, docker-images]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

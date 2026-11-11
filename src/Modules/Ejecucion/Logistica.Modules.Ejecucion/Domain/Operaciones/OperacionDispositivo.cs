@@ -26,7 +26,7 @@ internal sealed class OperacionDispositivo : Entity, IOperadorOwned
     public string? Motivo { get; private set; }
     public string? Detalle { get; private set; }
 
-    // Sólo en las rechazadas: la operación tal como llegó, en JSON.
+    // Rechazadas: operación completa con evidencia. Carga por bulto aplicada: manifiesto de faltantes para conciliación.
     public string? Contenido { get; private set; }
 
     // Sólo en una visita rechazada: el diagnóstico de cada bulto, en JSON, para responder lo mismo a un reenvío
@@ -40,9 +40,9 @@ internal sealed class OperacionDispositivo : Entity, IOperadorOwned
 
     private OperacionDispositivo(Guid operacionId) : base(operacionId) { }
 
-    public static OperacionDispositivo Aplicada(Guid operacionId, DatosOperacion datos)
+    public static OperacionDispositivo Aplicada(Guid operacionId, DatosOperacion datos, string? contenido = null)
     {
-        return Crear(operacionId, datos, ResultadoOperacion.Aplicada, null, null, null);
+        return Crear(operacionId, datos, ResultadoOperacion.Aplicada, null, null, contenido);
     }
 
     public static OperacionDispositivo Rechazada(Guid operacionId, DatosOperacion datos, ResultadoOperacion resultado,

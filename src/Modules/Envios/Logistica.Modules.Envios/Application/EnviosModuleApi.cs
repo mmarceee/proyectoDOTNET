@@ -44,9 +44,33 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
 
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
+        // La nueva visita excluye los ya entregados; una carga en preparación conserva los todavía asignados
+        // aunque el primer lote cargado ya haya dejado el estado de compatibilidad EnTransito.
         var lista = await envios.ObtenerParaPlanificacionAsync(ids, ct);
-        return lista.Select(e => new EnvioParaCarga(e.Id, e.Estado.ToString(),
-            e.Bultos.Select(b => new BultoParaCarga(b.Id, b.Codigo)).ToArray()) { Numero = e.Numero }).ToArray();
+        var resultado = new List<EnvioParaCarga>();
+        foreach (var e in lista)
+            resultado.Add(new(e.Id, e.Estado.ToString(), e.BultosParaCarga.Select(b => new BultoParaCarga(b.Id, b.Codigo, b.Estado.ToString())).ToArray())
+            { Numero = e.Numero, AdmiteEntregaParcial = (await reglasDeEntrega.ParaHojaAsync(e, ct)).AdmiteEntregaParcial });
+        return resultado;
+    }
+
+    public async Task<bool> RegistrarCargaPorBultosAsync(IReadOnlyCollection<Guid> bultoIds, Guid? responsable, DateTimeOffset ocurridoEn, CancellationToken ct)
+    {
+        var lista = await envios.ObtenerPorBultosAsync(bultoIds, ct);
+        if (bultoIds.Distinct().Count() != bultoIds.Count || lista.Sum(e => e.Bultos.Count(b => bultoIds.Contains(b.Id))) != bultoIds.Count) return false;
+        foreach (var envio in lista)
+        {
+            var ids = envio.Bultos.Where(b => bultoIds.Contains(b.Id)).Select(b => b.Id).ToArray();
+            var reglas = await reglasDeEntrega.ParaHojaAsync(envio, ct);
+            if (!envio.PuedeCargarBultos(ids, reglas.AdmiteEntregaParcial)) return false;
+        }
+        foreach (var envio in lista)
+        {
+            envio.CargarBultos(envio.Bultos.Where(b => bultoIds.Contains(b.Id)).Select(b => b.Id).ToArray(), responsable, ocurridoEn);
+            eventos.Registrar(EnvioEnTransito.Tipo, new EnvioEnTransito(envio.Id, envio.Numero, ocurridoEn, responsable), ocurridoEn);
+        }
+        await envios.GuardarCambiosAsync(ct);
+        return true;
     }
 
     public async Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct)
@@ -255,7 +279,8 @@ internal sealed class EnviosModuleApi(IEnvioRepository envios, TimeProvider relo
         var lista = await envios.ObtenerParaPlanificacionAsync(envioIds, ct);
         return lista.Select(e => new EnvioPlanificable(e.Id, e.OperadorId, e.Numero, e.Estado.ToString(), e.ZonaId,
             e.FranjaHorariaId, e.FechaEntregaProgramada, $"{e.Direccion.Calle} {e.Direccion.Numero}, {e.Direccion.Localidad}",
-            e.Direccion.CodigoPostal, e.Bultos.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
+            // Sólo los bultos que acompañan al envío: la capacidad del vehículo no cuenta los ya entregados (RF 34).
+            e.Direccion.CodigoPostal, e.BultosQueAcompanan.Select(b => new BultoPlanificable(b.Id, b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
             new PuntoEntregaPlanificable(e.Direccion.Calle, e.Direccion.Numero, e.Direccion.Localidad, e.Direccion.Departamento, e.Direccion.CodigoPostal),
             e.ReintentoDesde, e.Modalidad.ToString())).ToList();
     }

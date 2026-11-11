@@ -80,15 +80,38 @@ internal sealed class IndexModel(RecibirBultoHandler handler, ConsultarBultoPara
             return Page();
         }
 
-        var envio = await CargarEnvioAsync(ct);
+        var envio = await CargarEnvioAsync(ct, precargar: true);
         return envio ? Page() : NotFound();
     }
 
-    private async Task<bool> CargarEnvioAsync(CancellationToken ct)
+    public async Task<IActionResult> OnPostConsultarAsync(CancellationToken ct)
+    {
+        ModelState.Clear();
+        ConfirmarDiferencias = false;
+        ConfirmacionMedidas = null;
+        PesoKg = LargoCm = AnchoCm = AltoCm = null;
+        if (string.IsNullOrWhiteSpace(CodigoBulto))
+        {
+            ModelState.AddModelError(nameof(CodigoBulto), "Escaneá o escribí el código del bulto.");
+            return Page();
+        }
+        if (!await CargarEnvioAsync(ct, precargar: true))
+            ModelState.AddModelError(nameof(CodigoBulto), "Bulto desconocido.");
+        return Page();
+    }
+
+    private async Task<bool> CargarEnvioAsync(CancellationToken ct, bool precargar = false)
     {
         var bulto = await consulta.HandleAsync(new(CodigoBulto ?? ""), ct);
         NumeroEnvio = bulto?.NumeroEnvio;
         if (bulto is not null) CodigoBulto = bulto.CodigoBulto;
+        if (precargar && bulto is not null)
+        {
+            PesoKg = bulto.Declaradas.PesoKg;
+            LargoCm = bulto.Declaradas.LargoCm;
+            AnchoCm = bulto.Declaradas.AnchoCm;
+            AltoCm = bulto.Declaradas.AltoCm;
+        }
         return bulto is not null;
     }
 

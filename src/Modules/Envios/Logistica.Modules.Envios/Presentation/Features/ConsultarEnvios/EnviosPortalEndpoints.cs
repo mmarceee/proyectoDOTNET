@@ -42,7 +42,8 @@ internal static class EnviosPortalEndpoints
         var filas = resultado.Envios.Select(e => new EnvioPortalFila(e.Numero, e.ReferenciaComercio,
             e.DestinatarioNombre, e.Localidad, e.ZonaId is Guid id ? nombres.GetValueOrDefault(id) : null,
             EstadoEnvioTexto.Modalidad(e.Modalidad), EstadoEnvioTexto.Resumen(e.Resumen, e.Terminado, e.BultosEntregados),
-            e.Terminado, e.BultosEntregados, e.TotalBultos, e.CreadoEn, e.MontoTarifa)).ToList();
+            e.Terminado, e.BultosEntregados, e.TotalBultos, e.CreadoEn, e.MontoTarifa,
+            e.Estado != nameof(EstadoEnvio.Cancelado))).ToList();
 
         return Results.Ok(new PaginaEnviosPortal(filas, resultado.Pagina, resultado.TotalPaginas, resultado.TotalRegistros, zonas));
     }
@@ -59,6 +60,7 @@ internal static class EnviosPortalEndpoints
         return Results.Ok(new DetalleEnvioPortal(detalle.Numero,
             EstadoEnvioTexto.Resumen(detalle.Resumen, detalle.Terminado, detalle.BultosEntregados),
             detalle.Terminado, detalle.BultosEntregados,
-            detalle.Bultos.Select(b => new BultoEnvioPortal(b.Codigo, EstadoEnvioTexto.Mostrar(b.Estado))).ToList()));
+            detalle.Bultos.Select(b => new BultoEnvioPortal(b.Codigo, EstadoEnvioTexto.Mostrar(b.Estado))).ToList(),
+            detalle.Estado != nameof(EstadoEnvio.Cancelado)));
     }
 }

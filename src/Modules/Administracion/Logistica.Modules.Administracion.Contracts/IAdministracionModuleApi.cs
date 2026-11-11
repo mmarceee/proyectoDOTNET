@@ -35,6 +35,9 @@ public interface IAdministracionModuleApi
     // hay inquilino.
     Task<MarcaOperador?> MarcaDelOperadorAsync(CancellationToken ct);
 
+    // CU-15: contenido del logo del operador de la sesión; null si no tiene logo o no hay operador.
+    Task<LogoParaEtiqueta?> LogoParaEtiquetaAsync(CancellationToken ct);
+
     // CU-32: los comercios con relación con el operador de la sesión, activa o suspendida, ordenados por razón social.
     Task<IReadOnlyList<ComercioRelacionado>> ConsultarComerciosAsync(CancellationToken ct);
 

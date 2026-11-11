@@ -1,0 +1,44 @@
+@page "/backoffice/envios/{numero}/incidencias/nueva"
+@model Logistica.Modules.Envios.Presentation.Features.GestionarIncidencias.NuevaModel
+@using Logistica.Modules.Envios.Domain.Incidencias
+
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = $"Nueva incidencia · {Model.Numero}";
+}
+
+<div class="backoffice-page-header mb-4">
+    <h1 class="mb-2">Nueva incidencia del envío @Model.Numero</h1>
+    <a href="/backoffice/envios/@Uri.EscapeDataString(Model.Numero)" class="btn btn-outline-secondary">Volver al envío</a>
+</div>
+
+<p class="text-body-secondary">La incidencia queda <strong>Abierta</strong>. No cambia el estado del envío.</p>
+
+<form method="post" class="card">
+    <div class="card-body p-4">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+        }
+
+        <div class="mb-3">
+            <label asp-for="Tipo" class="form-label">Tipo</label>
+            <select asp-for="Tipo" class="form-select">
+                <option value="">Elegí un tipo</option>
+                @foreach (var tipo in Enum.GetValues<TipoIncidencia>())
+                {
+                    <option value="@tipo">@IncidenciaTexto.Tipo(tipo.ToString())</option>
+                }
+            </select>
+            <span asp-validation-for="Tipo" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Descripcion" class="form-label">Descripción</label>
+            <textarea asp-for="Descripcion" class="form-control" rows="3" maxlength="500"></textarea>
+            <span asp-validation-for="Descripcion" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Registrar incidencia</button>
+    </div>
+</form>

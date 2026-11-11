@@ -13,8 +13,9 @@
     <a href="@urlDetalle" class="btn btn-outline-secondary mb-3">Volver al detalle del envío</a>
 }
 <p class="text-muted">
-    Escaneá el código del bulto. El lector funciona como un teclado: escribe el código y presiona Enter.
-    El peso y las medidas son opcionales.
+    Escaneá el código del bulto o ingresalo y elegí Consultar. Se completan el peso y las dimensiones
+    declarados por el comercio: revisalos y corregilos antes de registrar la recepción.
+    Si ingresás medidas, deben ser mayores que cero. Podés dejarlas vacías si no las verificaste.
 </p>
 
 @if (!ViewData.ModelState.IsValid)
@@ -60,7 +61,7 @@
     </table>
 }
 
-<form id="formulario-recepcion" method="post" class="row g-3 align-items-end">
+<form id="formulario-recepcion" method="post" class="row g-3 align-items-start">
     <input type="hidden" asp-for="Pagina" />
     <input type="hidden" asp-for="TamanoPagina" />
     <input type="hidden" asp-for="Estado" />
@@ -74,19 +75,19 @@
     </div>
     <div class="col-md-2">
         <label asp-for="PesoKg" class="form-label">Peso (kg)</label>
-        <input asp-for="PesoKg" type="number" step="0.01" min="0" class="form-control" />
+        <input asp-for="PesoKg" type="number" step="any" min="0" data-medida-recepcion class="form-control" />
     </div>
     <div class="col-md-2">
         <label asp-for="LargoCm" class="form-label">Largo (cm)</label>
-        <input asp-for="LargoCm" type="number" step="0.1" min="0" class="form-control" />
+        <input asp-for="LargoCm" type="number" step="any" min="0" data-medida-recepcion class="form-control" />
     </div>
     <div class="col-md-2">
         <label asp-for="AnchoCm" class="form-label">Ancho (cm)</label>
-        <input asp-for="AnchoCm" type="number" step="0.1" min="0" class="form-control" />
+        <input asp-for="AnchoCm" type="number" step="any" min="0" data-medida-recepcion class="form-control" />
     </div>
     <div class="col-md-2">
         <label asp-for="AltoCm" class="form-label">Alto (cm)</label>
-        <input asp-for="AltoCm" type="number" step="0.1" min="0" class="form-control" />
+        <input asp-for="AltoCm" type="number" step="any" min="0" data-medida-recepcion class="form-control" />
     </div>
     <div class="col-12">
         @if (Model.Diferencias.Count > 0)
@@ -112,7 +113,10 @@
                 </div>
             </div>
         }
-        <button type="submit" class="btn btn-primary" data-registrar-recepcion>@(Model.Diferencias.Count > 0 ? "Confirmar y registrar" : "Registrar")</button>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="submit" asp-page-handler="Consultar" formnovalidate class="btn btn-outline-primary" data-consultar-bulto>Consultar</button>
+            <button type="submit" class="btn btn-primary" data-registrar-recepcion>@(Model.Diferencias.Count > 0 ? "Confirmar y registrar" : "Registrar")</button>
+        </div>
     </div>
 </form>
 
@@ -120,6 +124,18 @@
     <script>
         (() => {
             const formulario = document.getElementById('formulario-recepcion');
+            formulario.querySelectorAll('[data-medida-recepcion]').forEach(campo => {
+                const validar = () => campo.setCustomValidity(campo.value !== '' && campo.valueAsNumber <= 0
+                    ? 'El valor debe ser mayor que cero.' : '');
+                campo.addEventListener('input', validar);
+                validar();
+            });
+            formulario.addEventListener('keydown', evento => {
+                if (evento.key !== 'Enter' || evento.target.tagName !== 'INPUT' || evento.target.type === 'checkbox') return;
+                evento.preventDefault();
+                formulario.requestSubmit(formulario.querySelector(evento.target.id === 'CodigoBulto'
+                    ? '[data-consultar-bulto]' : '[data-registrar-recepcion]'));
+            });
             const advertencia = formulario.querySelector('[data-advertencia-recepcion]');
             if (!advertencia) return;
             const confirmacion = formulario.querySelector('#ConfirmarDiferencias');
