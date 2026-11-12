@@ -19,6 +19,8 @@ internal sealed class NotificarNovedadTablero(ITableroEnVivo tablero) : IConsumi
         RutaDespachada.Tipo, EnvioEnTransito.Tipo, EnvioEntregado.Tipo, IntentoFallidoRegistrado.Tipo,
         EnvioDesasignadoDeRuta.Tipo, EnvioExtraviado.Tipo, DevolucionIniciada.Tipo,
         CargaConDiscrepancias.Tipo, ConflictoSincronizacionRegistrado.Tipo, RutasSinFinalizar.Tipo,
+        CustodiaBultosConciliada.Tipo,
+        PlanificacionBultosActualizada.Tipo,
     ];
 
     public static string Cola(string tipo) => $"seguimiento.tablero.{tipo}";
@@ -50,6 +52,8 @@ internal sealed class NotificarNovedadTablero(ITableroEnVivo tablero) : IConsumi
             EnvioEntregado.Tipo => Novedad($"{Texto("Numero")} se entregó."),
             IntentoFallidoRegistrado.Tipo => Novedad($"Intento fallido en {Texto("Numero")} (motivo {Texto("Motivo")})."),
             EnvioDesasignadoDeRuta.Tipo => Novedad("Un envío salió de su ruta."),
+            CustodiaBultosConciliada.Tipo => Novedad("Se concilió la ubicación de bultos pendientes."),
+            PlanificacionBultosActualizada.Tipo => Novedad("Se actualizó la asignación de bultos a una ruta."),
             EnvioExtraviado.Tipo => Novedad($"{Texto("Numero")} se declaró extraviado."),
             DevolucionIniciada.Tipo => Novedad($"{Texto("Numero")} quedó en devolución."),
             CargaConDiscrepancias.Tipo => Novedad(

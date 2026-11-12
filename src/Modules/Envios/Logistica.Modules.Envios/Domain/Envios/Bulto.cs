@@ -18,6 +18,28 @@ internal sealed class Bulto : Entity, IOperadorOwned, IComercioOwned
     public EstadoEnvio Estado { get; private set; }
     // Intentos reales fallidos de este bulto (T7). Cargar, reasignar o reintegrar no los consume (RF 33).
     public int IntentosFallidos { get; private set; }
+    public DateTimeOffset? ReintentoDesde { get; private set; }
+    internal void ProgramarReintento(DateTimeOffset desde) => ReintentoDesde = desde.ToUniversalTime();
+    public UbicacionCustodia Custodia { get; private set; }
+    public Guid? CustodiaRutaId { get; private set; }
+    public Guid? CustodiaResponsableId { get; private set; }
+    public DateTimeOffset? CustodiaConfirmadaEn { get; private set; }
+    public Guid? CustodiaOperacionId { get; private set; }
+    public long RevisionCustodia { get; private set; }
+    private readonly List<MovimientoCustodia> _movimientosCustodia = [];
+    public IReadOnlyList<MovimientoCustodia> MovimientosCustodia => _movimientosCustodia;
+
+    internal void ConfirmarCustodia(UbicacionCustodia ubicacion, Guid? ruta, Guid? actor,
+        Guid operacion, DateTimeOffset ahora, string motivo)
+    {
+        if (operacion == Guid.Empty || string.IsNullOrWhiteSpace(motivo))
+            throw new DomainException("La confirmación de custodia requiere operación y motivo.");
+        if (ubicacion == UbicacionCustodia.Repartidor && ruta is null)
+            throw new DomainException("La custodia del repartidor requiere ruta.");
+        Custodia = ubicacion; CustodiaRutaId = ruta; CustodiaResponsableId = actor;
+        CustodiaConfirmadaEn = ahora.ToUniversalTime(); CustodiaOperacionId = operacion; RevisionCustodia++;
+        _movimientosCustodia.Add(new(this, ubicacion, ruta, actor, operacion, ahora, motivo));
+    }
 
     private Bulto() { } // para EF Core
 

@@ -36,7 +36,7 @@ internal sealed class Ruta : Entity, IOperadorOwned
         ExigirPlanificada();
         if (envios.Count == 0 || envios.Any(e => e.Id == Guid.Empty)
             || envios.Select(e => e.Id).Distinct().Count() != envios.Count
-            || EnvioIds.Any(id => !envios.Any(e => e.Id == id)) || envios.Count <= EnvioIds.Count())
+            || EnvioIds.Any(id => !envios.Any(e => e.Id == id)) || envios.Count < EnvioIds.Count())
             throw new DomainException("La selección debe contener envíos válidos, nuevos y sin duplicados.");
         Reorganizar(envios);
         Actualizar();
@@ -153,4 +153,5 @@ internal sealed class Ruta : Entity, IOperadorOwned
         Revision++;
         ReservaActiva = Estado is EstadoRuta.Despachada or EstadoRuta.EnCurso || Estado == EstadoRuta.Planificada && _paradas.Count > 0;
     }
+    public void RegistrarConciliacion() => Actualizar();
 }

@@ -25,16 +25,17 @@ internal sealed class ReprogramarPorDestinatarioHandler(IEnvioRepository envios,
             return null;
         }
 
-        if (!Envio.EstadosReprogramablesPorDestinatario.Contains(envio.Estado) || envio.ZonaId is null)
+        var reglas = await ReglasAsync(envio, ct);
+        if (!envio.PuedeReprogramarPendientes(reglas.MaxIntentos) || envio.ZonaId is null
+            || await planificacion.EnvioEnLaCalleAsync(envio.Id, ct))
         {
             return [];
         }
 
-        var reglas = await ReglasAsync(envio, ct);
         var zona = await ZonaHorariaAsync(ct);
         var ahora = reloj.GetUtcNow();
         var desde = ahora + reglas.AnticipacionReprogramacion;
-        if (envio.Estado == EstadoEnvio.Reprogramado && envio.ReintentoDesde is DateTimeOffset reintento && reintento > desde)
+        if (envio.PendientesDeEntrega.Max(b => b.ReintentoDesde) is DateTimeOffset reintento && reintento > desde)
         {
             desde = reintento;
         }
@@ -60,6 +61,7 @@ internal sealed class ReprogramarPorDestinatarioHandler(IEnvioRepository envios,
         var encontrado = false;
         await unidad.EjecutarAsync(async () =>
         {
+            await administracion.BloquearPlanificacionAsync(ct);
             if (await envios.ObtenerAsync(envioId, ct) is not { } envio)
             {
                 return;
@@ -78,8 +80,8 @@ internal sealed class ReprogramarPorDestinatarioHandler(IEnvioRepository envios,
             var comienzo = Comienzo(fecha, franja.Desde, await ZonaHorariaAsync(ct));
 
             // T19: la ruta es de Planificación. Si ya se despachó, el envío salió a reparto (A1).
-            if (envio.Estado == EstadoEnvio.AsignadoARuta
-                && !await planificacion.QuitarPorReprogramacionAsync(envio.Id, envio.Numero, ct))
+            if (!envio.PuedeReprogramarPendientes(reglas.MaxIntentos)
+                || !await planificacion.QuitarPorReprogramacionAsync(envio.Id, envio.Numero, ct))
             {
                 throw new DomainException("Tu envío ya salió a reparto: no se puede reprogramar.");
             }

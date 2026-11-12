@@ -94,7 +94,7 @@ public sealed class PlazoEntreIntentosTests(PostgresApiFactory factory) : IClass
             var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
             var id = envio.Id;
             var nuevoLimite = limite.AddHours(1).ToUniversalTime();
-            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE envios.\"Envios\" SET \"ReintentoDesde\"={nuevoLimite} WHERE \"Id\"={id}");
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE envios.\"Bultos\" SET \"ReintentoDesde\"={nuevoLimite} WHERE \"EnvioId\"={id}");
         }
         foreach (var accion in new[] { "despacho/prevalidacion", "despacho" })
         {
@@ -122,6 +122,8 @@ public sealed class PlazoEntreIntentosTests(PostgresApiFactory factory) : IClass
         envio.Transicionar(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, null, fallo.AddHours(-3));
         envio.RegistrarIntentoFallido(new MotivoNoEntrega(Guid.NewGuid(), "AUSENTE", true, false), null, null,
             new Ubicacion(-34.9m, -56.16m), new ReglasEntrega(false, false, 3, TimeSpan.FromHours(24)), null, fallo);
+        Assert.Single(envio.Bultos).ConfirmarCustodia(UbicacionCustodia.Deposito, null, null,
+            Guid.NewGuid(), fallo.AddHours(1), "Retorno físico al depósito del escenario de prueba");
         var db = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
         db.Envios.Add(envio);
         await db.SaveChangesAsync();

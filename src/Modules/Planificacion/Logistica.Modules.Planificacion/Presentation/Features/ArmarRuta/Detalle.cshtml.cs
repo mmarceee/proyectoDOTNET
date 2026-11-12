@@ -82,7 +82,7 @@ internal sealed class DetalleModel(ArmarRutaHandler service, ConsultarRutasHandl
                 await CargarFrescoAsync(ct);
                 return Page();
             }
-            var ruta = await quitar.HandleAsync(new(id, EnvioAQuitar, RevisionEsperada), ct);
+            var ruta = await quitar.HandleAsync(new(id, EnvioAQuitar, RevisionEsperada, OperacionId), ct);
             MensajeConfirmacion = ruta.Paradas.Count == 0
                 ? "Envío quitado. Volvió a En depósito y la ruta quedó vacía, con sus recursos liberados."
                 : "Envío quitado. Volvió a En depósito y se actualizó el orden de las paradas.";

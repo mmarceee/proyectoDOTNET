@@ -43,13 +43,17 @@ internal sealed class DescargarHojaDeRutaHandler(IConsultaConsistente lectura, I
             // Hoja y rendición comparten el manifiesto de esta ruta: no se incluyen entregas de una ruta
             // anterior y sí los bultos todavía asignados durante la preparación de una carga parcial.
             var preparacion = await rendiciones.ConsultarAsync(ruta.Id, ids, ct);
+            var pertenencias = (await rutas.ConsultarReservasRutaAsync(ruta.Id, ct)).GroupBy(r => r.BultoId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.CerradaEn == null).ThenByDescending(r => r.AbiertaEn).First());
             var bultosDeRuta = preparacion.Bultos.ToDictionary(b => b.BultoId, b => b.EnvioId);
             var porId = lista.ToDictionary(e => e.Id);
             var zonas = new Dictionary<Guid, ZonaHojaResponse>();
             var bultos = new HashSet<Guid>();
             EnvioHojaResponse Mapear(EnvioParaHoja e)
             {
-                e = e with { Bultos = e.Bultos.Where(b => bultosDeRuta.TryGetValue(b.Id, out var envioId) && envioId == e.Id).ToArray() };
+                e = e with { Bultos = e.Bultos.Where(b => bultosDeRuta.TryGetValue(b.Id, out var envioId) && envioId == e.Id)
+                    .Select(b => pertenencias[b.Id].CerradaEn is not null ? b with
+                    { Estado = pertenencias[b.Id].CausaCierre == "Entregado" ? "Entregado" : "EnDeposito" } : b).ToArray() };
                 var coincidencias = contexto.Zonas.Where(z => e.ZonaId is Guid zonaId
                     ? z.Id == zonaId : z.CodigosPostales.Contains(e.CodigoPostal)).ToArray();
                 if (coincidencias.Length != 1 || e.Bultos.Count == 0 || e.Bultos.Any(b => !bultos.Add(b.Id))

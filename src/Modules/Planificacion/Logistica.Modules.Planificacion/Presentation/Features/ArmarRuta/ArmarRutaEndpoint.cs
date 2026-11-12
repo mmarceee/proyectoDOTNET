@@ -11,14 +11,14 @@ internal static class ArmarRutaEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/rutas/prevalidacion", async (PrevalidarRutaRequest request, ArmarRutaHandler service, CancellationToken ct)
-            => Results.Ok(await service.PrevalidarAsync(new(request.Fecha, request.RepartidorId, request.VehiculoId, request.EnvioIds, request.RutaId, request.RevisionEsperada), ct)));
+            => Results.Ok(await service.PrevalidarAsync(new(request.Fecha, request.RepartidorId, request.VehiculoId, request.EnvioIds, request.RutaId, request.RevisionEsperada, request.BultoIds, request.RevisionesBultos), ct)));
         group.MapPost("/rutas", async (CrearRutaRequest request, ArmarRutaHandler service, CancellationToken ct) =>
         {
-            var ruta = await service.CrearAsync(new(request.Fecha, request.RepartidorId, request.VehiculoId, request.EnvioIds), ct);
+            var ruta = await service.CrearAsync(new(request.Fecha, request.RepartidorId, request.VehiculoId, request.EnvioIds, request.BultoIds, request.OperacionId, request.RevisionesBultos), ct);
             return Results.Created($"/api/planificacion/rutas/{ruta.Id}", ruta);
         });
         group.MapPost("/rutas/{id:guid}/envios", async (Guid id, AgregarEnviosRutaRequest request, ArmarRutaHandler service, CancellationToken ct)
-            => Results.Ok(await service.AgregarAsync(id, new(request.RevisionEsperada, request.EnvioIds), ct)));
+            => Results.Ok(await service.AgregarAsync(id, new(request.RevisionEsperada, request.EnvioIds, request.BultoIds, request.OperacionId, request.RevisionesBultos), ct)));
         group.MapPut("/rutas/{id:guid}/planificacion", async (Guid id, ModificarRutaRequest request, ArmarRutaHandler service, CancellationToken ct)
             => Results.Ok(await service.ModificarAsync(id, new(request.RevisionEsperada, request.Fecha, request.RepartidorId, request.VehiculoId), ct)));
 

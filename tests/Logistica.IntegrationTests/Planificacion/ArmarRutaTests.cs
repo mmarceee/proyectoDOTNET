@@ -437,7 +437,7 @@ public class ArmarRutaTests(PostgresApiFactory factory) : IClassFixture<Postgres
         Assert.Equal(HttpStatusCode.OK, filtrado.StatusCode);
         var resultado = WebUtility.HtmlDecode(await filtrado.Content.ReadAsStringAsync());
         Assert.DoesNotContain("is invalid", resultado);
-        Assert.DoesNotContain("validation-summary-errors", resultado);
+        Assert.True(!resultado.Contains("validation-summary-errors"), Regex.Match(resultado, "validation-summary-errors[\\s\\S]{0,1800}").Value);
         Assert.Contains("value=\"2035-02-04\"", resultado);
         Assert.Contains(envio.Id.ToString(), resultado);
         foreach (var accion in new[] { "Validar", "Confirmar", "Modificar" })

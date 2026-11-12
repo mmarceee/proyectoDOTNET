@@ -7,14 +7,32 @@ namespace Logistica.Modules.Planificacion.Application;
 
 // Implementación del contrato de Planificación. Es internal: los otros módulos sólo ven la interfaz.
 internal sealed class PlanificacionModuleApi(IRutaRepository rutas, IAdministracionModuleApi administracion,
-    TimeProvider reloj, Features.AlertarRutasSinFinalizar.AlertarRutasSinFinalizarHandler alertar) : IPlanificacionModuleApi
+    TimeProvider reloj, Features.AlertarRutasSinFinalizar.AlertarRutasSinFinalizarHandler alertar,
+    IReservaBultoRepository reservas, ReservasBultos bultos) : IPlanificacionModuleApi
 {
+    public Task<IReadOnlyList<ReservaBultoRuta>> ConsultarReservasRutaAsync(Guid rutaId, CancellationToken ct) => bultos.DeRutaAsync(rutaId, ct);
+    public Task<IReadOnlyList<ReservaBultoRuta>> ConsultarReservasActivasAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) => bultos.ActivasAsync(ids, ct);
+    public Task<IReadOnlyList<Guid>> ConsultarBultosOcupadosAsync(IReadOnlyCollection<Guid> ids, Guid? propia, CancellationToken ct) => bultos.OcupadosAsync(ids, propia, ct);
+    public Task CerrarReservasBultosAsync(Guid rutaId, IReadOnlyCollection<Guid> ids, string causa, CancellationToken ct) => bultos.CerrarAsync(rutaId, ids, causa, ct);
+    public async Task<long?> RevisionAsync(Guid rutaId, CancellationToken ct) => (await rutas.ObtenerAsync(rutaId, ct))?.Revision;
+    public async Task RegistrarConciliacionAsync(Guid rutaId, long revisionEsperada, CancellationToken ct)
+    {
+        var ruta = await rutas.ObtenerAsync(rutaId, ct) ?? throw new Logistica.SharedKernel.DomainException("La ruta no existe.");
+        if (ruta.Revision != revisionEsperada)
+            throw new Application.Exceptions.ConflictoRutaException("RutaModificada", "La ruta cambió. Recargá antes de conciliar.", revision: ruta.Revision);
+        ruta.RegistrarConciliacion();
+        await rutas.GuardarAsync(ct);
+    }
     public Task<int> AlertarRutasSinFinalizarAsync(DateOnly hoy, CancellationToken ct) => alertar.HandleAsync(hoy, ct);
 
     // CU-20: el envío está arriba de un vehículo si su parada pendiente es de una ruta Despachada o EnCurso.
     public async Task<bool> EnvioEnLaCalleAsync(Guid envioId, CancellationToken ct)
-        => await rutas.RutaActivaDelEnvioAsync(envioId, ct) is Guid rutaId
-            && await rutas.ObtenerAsync(rutaId, ct) is { Estado: EstadoRuta.Despachada or EstadoRuta.EnCurso };
+    {
+        foreach (var rutaId in (await reservas.DelEnvioAsync(envioId, ct)).Select(r => r.RutaId).Distinct())
+            if (await rutas.ObtenerAsync(rutaId, ct) is { Estado: EstadoRuta.Despachada or EstadoRuta.EnCurso or EstadoRuta.Finalizada })
+                return true; // Una reserva abierta de una ruta cerrada sigue siendo obligación de conciliación.
+        return false;
+    }
 
     // CU-61 (T19): la ruta es de Planificación, así que es ella quien saca al envío. Toma el mismo bloqueo que armar,
     // quitar y despachar, para que nadie despache la ruta mientras tanto. No pasa el envío a EnDeposito (T4): la
@@ -23,20 +41,21 @@ internal sealed class PlanificacionModuleApi(IRutaRepository rutas, IAdministrac
     {
         await administracion.BloquearPlanificacionAsync(ct);
 
-        if (await rutas.RutaActivaDelEnvioAsync(envioId, ct) is not Guid rutaId
-            || await rutas.ObtenerAsync(rutaId, ct) is not { } ruta)
+        var abiertas = await reservas.DelEnvioAsync(envioId, ct);
+        var afectadas = new List<Ruta>();
+        foreach (var rutaId in abiertas.Select(r => r.RutaId).Distinct())
         {
-            return true;
+            var ruta = await rutas.ObtenerAsync(rutaId, ct);
+            if (ruta is not { Estado: EstadoRuta.Planificada }) return false;
+            afectadas.Add(ruta);
         }
-
-        if (ruta.Estado != EstadoRuta.Planificada)
+        foreach (var ruta in afectadas)
         {
-            return false;
+            var orden = ruta.Paradas.Single(p => p.Envios.Any(e => e.EnvioId == envioId)).Orden;
+            ruta.QuitarEnvio(envioId);
+            rutas.Agregar(RetiroEnvioRuta.Registrar(ruta, envioId, numeroEnvio, orden, null, reloj.GetUtcNow()));
         }
-
-        var orden = ruta.Paradas.Single(p => p.Envios.Any(e => e.EnvioId == envioId)).Orden;
-        ruta.QuitarEnvio(envioId);
-        rutas.Agregar(RetiroEnvioRuta.Registrar(ruta, envioId, numeroEnvio, orden, null, reloj.GetUtcNow()));
+        foreach (var reserva in abiertas) reserva.Cerrar("ReprogramacionDestinatario", reloj.GetUtcNow());
         await rutas.GuardarAsync(ct);
         return true;
     }

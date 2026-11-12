@@ -1,3 +1,6 @@
 namespace Logistica.Modules.Envios.Contracts.Results;
 
-public sealed record AsignacionEnvioRuta(Guid EnvioId, Guid? FranjaId);
+public sealed record AsignacionEnvioRuta(Guid EnvioId, Guid? FranjaId)
+{
+    public IReadOnlyList<Guid>? BultoIds { get; init; }
+}

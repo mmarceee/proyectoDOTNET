@@ -6,6 +6,13 @@ namespace Logistica.Modules.Envios.Contracts;
 // (ADR-0001, addendum 3). Los otros módulos nunca tocan las tablas ni las entidades de Envíos.
 public interface IEnviosModuleApi
 {
+    Task<IReadOnlyList<CustodiaBulto>> ConsultarCustodiaAsync(IReadOnlyCollection<Guid> envioIds, CancellationToken ct);
+    Task ConfirmarCustodiaAsync(ConciliacionBultos confirmacion, CancellationToken ct);
+    Task RegistrarCustodiaCargaAsync(Guid rutaId, IReadOnlyCollection<Guid> bultoIds, Guid operacionId,
+        Guid? actor, DateTimeOffset ocurridoEn, CancellationToken ct);
+    Task RegistrarCustodiaVisitaAsync(Guid rutaId, IReadOnlyCollection<Guid> entregados, Guid operacionId,
+        Guid? actor, DateTimeOffset ocurridoEn, CancellationToken ct);
+    Task ReintegrarBultosAsync(Guid rutaId, IReadOnlyCollection<Guid> bultoIds, Guid? actor, CancellationToken ct);
     // CU-51: lectura y T5 dentro de la transacción compartida de confirmación de carga.
     Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
     Task<IReadOnlyList<BultoParaCarga>> ReconocerBultosAsync(IReadOnlyCollection<string> codigos, CancellationToken ct);
@@ -16,8 +23,8 @@ public interface IEnviosModuleApi
     Task<EnvioParaRecepcion?> ObtenerParaRecepcionAsync(string codigoBulto, CancellationToken ct);
 
     // Aplica T2 a un bulto (RF 31): con el primero el envío queda En operación. Devuelve true cuando ya llegaron todos
-    // los bultos y el envío quedó EnDeposito. Lanza una DomainException si el envío no está pendiente de recepción.
-    Task<bool> RecibirBultoAsync(Guid envioId, Guid bultoId, Guid? responsableId, CancellationToken ct);
+    // los bultos y el envío quedó EnDeposito. Rechaza bultos que no estén Admitidos y envíos cancelados.
+    Task<bool> RecibirBultoAsync(Guid envioId, Guid bultoId, Guid? responsableId, CancellationToken ct, Guid? operacionId = null);
     Task<IReadOnlyList<EnvioPlanificable>> ObtenerParaPlanificacionAsync(IReadOnlyCollection<Guid>? envioIds, CancellationToken ct);
     Task AsignarARutaAsync(Guid rutaId, IReadOnlyList<AsignacionEnvioRuta> asignaciones, Guid? responsableId, CancellationToken ct);
     // T4. Planificación comprueba pertenencia y estado de la ruta dentro de la transacción compartida.
@@ -27,7 +34,7 @@ public interface IEnviosModuleApi
     // consulta los bultos del envío para clasificar cada uno antes de registrar la visita. El registro no lanza por
     // reglas de negocio: devuelve el resultado para que Ejecución aplique la política de conflictos. Guarda con la unidad
     // de trabajo en curso, junto con el registro de la operación.
-    Task<EnvioParaVisita?> ConsultarParaVisitaAsync(Guid envioId, CancellationToken ct);
+    Task<EnvioParaVisita?> ConsultarParaVisitaAsync(Guid envioId, CancellationToken ct, Guid? rutaId = null);
     Task<RegistroEnCalle> RegistrarVisitaAsync(VisitaARegistrar visita, CancellationToken ct);
 
     // CU-04: ¿algún envío sin terminar tiene una de estas franjas comprometida en esa fecha o después? Administración

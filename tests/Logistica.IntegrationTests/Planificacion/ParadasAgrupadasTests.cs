@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Logistica.Http.Contracts.Deposito;
 using Logistica.Http.Contracts.Envios;
 using Logistica.Http.Contracts.Planificacion;
+using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.Modules.Envios.Infrastructure.Persistence;
 using Logistica.Modules.Administracion.Domain.Planificacion;
 using Logistica.Modules.Administracion.Infrastructure.Persistence;
@@ -41,7 +42,7 @@ public sealed class ParadasAgrupadasTests(PostgresApiFactory factory) : IClassFi
         Assert.True(actual.ReservaActiva);
         var retiros = (await client.GetFromJsonAsync<List<RetiroEnvioRutaResponse>>($"/api/planificacion/rutas/{ruta.Id}/retiros"))!;
         Assert.Equal(1, Assert.Single(retiros).ParadasRestantes);
-        // La exclusividad RF15 sigue siendo por envío.
+        // El bulto del envío A sigue reservado en la ruta original.
         var duplicado = await client.PostAsJsonAsync("/api/planificacion/rutas", Pedido(Fecha(), a.Id));
         Assert.Equal(HttpStatusCode.Conflict, duplicado.StatusCode);
         var otra = await Crear(client, Fecha(), b.Id); Assert.Single(otra.Paradas);
@@ -90,8 +91,16 @@ public sealed class ParadasAgrupadasTests(PostgresApiFactory factory) : IClassFi
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<PlanificacionDbContext>();
+            var envios = scope.ServiceProvider.GetRequiredService<EnviosDbContext>();
+            Guid[] ids = [a.Id, b.Id, c.Id];
+            var movimientos = await envios.Set<MovimientoCustodia>().Where(m => ids.Contains(m.EnvioId))
+                .Select(m => m.Id).OrderBy(id => id).ToArrayAsync();
+            Assert.Equal(3, movimientos.Length);
             await db.GetService<IMigrator>().MigrateAsync("20261012134731_HistorialRetirosCU41");
             await db.Database.MigrateAsync();
+            Assert.Equal(movimientos, await envios.Set<MovimientoCustodia>().Where(m => ids.Contains(m.EnvioId))
+                .Select(m => m.Id).OrderBy(id => id).ToArrayAsync());
+            Assert.Equal(3, await db.ReservasBulto.CountAsync(r => r.RutaId == ruta.Id && r.CerradaEn == null));
         }
         var actual = (await client.GetFromJsonAsync<RutaResponse>($"/api/planificacion/rutas/{ruta.Id}"))!;
         Assert.Equal(3, Assert.Single(actual.Paradas).Envios.Count);

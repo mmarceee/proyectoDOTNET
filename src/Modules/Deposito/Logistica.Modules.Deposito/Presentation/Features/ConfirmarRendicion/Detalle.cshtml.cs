@@ -11,10 +11,12 @@ namespace Logistica.Modules.Deposito.Presentation.Features.ConfirmarRendicion;
 // Después de confirmar, o si la confirmación falla, se vuelve a la página con un GET nuevo: la transacción se deshizo,
 // pero las entidades en seguimiento de este request pueden haber quedado cambiadas, y no hay que mostrarlas.
 [Authorize(Policy = Politicas.OperarioDeposito)]
-internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageModel
+internal sealed class DetalleModel(ConfirmarRendicionHandler handler, Logistica.Modules.Planificacion.Contracts.IPlanificacionModuleApi rutas) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public Guid RutaId { get; set; }
+    [BindProperty] public long? RevisionEsperada { get; set; }
+    [BindProperty] public Guid OperacionId { get; set; } = Guid.NewGuid();
 
     // Un código por línea: el lector escribe el código y presiona Enter.
     [BindProperty]
@@ -43,8 +45,8 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
         {
             if (!ConfirmarNoCargadosEnDeposito)
                 throw new DomainException("Confirmá que todos los bultos de los envíos no cargados están en depósito antes de liberarlos.");
-            if (await handler.RecuperarNoCargadosAsync(RutaId, ct) is not { } cantidad) return NotFound();
-            TempData["Mensaje"] = $"{cantidad} envíos no cargados quedaron disponibles en depósito para asignarlos a otra ruta.";
+            if (await handler.RecuperarNoCargadosAsync(RutaId, ct, RevisionEsperada, OperacionId) is not { } cantidad) return NotFound();
+            TempData["Mensaje"] = $"Se liberaron bultos confirmados en depósito de {cantidad} envíos para una nueva planificación.";
         }
         catch (DomainException e)
         {
@@ -87,13 +89,13 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
                 return Page();
             }
 
-            if (await handler.ConfirmarAsync(RutaId, Codigos(), ct, ConfirmarNoCargadosEnDeposito) is not { } confirmada)
+            if (await handler.ConfirmarAsync(RutaId, Codigos(), ct, ConfirmarNoCargadosEnDeposito, RevisionEsperada, OperacionId) is not { } confirmada)
             {
                 return NotFound();
             }
 
             TempData["Mensaje"] = $"Rendición confirmada: {confirmada.Devueltos} bultos recibidos, " +
-                $"{confirmada.Reintegrados} envíos reintegrados al depósito y {confirmada.Faltantes} bultos faltantes " +
+                $"{confirmada.Reintegrados} envíos con bultos reintegrados al depósito y {confirmada.Faltantes} bultos faltantes " +
                 "con incidencia. La ruta quedó finalizada.";
             return LocalRedirect("/backoffice/rendiciones");
         }
@@ -115,6 +117,8 @@ internal sealed class DetalleModel(ConfirmarRendicionHandler handler) : PageMode
         }
 
         Comparacion = comparacion;
+        RevisionEsperada = await rutas.RevisionAsync(RutaId, ct);
+        ModelState.Remove(nameof(RevisionEsperada));
         NoCargadosRecuperables = (await handler.NoCargadosRecuperablesAsync(comparacion.Rendicion, ct)).Count;
         return Page();
     }

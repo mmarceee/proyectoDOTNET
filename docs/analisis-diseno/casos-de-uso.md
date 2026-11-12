@@ -1,6 +1,6 @@
 # **Casos de uso**
 
-> **Cambio RF 31 a 36 · 02/11/2026:** la [decisión funcional cerrada](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) definen el nuevo resumen de envío y la operación por bulto. Las fichas anteriores afectadas requieren actualización detallada; no deben usarse para contradecir ese acuerdo. La implementación de entrega parcial sigue pendiente.
+> **Cambio RF 31 a 36 · 02/11/2026:** la [decisión funcional cerrada](decisiones-entrega-parcial.md) y el [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md) definen el nuevo resumen de envío y la operación por bulto. Las fichas anteriores afectadas requieren actualización detallada; no deben usarse para contradecir ese acuerdo. El avance y la aceptación actuales se registran en el ADR. Para RF 34, ver [implementación del 10/11](rf-34/README.md) y [prueba de aceptación](rf-34/verificacion.md): la pertenencia y disponibilidad son por bulto; CU-42 sólo ordena las visitas resultantes.
 
 | Estado | Borrador — para revisar con el equipo |
 | :---- | :---- |

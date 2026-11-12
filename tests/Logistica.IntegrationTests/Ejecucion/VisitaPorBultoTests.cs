@@ -333,6 +333,9 @@ public sealed class VisitaPorBultoTests(PostgresApiFactory factory) : IClassFixt
         {
             db.Rutas.Add(ruta);
             await db.SaveChangesAsync();
+            await using var enviosDb = Contexto<EnviosDbContext>(operadorId);
+            var actuales = await enviosDb.Envios.Where(e => envios.Select(x => x.Id).Contains(e.Id)).ToListAsync();
+            await DatosFisicosRf34.AcreditarAsync(enviosDb, db, ruta, actuales, ahora);
         }
 
         return (ruta.Id, envios.Select(e => e.Id).ToArray());

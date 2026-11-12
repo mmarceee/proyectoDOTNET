@@ -23,6 +23,12 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
     [BindProperty] public Guid? VehiculoId { get; set; }
     [BindProperty] public long RevisionEsperada { get; set; }
     [BindProperty] public List<Guid> Seleccion { get; set; } = [];
+    [BindProperty(Name = nameof(BultosPorEnvio))] public Dictionary<Guid, List<Guid>> BultosPorEnvio { get; set; } = [];
+    [BindProperty] public Guid OperacionId { get; set; } = Guid.NewGuid();
+    [BindProperty] public bool SeleccionPorBulto { get; set; }
+    [BindProperty(Name = nameof(RevisionesBultos))] public Dictionary<Guid, long> RevisionesBultos { get; set; } = [];
+    private IReadOnlyList<Guid>? BultosSeleccionados => !SeleccionPorBulto && BultosPorEnvio.Count == 0 ? null
+        : Seleccion.SelectMany(id => BultosPorEnvio.GetValueOrDefault(id) ?? []).ToArray();
     [BindProperty] public Guid? ZonaId { get; set; }
     [BindProperty] public Guid? FranjaId { get; set; }
     [BindProperty] public string? Texto { get; set; }
@@ -104,7 +110,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
         if (Id is not null && Seleccion.Count == 0)
             ModelState.AddModelError(string.Empty, "Seleccioná al menos un envío para validar el agregado.");
         if (!ValidarRecursos()) { await CargarFrescoAsync(ct); return ResultadoEnvios(); }
-        try { Evaluacion = await service.PrevalidarAsync(new(Fecha, RepartidorId.GetValueOrDefault(), VehiculoId.GetValueOrDefault(), Seleccion, Id, Id is null ? null : RevisionEsperada), ct); }
+        try { Evaluacion = await service.PrevalidarAsync(new(Fecha, RepartidorId.GetValueOrDefault(), VehiculoId.GetValueOrDefault(), Seleccion, Id, Id is null ? null : RevisionEsperada, BultosSeleccionados, RevisionesBultos), ct); }
         catch (Exception e) when (Esperada(e)) { MostrarError(e); }
         await CargarFrescoAsync(ct);
         if (SeleccionValidada)
@@ -129,7 +135,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
         try
         {
             RutaResponse ruta;
-            if (Id is not Guid id) ruta = await service.CrearAsync(new(Fecha, RepartidorId.GetValueOrDefault(), VehiculoId.GetValueOrDefault(), Seleccion), ct);
+            if (Id is not Guid id) ruta = await service.CrearAsync(new(Fecha, RepartidorId.GetValueOrDefault(), VehiculoId.GetValueOrDefault(), Seleccion, BultosSeleccionados, OperacionId, RevisionesBultos), ct);
             else if (modificar)
             {
                 var actual = await consultas.DetalleAsync(id, ct);
@@ -142,7 +148,7 @@ internal abstract class RutaEditorModel(ArmarRutaHandler service, ConsultarRutas
                 var actual = await consultas.DetalleAsync(id, ct);
                 if (actual.Fecha != Fecha || actual.RepartidorId != RepartidorId || actual.VehiculoId != VehiculoId)
                     throw new DomainException("Confirmá primero el cambio de fecha o recursos y después agregá los envíos.");
-                ruta = await service.AgregarAsync(id, new(RevisionEsperada, Seleccion), ct);
+                ruta = await service.AgregarAsync(id, new(RevisionEsperada, Seleccion, BultosSeleccionados, OperacionId, RevisionesBultos), ct);
             }
             MensajeConfirmacion = Id is null ? "Ruta creada y envíos asignados correctamente."
                 : modificar ? "Fecha y recursos guardados correctamente."

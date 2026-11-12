@@ -25,6 +25,9 @@ public static class DepositoModule
 
         services.AddScoped<RecibirBultoHandler>();
         services.AddScoped<ConsultarBultoParaRecepcionHandler>();
+        services.AddScoped<Application.IResponsableDeposito, Presentation.ResponsableDeposito>();
+        services.AddScoped<Application.IOperacionesDeposito, OperacionesDeposito>();
+        services.AddScoped<Application.Features.ConciliarBultos.ConciliarBultosHandler>();
 
         // CU-55: confirmar la rendición.
         services.AddScoped<Application.Features.ConfirmarRendicion.ConfirmarRendicionHandler>();
@@ -47,6 +50,7 @@ public static class DepositoModule
         var group = endpoints.MapGroup("/api/deposito").WithTags("Deposito");
 
         RecibirBultoEndpoint.Map(group);
+        Presentation.Features.ConciliarBultos.ConciliarBultosEndpoint.Map(group);
         Presentation.Features.ConsultarCuentaCorriente.ConsultarCuentaCorrienteEndpoint.Map(endpoints);
 
         return endpoints;

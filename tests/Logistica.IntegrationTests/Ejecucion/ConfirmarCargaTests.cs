@@ -56,6 +56,7 @@ public sealed class ConfirmarCargaTests(PostgresApiFactory factory) : IClassFixt
                 new PuntoEntrega("Calle Carga","10","Montevideo","Montevideo","11300"))).ToArray(),ahora);
         ruta.Despachar(ahora); if(finalizada) ruta.Finalizar();
         plan.Rutas.Add(ruta); await plan.SaveChangesAsync();
+        await DatosFisicosRf34.AcreditarAsync(db, plan, ruta, envios, ahora);
         return new(ruta.Id,ruta.Revision,envios,fecha);
     }
     private HttpClient Cliente() => factory.WithWebHostBuilder(b=>b.UseSetting("Identity:PermitirTenantProvisorio","false")).CreateClient(Sesion.Opciones);
