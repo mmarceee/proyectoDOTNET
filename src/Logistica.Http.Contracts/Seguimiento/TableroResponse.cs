@@ -15,8 +15,11 @@ public sealed record ConflictoTableroResponse(Guid OperacionId, string Repartido
 public sealed record NovedadTableroResponse(string Tipo, string Texto, bool Alerta, DateTimeOffset OcurridoEn);
 
 // Una ruta en la calle: quién, con qué vehículo, cuánto avanzó y dónde está.
+// Envios, Entregados y Pendientes cuentan envíos; BultosEntregados y BultosTotal, los bultos de esos envíos, para que el
+// avance se vea aunque ningún envío cambie de resumen (entrega parcial, RF 31; cierre técnico, D5).
 public sealed record RutaTableroResponse(Guid RutaId, string Estado, string Repartidor, string Vehiculo, Guid VehiculoId,
-    int Envios, int Entregados, int Pendientes, PosicionTableroResponse? Posicion);
+    int Envios, int Entregados, int Pendientes, PosicionTableroResponse? Posicion, int BultosEntregados = 0,
+    int BultosTotal = 0);
 
 // La última posición conocida del vehículo (CU-53). Se compara por CapturadaEn, nunca por la hora en que llegó.
 public sealed record PosicionTableroResponse(Guid Id, Guid VehiculoId, Guid RutaId, decimal Latitud, decimal Longitud,

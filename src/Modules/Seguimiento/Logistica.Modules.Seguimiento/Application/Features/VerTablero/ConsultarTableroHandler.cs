@@ -45,7 +45,8 @@ internal sealed class ConsultarTableroHandler(
             return new RutaTableroResponse(r.RutaId, r.Estado,
                 nombres?.Repartidores.GetValueOrDefault(r.RepartidorId) ?? "Sin nombre",
                 nombres?.Vehiculos.GetValueOrDefault(r.VehiculoId) ?? "Sin nombre", r.VehiculoId,
-                r.EnvioIds.Count, suyos.Count(e => e.Estado == "Entregado"), suyos.Count(e => e.EntregaPendiente), posicion);
+                r.EnvioIds.Count, suyos.Count(e => e.Entregado), suyos.Count(e => e.EntregaPendiente), posicion,
+                suyos.Sum(e => e.BultosEntregados), suyos.Sum(e => e.BultosTotal));
         }).ToList();
 
         // 3. Envíos en riesgo (requerimiento especial 3). La franja se resuelve por fecha, porque puede haber cambiado.

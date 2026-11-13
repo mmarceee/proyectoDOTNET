@@ -21,6 +21,9 @@ internal sealed class NotificarNovedadTablero(ITableroEnVivo tablero) : IConsumi
         CargaConDiscrepancias.Tipo, ConflictoSincronizacionRegistrado.Tipo, RutasSinFinalizar.Tipo,
         CustodiaBultosConciliada.Tipo,
         PlanificacionBultosActualizada.Tipo,
+        // Entrega parcial (RF 31; cierre técnico, D5): cada resultado de un bulto actualiza el tablero aunque el resumen
+        // del envío no cambie (de 1/3 a 2/3 entregados sigue siendo Entregado parcialmente).
+        BultoEntregado.Tipo, BultoNoEntregado.Tipo, BultoDevuelto.Tipo,
     ];
 
     public static string Cola(string tipo) => $"seguimiento.tablero.{tipo}";
@@ -56,6 +59,10 @@ internal sealed class NotificarNovedadTablero(ITableroEnVivo tablero) : IConsumi
             PlanificacionBultosActualizada.Tipo => Novedad("Se actualizó la asignación de bultos a una ruta."),
             EnvioExtraviado.Tipo => Novedad($"{Texto("Numero")} se declaró extraviado."),
             DevolucionIniciada.Tipo => Novedad($"{Texto("Numero")} quedó en devolución."),
+            BultoEntregado.Tipo => Novedad($"Se entregó el bulto {Texto("CodigoBulto")} de {Texto("Numero")}."),
+            BultoNoEntregado.Tipo => Novedad(
+                $"No se entregó el bulto {Texto("CodigoBulto")} de {Texto("Numero")} (motivo {Texto("Motivo")})."),
+            BultoDevuelto.Tipo => Novedad($"El comercio recibió el bulto devuelto {Texto("CodigoBulto")} de {Texto("Numero")}."),
             CargaConDiscrepancias.Tipo => Novedad(
                 $"Carga con diferencias: {Cantidad("EnviosIncompletos")} envíos incompletos y {Cantidad("CodigosSobrantes")} bultos sobrantes.",
                 alerta: true),

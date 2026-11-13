@@ -52,7 +52,7 @@ public class GenerarLiquidacionTests(PostgresApiFactory factory) : IClassFixture
         // Requerimiento 3 y A2: generarla otra vez no duplica líneas; sin envíos nuevos no se genera (A1).
         var otraVez = await GenerarAsync(admin, "2025-03-01", "2025-03-31");
         Assert.Equal(Pagina, otraVez.Headers.Location?.ToString());
-        Assert.Contains("no tiene envíos sin liquidar", WebUtility.HtmlDecode(await admin.GetStringAsync(Pagina)));
+        Assert.Contains("no tiene envíos ni recargos sin liquidar", WebUtility.HtmlDecode(await admin.GetStringAsync(Pagina)));
         Assert.Equal(1L, await LineasDelEnvioAsync(entregado));
 
         // Paso 6 y A3.
@@ -114,6 +114,48 @@ public class GenerarLiquidacionTests(PostgresApiFactory factory) : IClassFixture
         Assert.Equal(1L, await LineasDelEnvioAsync(envio));
     }
 
+    // Cierre técnico D8: el cierre mixto cobra la base una vez, entera; un envío sólo con bultos cancelados o extraviados
+    // no se cobra; los recargos por nueva visita van en ajustes, por la fecha de la visita, aunque el envío no haya
+    // terminado; los importes quedan en pesos enteros, y generar otra vez no cobra dos veces ningún concepto.
+    [Fact]
+    public async Task Cierre_mixto_recargos_y_pesos_enteros_segun_D8()
+    {
+        using var comercio = factory.CreateClient();
+        var mixto = await CrearEnvioAsync(comercio, bultos: 3);
+        var perdido = await CrearEnvioAsync(comercio, bultos: 2);
+        var conRecargo = await CrearEnvioAsync(comercio);
+        var mayo = new DateTimeOffset(2025, 5, 10, 15, 0, 0, TimeSpan.Zero);
+        await CerrarBultosAsync(mixto, ["Entregado", "Entregado", "Devuelto"], mayo);
+        await CerrarBultosAsync(perdido, ["Cancelado", "Extraviado"], mayo);
+        // El envío del recargo sigue abierto: igual se cobra su visita adicional, con 0,50 que sube al peso siguiente.
+        var recargo = await RecargoAsync(conRecargo, 120.5m, mayo.AddDays(2));
+
+        using var admin = await AdminAsync();
+        var respuesta = await GenerarAsync(admin, "2025-05-01", "2025-05-31");
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        var id = IdDe(respuesta.Headers.Location!);
+
+        // Tres bultos de 2 kg a 150 cada uno: la base del envío es 450, una sola vez.
+        Assert.Equal(450m, await ConsultarAsync<decimal>("""SELECT "TotalBruto" FROM deposito."Liquidaciones" WHERE "Id" = @id""", id));
+        Assert.Equal(121m, await ConsultarAsync<decimal>("""SELECT "TotalAjustes" FROM deposito."Liquidaciones" WHERE "Id" = @id""", id));
+        Assert.Equal(571m, await ConsultarAsync<decimal>("""SELECT "TotalNeto" FROM deposito."Liquidaciones" WHERE "Id" = @id""", id));
+        Assert.Equal(1L, await LineasDelEnvioAsync(mixto));
+        Assert.Equal(0L, await LineasDelEnvioAsync(perdido));
+        Assert.Equal(1L, await ConsultarAsync<long>(
+            """SELECT count(*) FROM deposito."LineasLiquidacion" WHERE "Origen" = 'RecargoVisita' AND "IdDeOrigen" = @id""", recargo));
+        var html = WebUtility.HtmlDecode(await admin.GetStringAsync(respuesta.Headers.Location!.ToString()));
+        Assert.Contains("Envío entregado parcialmente", html);
+        Assert.Contains("Recargo por nueva visita", html);
+
+        // Cuando ese envío termine, su base entra en otro período sin volver a cobrar el recargo.
+        await CerrarBultosAsync(conRecargo, ["Entregado"], new DateTimeOffset(2025, 6, 3, 15, 0, 0, TimeSpan.Zero));
+        var junio = await GenerarAsync(admin, "2025-05-01", "2025-06-30");
+        var idJunio = IdDe(junio.Headers.Location!);
+        Assert.Equal(150m, await ConsultarAsync<decimal>("""SELECT "TotalNeto" FROM deposito."Liquidaciones" WHERE "Id" = @id""", idJunio));
+        Assert.Equal(1L, await ConsultarAsync<long>(
+            """SELECT count(*) FROM deposito."LineasLiquidacion" WHERE "IdDeOrigen" = @id""", recargo));
+    }
+
     private static Guid IdDe(Uri detalle) => Guid.Parse(detalle.ToString()[(Pagina.Length + 1)..]);
 
     private async Task<HttpClient> AdminAsync(string email = "admin@operador-demo.uy")
@@ -137,30 +179,66 @@ public class GenerarLiquidacionTests(PostgresApiFactory factory) : IClassFixture
             new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = token }));
     }
 
-    private static async Task<Guid> CrearEnvioAsync(HttpClient comercio)
+    private static async Task<Guid> CrearEnvioAsync(HttpClient comercio, int bultos = 1)
     {
         var respuesta = await comercio.PostAsJsonAsync("/api/envios", new CrearEnvioRequest(
             new DestinatarioRequest("Ana Pérez", "099123456", null, null),
             new DireccionRequest("Av. Italia", "1234", "Montevideo", "Montevideo", "11300", null),
-            [new BultoRequest(2, 30, 20, 10)]));
+            Enumerable.Repeat(new BultoRequest(2, 30, 20, 10), bultos).ToList()));
         Assert.Equal(HttpStatusCode.Created, respuesta.StatusCode);
         return (await respuesta.Content.ReadFromJsonAsync<CrearEnvioResponse>())!.Id;
     }
 
-    // Atajo de la prueba: lleva el envío a su estado final sin recorrer la ruta. La liquidación sólo lee el estado y el
-    // evento de esa transición, que acá reemplaza al de la admisión.
+    // Atajo de la prueba: lleva el envío y sus bultos a un estado final sin recorrer la ruta, con el instante de cierre
+    // (TerminadoEn) que lee la liquidación (D8). El evento de esa transición reemplaza al de la admisión.
     private async Task CerrarAsync(Guid envioId, string estado, DateTimeOffset en)
     {
         await using var conexion = new NpgsqlConnection(factory.ConnectionString);
         await conexion.OpenAsync();
         await using var comando = new NpgsqlCommand("""
-            UPDATE envios."Envios" SET "Estado" = @estado WHERE "Id" = @id;
+            UPDATE envios."Envios" SET "Estado" = @estado, "Terminado" = true, "TerminadoEn" = @en WHERE "Id" = @id;
+            UPDATE envios."Bultos" SET "Estado" = @estado WHERE "EnvioId" = @id;
             UPDATE envios."EventosEnvio" SET "EstadoNuevo" = @estado, "OcurridoEn" = @en WHERE "EnvioId" = @id;
             """, conexion);
         comando.Parameters.AddWithValue("id", envioId);
         comando.Parameters.AddWithValue("estado", estado);
         comando.Parameters.AddWithValue("en", en.ToUniversalTime());
         await comando.ExecuteNonQueryAsync();
+    }
+
+    // Como CerrarAsync, con un estado final por bulto (en el orden de sus códigos): un cierre mixto.
+    private async Task CerrarBultosAsync(Guid envioId, string[] estados, DateTimeOffset en)
+    {
+        await using var conexion = new NpgsqlConnection(factory.ConnectionString);
+        await conexion.OpenAsync();
+        await using var comando = new NpgsqlCommand("""
+            UPDATE envios."Bultos" b SET "Estado" = (@estados)[o.n]
+            FROM (SELECT "Id", row_number() OVER (ORDER BY "Codigo") AS n FROM envios."Bultos" WHERE "EnvioId" = @id) o
+            WHERE b."Id" = o."Id";
+            UPDATE envios."Envios" SET "Terminado" = true, "TerminadoEn" = @en WHERE "Id" = @id;
+            """, conexion);
+        comando.Parameters.AddWithValue("id", envioId);
+        comando.Parameters.AddWithValue("estados", estados);
+        comando.Parameters.AddWithValue("en", en.ToUniversalTime());
+        await comando.ExecuteNonQueryAsync();
+    }
+
+    // Un recargo por nueva visita ya registrado (RF 33), con el monto de ese momento.
+    private async Task<Guid> RecargoAsync(Guid envioId, decimal monto, DateTimeOffset en)
+    {
+        var recargoId = Guid.NewGuid();
+        await using var conexion = new NpgsqlConnection(factory.ConnectionString);
+        await conexion.OpenAsync();
+        await using var comando = new NpgsqlCommand("""
+            INSERT INTO envios."RecargosNuevaVisita" ("Id", "EnvioId", "OperadorId", "ComercioId", "Monto", "OcurridoEn")
+            SELECT @recargo, "Id", "OperadorId", "ComercioId", @monto, @en FROM envios."Envios" WHERE "Id" = @id;
+            """, conexion);
+        comando.Parameters.AddWithValue("recargo", recargoId);
+        comando.Parameters.AddWithValue("id", envioId);
+        comando.Parameters.AddWithValue("monto", monto);
+        comando.Parameters.AddWithValue("en", en.ToUniversalTime());
+        await comando.ExecuteNonQueryAsync();
+        return recargoId;
     }
 
     private Task<long> LineasDelEnvioAsync(Guid envioId) =>

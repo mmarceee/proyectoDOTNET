@@ -25,7 +25,7 @@ internal sealed class DepositoModuleApi(IRecepcionRepository recepciones, ILiqui
             throw new DomainException("La fecha desde es posterior a la fecha hasta.");
         return (await liquidaciones.ListarEmitidasEnPeriodoAsync(desde, hasta, ct))
             .GroupBy(l => l.ComercioId)
-            .Select(g => new ResumenLiquidacionesComercio(g.Key, g.Count(), g.Sum(l => l.Lineas.Count), g.Sum(l => l.TotalNeto),
+            .Select(g => new ResumenLiquidacionesComercio(g.Key, g.Count(), g.Sum(l => l.Lineas.Count(x => x.Origen == OrigenLiquidacion.BaseEnvio)), g.Sum(l => l.TotalNeto),
                 g.Where(l => l.Estado == EstadoLiquidacion.Pagada).Sum(l => l.TotalNeto),
                 g.Where(l => l.Estado == EstadoLiquidacion.Emitida).Sum(l => l.TotalNeto)))
             .ToList();

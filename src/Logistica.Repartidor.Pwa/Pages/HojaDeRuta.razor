@@ -47,7 +47,7 @@
                 <div class="card-body">
                     @foreach (var envio in parada.Envios) {
                         <section class="mb-4">
-                            <h3 class="h5">Envío @envio.Numero <span class="badge text-bg-secondary">@Estado(envio.Estado)</span></h3>
+                            <h3 class="h5">Envío @envio.Numero <span class="badge text-bg-secondary">@EstadoVisible(envio)</span></h3>
                             <p class="mb-1"><strong>@envio.DestinatarioNombre</strong> · <a href="@("tel:" + Uri.EscapeDataString(envio.DestinatarioTelefono))">@envio.DestinatarioTelefono</a></p>
                             <p class="mb-1">@envio.Direccion.Calle @envio.Direccion.Numero, @envio.Direccion.Localidad, @envio.Direccion.Departamento · CP @envio.Direccion.CodigoPostal</p>
                             @if (!string.IsNullOrWhiteSpace(envio.Direccion.Referencia)) { <p class="mb-1">Referencia: @envio.Direccion.Referencia</p> }
@@ -111,6 +111,18 @@
     };
     private static string Horario(TimeOnly? desde, TimeOnly? hasta) => desde is null || hasta is null ? "" : $"· {desde:HH:mm}–{hasta:HH:mm}";
     private static string Cantidad(int cantidad, string singular, string plural) => $"{cantidad} {(cantidad == 1 ? singular : plural)}";
+    // Entrega parcial (cierre técnico, D4): con bultos en estados distintos, el estado de compatibilidad del envío no dice
+    // qué pasó; se muestra cuántos bultos de esta hoja se entregaron. Las hojas anteriores sin estado por bulto siguen
+    // mostrando el del envío.
+    private static string EstadoVisible(Logistica.Http.Contracts.Repartidor.EnvioHojaResponse envio)
+    {
+        var estados = envio.Bultos.Select(b => b.Estado.Length == 0 ? envio.Estado : b.Estado).ToList();
+        var entregados = estados.Count(e => e == "Entregado");
+        return entregados > 0 && entregados < estados.Count
+            ? $"{entregados} de {estados.Count} bultos entregados"
+            : Estado(estados.Distinct().Count() == 1 ? estados[0] : envio.Estado);
+    }
+
     private static string Estado(string estado) => estado switch {
         "AsignadoARuta" => "Asignado a ruta", "EnCurso" => "En curso", "EnTransito" => "En tránsito",
         "EnDeposito" => "En depósito", "NoEntregado" => "No entregado", "EnDevolucion" => "En devolución",

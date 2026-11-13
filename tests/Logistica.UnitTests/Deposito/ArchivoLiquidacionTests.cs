@@ -16,7 +16,7 @@ public class ArchivoLiquidacionTests
             new DateOnly(2026, 10, 31), [new DatosLinea(Guid.NewGuid(), "ENV-000007", ahora, "Envío devuelto", 1234.5m)], ahora);
         liquidacion.Emitir(ahora);
         var detalle = new DetalleLiquidacion(liquidacion,
-            [new LineaCuentaCorriente("ENV-000007", new DateOnly(2026, 10, 28), "Envío devuelto", 1234.5m)]);
+            [new LineaCuentaCorriente("ENV-000007", new DateOnly(2026, 10, 28), "Envío devuelto", 1235m)]);
 
         var bytes = ConsultarCuentaCorrienteEndpoint.Csv(detalle);
 
@@ -26,10 +26,10 @@ public class ArchivoLiquidacionTests
         [
             "Liquidación;del 01/10/2026 al 31/10/2026;Emitida",
             "Envío;Fecha;Concepto;Monto",
-            "ENV-000007;28/10/2026;Envío devuelto;1234,50",
-            ";;Total bruto;1234,50",
+            "ENV-000007;28/10/2026;Envío devuelto;1235,00",
+            ";;Total bruto;1235,00",
             ";;Ajustes;0,00",
-            ";;Total neto;1234,50",
+            ";;Total neto;1235,00",
         ], lineas);
     }
 }
