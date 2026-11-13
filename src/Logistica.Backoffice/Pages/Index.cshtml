@@ -5,6 +5,16 @@
 }
 
 <h1 class="display-6">Backoffice</h1>
+@if (PerfilesBackoffice.DelUsuario(User) is { } perfil)
+{
+    <p class="d-flex flex-wrap align-items-center justify-content-center gap-2 mb-2 fs-5">
+        Bienvenido a
+        <span class="perfil-usuario perfil-usuario-grande @perfil.Clase">
+            @Html.Raw(PerfilesBackoffice.Svg(perfil, 22))
+            @perfil.Area
+        </span>
+    </p>
+}
 <p class="text-center text-body-secondary">Panel de trabajo del operador logístico. Elegí una de las opciones disponibles para tu perfil.</p>
 
 @* Las mismas secciones que el menú lateral, filtradas por perfil. *@
