@@ -21,11 +21,6 @@ else
     <EditForm Model="_formulario" OnValidSubmit="ConfirmarAsync">
         <DataAnnotationsValidator />
 
-        @if (_error is not null)
-        {
-            <div class="alert alert-danger" role="alert">@_error</div>
-        }
-
         <fieldset class="mb-4">
             <legend class="h5">Destinatario</legend>
             <div class="row g-3">
@@ -167,6 +162,13 @@ else
             </button>
         </fieldset>
 
+        @* Junto al botón: el formulario es largo y un aviso arriba quedaría fuera de la vista al confirmar. *@
+        <ValidationSummary class="text-danger" />
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+
         <button type="submit" class="btn btn-primary" disabled="@_enviando">
             @(_enviando ? "Creando..." : "Confirmar")
         </button>
@@ -209,11 +211,19 @@ else
         try
         {
             var url = $"/api/envios/franjas?codigoPostal={Uri.EscapeDataString(_formulario.CodigoPostal.Trim())}&fecha={fecha:yyyy-MM-dd}";
-            _franjas = await Http.GetFromJsonAsync<List<FranjaDisponibleResponse>>(url) ?? [];
+            var respuesta = await Http.GetAsync(url);
+            if (respuesta.IsSuccessStatusCode)
+            {
+                _franjas = await respuesta.Content.ReadFromJsonAsync<List<FranjaDisponibleResponse>>() ?? [];
+            }
+            else
+            {
+                _error = "No se pudieron cargar las franjas horarias. " + await MotivoDeError.LeerAsync(respuesta);
+            }
         }
-        catch (HttpRequestException)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            _error = "No se pudieron cargar las franjas horarias. Intentá de nuevo.";
+            _error = "No se pudieron cargar las franjas horarias. " + MotivoDeError.DeConexion(e);
         }
     }
 
@@ -233,31 +243,16 @@ else
             }
             else
             {
-                _error = await LeerMotivoAsync(response)
-                    ?? "No se pudo crear el envío. Revisá los datos e intentá de nuevo.";
+                    _error = "No se pudo crear el envío. " + await MotivoDeError.LeerAsync(response);
             }
         }
-        catch (HttpRequestException)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            _error = "No se pudo conectar con el servidor. Intentá de nuevo.";
+            _error = "No se pudo crear el envío. " + MotivoDeError.DeConexion(e);
         }
         finally
         {
             _enviando = false;
-        }
-    }
-
-    // Un 400 por regla de negocio trae un ProblemDetails con el motivo en "detail".
-    private static async Task<string?> LeerMotivoAsync(HttpResponseMessage response)
-    {
-        try
-        {
-            var problema = await response.Content.ReadFromJsonAsync<Problema>();
-            return problema?.Detail;
-        }
-        catch (JsonException)
-        {
-            return null;
         }
     }
 
@@ -267,6 +262,4 @@ else
         _franjas = [];
         _creado = null;
     }
-
-    private sealed record Problema(string? Title, string? Detail);
 }
