@@ -2,6 +2,7 @@ using Logistica.Modules.Envios.Contracts.Events;
 using Logistica.Modules.Envios.Domain.Envios;
 using Logistica.SharedKernel;
 using Logistica.Modules.Administracion.Contracts;
+using Logistica.Modules.Administracion.Contracts.Results;
 
 namespace Logistica.Modules.Envios.Application.Features.CrearEnvio;
 
@@ -28,6 +29,7 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             return new AltaEnvio(existente, Creado: false);
 
         var cotizacion = await CotizarAsync(command, ct);
+        var franja = await ResolverFranjaElegidaAsync(command, cotizacion.ZonaId, ct);
         var numero = await envios.SiguienteNumeroAsync(ct);
 
         var envio = Envio.Crear(
@@ -45,7 +47,8 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
             modalidad: command.Modalidad,
             referenciaComercio: referencia,
             esPrueba: command.EsPrueba);
-        envio.DefinirPlanificacion(cotizacion.ZonaId, null, null);
+        // Con franja y fecha elegidas, Planificación ofrece el envío sólo ese día y en esa franja (CU-40).
+        envio.DefinirPlanificacion(cotizacion.ZonaId, franja?.Id, franja is null ? null : command.FechaEntrega);
 
         try
         {
@@ -82,6 +85,58 @@ internal sealed class CrearEnvioHandler(IEnvioRepository envios, ICurrentTenant 
         if (referencia is not null && await envios.ObtenerPorReferenciaAsync(comercioId, referencia, command.EsPrueba, ct) is { } existente)
             return (existente, null);
         return (null, await CotizarAsync(command, ct));
+    }
+
+    // Las franjas que se pueden elegir para la dirección y el día: las de la zona del código postal que rigen esa fecha.
+    // Sin cobertura del código postal o para un día no elegible, ninguna.
+    public async Task<IReadOnlyList<FranjaPlanificacion>> FranjasDisponiblesAsync(string codigoPostal, DateOnly fecha,
+        CancellationToken ct)
+    {
+        if (fecha < await PrimerDiaElegibleAsync(ct))
+        {
+            return [];
+        }
+
+        var recursos = await administracion.ConsultarRecursosPlanificacionAsync(fecha, ct);
+        var zona = recursos.Zonas.SingleOrDefault(z => z.CodigosPostales.Contains(codigoPostal.Trim()));
+        return zona is null ? [] : recursos.Franjas.Where(f => f.ZonaId == zona.Id).OrderBy(f => f.Desde).ToList();
+    }
+
+    // La fecha y la franja van juntas. La franja tiene que regir esa fecha (día de la semana y vigencia) y ser de la
+    // zona del código postal, como en CU-19. Se guarda la franja vigente ese día, la que Planificación resuelve.
+    private async Task<FranjaPlanificacion?> ResolverFranjaElegidaAsync(CrearEnvioCommand command, Guid zonaId,
+        CancellationToken ct)
+    {
+        if (command.FechaEntrega is null && command.FranjaId is null)
+        {
+            return null;
+        }
+
+        if (command.FechaEntrega is not DateOnly fecha || command.FranjaId is not Guid franjaId)
+        {
+            throw new DomainException("Elegí la fecha y la franja de entrega juntas, o ninguna de las dos.");
+        }
+
+        if (fecha < await PrimerDiaElegibleAsync(ct))
+        {
+            throw new DomainException("La fecha de entrega tiene que ser posterior a hoy.");
+        }
+
+        var franja = (await administracion.ResolverFranjasAsync([franjaId], fecha, ct)).SingleOrDefault();
+        if (franja is null || franja.ZonaId != zonaId)
+        {
+            throw new DomainException("Esa franja no está disponible ese día en la zona de la dirección.");
+        }
+
+        return franja;
+    }
+
+    // Desde mañana, en el día del operador: el envío todavía tiene que llegar al depósito para salir en una ruta.
+    private async Task<DateOnly> PrimerDiaElegibleAsync(CancellationToken ct)
+    {
+        var contexto = await administracion.ObtenerContextoPlanificacionAsync(ct);
+        var zonaHoraria = TimeZoneInfo.FindSystemTimeZoneById(contexto.ZonaHoraria);
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(reloj.GetUtcNow(), zonaHoraria).DateTime).AddDays(1);
     }
 
     private static void ValidarDatos(CrearEnvioCommand command)

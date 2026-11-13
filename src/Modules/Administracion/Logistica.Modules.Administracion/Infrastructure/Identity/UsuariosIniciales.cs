@@ -59,6 +59,10 @@ internal sealed class UsuariosIniciales(
         await CrearAsync(Usuario.CrearPersonal(demo, "Depósito Demo", "deposito@operador-demo.uy"), Perfil.OperarioDeposito);
         await CrearAsync(Usuario.CrearPersonal(este, "Depósito Este", "deposito@envios-del-este.uy"), Perfil.OperarioDeposito);
 
+        // Administra la plataforma: da de alta operadores y sus administradores. No pertenece a ningún operador.
+        await CrearAsync(Usuario.CrearAdministradorGeneral("Administración General", "admin@plataforma.uy"),
+            Perfil.AdministradorGeneral);
+
         // Trabaja con los dos operadores: elige uno en la sesión (CU-03).
         await CrearAsync(Usuario.CrearDeComercio(DatosIniciales.ComercioDemoId, "Tienda Demo", "comercio@tiendademo.uy"),
             Perfil.UsuarioComercio);

@@ -60,6 +60,12 @@ internal sealed class Usuario : IdentityUser<Guid>
         return usuario;
     }
 
+    // Administrador general: ni operador ni comercio. Sin inquilino en la sesión no ve datos de ningún operador.
+    public static Usuario CrearAdministradorGeneral(string nombre, string email, Guid? id = null)
+    {
+        return Crear(nombre, email, id);
+    }
+
     private static Usuario Crear(string nombre, string email, Guid? id)
     {
         if (string.IsNullOrWhiteSpace(nombre))

@@ -118,6 +118,14 @@ Con el entorno completo levantado (`docker compose up -d --build --wait`):
 | 3 | `docker compose stop postgres` | `curl -i http://localhost:8080/health` responde 503 *Unhealthy*; crear un envío responde 503 con `Retry-After` | `docker compose start postgres`: `/health` vuelve a 200 sin reiniciar la API |
 | 4 | `docker compose stop mailpit` | Crear un envío con correo del destinatario: en la base, la notificación tiene `Intentos` > 0 y un `UltimoError` | `docker compose start mailpit`: el correo aparece en http://localhost:8025 en el reintento siguiente |
 
+Ensayado el 12/11/2026 con Docker Compose. Detalles a tener en cuenta:
+
+- **Antes de empezar, crear un envío con todo arriba.** El primero después de levantar la API tarda varios segundos por el arranque en frío (7 s en el ensayo); los siguientes, unos 40 ms. Sin ese paso, el caso 1 parece lento por una causa ajena a Valkey.
+- **Caso 1:** con Valkey detenido, los envíos se crearon en 24 a 27 ms.
+- **Caso 2:** el evento quedó con `PublicadoEn` vacío y se publicó al volver el broker. La consulta se corre con `docker compose exec postgres sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB'`, que toma el usuario y la base del propio contenedor. Sin comillas dobles adentro: PowerShell 5.1 las pierde al pasarle el argumento a Docker.
+- **Caso 3:** `/health` respondió 503 en 14 ms. Crear un envío respondió 503 con `Retry-After: 5`, pero tardó de 4 a 12 s, no los 41 ms de la prueba automática. En Compose, al detener `postgres` su nombre deja de resolverse en la red de Docker y la resolución tarda en fallar ("Name or service not known" en el registro de la API). La prueba automática se conecta a un puerto y el rechazo es inmediato. En Azure, la base es un servicio administrado y no se detiene de esta forma.
+- **Caso 4:** la tabla es `seguimiento.notificaciones`; se filtra por `"Destino"` (el correo usado). El Worker tarda unos segundos en hacer el primer intento: hay que esperar a ver `Intentos = 1` antes de levantar Mailpit, o el correo sale en el primer intento y no se ve el reintento. En el ensayo, la notificación quedó *Enviada* en el intento 2, unos 13 s después de creada.
+
 ---
 
 ## Historial de versiones
@@ -126,3 +134,4 @@ Con el entorno completo levantado (`docker compose up -d --build --wait`):
 | :---: | :---: | :---- |
 | 1.0 | 08/11/2026 | Versión inicial: los cuatro casos con su prueba de integración, el chequeo de PostgreSQL en `/health`, el 503 con la base caída y el backplane de SignalR en FailFast. |
 | 1.1 | 08/11/2026 | Caso 1: invalidación fallida, con el puntero del tarifario de 1 minuto. El precio viejo duró 59,6 s y la prueba falla con 10 minutos. |
+| 1.2 | 12/11/2026 | Sección 6: ensayo de los cuatro casos con Docker Compose, con el calentamiento previo, la demora del 503 por la resolución de nombres de Docker y la consulta de notificaciones. |

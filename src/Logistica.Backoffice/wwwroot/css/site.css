@@ -245,3 +245,44 @@ main h1 {
 .tarjeta-seccion .card-title a {
   color: var(--operador-primario, #1b6ec2);
 }
+
+/* Perfil de la sesión: un distintivo con ícono y color propio por perfil. Fondo blanco y borde de color, para que se
+   lea sobre la barra con el color de cualquier operador; los colores del texto cumplen contraste AA sobre blanco. */
+.perfil-usuario {
+  display: inline-flex;
+  align-items: center;
+  gap: .375rem;
+  padding: .2rem .6rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background-color: #fff;
+  font-size: .875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.perfil-usuario svg {
+  flex-shrink: 0;
+}
+
+.perfil-usuario-grande {
+  padding: .3rem .85rem;
+  font-size: 1rem;
+}
+
+.perfil-administrador {
+  color: #5b21b6;
+}
+
+.perfil-despacho {
+  color: #0f766e;
+}
+
+.perfil-deposito {
+  color: #b45309;
+}
+
+.perfil-general {
+  color: #1e3a8a;
+}

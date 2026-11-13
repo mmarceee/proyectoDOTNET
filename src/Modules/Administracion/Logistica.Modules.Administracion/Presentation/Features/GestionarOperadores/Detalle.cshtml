@@ -1,0 +1,107 @@
+@page "/backoffice/plataforma/operadores/{id:guid}"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarOperadores.DetalleModel
+@using Logistica.Modules.Administracion.Application.Features.GestionarUsuarios
+@using Logistica.Modules.Administracion.Presentation.Features.GestionarUsuarios
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    var operador = Model.Detalle.Operador;
+    ViewData["Title"] = operador.Nombre;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">@operador.Nombre</h1>
+    <a href="/backoffice/plataforma/operadores" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-success" role="status">@Model.Mensaje</div>
+}
+@if (Model.Enlace is not null)
+{
+    <div class="alert alert-info" role="status">
+        <strong>Sólo en desarrollo</strong>, mientras el Worker no manda el correo: <a href="@Model.Enlace">enlace de activación</a>.
+    </div>
+}
+
+<dl class="row">
+    <dt class="col-sm-3">Slug</dt>
+    <dd class="col-sm-9">@operador.Slug</dd>
+    <dt class="col-sm-3">Zona horaria</dt>
+    <dd class="col-sm-9">@operador.ZonaHoraria</dd>
+    <dt class="col-sm-3">Estado</dt>
+    <dd class="col-sm-9">
+        <span class="badge @(operador.Activo ? "text-bg-success" : "text-bg-secondary")">@(operador.Activo ? "Activo" : "Suspendido")</span>
+    </dd>
+</dl>
+
+<form method="post" asp-page-handler="@(operador.Activo ? "Suspender" : "Activar")" class="mb-5">
+    @if (operador.Activo)
+    {
+        <button type="submit" class="btn btn-outline-danger">Suspender operador</button>
+        <div class="form-text">Su personal no podrá iniciar sesión y sus comercios no lo podrán elegir. Los datos se conservan.</div>
+    }
+    else
+    {
+        <button type="submit" class="btn btn-outline-success">Activar operador</button>
+    }
+</form>
+
+<h2 class="h5">Administradores</h2>
+@if (Model.Detalle.Administradores.Count == 0)
+{
+    <p class="text-muted">El operador no tiene administradores.</p>
+}
+else
+{
+    <div class="table-responsive mb-4">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Estado</th>
+                    <th><span class="visually-hidden">Acciones</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var admin in Model.Detalle.Administradores)
+                {
+                    var (estado, clase) = TextosUsuario.Estado(admin.Estado);
+                    <tr>
+                        <td>@admin.Nombre</td>
+                        <td>@admin.Email</td>
+                        <td><span class="badge @clase">@estado</span></td>
+                        <td class="text-end">
+                            @if (admin.Estado != EstadoUsuario.Desactivado)
+                            {
+                                <form method="post" asp-page-handler="Desactivar">
+                                    <input type="hidden" name="UsuarioId" value="@admin.Id" />
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Desactivar</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<div class="row">
+    <div class="col-lg-6">
+        <h3 class="h6">Agregar un administrador</h3>
+        <form method="post" asp-page-handler="Administrador">
+            <div class="mb-3">
+                <label asp-for="NombreAdministrador" class="form-label">Nombre</label>
+                <input asp-for="NombreAdministrador" class="form-control" required />
+            </div>
+            <div class="mb-3">
+                <label asp-for="EmailAdministrador" class="form-label">Correo</label>
+                <input asp-for="EmailAdministrador" type="email" class="form-control" required />
+            </div>
+            <button type="submit" class="btn btn-primary">Crear e invitar</button>
+        </form>
+    </div>
+</div>
