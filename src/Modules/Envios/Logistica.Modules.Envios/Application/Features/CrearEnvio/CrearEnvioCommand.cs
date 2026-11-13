@@ -13,7 +13,9 @@ internal sealed record CrearEnvioCommand(
     OrigenEvento Origen,
     Modalidad Modalidad = Modalidad.Estandar,
     string? ReferenciaComercio = null,
-    bool EsPrueba = false);
+    bool EsPrueba = false,
+    DateOnly? FechaEntrega = null,
+    Guid? FranjaId = null);
 
 // Peso y medidas de un bulto. La tarifa no viene del cliente: la calcula el sistema.
 internal sealed record BultoACrear(decimal PesoKg, decimal LargoCm, decimal AnchoCm, decimal AltoCm);

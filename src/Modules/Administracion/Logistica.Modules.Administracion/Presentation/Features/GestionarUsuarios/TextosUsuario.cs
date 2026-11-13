@@ -17,6 +17,7 @@ internal static class TextosUsuario
         Perfil.Repartidor => "Repartidor",
         Perfil.OperarioDeposito => "Operario de depósito",
         Perfil.UsuarioComercio => "Usuario de comercio",
+        Perfil.AdministradorGeneral => "Administrador general",
         _ => perfil.ToString(),
     };
 

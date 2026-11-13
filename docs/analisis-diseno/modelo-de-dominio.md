@@ -40,7 +40,9 @@ Las notas junto a cada clase o relación reflejan decisiones tomadas durante el 
 
 * actualizarIdentidad(nueva: IdentidadVisual): void
 
-* desactivar(): void
+* suspender(): void (CU-00: su personal no inicia sesión y sus comercios no lo eligen)
+
+* activar(): void
 
 **IdentidadVisual**
 
@@ -438,7 +440,7 @@ La [especificación técnica de CU-40](cu-40/especificacion-tecnica-cu-40.md), s
 
 **Perfil**  *«enum»*
 
-Administrador, Despachador, Repartidor, OperarioDeposito, UsuarioComercio
+Administrador, Despachador, Repartidor, OperarioDeposito, UsuarioComercio, AdministradorGeneral (CU-00: sin operador ni comercio)
 
 **Modalidad**  *«enum»*
 

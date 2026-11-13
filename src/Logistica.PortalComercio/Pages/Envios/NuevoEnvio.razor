@@ -79,7 +79,8 @@ else
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="codigo-postal">Código postal</label>
-                    <InputText id="codigo-postal" class="form-control" @bind-Value="_formulario.CodigoPostal" />
+                    <InputText id="codigo-postal" class="form-control" @bind-Value="_formulario.CodigoPostal"
+                               @bind-Value:after="CargarFranjasAsync" />
                     <ValidationMessage For="() => _formulario.CodigoPostal" />
                 </div>
                 <div class="col-12">
@@ -92,12 +93,34 @@ else
 
         <fieldset class="mb-4">
             <legend class="h5">Servicio</legend>
-            <div class="col-md-4">
-                <label class="form-label" for="modalidad">Modalidad</label>
-                <InputSelect id="modalidad" class="form-select" @bind-Value="_formulario.Modalidad">
-                    <option value="Estandar">Estándar</option>
-                    <option value="Urgente">Urgente</option>
-                </InputSelect>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="modalidad">Modalidad</label>
+                    <InputSelect id="modalidad" class="form-select" @bind-Value="_formulario.Modalidad">
+                        <option value="Estandar">Estándar</option>
+                        <option value="Urgente">Urgente</option>
+                    </InputSelect>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="fecha-entrega">Fecha de entrega (opcional)</label>
+                    <InputDate id="fecha-entrega" class="form-control" min="@Manana.ToString("yyyy-MM-dd")"
+                               @bind-Value="_formulario.FechaEntrega" @bind-Value:after="CargarFranjasAsync" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="franja">Franja horaria</label>
+                    <InputSelect id="franja" class="form-select" @bind-Value="_formulario.FranjaHorariaId"
+                                 disabled="@(_franjas.Count == 0)">
+                        <option value="">@TextoSinFranja</option>
+                        @foreach (var franja in _franjas)
+                        {
+                            <option value="@franja.Id">@franja.Desde.ToString("HH:mm") a @franja.Hasta.ToString("HH:mm")</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12 form-text">
+                    Si elegís fecha y franja, el envío se planifica para ese día y ese horario. Las franjas dependen de la
+                    zona del código postal.
+                </div>
             </div>
         </fieldset>
 
@@ -162,6 +185,37 @@ else
     private CrearEnvioResponse? _creado;
     private string? _error;
     private bool _enviando;
+    private IReadOnlyList<FranjaDisponibleResponse> _franjas = [];
+
+    // Sólo para el mínimo del selector: el servidor valida con el día del operador.
+    private static DateOnly Manana => DateOnly.FromDateTime(DateTime.Today).AddDays(1);
+
+    private string TextoSinFranja =>
+        _formulario.FechaEntrega is null || string.IsNullOrWhiteSpace(_formulario.CodigoPostal)
+            ? "Elegí la fecha y el código postal"
+            : _franjas.Count == 0 ? "No hay franjas ese día" : "Sin franja";
+
+    // Al cambiar la fecha o el código postal, se piden las franjas de esa zona para ese día y se descarta la elegida.
+    private async Task CargarFranjasAsync()
+    {
+        _formulario.FranjaHorariaId = null;
+        _franjas = [];
+
+        if (_formulario.FechaEntrega is not DateOnly fecha || string.IsNullOrWhiteSpace(_formulario.CodigoPostal))
+        {
+            return;
+        }
+
+        try
+        {
+            var url = $"/api/envios/franjas?codigoPostal={Uri.EscapeDataString(_formulario.CodigoPostal.Trim())}&fecha={fecha:yyyy-MM-dd}";
+            _franjas = await Http.GetFromJsonAsync<List<FranjaDisponibleResponse>>(url) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No se pudieron cargar las franjas horarias. Intentá de nuevo.";
+        }
+    }
 
     private async Task ConfirmarAsync()
     {
@@ -210,6 +264,7 @@ else
     private void NuevoFormulario()
     {
         _formulario = new NuevoEnvioFormulario();
+        _franjas = [];
         _creado = null;
     }
 

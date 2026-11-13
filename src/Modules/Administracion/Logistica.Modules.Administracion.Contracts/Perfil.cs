@@ -9,4 +9,7 @@ public enum Perfil
     Repartidor,
     OperarioDeposito,
     UsuarioComercio,
+    // Administra la plataforma: da de alta los operadores y sus administradores. No pertenece a ningún operador ni
+    // comercio, así que no ve datos de ningún inquilino (el filtro "Tenant" falla cerrado sin operador).
+    AdministradorGeneral,
 }

@@ -46,7 +46,12 @@ internal sealed class AccesoAplicacionesMiddleware(RequestDelegate next)
                 : !http.User.HasClaim(c => c.Type == ClaimsDeSesion.ComercioId)
                     && (http.User.IsInRole(nameof(Perfil.Administrador))
                         || http.User.IsInRole(nameof(Perfil.Despachador))
-                        || http.User.IsInRole(nameof(Perfil.OperarioDeposito)));
+                        || http.User.IsInRole(nameof(Perfil.OperarioDeposito))
+                        // El administrador general entra al Backoffice sin operador: sus páginas exigen su política y
+                        // las del operador lo rechazan; sin operador en la sesión, el filtro no le muestra datos.
+                        || http.User.IsInRole(nameof(Perfil.AdministradorGeneral))
+                            && http.Request.Path.StartsWithSegments("/backoffice")
+                            && !http.User.HasClaim(c => c.Type == ClaimsDeSesion.OperadorId));
             if (!permitido)
             {
                 http.Response.StatusCode = StatusCodes.Status403Forbidden;
