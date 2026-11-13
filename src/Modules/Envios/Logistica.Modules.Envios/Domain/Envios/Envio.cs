@@ -70,6 +70,10 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     // En una nueva visita (RF 34) deja afuera los bultos ya entregados; carga y hoja conservan además su contexto de ruta.
     public IReadOnlyList<Bulto> BultosQueAcompanan => _bultos.Where(b => b.Estado == Estado).ToList();
 
+    // Algún bulto todavía tiene una entrega por delante (cierre técnico RF 31, D4). Se decide por bulto y no por el
+    // estado de compatibilidad: con un bulto entregado y otro reprogramado, el envío sigue esperando una entrega.
+    public bool TieneEntregaPendiente => _bultos.Any(b => EstadosConEntregaPendiente.Contains(b.Estado));
+
     // Confirmar parte de la carga puede dejar el envío EnTransito con otros bultos AsignadoARuta.
     // Siguen disponibles hasta Comenzar ruta; los ya entregados no vuelven a cargarse.
     public IReadOnlyList<Bulto> BultosParaCarga => _bultos.Where(b => b.Estado == Estado
