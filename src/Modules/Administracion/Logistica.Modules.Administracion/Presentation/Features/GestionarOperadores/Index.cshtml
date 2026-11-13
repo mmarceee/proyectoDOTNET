@@ -1,0 +1,46 @@
+@page "/backoffice/plataforma/operadores"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarOperadores.IndexModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Operadores";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Operadores</h1>
+    <a href="/backoffice/plataforma/operadores/nuevo" class="btn btn-primary">Nuevo operador</a>
+</div>
+
+@if (Model.Operadores.Count == 0)
+{
+    <p class="text-muted">Todavía no hay operadores.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Slug</th>
+                    <th>Zona horaria</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var operador in Model.Operadores)
+                {
+                    <tr>
+                        <td><a href="/backoffice/plataforma/operadores/@operador.Id">@operador.Nombre</a></td>
+                        <td>@operador.Slug</td>
+                        <td>@operador.ZonaHoraria</td>
+                        <td>
+                            <span class="badge @(operador.Activo ? "text-bg-success" : "text-bg-secondary")">
+                                @(operador.Activo ? "Activo" : "Suspendido")
+                            </span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

@@ -17,6 +17,17 @@ internal static class CrearEnvioEndpoint
     {
         // CU-10: lo crea el usuario de comercio, con el operador de la sesión elegido.
         group.MapPost("/", CrearAsync).RequireAuthorization(Politicas.Comercio);
+
+        // Las franjas que el comercio puede elegir para la dirección y el día (CU-10, compromiso de entrega).
+        group.MapGet("/franjas", FranjasAsync).RequireAuthorization(Politicas.Comercio);
+    }
+
+    private static async Task<Ok<IReadOnlyList<FranjaDisponibleResponse>>> FranjasAsync(
+        string codigoPostal, DateOnly fecha, CrearEnvioHandler handler, CancellationToken ct)
+    {
+        var franjas = await handler.FranjasDisponiblesAsync(codigoPostal, fecha, ct);
+        return TypedResults.Ok<IReadOnlyList<FranjaDisponibleResponse>>(
+            franjas.Select(f => new FranjaDisponibleResponse(f.Id, f.Desde, f.Hasta)).ToList());
     }
 
     private static async Task<Created<CrearEnvioResponse>> CrearAsync(
@@ -42,6 +53,6 @@ internal static class CrearEnvioEndpoint
             new Destinatario(d.Nombre, d.Telefono, d.Email, d.Documento),
             new Direccion(dir.Calle, dir.Numero, dir.Localidad, dir.Departamento, dir.CodigoPostal, dir.Referencia),
             request.Bultos.Select(b => new BultoACrear(b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
-            origen, modalidad, referenciaComercio, esPrueba);
+            origen, modalidad, referenciaComercio, esPrueba, request.FechaEntrega, request.FranjaHorariaId);
     }
 }

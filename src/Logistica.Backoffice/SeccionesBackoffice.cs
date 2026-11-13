@@ -15,6 +15,7 @@ public static class SeccionesBackoffice
     private const string Administrador = "Administrador";
     private const string Despachador = "Despachador";
     private const string OperarioDeposito = "OperarioDeposito";
+    private const string AdministradorGeneral = "AdministradorGeneral";
 
     public static IReadOnlyList<SeccionBackoffice> Todas { get; } =
     [
@@ -55,6 +56,9 @@ public static class SeccionesBackoffice
             "/backoffice/liquidaciones", [Administrador]),
         new("Administración", "Mensajes fallidos", "Los mensajes que no se pudieron procesar, para reintentarlos.",
             "/backoffice/mensajes-fallidos", [Administrador]),
+
+        new("Plataforma", "Operadores", "Los operadores de la plataforma y sus administradores.",
+            "/backoffice/plataforma/operadores", [AdministradorGeneral]),
     ];
 
     // El menú es para el personal del operador. Un usuario de comercio no lo ve aunque tenga otro perfil.

@@ -21,4 +21,7 @@ public static class Politicas
 
     // Repartidor vinculado a su Repartidor (claim repartidor_id): sincroniza lo que registró en la PWA (CU-52).
     public const string Repartidor = "Repartidor";
+
+    // Da de alta y gestiona los operadores de la plataforma y sus administradores.
+    public const string AdministradorGeneral = "AdministradorGeneral";
 }

@@ -45,6 +45,28 @@ internal sealed class Operador : Entity
         };
     }
 
+    // Administrador general: un operador suspendido no opera. Su personal no inicia sesión, sus comercios no lo pueden
+    // elegir y el cierre diario lo saltea. Los datos se conservan, así que se puede volver a activar.
+    public void Suspender()
+    {
+        if (!Activo)
+        {
+            throw new DomainException("El operador ya está suspendido.");
+        }
+
+        Activo = false;
+    }
+
+    public void Activar()
+    {
+        if (Activo)
+        {
+            throw new DomainException("El operador ya está activo.");
+        }
+
+        Activo = true;
+    }
+
     // CU-07: la identidad se reemplaza entera; las reglas de cada dato las valida IdentidadVisual.
     public void ActualizarIdentidad(IdentidadVisual nueva)
     {

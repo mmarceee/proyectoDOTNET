@@ -1,11 +1,18 @@
 @model RutaEditorModel
+@functions {
+    // La franja se muestra con su zona: dos zonas pueden tener el mismo horario.
+    private string NombreZona(Guid zonaId) => Model.Recursos.Zonas.FirstOrDefault(z => z.Id == zonaId)?.Nombre ?? "Zona";
+
+    private string TextoFranja(Guid? franjaId) => Model.Recursos.Franjas.FirstOrDefault(f => f.Id == franjaId) is { } f
+        ? $"{f.Desde.ToString("HH:mm")}–{f.Hasta.ToString("HH:mm")}" : "Sin franja";
+}
     <section class="card mb-4" aria-labelledby="envios-disponibles">
     <div class="card-body p-4">
     <h2 id="envios-disponibles" class="h5">Envíos disponibles</h2>
     <p class="text-muted">Seleccioná los envíos y sus bultos disponibles. Sólo se ofrecen bultos confirmados en depósito y sin reserva activa.</p>
     <div class="row g-2 mb-3">
         <div class="col-md-3"><label asp-for="ZonaId" class="form-label">Zona</label><select asp-for="ZonaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var z in Model.Recursos.Zonas) { <option value="@z.Id">@z.Nombre</option> }</select></div>
-        <div class="col-md-3"><label asp-for="FranjaId" class="form-label">Franja</label><select asp-for="FranjaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var f in Model.Recursos.Franjas) { <option value="@f.Id">@f.Desde.ToString("HH:mm")–@f.Hasta.ToString("HH:mm")</option> }</select></div>
+        <div class="col-md-3"><label asp-for="FranjaId" class="form-label">Franja</label><select asp-for="FranjaId" class="form-select" data-filtro-ruta><option value="">Todas</option>@foreach (var f in Model.Recursos.Franjas.OrderBy(f => NombreZona(f.ZonaId)).ThenBy(f => f.Desde)) { <option value="@f.Id">@NombreZona(f.ZonaId) · @f.Desde.ToString("HH:mm")–@f.Hasta.ToString("HH:mm")</option> }</select></div>
         <div class="col-md-4"><label asp-for="Texto" class="form-label">Número de envío o dirección</label><input asp-for="Texto" class="form-control" placeholder="ENV-000123 o Av. Italia 1234" data-filtro-ruta /></div>
         <div class="col-md-2"><label asp-for="Pagina" class="form-label">Página</label><input asp-for="Pagina" type="number" min="1" class="form-control" data-filtro-ruta /></div>
     </div>
@@ -17,7 +24,7 @@
         </div>
     </div>
     <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0"><thead><tr><th>Seleccionar</th><th>Envío</th><th>Dirección</th><th>Peso kg</th><th>Volumen m³</th><th>Reintento</th></tr></thead><tbody>
+    <table class="table table-hover align-middle mb-0"><thead><tr><th>Seleccionar</th><th>Envío</th><th>Dirección</th><th>Franja</th><th>Peso kg</th><th>Volumen m³</th><th>Reintento</th></tr></thead><tbody>
     @foreach (var e in Model.Candidatos)
     {
         <tr><td><input type="checkbox" name="Seleccion" value="@e.Id" checked="@(e.DisponibleParaFecha && Model.Seleccion.Contains(e.Id))" disabled="@(!e.DisponibleParaFecha)" aria-label="Seleccionar @e.Numero" /></td>
@@ -37,7 +44,7 @@
                 {
                     <span class="badge text-bg-warning text-nowrap ms-2">Urgente</span>
                 }
-            </td><td>@e.Direccion</td><td>@e.PesoKg</td><td>@e.VolumenM3.ToString("0.######")</td>
+            </td><td>@e.Direccion</td><td>@TextoFranja(e.FranjaId)</td><td>@e.PesoKg</td><td>@e.VolumenM3.ToString("0.######")</td>
             <td>
                 @if (e.ReintentoDesde is DateTimeOffset desde)
                 {
@@ -52,7 +59,7 @@
     }
     @if (Model.Candidatos.Count == 0)
     {
-        <tr><td colspan="6" class="text-center text-muted py-4">No hay envíos disponibles para la fecha y los filtros elegidos.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">No hay envíos disponibles para la fecha y los filtros elegidos.</td></tr>
     }
     </tbody></table>
     </div>
