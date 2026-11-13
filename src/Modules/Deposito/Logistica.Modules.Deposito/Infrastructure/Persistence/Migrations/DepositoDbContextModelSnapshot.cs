@@ -18,7 +18,7 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("deposito")
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -79,6 +79,9 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("Fecha")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("IdDeOrigen")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("LiquidacionId")
                         .HasColumnType("uuid");
 
@@ -92,13 +95,20 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OperadorId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Origen")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("EnvioId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_LineasLiquidacion_EnvioId");
+                    b.HasIndex("EnvioId");
 
                     b.HasIndex("LiquidacionId");
+
+                    b.HasIndex("OperadorId", "Origen", "IdDeOrigen")
+                        .IsUnique()
+                        .HasDatabaseName("UX_LineasLiquidacion_Origen");
 
                     b.ToTable("LineasLiquidacion", "deposito");
                 });

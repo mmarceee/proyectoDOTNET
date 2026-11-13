@@ -30,6 +30,44 @@ public class LiquidacionTests
         Assert.Equal(450m, liquidacion.TotalNeto);
     }
 
+    // Cierre técnico D8: la base va en TotalBruto y los recargos en TotalAjustes; un envío aporta su base y varios
+    // recargos distintos, y puede haber una liquidación sólo de recargos.
+    [Fact]
+    public void Los_recargos_van_en_ajustes_y_un_envio_aporta_su_base_y_sus_recargos()
+    {
+        var envio = Guid.NewGuid();
+        var liquidacion = Generar(Linea(450, envio), Recargo(100, envio), Recargo(100, envio));
+
+        Assert.Equal(450m, liquidacion.TotalBruto);
+        Assert.Equal(200m, liquidacion.TotalAjustes);
+        Assert.Equal(650m, liquidacion.TotalNeto);
+        Assert.Equal(0m, Generar(Recargo(80, envio)).TotalBruto);
+    }
+
+    [Fact]
+    public void Un_recargo_no_aparece_dos_veces()
+    {
+        var recargo = Guid.NewGuid();
+        Assert.Throws<DomainException>(() => Generar(Recargo(100, recargoId: recargo), Recargo(100, recargoId: recargo)));
+    }
+
+    // D8: pesos enteros, al peso más cercano y 0,50 hacia arriba, una vez por concepto; los totales no se redondean de nuevo.
+    [Theory]
+    [InlineData(1500, 1500)]
+    [InlineData(1500.49, 1500)]
+    [InlineData(1500.50, 1501)]
+    public void Cada_concepto_queda_en_pesos_enteros(decimal monto, decimal esperado)
+    {
+        var liquidacion = Generar(Linea(monto), Recargo(monto));
+
+        Assert.All(liquidacion.Lineas, l => Assert.Equal(esperado, l.Monto));
+        Assert.Equal(esperado * 2, liquidacion.TotalNeto);
+    }
+
+    private static DatosLinea Recargo(decimal monto, Guid? envioId = null, Guid? recargoId = null) =>
+        new(envioId ?? Guid.NewGuid(), "ENV-000001", Ahora.AddDays(-5), "Recargo por nueva visita", monto,
+            OrigenLiquidacion.RecargoVisita, recargoId ?? Guid.NewGuid());
+
     [Fact]
     public void A1_sin_envios_no_se_genera()
     {

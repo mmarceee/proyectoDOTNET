@@ -23,6 +23,9 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
     public ResumenEnvio Resumen { get; private set; }
     // Todos los bultos llegaron a un estado terminal: no queda trabajo pendiente.
     public bool Terminado { get; private set; }
+    // Cuándo pasó Terminado de falso a verdadero (cierre técnico, D8): define en qué período se liquida la tarifa base.
+    // No se deduce del estado de compatibilidad ni del historial; los bultos terminales no vuelven atrás.
+    public DateTimeOffset? TerminadoEn { get; private set; }
     // Contador entregados / total (el total es Bultos.Count, incluidos devueltos, extraviados y cancelados).
     public int BultosEntregados { get; private set; }
     public decimal MontoTarifa { get; private set; }
@@ -142,7 +145,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
 
         // T1: el envío nace Admitido y su historial empieza con este evento.
         envio._eventos.Add(new EventoEnvio(envio, null, EstadoEnvio.Admitido, ahora, origen, responsableId));
-        envio.RecalcularResumen();
+        envio.RecalcularResumen(ahora);
 
         return envio;
     }
@@ -166,7 +169,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         Ubicacion? ubicacion = null, string? detalle = null)
     {
         CambiarEstado(nuevo, origen, responsableId, ahora, ubicacion, detalle, moverBultos: true);
-        RecalcularResumen();
+        RecalcularResumen(ahora);
     }
 
     // El cambio del estado de compatibilidad y su EventoEnvio. moverBultos: el puente que lleva a los bultos que
@@ -223,14 +226,14 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
             return true;
         }
 
-        RecalcularResumen();
+        RecalcularResumen(ahora);
         return false;
     }
 
     // CU-31 por bulto (RF 31, pendiente 2 de la decisión): el comercio recibió bultos que volvieron solos, mientras otros
     // del envío siguen su camino. Sólo esos bultos pasan a Devuelto (T15); el estado del envío no cambia. La devolución
     // del envío entero sigue siendo Transicionar(Devuelto).
-    public void DevolverBultos(IReadOnlyCollection<Guid> bultoIds)
+    public void DevolverBultos(IReadOnlyCollection<Guid> bultoIds, DateTimeOffset ahora)
     {
         var bultos = bultoIds.Distinct().Select(id => _bultos.SingleOrDefault(b => b.Id == id)
             ?? throw new DomainException("El bulto no pertenece a este envío.")).ToList();
@@ -245,7 +248,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         }
 
         bultos.ForEach(b => b.Transicionar(EstadoEnvio.Devuelto));
-        RecalcularResumen();
+        RecalcularResumen(ahora);
     }
 
     // RF 31: las cuatro reglas del resumen, en orden; gana la primera que se cumple (tabla-de-transiciones, sección
@@ -277,7 +280,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         if (Estado == EstadoEnvio.AsignadoARuta)
             CambiarEstado(EstadoEnvio.EnTransito, OrigenEvento.AppRepartidor, responsable, ocurridoEn, null,
                 $"Carga: {ids.Count} bultos.", moverBultos: false);
-        RecalcularResumen();
+        RecalcularResumen(ocurridoEn);
     }
 
     // RF 34: valida el conjunto completo y utiliza la tabla declarativa por bulto.
@@ -292,7 +295,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         if (Estado != nuevo && !_bultos.Any(b => b.Estado == Estado) && TablaTransiciones.Permite(Estado, nuevo))
             CambiarEstado(nuevo, origen, actor, ahora, null,
                 $"Planificación por bulto: {ids.Count}.", moverBultos: false);
-        RecalcularResumen();
+        RecalcularResumen(ahora);
     }
 
     internal void ResolverFranjaDeRuta(Guid? franja)
@@ -301,11 +304,17 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
         FranjaHorariaId = franja;
     }
 
-    private void RecalcularResumen()
+    // ahora es el instante de la operación que cambió los bultos: si con ella el envío termina, es su instante de cierre.
+    private void RecalcularResumen(DateTimeOffset ahora)
     {
         var estados = _bultos.Select(b => b.Estado).ToList();
         Resumen = CalcularResumen(estados, Resumen);
+        var terminaAhora = !Terminado && estados.All(EstadosTerminales.Contains);
         Terminado = estados.All(EstadosTerminales.Contains);
+        if (terminaAhora)
+        {
+            TerminadoEn = ahora.ToUniversalTime();
+        }
         BultosEntregados = estados.Count(e => e == EstadoEnvio.Entregado);
     }
 
@@ -477,7 +486,7 @@ internal sealed class Envio : Entity, IOperadorOwned, IComercioOwned
                 CambiarEstado(compatible, OrigenEvento.Sistema, null, ocurridoEn, null, null, moverBultos: false);
         }
 
-        RecalcularResumen();
+        RecalcularResumen(ocurridoEn);
         return intentos;
     }
 

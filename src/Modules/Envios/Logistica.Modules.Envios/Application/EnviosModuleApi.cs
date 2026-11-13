@@ -24,7 +24,7 @@ internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvi
         DateTimeOffset hasta, CancellationToken ct)
     {
         var cerrados = await envios.ListarCerradosAsync(comercioId, desde, hasta, ct);
-        return cerrados.Select(c => new EnvioLiquidable(c.EnvioId, c.Numero, c.Estado.ToString(), c.LlegoEn, c.MontoTarifa))
+        return cerrados.Select(c => new EnvioLiquidable(c.EnvioId, c.Numero, c.Cierre, c.LlegoEn, c.MontoTarifa))
             .ToArray();
     }
 
@@ -539,7 +539,7 @@ internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvi
         {
             // Bultos sueltos: sólo los que recibió el comercio pasan a Devuelto; el envío y sus demás bultos no cambian.
             // Quién los recibió queda en la devolución.
-            envio.DevolverBultos(entregados);
+            envio.DevolverBultos(entregados, ahora);
         }
 
         // A2: la entrega parcial queda registrada como incidencia del envío, con los códigos que faltaron.

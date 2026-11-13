@@ -133,7 +133,8 @@ public class ConsultarCuentaCorrienteTests(PostgresApiFactory factory) : IClassF
         await using var conexion = new NpgsqlConnection(factory.ConnectionString);
         await conexion.OpenAsync();
         await using var comando = new NpgsqlCommand("""
-            UPDATE envios."Envios" SET "Estado" = @estado WHERE "Id" = @id;
+            UPDATE envios."Envios" SET "Estado" = @estado, "Terminado" = true, "TerminadoEn" = @en WHERE "Id" = @id;
+            UPDATE envios."Bultos" SET "Estado" = @estado WHERE "EnvioId" = @id;
             UPDATE envios."EventosEnvio" SET "EstadoNuevo" = @estado, "OcurridoEn" = @en WHERE "EnvioId" = @id;
             """, conexion);
         comando.Parameters.AddWithValue("id", envioId);
