@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptado. Decisiones y evaluación retrospectiva cerradas para este alcance al 09/11/2026. Implementación y aceptación pendientes identificadas en 4.6.** |
-| Versión y fecha | 2.5 · 10/11/2026 |
+| Versión y fecha | 2.9 · 14/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | Inicial: `586f630` (CU-42). Cierre documental: `549c1ae`, con la prueba de caché agregada en esta revisión. |
@@ -12,6 +12,8 @@
 | Relacionados | ADR-0001 a ADR-0006; RF 31 a 36; CU-06, CU-17/18/20/21/30/31/40/41/42/43/50/51/52/54/55/60/64/65/66 y liquidaciones. |
 
 **Continuación RF 34 · 10/11/2026:** se implementan D1/D2 y los consumidores de planificación/carga/visita/retorno/rendición, con custodia individual, reservas, migración conservadora e idempotencia. Las acciones entre módulos se mantienen en ModuleApi (ADR-0001). [Alcance RF 34](rf-34/README.md) y [evidencia/aceptación](rf-34/verificacion.md): compilación correcta, 498 unitarias, 56 de arquitectura y 225 integraciones seleccionadas aprobadas, incluido el circuito real API/Worker/RabbitMQ/Valkey. No se aplicaron migraciones a la base del usuario ni se extiende la aceptación física RF 32 a este recorrido. CU-31 incorpora la devolución individual al comercio. Quedan su aceptación integrada y los pendientes de D8 y D9.
+
+**Continuación · 13/11/2026:** el tablero recibe los eventos de bulto y muestra el avance por bulto (D5); los envíos pendientes del comercio se cuentan por `Terminado` y la hoja de la PWA muestra el avance por bulto (D4); la liquidación cobra la base al cierre (`TerminadoEn`, cierre mixto incluido), los recargos en ajustes y pesos enteros (D8, con dos simplificaciones). Detalle y pruebas en la sección 4.6. Quedan D9 y las aceptaciones manuales.
 
 ## 1. Contexto y restricciones
 
@@ -210,3 +212,4 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | 2.6 | 10/11/2026 | Integración de marce: devolución de un bulto suelto al comercio implementada (CU-31), en la matriz de 4.4 y en las deudas de RF 34. | Ezequiel Marcenal |
 | 2.7 | 13/11/2026 | Sección 4.6: tablero con progreso por bulto y eventos de bulto; consumidores de estado global migrados salvo la liquidación (pendientes 7 y 8 de la decisión). | Ezequiel Marcenal |
 | 2.8 | 13/11/2026 | Sección 4.6: liquidación según D8 implementada (cargo y liquidación, consumidores de estado global), con sus dos simplificaciones. | Ezequiel Marcenal |
+| 2.9 | 14/11/2026 | Encabezado actualizado a la última versión del historial y resumen de la continuación del 13/11 (tablero, lecturas por bulto y liquidación). | Ezequiel Marcenal |
