@@ -322,13 +322,14 @@ public class PlanificacionIdentityTests(PostgresApiFactory factory) : IClassFixt
         }));
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Contains(response.Headers.GetValues("Set-Cookie"), c => c.StartsWith("logistica.sesion="));
-        // El token anónimo anterior no sirve para la identidad autenticada.
-        client.DefaultRequestHeaders.Add("RequestVerificationToken", await TokenAsync(client, login));
+        // El token debe corresponder a la sesión nueva. El formulario de salida de Backoffice sigue accesible tras el ingreso.
+        var paginaConToken = login == "/cuenta/ingresar" ? "/cuenta/salir" : login;
+        client.DefaultRequestHeaders.Add("RequestVerificationToken", await TokenAsync(client, paginaConToken));
         return response;
     }
-    private static async Task<string> TokenAsync(HttpClient client, string login = "/cuenta/ingresar")
+    private static async Task<string> TokenAsync(HttpClient client, string pagina)
     {
-        var html = await client.GetStringAsync(login);
+        var html = await client.GetStringAsync(pagina);
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(token.Success);
         return WebUtility.HtmlDecode(token.Groups[1].Value);
