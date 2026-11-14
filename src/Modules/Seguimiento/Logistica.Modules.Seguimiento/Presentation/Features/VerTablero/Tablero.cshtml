@@ -141,8 +141,12 @@
                 for (const r of rutas) {
                     etiquetas.set(r.vehiculoId, `${r.repartidor} · ${r.vehiculo}`);
                     const fila = el('tr');
-                    fila.append(el('td', r.repartidor), el('td', r.vehiculo), el('td', r.estado),
-                        el('td', `${r.entregados} de ${r.envios} entregados (${r.pendientes} pendientes)`),
+                    // Envíos y, debajo, bultos: con entrega parcial el avance se ve aunque ningún envío se complete.
+                    const avance = el('td', `${r.entregados} de ${r.envios} envíos entregados (${r.pendientes} pendientes)`);
+                    if (r.bultosTotal > 0) {
+                        avance.append(el('div', `${r.bultosEntregados} de ${r.bultosTotal} bultos entregados`, 'small text-muted'));
+                    }
+                    fila.append(el('td', r.repartidor), el('td', r.vehiculo), el('td', r.estado), avance,
                         el('td', r.posicion ? hora.format(new Date(r.posicion.capturadaEn)) : 'Sin ubicación'));
                     cuerpo.append(fila);
                     if (r.posicion) ponerPosicion(r.posicion);

@@ -22,6 +22,28 @@ public class NovedadesTableroTests
         Assert.False(novedad.Alerta);
     }
 
+    // Entrega parcial (cierre técnico, D5): cada resultado de un bulto llega al tablero, aunque el resumen no cambie.
+    [Fact]
+    public void Los_resultados_de_cada_bulto_son_novedades_suscritas()
+    {
+        Assert.Contains(BultoEntregado.Tipo, NotificarNovedadTablero.Tipos);
+        Assert.Contains(BultoNoEntregado.Tipo, NotificarNovedadTablero.Tipos);
+        Assert.Contains(BultoDevuelto.Tipo, NotificarNovedadTablero.Tipos);
+
+        var entregado = NotificarNovedadTablero.Leer(Mensaje(BultoEntregado.Tipo,
+            new BultoEntregado(Guid.NewGuid(), "ENV-000045", "ENV-000045-2", "EnTransito", DateTimeOffset.UtcNow)));
+        var noEntregado = NotificarNovedadTablero.Leer(Mensaje(BultoNoEntregado.Tipo,
+            new BultoNoEntregado(Guid.NewGuid(), "ENV-000045", "ENV-000045-3", "AUSENTE", "Reprogramado", "Reprogramado",
+                DateTimeOffset.UtcNow)));
+        var devuelto = NotificarNovedadTablero.Leer(Mensaje(BultoDevuelto.Tipo,
+            new BultoDevuelto(Guid.NewGuid(), "ENV-000045", "ENV-000045-3", "Devuelto", DateTimeOffset.UtcNow)));
+
+        Assert.Equal("Se entregó el bulto ENV-000045-2 de ENV-000045.", entregado.Texto);
+        Assert.Equal("No se entregó el bulto ENV-000045-3 de ENV-000045 (motivo AUSENTE).", noEntregado.Texto);
+        Assert.Equal("El comercio recibió el bulto devuelto ENV-000045-3 de ENV-000045.", devuelto.Texto);
+        Assert.False(entregado.Alerta || noEntregado.Alerta || devuelto.Alerta);
+    }
+
     [Fact]
     public void Una_carga_con_diferencias_es_una_alerta_con_las_cantidades()
     {

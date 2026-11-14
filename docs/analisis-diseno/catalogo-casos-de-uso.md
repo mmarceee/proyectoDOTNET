@@ -27,6 +27,7 @@ Por el RF 28 (avisos a los comercios ante cada cambio de estado) y el RF 27 (not
 
 | ID | Caso de uso | Actor | App | Tipo | Transición | Eventos | RF | Hito |
 | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- |
+| CU-00 | Gestionar los operadores de la plataforma: alta con su primer administrador, suspender, activar y sus administradores | Administrador general | BO | C/Q | — | UsuarioInvitado (O) | 1 | 12/11 |
 | CU-01 | Dar de alta, modificar, suspender y consultar comercios (y su `RelacionComercial` con el operador) | Administrador | BO | C/Q | — | — | 1 | 15/10 |
 | CU-02 | Gestionar usuarios del operador y de los comercios, con perfiles y permisos | Administrador | BO | C/Q | — | — | 1, 6.3 | 15/10 |
 | CU-03 | Seleccionar el operador con el que trabaja un comercio en la sesión | Usuario de comercio | PC | C | — | — | 3.3 | 15/10 |
@@ -43,7 +44,7 @@ Por el RF 28 (avisos a los comercios ante cada cambio de estado) y el RF 27 (not
 
 | ID | Caso de uso | Actor | App | Tipo | Transición | Eventos | RF | Hito |
 | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- |
-| CU-10 | **Crear un envío individual** con sus bultos, calculando la tarifa | Usuario de comercio | PC | C | T1 | EnvioAdmitido (O) | 7, 8, 9, 11, 12 | **8/10** |
+| CU-10 | **Crear un envío individual** con sus bultos, calculando la tarifa, y opcionalmente la fecha y la franja de entrega | Usuario de comercio | PC | C | T1 | EnvioAdmitido (O) | 7, 8, 9, 11, 12 | **8/10** |
 | CU-11 | Importar envíos desde un archivo, de forma idempotente | Usuario de comercio | PC | C | T1 | EnvioAdmitido (O) por envío | 7 | 12/11 |
 | CU-12 | Crear envíos por API desde el sistema del comercio | Sistema del comercio | API | C | T1 | EnvioAdmitido (O) | 7 | 12/11 — ver sección 2.7 |
 | CU-13 | **Consultar envíos** (listado con filtros) | Personal del operador / usuario de comercio | BO / PC | Q | — | — | 7, 25 | **8/10** |
@@ -177,3 +178,4 @@ Los tres pasos previstos se completaron: las preguntas abiertas del catálogo es
 | 0.3 | 30/09/2026 | Se aceptan las sugerencias sobre el tablero, los reportes y el registro de entregas; la rendición se divide en CU-54 y CU-55. | Ezequiel Marcenal |
 | 0.4 | 02/10/2026 | T18 y T19 confirmadas y T11 eliminada en la tabla de transiciones; se actualiza CU-61. | Ezequiel Marcenal |
 | 0.5 | 03/10/2026 | Se actualizan las preguntas abiertas (T18 y T19 confirmadas, ambiente de pruebas de la API pública) y los próximos pasos. | Ezequiel Marcenal |
+| 0.6 | 13/11/2026 | CU-00 nuevo (administrador general); CU-10 con fecha y franja de entrega opcionales. | Ezequiel Marcenal |

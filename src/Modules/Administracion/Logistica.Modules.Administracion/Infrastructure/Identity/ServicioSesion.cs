@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Logistica.Modules.Administracion.Application.Features.IniciarSesion;
 using Logistica.Modules.Administracion.Application.Features.SeleccionarOperador;
 using Logistica.Modules.Administracion.Contracts;
+using Logistica.Modules.Administracion.Domain.Operadores;
 using Microsoft.AspNetCore.Identity;
 
 namespace Logistica.Modules.Administracion.Infrastructure.Identity;
@@ -9,7 +10,8 @@ namespace Logistica.Modules.Administracion.Infrastructure.Identity;
 // Inicia la sesión con ASP.NET Core Identity: verifica la contraseña contra su hash y emite la cookie con los
 // claims de FabricaDeClaims.
 internal sealed class ServicioSesion(
-    SignInManager<Usuario> sesiones, UserManager<Usuario> usuarios, IOperadoresDelComercio operadores) : IServicioSesion
+    SignInManager<Usuario> sesiones, UserManager<Usuario> usuarios, IOperadoresDelComercio operadores,
+    IOperadorRepository operadoresPlataforma) : IServicioSesion
 {
     public async Task<ResultadoInicioSesion> IniciarAsync(string email, string contrasena, TipoAccesoSesion acceso = TipoAccesoSesion.Personal)
     {
@@ -29,10 +31,18 @@ internal sealed class ServicioSesion(
             TipoAccesoSesion.Repartidor => usuario.ComercioId is null && usuario.OperadorId is not null
                 && perfiles.Contains(nameof(Perfil.Repartidor)),
             TipoAccesoSesion.Personal => usuario.ComercioId is null && perfiles.Any(p => p is nameof(Perfil.Administrador)
-                or nameof(Perfil.Despachador) or nameof(Perfil.OperarioDeposito)),
+                or nameof(Perfil.Despachador) or nameof(Perfil.OperarioDeposito))
+                || usuario is { OperadorId: null, ComercioId: null } && perfiles.Contains(nameof(Perfil.AdministradorGeneral)),
             _ => false
         };
         if (!permitido) return ResultadoInicioSesion.CredencialesInvalidas;
+
+        // El personal de un operador suspendido por el administrador general no inicia sesión. Se responde como a
+        // credenciales inválidas, igual que a un usuario desactivado.
+        if (usuario.OperadorId is Guid operadorId && await operadoresPlataforma.ObtenerAsync(operadorId, CancellationToken.None) is not { Activo: true })
+        {
+            return ResultadoInicioSesion.CredencialesInvalidas;
+        }
 
         // lockoutOnFailure: después de 5 contraseñas incorrectas la cuenta se bloquea un rato (letra, sección 6.3).
         var resultado = await sesiones.PasswordSignInAsync(usuario, contrasena, isPersistent: false, lockoutOnFailure: true);

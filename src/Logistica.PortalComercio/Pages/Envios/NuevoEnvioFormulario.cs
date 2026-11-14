@@ -37,6 +37,11 @@ public sealed class NuevoEnvioFormulario
 
     public string Modalidad { get; set; } = "Estandar";
 
+    // Opcionales y juntas: el día y la franja de la zona en que se quiere la entrega.
+    public DateOnly? FechaEntrega { get; set; }
+
+    public Guid? FranjaHorariaId { get; set; }
+
     public List<BultoFormulario> Bultos { get; } = [new()];
 
     public CrearEnvioRequest ARequest() => new(
@@ -49,7 +54,10 @@ public sealed class NuevoEnvioFormulario
             CodigoPostal.Trim(),
             Opcional(Referencia)),
         Bultos.Select(b => new BultoRequest(b.PesoKg, b.LargoCm, b.AnchoCm, b.AltoCm)).ToList(),
-        Modalidad);
+        Modalidad,
+        // Sin franja elegida no se manda la fecha sola: el servidor exige las dos o ninguna.
+        FranjaHorariaId is null ? null : FechaEntrega,
+        FranjaHorariaId);
 
     // Un campo opcional que quedó vacío viaja como null, no como "".
     private static string? Opcional(string? valor)

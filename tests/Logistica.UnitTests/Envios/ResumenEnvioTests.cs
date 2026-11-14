@@ -73,6 +73,24 @@ public class ResumenEnvioTests
         Assert.Equal((ResumenEnvio.Creado, true), (envio.Resumen, envio.Terminado));
     }
 
+    // Cierre técnico D8: el instante en que Terminado pasa de falso a verdadero queda guardado; es el período en que se
+    // liquida la base. Mientras quede un bulto sin terminar, no hay instante de cierre.
+    [Fact]
+    public void El_envio_guarda_cuando_termina_su_ultimo_bulto()
+    {
+        var envio = CrearEnvio(2);
+        envio.Transicionar(Dep, OrigenEvento.Backoffice, null, Ahora);
+        envio.Transicionar(Asig, OrigenEvento.Backoffice, null, Ahora);
+        Assert.Null(envio.TerminadoEn);
+
+        var cierre = Ahora.AddHours(5);
+        envio.Transicionar(Tra, OrigenEvento.AppRepartidor, null, Ahora.AddHours(1));
+        envio.Transicionar(Ent, OrigenEvento.AppRepartidor, null, cierre);
+
+        Assert.True(envio.Terminado);
+        Assert.Equal(cierre, envio.TerminadoEn);
+    }
+
     [Fact]
     public void Un_intento_fallido_suma_un_intento_a_cada_bulto_y_reprogramar_no()
     {

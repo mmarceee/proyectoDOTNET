@@ -9,8 +9,9 @@ namespace Logistica.Modules.Deposito.Application.Features.GenerarLiquidacion;
 internal sealed record GenerarLiquidacionCommand(Guid ComercioId, DateOnly Desde, DateOnly Hasta);
 
 // CU-32: el administrador genera la liquidación de un comercio y un período, la revisa en borrador, la emite y registra
-// el pago (A3). Los envíos liquidables los informa Envíos por su contrato, con la tarifa con que se admitieron: así la
-// definición de "liquidable" vive con el envío, que es lo que cambia con la entrega parcial (RF 31 a 36).
+// el pago (A3). Los envíos liquidables y los recargos los informa Envíos por su contrato, con los montos con que se
+// registraron: así la definición de "liquidable" vive con el envío, que es lo que cambia con la entrega parcial (RF 31 a
+// 36; cierre técnico, D8). Depósito no recalcula tarifas.
 internal sealed class GenerarLiquidacionHandler(IEnviosModuleApi envios, IAdministracionModuleApi administracion,
     ILiquidacionRepository liquidaciones, ICurrentTenant tenant, TimeProvider reloj)
 {
@@ -22,7 +23,7 @@ internal sealed class GenerarLiquidacionHandler(IEnviosModuleApi envios, IAdmini
     public Task<Liquidacion?> ObtenerAsync(Guid id, CancellationToken ct) => liquidaciones.ObtenerAsync(id, ct);
 
     // CU-70, paso 4: la liquidación del período de cada comercio del operador, generada por el cierre diario. Saltea los
-    // comercios sin envíos sin liquidar (A1), así repetirlo no genera otra liquidación con los mismos envíos (A2).
+    // comercios sin envíos ni recargos sin liquidar (A1), así repetirlo no genera otra liquidación con lo mismo (A2).
     public async Task<int> GenerarDelPeriodoAsync(DateOnly desde, DateOnly hasta, CancellationToken ct)
     {
         var generadas = 0;
@@ -55,13 +56,24 @@ internal sealed class GenerarLiquidacionHandler(IEnviosModuleApi envios, IAdmini
         var desde = Inicio(command.Desde, zona);
         var hasta = Inicio(command.Hasta.AddDays(1), zona);
 
-        // Paso 2 y A2: los envíos que llegaron a un estado liquidable en el período y que no están en otra liquidación.
+        // Paso 2 y A2 (cierre técnico, D8): la tarifa base de los envíos que terminaron en el período y los recargos por
+        // nueva visita registrados en el período, que no estén en otra liquidación. Un recargo se cobra por la fecha de
+        // su visita, aunque el envío termine en otro período.
         var liquidables = await envios.ListarLiquidablesAsync(command.ComercioId, desde, hasta, ct);
-        var yaLiquidados = await liquidaciones.EnviosLiquidadosAsync(liquidables.Select(e => e.EnvioId).ToList(), ct);
+        var recargos = await envios.ListarRecargosAsync(command.ComercioId, desde, hasta, ct);
+        var basesCobradas = await liquidaciones.ConceptosLiquidadosAsync(OrigenLiquidacion.BaseEnvio,
+            liquidables.Select(e => e.EnvioId).ToList(), ct);
+        var recargosCobrados = await liquidaciones.ConceptosLiquidadosAsync(OrigenLiquidacion.RecargoVisita,
+            recargos.Select(r => r.RecargoId).ToList(), ct);
+
         var lineas = liquidables
-            .Where(e => !yaLiquidados.Contains(e.EnvioId))
-            .Select(e => new DatosLinea(e.EnvioId, e.Numero, e.LlegoEn,
-                e.Estado == "Devuelto" ? "Envío devuelto" : "Envío entregado", e.MontoTarifa))
+            .Where(e => !basesCobradas.Contains(e.EnvioId))
+            .Select(e => new DatosLinea(e.EnvioId, e.Numero, e.LlegoEn, ConceptoBase(e.Estado), e.MontoTarifa))
+            .Concat(recargos
+                .Where(r => !recargosCobrados.Contains(r.RecargoId))
+                .Select(r => new DatosLinea(r.EnvioId, r.Numero, r.OcurridoEn, "Recargo por nueva visita", r.Monto,
+                    OrigenLiquidacion.RecargoVisita, r.RecargoId)))
+            .OrderBy(l => l.Fecha)
             .ToList();
 
         var liquidacion = Liquidacion.Generar(operadorId, command.ComercioId, command.Desde, command.Hasta, lineas,
@@ -96,6 +108,15 @@ internal sealed class GenerarLiquidacionHandler(IEnviosModuleApi envios, IAdmini
         await liquidaciones.GuardarCambiosAsync(ct);
         return true;
     }
+
+    // Cómo ve el comercio la tarifa base según el cierre del envío. El cierre mixto cobra la tarifa de admisión entera,
+    // una vez, sin prorratearla por bulto (D8).
+    private static string ConceptoBase(string cierre) => cierre switch
+    {
+        "Devuelto" => "Envío devuelto",
+        "EntregadoParcialmente" => "Envío entregado parcialmente",
+        _ => "Envío entregado",
+    };
 
     private static DateTimeOffset Inicio(DateOnly dia, TimeZoneInfo zona) =>
         new(TimeZoneInfo.ConvertTimeToUtc(dia.ToDateTime(TimeOnly.MinValue), zona), TimeSpan.Zero);

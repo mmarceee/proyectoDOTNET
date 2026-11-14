@@ -8,10 +8,20 @@
     <link rel="stylesheet" href="~/_content/Logistica.Backoffice/css/site.css" asp-append-version="true" />
     @* La marca del operador de la sesión (CU-07): va última para pisar los colores por defecto. *@
     <link rel="stylesheet" href="/cuenta/estilo.css" />
+    @* El ícono de la pestaña cambia con el perfil de la sesión; sin sesión, el del Backoffice. *@
+    @if (PerfilesBackoffice.DelUsuario(User) is { } perfilPestana)
+    {
+        <link rel="icon" type="image/svg+xml" href="@PerfilesBackoffice.Favicon(perfilPestana)" />
+    }
+    else
+    {
+        <link rel="icon" href="~/_content/Logistica.Backoffice/favicon.ico" />
+    }
 </head>
 @{
     var muestraMenu = SeccionesBackoffice.MuestraMenu(User);
     var rutaActual = Context.Request.Path;
+    var perfil = PerfilesBackoffice.DelUsuario(User);
 }
 <body>
     <header>
@@ -34,6 +44,15 @@
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <div class="cuenta-usuario d-flex align-items-center gap-2">
+                        @if (perfil is not null)
+                        {
+                            @* El perfil de la sesión, con su ícono y color. En pantallas chicas queda sólo el ícono. *@
+                            <span class="perfil-usuario @perfil.Clase" title="Perfil: @perfil.Nombre">
+                                @Html.Raw(PerfilesBackoffice.Svg(perfil, 18))
+                                <span class="d-none d-md-inline">@perfil.Nombre</span>
+                                <span class="visually-hidden d-md-none">Perfil: @perfil.Nombre</span>
+                            </span>
+                        }
                         <span class="navbar-text d-none d-sm-inline">@User.Identity.Name</span>
                         <form method="post" action="/cuenta/salir" asp-antiforgery="true" class="m-0">
                             <button type="submit" class="btn btn-outline-secondary btn-sm btn-logout">Cerrar sesión</button>
@@ -91,7 +110,7 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2026 - VoluptaExpress
+            &copy; 2026 - VoluptasExpress
         </div>
     </footer>
 

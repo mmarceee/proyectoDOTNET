@@ -1,0 +1,57 @@
+@page "/backoffice/plataforma/operadores/nuevo"
+@model Logistica.Modules.Administracion.Presentation.Features.GestionarOperadores.NuevoModel
+@{
+    Layout = "/Pages/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Nuevo operador";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">Nuevo operador</h1>
+    <a href="/backoffice/plataforma/operadores" class="btn btn-outline-secondary">Volver al listado</a>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <form method="post">
+            <fieldset class="mb-4">
+                <legend class="h5">Operador</legend>
+                <div class="mb-3">
+                    <label asp-for="Nombre" class="form-label">Nombre</label>
+                    <input asp-for="Nombre" class="form-control" />
+                    <span asp-validation-for="Nombre" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Slug" class="form-label">Slug</label>
+                    <input asp-for="Slug" class="form-control" placeholder="envios-del-sur" />
+                    <div class="form-text">Identifica al operador en la plataforma: minúsculas, números y guiones. No se repite.</div>
+                    <span asp-validation-for="Slug" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ZonaHoraria" class="form-label">Zona horaria</label>
+                    <input asp-for="ZonaHoraria" class="form-control" />
+                    <div class="form-text">Define el día del operador para las franjas, los plazos y el cierre diario.</div>
+                    <span asp-validation-for="ZonaHoraria" class="text-danger"></span>
+                </div>
+            </fieldset>
+
+            <fieldset class="mb-4">
+                <legend class="h5">Primer administrador</legend>
+                <div class="mb-3">
+                    <label asp-for="NombreAdministrador" class="form-label">Nombre</label>
+                    <input asp-for="NombreAdministrador" class="form-control" />
+                    <span asp-validation-for="NombreAdministrador" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="EmailAdministrador" class="form-label">Correo</label>
+                    <input asp-for="EmailAdministrador" type="email" class="form-control" />
+                    <span asp-validation-for="EmailAdministrador" class="text-danger"></span>
+                </div>
+                <div class="form-text">Le llega un correo para definir su contraseña. Después configura zonas, tarifario y reglas del operador.</div>
+            </fieldset>
+
+            <button type="submit" class="btn btn-primary">Crear e invitar</button>
+        </form>
+    </div>
+</div>

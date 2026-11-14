@@ -159,29 +159,17 @@
             else
             {
                 _resultado = null;
-                _error = await LeerMotivoAsync(response) ?? "No se pudo procesar el archivo. Intentá de nuevo.";
+                // Un archivo rechazado entero (A1) trae el motivo en "detail"; los demás errores, según el código.
+                _error = "No se pudo procesar el archivo. " + await MotivoDeError.LeerAsync(response);
             }
         }
-        catch (HttpRequestException)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            _error = "No se pudo conectar con el servidor. Intentá de nuevo.";
+            _error = "No se pudo procesar el archivo. " + MotivoDeError.DeConexion(e);
         }
         finally
         {
             _enviando = false;
-        }
-    }
-
-    // Un archivo rechazado entero (A1) trae un ProblemDetails con el motivo en "detail".
-    private static async Task<string?> LeerMotivoAsync(HttpResponseMessage response)
-    {
-        try
-        {
-            return (await response.Content.ReadFromJsonAsync<Problema>())?.Detail;
-        }
-        catch (JsonException)
-        {
-            return null;
         }
     }
 
@@ -200,6 +188,4 @@
         "YaExistente" => "text-bg-secondary",
         _ => "text-bg-danger",
     };
-
-    private sealed record Problema(string? Title, string? Detail);
 }

@@ -9,6 +9,21 @@ public sealed class IngresoInvalidoTests(PostgresApiFactory factory) : IClassFix
         b.UseSetting("Identity:PermitirTenantProvisorio", "false")).CreateClient(Sesion.Opciones);
 
     [Theory]
+    [InlineData("admin@operador-demo.uy")]
+    [InlineData("admin@plataforma.uy")]
+    public async Task Ingresar_con_sesion_de_backoffice_abierta_redirige_al_inicio(string correo)
+    {
+        using var client = Cliente();
+        await Sesion.IngresarAsync(client, correo);
+
+        var respuesta = await client.GetAsync("/cuenta/ingresar?ReturnUrl=%2Fbackoffice%2Fplataforma%2Foperadores");
+
+        Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+        Assert.Equal("/backoffice", respuesta.Headers.Location!.ToString());
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(respuesta.Headers.Location)).StatusCode);
+    }
+
+    [Theory]
     [InlineData("/repartidor/ingresar", "repartidor@operador-demo.uy")]
     [InlineData("/portal/ingresar", "comercio@tiendademo.uy")]
     [InlineData("/cuenta/ingresar", "despacho@operador-demo.uy")]
@@ -54,7 +69,18 @@ public sealed class IngresoInvalidoTests(PostgresApiFactory factory) : IClassFix
             ["__RequestVerificationToken"] = tokenAnterior,
             ["Email"] = "repartidor@operador-demo.uy", ["Contrasena"] = "Demo-2026!"
         }));
-        await ExigirFormularioRenovadoAsync(client, pagina, respuesta);
+        if (pagina == "/cuenta/ingresar")
+        {
+            Assert.Equal(HttpStatusCode.Redirect, respuesta.StatusCode);
+            Assert.Equal("/cuenta/ingresar?formularioVencido=true", respuesta.Headers.Location!.ToString());
+            var ingreso = await client.GetAsync(respuesta.Headers.Location);
+            Assert.Equal(HttpStatusCode.Redirect, ingreso.StatusCode);
+            Assert.Equal("/backoffice", ingreso.Headers.Location!.ToString());
+        }
+        else
+        {
+            await ExigirFormularioRenovadoAsync(client, pagina, respuesta);
+        }
         // El formulario rechazado no cambió el usuario ni abrió la sesión del repartidor.
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/repartidor/sesion")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/planificacion/rutas")).StatusCode);

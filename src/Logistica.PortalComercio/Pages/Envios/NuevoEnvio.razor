@@ -21,11 +21,6 @@ else
     <EditForm Model="_formulario" OnValidSubmit="ConfirmarAsync">
         <DataAnnotationsValidator />
 
-        @if (_error is not null)
-        {
-            <div class="alert alert-danger" role="alert">@_error</div>
-        }
-
         <fieldset class="mb-4">
             <legend class="h5">Destinatario</legend>
             <div class="row g-3">
@@ -79,7 +74,8 @@ else
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="codigo-postal">Código postal</label>
-                    <InputText id="codigo-postal" class="form-control" @bind-Value="_formulario.CodigoPostal" />
+                    <InputText id="codigo-postal" class="form-control" @bind-Value="_formulario.CodigoPostal"
+                               @bind-Value:after="CargarFranjasAsync" />
                     <ValidationMessage For="() => _formulario.CodigoPostal" />
                 </div>
                 <div class="col-12">
@@ -92,12 +88,34 @@ else
 
         <fieldset class="mb-4">
             <legend class="h5">Servicio</legend>
-            <div class="col-md-4">
-                <label class="form-label" for="modalidad">Modalidad</label>
-                <InputSelect id="modalidad" class="form-select" @bind-Value="_formulario.Modalidad">
-                    <option value="Estandar">Estándar</option>
-                    <option value="Urgente">Urgente</option>
-                </InputSelect>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="modalidad">Modalidad</label>
+                    <InputSelect id="modalidad" class="form-select" @bind-Value="_formulario.Modalidad">
+                        <option value="Estandar">Estándar</option>
+                        <option value="Urgente">Urgente</option>
+                    </InputSelect>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="fecha-entrega">Fecha de entrega (opcional)</label>
+                    <InputDate id="fecha-entrega" class="form-control" min="@Manana.ToString("yyyy-MM-dd")"
+                               @bind-Value="_formulario.FechaEntrega" @bind-Value:after="CargarFranjasAsync" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="franja">Franja horaria</label>
+                    <InputSelect id="franja" class="form-select" @bind-Value="_formulario.FranjaHorariaId"
+                                 disabled="@(_franjas.Count == 0)">
+                        <option value="">@TextoSinFranja</option>
+                        @foreach (var franja in _franjas)
+                        {
+                            <option value="@franja.Id">@franja.Desde.ToString("HH:mm") a @franja.Hasta.ToString("HH:mm")</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12 form-text">
+                    Si elegís fecha y franja, el envío se planifica para ese día y ese horario. Las franjas dependen de la
+                    zona del código postal.
+                </div>
             </div>
         </fieldset>
 
@@ -144,6 +162,13 @@ else
             </button>
         </fieldset>
 
+        @* Junto al botón: el formulario es largo y un aviso arriba quedaría fuera de la vista al confirmar. *@
+        <ValidationSummary class="text-danger" />
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+
         <button type="submit" class="btn btn-primary" disabled="@_enviando">
             @(_enviando ? "Creando..." : "Confirmar")
         </button>
@@ -162,6 +187,45 @@ else
     private CrearEnvioResponse? _creado;
     private string? _error;
     private bool _enviando;
+    private IReadOnlyList<FranjaDisponibleResponse> _franjas = [];
+
+    // Sólo para el mínimo del selector: el servidor valida con el día del operador.
+    private static DateOnly Manana => DateOnly.FromDateTime(DateTime.Today).AddDays(1);
+
+    private string TextoSinFranja =>
+        _formulario.FechaEntrega is null || string.IsNullOrWhiteSpace(_formulario.CodigoPostal)
+            ? "Elegí la fecha y el código postal"
+            : _franjas.Count == 0 ? "No hay franjas ese día" : "Sin franja";
+
+    // Al cambiar la fecha o el código postal, se piden las franjas de esa zona para ese día y se descarta la elegida.
+    private async Task CargarFranjasAsync()
+    {
+        _formulario.FranjaHorariaId = null;
+        _franjas = [];
+
+        if (_formulario.FechaEntrega is not DateOnly fecha || string.IsNullOrWhiteSpace(_formulario.CodigoPostal))
+        {
+            return;
+        }
+
+        try
+        {
+            var url = $"/api/envios/franjas?codigoPostal={Uri.EscapeDataString(_formulario.CodigoPostal.Trim())}&fecha={fecha:yyyy-MM-dd}";
+            var respuesta = await Http.GetAsync(url);
+            if (respuesta.IsSuccessStatusCode)
+            {
+                _franjas = await respuesta.Content.ReadFromJsonAsync<List<FranjaDisponibleResponse>>() ?? [];
+            }
+            else
+            {
+                _error = "No se pudieron cargar las franjas horarias. " + await MotivoDeError.LeerAsync(respuesta);
+            }
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            _error = "No se pudieron cargar las franjas horarias. " + MotivoDeError.DeConexion(e);
+        }
+    }
 
     private async Task ConfirmarAsync()
     {
@@ -179,13 +243,12 @@ else
             }
             else
             {
-                _error = await LeerMotivoAsync(response)
-                    ?? "No se pudo crear el envío. Revisá los datos e intentá de nuevo.";
+                    _error = "No se pudo crear el envío. " + await MotivoDeError.LeerAsync(response);
             }
         }
-        catch (HttpRequestException)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            _error = "No se pudo conectar con el servidor. Intentá de nuevo.";
+            _error = "No se pudo crear el envío. " + MotivoDeError.DeConexion(e);
         }
         finally
         {
@@ -193,25 +256,10 @@ else
         }
     }
 
-    // Un 400 por regla de negocio trae un ProblemDetails con el motivo en "detail".
-    private static async Task<string?> LeerMotivoAsync(HttpResponseMessage response)
-    {
-        try
-        {
-            var problema = await response.Content.ReadFromJsonAsync<Problema>();
-            return problema?.Detail;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
     private void NuevoFormulario()
     {
         _formulario = new NuevoEnvioFormulario();
+        _franjas = [];
         _creado = null;
     }
-
-    private sealed record Problema(string? Title, string? Detail);
 }

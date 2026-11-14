@@ -96,6 +96,10 @@ public static class AdministracionModule
         services.AddScoped<Application.Features.GestionarUsuarios.ConsultarUsuariosHandler>();
         services.AddScoped<Application.Features.GestionarUsuarios.AltaUsuarioHandler>();
         services.AddScoped<Application.Features.GestionarUsuarios.ModificarUsuarioHandler>();
+
+        // Administrador general: alta y gestión de operadores y de sus administradores.
+        services.AddScoped<Application.Features.GestionarOperadores.IServicioPlataforma, ServicioPlataforma>();
+        services.AddScoped<Application.Features.GestionarOperadores.GestionarOperadoresHandler>();
         services.AddScoped<Application.Features.SeleccionarOperador.IOperadoresDelComercio, OperadoresDelComercio>();
         services.AddScoped<IRecursosPlanificacionReader, RecursosPlanificacionReader>();
         services.AddScoped<Contracts.IAdministracionModuleApi, AdministracionModuleApi>();
@@ -155,6 +159,7 @@ public static class AdministracionModule
             opciones.AddPolicy(Politicas.Despachador, p => p.AddRequirements(new PoliticaDePerfil(Perfil.Despachador)));
             opciones.AddPolicy(Politicas.Repartidor, p => p.AddRequirements(
                 new PoliticaDePerfil(Perfil.Repartidor, ExigeOperador: true, ExigeRepartidor: true)));
+            opciones.AddPolicy(Politicas.AdministradorGeneral, p => p.AddRequirements(new PoliticaDePerfil(Perfil.AdministradorGeneral)));
         });
 
         services.AddHttpContextAccessor();

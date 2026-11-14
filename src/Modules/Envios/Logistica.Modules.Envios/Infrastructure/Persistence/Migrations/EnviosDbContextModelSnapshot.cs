@@ -19,7 +19,7 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("envios")
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -273,6 +273,9 @@ namespace Logistica.Modules.Envios.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("Terminado")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("TerminadoEn")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()

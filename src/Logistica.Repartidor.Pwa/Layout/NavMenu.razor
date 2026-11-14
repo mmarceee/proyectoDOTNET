@@ -3,7 +3,7 @@
 
 <nav class="navbar navbar-expand-xxl navbar-dark" aria-label="Navegación principal">
     <div class="container">
-        <a class="navbar-brand" href="">VoluptaExpress</a>
+        <a class="navbar-brand" href="">VoluptasExpress</a>
         <button type="button" class="navbar-toggler" aria-label="Mostrar navegación"
                 aria-controls="main-navigation" aria-expanded="@(!collapseNavMenu ? "true" : "false")"
                 @onclick="ToggleNavMenu">
@@ -16,6 +16,10 @@
                 </li>
             </ul>
             <div class="cuenta-usuario">
+                <span class="perfil-repartidor">
+                    <img src="favicon-repartidor.svg" alt="" width="16" height="16" />
+                    Repartidor
+                </span>
                 @if (!string.IsNullOrWhiteSpace(nombreUsuario))
                 {
                     <span class="navbar-text">@nombreUsuario</span>

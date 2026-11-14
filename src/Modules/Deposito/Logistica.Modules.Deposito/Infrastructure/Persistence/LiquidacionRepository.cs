@@ -8,10 +8,12 @@ namespace Logistica.Modules.Deposito.Infrastructure.Persistence;
 
 internal sealed class LiquidacionRepository(DepositoDbContext db) : ILiquidacionRepository
 {
-    public async Task<IReadOnlySet<Guid>> EnviosLiquidadosAsync(IReadOnlyCollection<Guid> envioIds, CancellationToken ct)
+    public async Task<IReadOnlySet<Guid>> ConceptosLiquidadosAsync(OrigenLiquidacion origen, IReadOnlyCollection<Guid> ids,
+        CancellationToken ct)
     {
-        if (envioIds.Count == 0) return new HashSet<Guid>();
-        return (await db.LineasLiquidacion.Where(l => envioIds.Contains(l.EnvioId)).Select(l => l.EnvioId).ToListAsync(ct))
+        if (ids.Count == 0) return new HashSet<Guid>();
+        return (await db.LineasLiquidacion.Where(l => l.Origen == origen && ids.Contains(l.IdDeOrigen))
+                .Select(l => l.IdDeOrigen).ToListAsync(ct))
             .ToHashSet();
     }
 
@@ -57,7 +59,7 @@ internal sealed class LiquidacionRepository(DepositoDbContext db) : ILiquidacion
         catch (DbUpdateConcurrencyException)
         { throw new DomainException("La liquidación cambió mientras la revisabas. Volvé a abrirla."); }
         catch (DbUpdateException e) when (e.InnerException is PostgresException
-            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: LineaLiquidacionConfiguration.IndiceEnvio })
-        { throw new DomainException("Otra liquidación incluyó alguno de estos envíos mientras se generaba. Volvé a generarla."); }
+            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: LineaLiquidacionConfiguration.IndiceOrigen })
+        { throw new DomainException("Otra liquidación incluyó alguno de estos envíos o recargos mientras se generaba. Volvé a generarla."); }
     }
 }

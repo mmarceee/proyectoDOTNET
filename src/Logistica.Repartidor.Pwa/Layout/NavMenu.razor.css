@@ -5,11 +5,25 @@
 }
 .navbar-brand {
     color: #fff;
+    margin-right: .75rem;
     white-space: nowrap;
     min-width: 0;
-    max-width: calc(100% - 5rem);
     overflow: hidden;
     text-overflow: ellipsis;
+}
+.perfil-repartidor {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    padding: .2rem .6rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background-color: #fff;
+    color: #166534;
+    font-size: .875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 .navbar-collapse {
     align-items: center;

@@ -24,7 +24,7 @@ internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvi
         DateTimeOffset hasta, CancellationToken ct)
     {
         var cerrados = await envios.ListarCerradosAsync(comercioId, desde, hasta, ct);
-        return cerrados.Select(c => new EnvioLiquidable(c.EnvioId, c.Numero, c.Estado.ToString(), c.LlegoEn, c.MontoTarifa))
+        return cerrados.Select(c => new EnvioLiquidable(c.EnvioId, c.Numero, c.Cierre, c.LlegoEn, c.MontoTarifa))
             .ToArray();
     }
 
@@ -264,13 +264,15 @@ internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvi
         return new PaginaEnviosParaSeguimiento(filas, resultado.Pagina, resultado.TotalPaginas);
     }
 
-    // CU-66: traduce los envíos a lo que ve el tablero. "EntregaPendiente" usa la misma lista que CU-04.
+    // CU-66: traduce los envíos a lo que ve el tablero, decidiendo por bulto (D4): "EntregaPendiente" usa la misma
+    // lista que CU-04 sobre cada bulto, y "Entregado" es el resumen, no el estado de compatibilidad.
     public async Task<IReadOnlyList<EnvioParaTablero>> ListarParaTableroAsync(IReadOnlyCollection<Guid> deRutas,
         DateOnly hasta, CancellationToken ct)
     {
         return (await envios.ListarParaTableroAsync(deRutas, hasta, ct))
             .Select(e => new EnvioParaTablero(e.Id, e.Numero, e.Estado.ToString(), e.FechaEntregaProgramada,
-                e.FranjaHorariaId, Envio.EstadosConEntregaPendiente.Contains(e.Estado)))
+                e.FranjaHorariaId, e.TieneEntregaPendiente, e.Resumen == ResumenEnvio.Entregado,
+                e.BultosEntregados, e.Bultos.Count))
             .ToArray();
     }
 
@@ -537,7 +539,7 @@ internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvi
         {
             // Bultos sueltos: sólo los que recibió el comercio pasan a Devuelto; el envío y sus demás bultos no cambian.
             // Quién los recibió queda en la devolución.
-            envio.DevolverBultos(entregados);
+            envio.DevolverBultos(entregados, ahora);
         }
 
         // A2: la entrega parcial queda registrada como incidencia del envío, con los códigos que faltaron.

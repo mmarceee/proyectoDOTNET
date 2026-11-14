@@ -12,6 +12,17 @@ internal sealed class OperadorRepository(AdministracionDbContext db) : IOperador
         return db.Operadores.SingleOrDefaultAsync(o => o.Id == id, ct);
     }
 
+    public async Task<IReadOnlyList<Operador>> ListarAsync(CancellationToken ct) =>
+        await db.Operadores.AsNoTracking().OrderBy(o => o.Nombre).ToListAsync(ct);
+
+    public Task<bool> ExisteSlugAsync(string slug, CancellationToken ct) =>
+        db.Operadores.AnyAsync(o => o.Slug == slug, ct);
+
+    public void Agregar(Operador operador)
+    {
+        db.Operadores.Add(operador);
+    }
+
     public Task<LogoOperador?> ObtenerLogoAsync(Guid id, CancellationToken ct)
     {
         return db.Logos.AsNoTracking().SingleOrDefaultAsync(l => l.Id == id, ct);
