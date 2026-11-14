@@ -2,8 +2,8 @@
 
 | Estado | Pendiente de revisión por el equipo |
 | :---- | :---- |
-| **Versión** | 2.1 |
-| **Fecha** | 2 de octubre de 2026 |
+| **Versión** | 2.2 |
+| **Fecha** | 2 de octubre de 2026 (actualizado el 14 de noviembre de 2026) |
 | **Responsable** | Cristian Reyes |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Decisión relacionada** | Estrategia de multitenancy |
@@ -103,6 +103,7 @@ Tres situaciones que podrían parecer excepciones se resuelven por diseño, sin 
 - **Usuario (ASP.NET Core Identity).** No implementa IOperadorOwned y no tiene filtro de inquilino, por dos motivos:
   - El UserManager y el SignInManager de Identity buscan al usuario por correo antes de que exista una sesión: al iniciar sesión, al activar la cuenta con el enlace de invitación (CU-01) y al recuperar la contraseña. Con el filtro, fallando cerrado, esas búsquedas no encontrarían a nadie y nadie podría entrar.
   - El usuario de un comercio no tiene un OperadorId fijo (sección 2.6), así que un filtro por operador nunca lo encontraría.
+- **Administrador general de la plataforma (CU-00, 13/11/2026).** Es un usuario sin OperadorId ni ComercioId: su sesión no tiene inquilino, así que el filtro "Tenant" no le muestra datos de ningún operador (falla cerrado). Lista y modifica operadores porque Operador es global, y lista sus administradores por el servicio de usuarios, filtrando explícitamente por el operador elegido, igual que en CU-02. Para dar de alta un operador con su administrador, el outbox necesita un inquilino (ADR-0003, sección 2.2): el caso de uso abre un ámbito de DI propio y fija ese operador con `InquilinoTrabajo`, como las tareas que recorren operadores (punto anterior). No ignora el filtro ni escribe el outbox con un operador recibido por parámetro. Sus páginas exigen la política `AdministradorGeneral`, y las del operador lo rechazan.
 
 Además, el IdentityDbContext hereda de la clase base de Identity y no de ModuleDbContext, así que el filtro no se le aplicaría de todos modos. Usuario figura con nombre propio en la lista de excepciones de la prueba estructural, junto al Outbox (sección 4).
 
@@ -201,5 +202,14 @@ Todas estas pruebas tienen que existir desde el principio y correr en el pipelin
 - Casos de uso: CU-01 y CU-03 (usuarios e inicio de sesión), CU-80 a CU-83 (API pública).
 - Modelo de dominio del equipo (convención de OperadorId, RelacionComercial, Usuario y ClaveApi).
 - Microsoft Learn. EF Core: Global Query Filters (filtros con nombre en EF Core 10) e Interceptors.
+
+# **7\. Historial de versiones**
+
+Las versiones hasta la 2.1 no tienen historial propio. El repositorio registra la versión 2.1 el 03/10/2026 y cambios posteriores el 16/10 (Lucas Ottonello, CU-01) y el 19/10 (Cristian Reyes, token firmado del seguimiento público, CU-60).
+
+| Versión | Fecha | Descripción | Responsable |
+| :---: | :---: | :---- | :---- |
+| 2.1 | 02/10/2026 | Versión entregada con el análisis y diseño. | Cristian Reyes |
+| 2.2 | 14/11/2026 | Sección 2.4: el administrador general de la plataforma (CU-00), sesión sin inquilino y alta con `InquilinoTrabajo`. Se agrega este historial. | Ezequiel Marcenal |
 
 *Equipo 1 · Laboratorio .NET 2026*
