@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Logistica.Modules.Administracion.Application.Features.IniciarSesion;
+using Logistica.Modules.Administracion.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -8,7 +9,23 @@ namespace Logistica.Modules.Administracion.Presentation.Features.IniciarSesion;
 // Inicio de sesión del personal y de los comercios. Página del Backoffice en Presentation (ADR-0001, addendum 4):
 // verifica la contraseña a través de IServicioSesion, sin conocer Identity.
 internal sealed class IngresarModel(IServicioSesion sesion)
-    : IngresoModel(sesion, TipoAccesoSesion.Personal, "/backoffice") { }
+    : IngresoModel(sesion, TipoAccesoSesion.Personal, "/backoffice")
+{
+    public override IActionResult OnGet(bool formularioVencido = false)
+    {
+        var usuario = HttpContext.User;
+        if (usuario.Identity?.IsAuthenticated == true
+            && (usuario.IsInRole(nameof(Perfil.AdministradorGeneral))
+                || usuario.IsInRole(nameof(Perfil.Administrador))
+                || usuario.IsInRole(nameof(Perfil.Despachador))
+                || usuario.IsInRole(nameof(Perfil.OperarioDeposito))))
+        {
+            return LocalRedirect("/backoffice");
+        }
+
+        return base.OnGet(formularioVencido);
+    }
+}
 
 [TypeFilter(typeof(FormularioIngresoVencidoFilter))]
 internal abstract class IngresoModel(IServicioSesion sesion, TipoAccesoSesion acceso, string inicio) : PageModel
@@ -25,10 +42,12 @@ internal abstract class IngresoModel(IServicioSesion sesion, TipoAccesoSesion ac
 
     public string? Error { get; private set; }
 
-    public void OnGet(bool formularioVencido = false)
+    public virtual IActionResult OnGet(bool formularioVencido = false)
     {
         if (formularioVencido)
             Error = "El formulario de ingreso venció o la sesión cambió en otra pestaña. Lo actualizamos; ingresá tus datos nuevamente.";
+
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
