@@ -12,7 +12,8 @@ internal interface IEnvioRepository
 
     Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct);
 
-    // CU-32: los envíos del comercio que llegaron a Entregado o Devuelto en [desde, hasta), sólo para leer.
+    // CU-32: los envíos del comercio que terminaron en [desde, hasta) con algún bulto entregado o devuelto (D8), sólo
+    // para leer.
     Task<IReadOnlyList<EnvioCerrado>> ListarCerradosAsync(Guid comercioId, DateTimeOffset desde, DateTimeOffset hasta,
         CancellationToken ct);
 

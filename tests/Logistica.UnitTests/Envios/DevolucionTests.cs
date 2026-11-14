@@ -88,11 +88,11 @@ public class DevolucionTests
         envio.Transicionar(EstadoEnvio.NoEntregado, OrigenEvento.AppRepartidor, null, Ahora);
         envio.Transicionar(EstadoEnvio.Reprogramado, OrigenEvento.Sistema, null, Ahora);
 
-        Assert.Throws<DomainException>(() => envio.DevolverBultos([reprogramado.Id]));
-        Assert.Throws<DomainException>(() => envio.DevolverBultos([Guid.NewGuid()]));
-        Assert.Throws<DomainException>(() => envio.DevolverBultos([]));
+        Assert.Throws<DomainException>(() => envio.DevolverBultos([reprogramado.Id], DateTimeOffset.UtcNow));
+        Assert.Throws<DomainException>(() => envio.DevolverBultos([Guid.NewGuid()], DateTimeOffset.UtcNow));
+        Assert.Throws<DomainException>(() => envio.DevolverBultos([], DateTimeOffset.UtcNow));
 
-        envio.DevolverBultos([devuelto.Id]);
+        envio.DevolverBultos([devuelto.Id], DateTimeOffset.UtcNow);
 
         Assert.Equal((EstadoEnvio.Reprogramado, EstadoEnvio.Reprogramado, EstadoEnvio.Devuelto),
             (envio.Estado, reprogramado.Estado, devuelto.Estado));

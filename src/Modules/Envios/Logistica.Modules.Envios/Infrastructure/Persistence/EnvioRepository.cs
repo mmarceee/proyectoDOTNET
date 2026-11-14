@@ -101,18 +101,23 @@ internal sealed class EnvioRepository(EnviosDbContext db) : IEnvioRepository
         DateTimeOffset hasta, CancellationToken ct)
     {
         await db.ParticiparEnTransaccionAsync(ct);
-        // El instante en que llegó al estado final sale de su historial: el evento de esa transición (T6 o T15).
+        // D8: se cobra la base una vez, al terminar todos los bultos, si al menos uno se entregó o se devolvió. Un envío con
+        // todos sus bultos cancelados o extraviados no se cobra. El período lo decide TerminadoEn, no el estado del envío.
         var cerrados = await db.Envios.AsNoTracking()
-            .Where(e => e.ComercioId == comercioId && (e.Estado == EstadoEnvio.Entregado || e.Estado == EstadoEnvio.Devuelto))
+            .Where(e => e.ComercioId == comercioId && e.Terminado && e.TerminadoEn >= desde && e.TerminadoEn < hasta)
             .Select(e => new
             {
-                e.Id, e.Numero, e.Estado, e.MontoTarifa,
-                LlegoEn = e.Eventos.Where(ev => ev.EstadoNuevo == e.Estado).Max(ev => (DateTimeOffset?)ev.OcurridoEn),
+                e.Id, e.Numero, e.MontoTarifa, e.TerminadoEn,
+                Total = e.Bultos.Count,
+                Entregados = e.Bultos.Count(b => b.Estado == EstadoEnvio.Entregado),
+                Devueltos = e.Bultos.Count(b => b.Estado == EstadoEnvio.Devuelto),
             })
-            .Where(e => e.LlegoEn >= desde && e.LlegoEn < hasta)
-            .OrderBy(e => e.LlegoEn)
+            .Where(e => e.Entregados + e.Devueltos > 0)
+            .OrderBy(e => e.TerminadoEn)
             .ToListAsync(ct);
-        return cerrados.Select(e => new EnvioCerrado(e.Id, e.Numero, e.Estado, e.LlegoEn!.Value, e.MontoTarifa)).ToList();
+        return cerrados.Select(e => new EnvioCerrado(e.Id, e.Numero,
+            e.Entregados == e.Total ? "Entregado" : e.Entregados == 0 ? "Devuelto" : "EntregadoParcialmente",
+            e.TerminadoEn!.Value, e.MontoTarifa)).ToList();
     }
 
     public async Task<IReadOnlyList<RecargoRegistrado>> ListarRecargosAsync(Guid comercioId, DateTimeOffset desde,

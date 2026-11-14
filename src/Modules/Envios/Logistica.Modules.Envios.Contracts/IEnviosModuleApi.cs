@@ -105,8 +105,9 @@ public interface IEnviosModuleApi
     // (A1, A2, A3) lanza DomainException.
     Task<bool> ReprogramarPorDestinatarioAsync(Guid envioId, DateOnly fecha, Guid franjaId, CancellationToken ct);
 
-    // CU-32: los envíos del comercio que llegaron a Entregado o Devuelto entre desde (inclusive) y hasta (exclusive), con
-    // la tarifa con que se admitieron. Los cancelados y extraviados no se cobran. El operador lo pone el filtro "Tenant".
+    // CU-32: los envíos del comercio que terminaron entre desde (inclusive) y hasta (exclusive) con algún bulto entregado
+    // o devuelto, con la tarifa con que se admitieron (D8). Si todos sus bultos quedaron cancelados o extraviados, no se
+    // cobran. El operador lo pone el filtro "Tenant".
     Task<IReadOnlyList<EnvioLiquidable>> ListarLiquidablesAsync(Guid comercioId, DateTimeOffset desde, DateTimeOffset hasta,
         CancellationToken ct);
 
