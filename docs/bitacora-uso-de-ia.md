@@ -1607,6 +1607,21 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | **Modificado** | — |
 | **Descartado** | Dar por aprobados los ADR pendientes: lo decide el equipo. |
 | **Verificación** | Revisión del responsable antes de entregar. |
+| **Documento técnico** | Borrador de `docs/documento-tecnico.md` escrito por el asistente a partir de los ADR, la documentación y el código; al revisar el código encontró que faltaban Serilog y las cabeceras seguras (entrada 3.107). Se corrigieron dos afirmaciones al verificarlas (tiempos del caché de configuración y perfiles del hub). |
+
+## **3.107 Serilog y cabeceras seguras (letra 6.12 y 6.3)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 14/11/2026 |
+| **Archivos** | `BuildingBlocks/.../Observabilidad/RegistroEstructurado.cs`, `Directory.Packages.props` (Serilog.AspNetCore 10.0.0), `Logistica.Api/Program.cs`, `Logistica.Worker/Program.cs`, `Logistica.Api/Seguridad/CabecerasSeguridadMiddleware.cs`; prueba `CabecerasSeguridadTests` |
+| **¿Se usó IA?** | Sí, Claude Code: detectó los dos huecos al armar el documento técnico y escribió el código y la prueba a pedido mío. |
+| **Finalidad** | Cumplir dos exigencias de la letra que no estaban: Serilog para el registro estructurado y cabeceras seguras. |
+| **Aceptado sin modificaciones** | Serilog configurado en un solo lugar de BuildingBlocks para la API y el Worker, con JSON compacto en consola, el `TraceId` de cada evento y reenvío a Aspire Dashboard por OTLP cuando está configurado. Cabeceras `nosniff`, `DENY`, `strict-origin-when-cross-origin`, `Permissions-Policy`, HSTS fuera de Development y una CSP acotada. |
+| **Modificado** | La prueba no podía usar la constante del middleware, que es interna de la API: compara el valor literal. |
+| **Descartado** | Restringir scripts y estilos en la CSP: rompería el tablero (Leaflet y SignalR desde cdnjs, scripts en línea) y Blazor WebAssembly a un día de la entrega; queda anotado como mejora. |
+| **Verificación** | `CabecerasSeguridadTests` (página, Portal y error 404) y suite completa en Docker. |
 
 # **4\. Historial de versiones**
 
@@ -1664,3 +1679,4 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | 0.49 | 10/11/2026 | Entrada de las pruebas de extremo a extremo con Playwright (3.98). | Cristian Reyes |
 | 0.50 | 10/11/2026 | Integración de main: conservación de las entradas de RF 32/CU-15 y CU-22/Playwright, renumeración 3.97/3.98 y resolución de ADR-0007 manteniendo decisiones y aceptación RF 32. | Lucas Ottonello |
 | 0.51 | 14/11/2026 | Entradas del 13 y 14/11: administrador general (3.100), fecha y franja en el alta (3.101), motivo de los errores del Portal (3.102), perfil e ícono del Backoffice (3.103), tablero y lecturas por bulto (3.104), liquidación según D8 (3.105) y revisión para la entrega (3.106). | Ezequiel Marcenal |
+| 0.52 | 14/11/2026 | Documento técnico en la entrada 3.106 y entrada de Serilog y cabeceras seguras (3.107). | Ezequiel Marcenal |

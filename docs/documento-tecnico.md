@@ -2,7 +2,7 @@
 
 | Estado | Borrador para la entrega final, pendiente de revisión del equipo |
 | :---- | :---- |
-| **Versión** | 0.1 |
+| **Versión** | 0.2 |
 | **Fecha** | 14 de noviembre de 2026 |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigido por** | Letra del laboratorio, sección 8.4: «documento técnico que describa la implementación de los requerimientos no funcionales, las decisiones de diseño adoptadas, las configuraciones relevantes y los diagramas correspondientes» |
@@ -122,7 +122,7 @@ Localmente, el mismo conjunto corre con `docker compose up -d --build --wait` (P
 | Limitación de tasa | `AddRateLimiter`: seguimiento público por IP (60 consultas por minuto, configurable) y API pública por clave; responde 429 |
 | Seguimiento público sin enumeración | El enlace es un token firmado con HMAC que lleva el operador; el servidor valida la firma antes de tocar un repositorio y nunca busca el envío ignorando el filtro (ADR-0002, sección 2.5) |
 | Cifrado en reposo en el dispositivo | La PWA guarda hoja de ruta, operaciones pendientes y evidencia en IndexedDB cifradas con AES-GCM (Web Crypto) |
-| **Cabeceras seguras** | **No implementado.** No se agregan `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options` ni `Referrer-Policy` de forma global (sólo el endpoint de evidencia fija cabeceras propias). Ver sección 6 |
+| Cabeceras seguras | `CabecerasSeguridadMiddleware`, en todas las respuestas: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` (el token del seguimiento va en la URL y no se manda a otros sitios), `Permissions-Policy` (cámara y ubicación sólo para este origen) y `Strict-Transport-Security` fuera de Development. La `Content-Security-Policy` fija `object-src 'none'`, `base-uri`, `form-action` y `frame-ancestors 'none'`; no restringe scripts ni estilos, porque el tablero carga Leaflet y SignalR de cdnjs y tiene scripts en línea, y Blazor WebAssembly compila su código en el navegador (sección 7) |
 
 ## **2.4 Persistencia y datos (6.4)**
 
@@ -232,7 +232,7 @@ La letra permite a los equipos de tres reemplazar la app MAUI por una PWA con op
 | Visualización centralizada | Aspire Dashboard: en Docker en `:18888`; en Azure, una Container App con Caddy y clave (`terraform output -raw acceso_observabilidad`) |
 | Correlación de extremo a extremo | La PWA envía la cabecera `traceparent` con cada sincronización; la API continúa esa traza, la guarda en la fila del outbox (`TraceParent`) y el Worker la retoma al consumir el mensaje (ADR-0003, sección 2.9; ADR-0004, sección 2.9) |
 | Tablero técnico | Tiempo medio de respuesta, p95 y p99, tasa de errores, profundidad de la cola de fallidos, sincronizaciones pendientes, avisos fallidos y relación de aciertos del caché, en Aspire Dashboard |
-| **Serilog para el registro estructurado** | **No implementado.** Se usa el registro de .NET (`ILogger`) con su salida por consola; la propuesta de stack preveía Serilog. Ver sección 6 |
+| Serilog para el registro estructurado | `RegistroEstructurado` (BuildingBlocks), en la API y el Worker: el código sigue usando `ILogger<T>` y Serilog arma cada evento con sus propiedades, el nombre del servicio y el `TraceId`/`SpanId` de la actividad en curso. Salida por consola en JSON compacto y, con OTLP configurado, los mismos eventos van a Aspire Dashboard junto a las trazas. La API registra una línea estructurada por request (`UseSerilogRequestLogging`). Los niveles se cambian con la sección `Serilog` de la configuración |
 
 ## **2.13 Escalabilidad y balanceo de carga (6.13)**
 
@@ -366,6 +366,7 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | `CierreDiario:Habilitado`, `CierreDiario:Hora` | Tarea del cierre diario |
 | `Demo:Contrasena` | Obligatoria en producción |
 | `Identity:PermitirTenantProvisorio` | Sólo Development y pruebas: inquilino provisorio sin sesión |
+| `Serilog:MinimumLevel` (y `:Override`) | Niveles del registro estructurado, sin recompilar (por defecto Information; ASP.NET Core y EF Core en Warning) |
 
 ## **6.3 Producción**
 
@@ -375,8 +376,7 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 
 | Tema | Situación |
 | :---- | :---- |
-| Serilog (6.12) | No implementado; se usa `ILogger` de .NET con OpenTelemetry |
-| Cabeceras seguras (6.3) | No hay una política global de cabeceras |
+| Content-Security-Policy (6.3) | No restringe el origen de scripts y estilos: hacerlo exige nonces en las páginas con scripts en línea y servir Leaflet y SignalR desde el propio origen |
 | PWA: biometría, notificaciones con la app cerrada y posición en segundo plano (6.11) | No implementadas; la posición se sigue con la aplicación abierta |
 | Escalabilidad (6.13) | Eximida: una réplica, sin `/ready` ni `/live`, tareas programadas sin ejecución única garantizada |
 | Entrega parcial | Extravío de un bulto suelto, captura cifrada antes de confirmar (D9) y aceptaciones manuales pendientes; dos simplificaciones en la liquidación (ADR-0007, sección 4.6) |
@@ -395,3 +395,4 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 0.1 | 14/11/2026 | Borrador inicial para la entrega final, armado con IA a partir de los ADR, la documentación y el código, para revisión del equipo. | Ezequiel Marcenal |
+| 0.2 | 14/11/2026 | Serilog (6.12) y cabeceras seguras (6.3) implementados: pasan de limitaciones a implementación. | Ezequiel Marcenal |
