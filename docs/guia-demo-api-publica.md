@@ -2,7 +2,7 @@
 
 Guion preparado a partir de la implementación del repositorio. Los resultados indicados son los esperados; esta guía no registra una ejecución de la demostración.
 
-Duración sugerida: 12 a 15 minutos. Usar el entorno local y PowerShell 7 (`pwsh`) para los comandos con `-SkipHttpErrorCheck` y `-MaskInput`.
+La defensa en vivo dura unos 5 a 7 minutos. Los pasos 1 a 5 se hacen desde el navegador y el paso 6 muestra las dos cuotas con un lanzador local. El anexo conserva las demás comprobaciones para el ensayo o para responder preguntas.
 
 ## 1. Preparar el entorno antes de presentar
 
@@ -21,8 +21,6 @@ Abrir estas pestañas:
 
 En el entorno de desarrollo con los usuarios iniciales y sin contraseña personalizada, ingresar al Portal con `comercio@tiendademo.uy` y `Demo-2026!`. Seleccionar **Operador Demo**. Si se configuró `Demo:Contrasena`, usar ese valor.
 
-Mantener disponible una terminal con `pwsh`. No ejecutar la prueba de saturación hasta el paso 8: comparte cuota con las consultas de la consola web.
-
 **Presentación:** «Esta API permite que el sistema de un comercio cree y consulte envíos sin usar manualmente el Portal. Voy a mostrar las cinco condiciones del opcional: versionado y documentación, claves, pruebas, límites diferenciados y documentación navegable».
 
 ## 2. Mostrar la documentación y el versionado
@@ -31,7 +29,7 @@ Mantener disponible una terminal con `pwsh`. No ejecutar la prueba de saturació
 2. Mostrar la versión `v1` y las operaciones `POST /api/v1/envios`, `GET /api/v1/envios` y `GET /api/v1/envios/{numero}`.
 3. Desplegar un esquema de solicitud, los códigos de respuesta y los modelos.
 4. Abrir **Descargar OpenAPI**: `/api/openapi/v1.json`.
-5. Señalar la autenticación por cabecera `X-Api-Key` y las cuotas publicadas en la propia página.
+5. En **Autenticación y límites**, señalar la cabecera `X-Api-Key` y las cuotas publicadas. Con los valores predeterminados son 30 solicitudes por minuto en prueba y 120 en producción. Explicar que, cuando se supera la cuota, la API devuelve 429 con `Retry-After`.
 
 **Explicación:** «El contrato está versionado en la URL y la documentación se genera desde los endpoints. La consola permite ejecutar ejemplos con claves de prueba».
 
@@ -41,20 +39,10 @@ En **Claves de API**, con Operador Demo seleccionado:
 
 1. Nombre: `Demo opcional - prueba`; ambiente: **Prueba**; pulsar **Generar clave**.
 2. Copiar el secreto antes de pulsar **Ya la guardé**. Se muestra una sola vez.
-3. Generar otra con nombre `Demo opcional - produccion` y ambiente **Producción**. Copiar también ese secreto.
-4. Mostrar la tabla: nombre, ambiente, prefijo, creación, último uso y estado.
+3. Mostrar el selector **Ambiente**, con las opciones **Prueba** y **Producción**. Explicar que la clave de prueba permite ensayar desde la consola y que los envíos de prueba quedan fuera de la operación real.
+4. Mostrar la tabla con el nombre, ambiente, prefijo, creación, último uso y estado. Señalar **Revocar** y explicar que la clave deja de servir cuando se confirma la revocación.
 
 **Explicación:** «La clave identifica al comercio y al operador seleccionado. El servidor obtiene de ella el ambiente; el cliente no elige otro comercio enviando un identificador en el JSON».
-
-En PowerShell 7, cargar ambas claves sin escribirlas en el historial:
-
-```powershell
-$base = 'http://localhost:8080'
-$clavePrueba = Read-Host 'Pegar clave de prueba' -MaskInput
-$claveProduccion = Read-Host 'Pegar clave de produccion' -MaskInput
-$hPrueba = @{ 'X-Api-Key' = $clavePrueba }
-$hProduccion = @{ 'X-Api-Key' = $claveProduccion }
-```
 
 ## 4. Crear un envío de prueba y repetir el alta — CU-81
 
@@ -84,9 +72,65 @@ En la misma documentación:
 
 **Explicación:** «El comercio puede consultar tanto un listado paginado como el detalle y el historial de un envío. Un envío recién creado todavía no tiene entregas».
 
-Para mostrar progreso parcial, preparar previamente un envío de producción de tres bultos mediante el flujo operativo del proyecto. Con dos entregados y uno pendiente, comprobar en la API `estado = EntregadoParcialmente`, `entregados = 2`, `totalBultos = 3` y `terminado = false`. Si el tercero luego se devuelve al comercio, comprobar `terminado = true` y un devuelto. La consola de documentación no simula entregas.
+Dejar el detalle abierto y el número a la vista para compararlo con las respuestas del alta y el reintento.
 
-## 6. Demostrar separación entre prueba y producción
+## 6. Mostrar la tasa diferenciada
+
+Volver a **Autenticación y límites** en `/api/docs` y señalar las cuotas predeterminadas de **30/min en prueba** y **120/min en producción**. Cuando hayan pasado 61 segundos sin solicitudes públicas de esa relación, abrir `TestResults/demo-api-publica/Mostrar-cuotas.cmd`. El lanzador usa las claves locales guardadas y pide claves activas si faltan o fueron revocadas. Hace 31 consultas de solo lectura por ambiente y muestra el resultado en dos filas.
+
+En prueba deben aparecer 30 respuestas 200 y una 429 con `Retry-After`. Producción debe aceptar las 31 consultas. Si la prueba venía con solicitudes anteriores, el 429 puede aparecer antes. Los valores de la tabla muestran el resultado de esa tanda. La cuota de 120/min se muestra en la documentación.
+
+**Explicación:** «Hice la misma consulta 31 veces en cada ambiente. Prueba llegó al límite y devolvió 429 con los segundos de espera. Producción aceptó la tanda completa».
+
+## Anexo de ensayo y consultas opcionales
+
+Los comandos funcionan en Windows PowerShell 5.1 y PowerShell 7. Para los pasos que requieren producción, usar una clave de ese ambiente del mismo comercio y operador.
+
+Ejecutar este bloque en una misma terminal. Cuando aparezca cada mensaje de `Read-Host`, pegar la clave correspondiente y pulsar Enter. Dejar el texto entre comillas tal como está. Las asignaciones preparan variables y no imprimen resultados.
+
+```powershell
+$base = 'http://localhost:8080'
+$clavePrueba = Read-Host 'Pegar clave de prueba' -AsSecureString
+$claveProduccion = Read-Host 'Pegar clave de produccion' -AsSecureString
+$hPrueba = @{ 'X-Api-Key' = [pscredential]::new('demo', $clavePrueba).GetNetworkCredential().Password }
+$hProduccion = @{ 'X-Api-Key' = [pscredential]::new('demo', $claveProduccion).GetNetworkCredential().Password }
+
+function Invoke-DemoWebRequest {
+    param([string]$Uri, [hashtable]$Headers = @{}, [string]$Method = 'Get',
+        [string]$ContentType, [string]$Body)
+
+    try {
+        Invoke-WebRequest @PSBoundParameters -UseBasicParsing -ErrorAction Stop
+    } catch {
+        $respuesta = $_.Exception.Response
+        if ($null -eq $respuesta) { throw }
+        [pscustomobject]@{
+            StatusCode = [int]$respuesta.StatusCode
+            Headers = $respuesta.Headers
+            Content = $_.ErrorDetails.Message
+        }
+    }
+}
+```
+
+### Consultar una entrega parcial
+
+Para mostrar progreso parcial, preparar previamente un envío de producción de tres bultos mediante el flujo operativo del proyecto. La consola web ejecuta las consultas en `/api/v1/pruebas`. Un envío real devuelve 404 con clave de prueba. Consultarlo desde la terminal con la clave de **producción** del comercio y operador del envío y su número público `ENV-…`.
+
+Con `$base` y `$hProduccion` cargados en el bloque anterior, ejecutar:
+
+```powershell
+$numeroReal = Read-Host 'Numero publico del envio real (ENV-...)'
+$detalle = Invoke-RestMethod -Uri "$base/api/v1/envios/$numeroReal" -Headers $hProduccion -UseBasicParsing
+$detalle.envio | Format-List numero, estado, entregados, totalBultos, terminado
+$detalle.envio.resultados | Format-List
+$detalle.bultos | Format-Table codigo, estado
+$detalle.historial | Format-Table tipo, ocurridoEn
+```
+
+Con dos bultos entregados y uno pendiente, esperar `estado = EntregadoParcialmente`, `entregados = 2`, `totalBultos = 3` y `terminado = false`. Si el tercero se devuelve al comercio, volver a consultar y comprobar `terminado = true` y un devuelto.
+
+### Comprobar separación entre prueba y producción
 
 En la terminal, ingresar los valores usados en la consola:
 
@@ -102,15 +146,15 @@ Invoke-RestMethod "$base/api/v1/envios?referenciaComercio=$refEscapada" -Headers
     ConvertTo-Json -Depth 10
 
 # El detalle de prueba no se puede leer con la clave de produccion: 404.
-(Invoke-WebRequest "$base/api/v1/envios/$numeroPrueba" -Headers $hProduccion -SkipHttpErrorCheck).StatusCode
+(Invoke-DemoWebRequest "$base/api/v1/envios/$numeroPrueba" -Headers $hProduccion).StatusCode
 
 # El destino de la consola rechaza produccion por el servidor: 403.
-(Invoke-WebRequest "$base/api/v1/pruebas/envios" -Headers $hProduccion -SkipHttpErrorCheck).StatusCode
+(Invoke-DemoWebRequest "$base/api/v1/pruebas/envios" -Headers $hProduccion).StatusCode
 ```
 
 Con una referencia nueva exclusiva de esta demo, esperar total 1 en prueba y total 0 en producción. Buscar también esa referencia en el listado operativo del Portal: no debe aparecer.
 
-Para comprobar que la referencia se puede reutilizar en ambos ambientes, crear un envío de producción con la misma referencia:
+Para comprobar que la referencia se puede reutilizar en ambos ambientes, crear un envío de producción con la misma referencia. Usar la variable `$referencia` cargada al principio de este paso con la referencia del envío de prueba.
 
 ```powershell
 $cuerpo = @{
@@ -124,8 +168,8 @@ $cuerpo = @{
     modalidad = 'Estandar'
 } | ConvertTo-Json -Depth 5
 
-$altaProduccion = Invoke-WebRequest "$base/api/v1/envios" -Method Post -Headers $hProduccion `
-    -ContentType 'application/json; charset=utf-8' -Body $cuerpo -SkipHttpErrorCheck
+$altaProduccion = Invoke-DemoWebRequest "$base/api/v1/envios" -Method Post -Headers $hProduccion `
+    -ContentType 'application/json; charset=utf-8' -Body $cuerpo
 $altaProduccion.StatusCode
 $altaProduccion.Content
 ```
@@ -136,14 +180,14 @@ Esperar 201 y un número distinto al de prueba. Ahora el listado de producción 
 
 Para mostrar además aislamiento por operador, generar una clave de prueba seleccionando otro operador con relación activa, por ejemplo Operador Este si conserva los datos iniciales. Consultar el número de prueba de Operador Demo con esa clave: esperar 404. Para aislamiento entre comercios, preparar una segunda cuenta de comercio con relación activa y repetir la consulta del número ajeno.
 
-## 7. Mostrar autenticación y errores
+### Comprobar autenticación y errores
 
 ```powershell
 # Una peticion sin clave recibe 401, aunque haya una sesion abierta en el navegador.
-(Invoke-WebRequest "$base/api/v1/envios" -SkipHttpErrorCheck).StatusCode
+(Invoke-DemoWebRequest "$base/api/v1/envios").StatusCode
 
 # Paginacion invalida: 400.
-(Invoke-WebRequest "$base/api/v1/envios?tamanoPagina=0" -Headers $hPrueba -SkipHttpErrorCheck).StatusCode
+(Invoke-DemoWebRequest "$base/api/v1/envios?tamanoPagina=0" -Headers $hPrueba).StatusCode
 ```
 
 Opcionalmente, en el alta de la consola:
@@ -153,7 +197,7 @@ Opcionalmente, en el alta de la consola:
 
 Usar siempre una referencia nueva para probar cobertura o tarifa: con una referencia existente se devuelve el envío anterior antes de cotizar.
 
-## 8. Mostrar limitación de tasa diferenciada
+### Comprobar limitación de tasa manualmente
 
 La configuración inicial es 30 solicitudes/minuto en prueba y 120 en producción, compartidas por relación comercial y ambiente. Además, hay 600/minuto por IP antes de autenticar. Si se personalizaron, usar los valores publicados en `/api/docs`.
 
@@ -163,8 +207,7 @@ Las altas y consultas anteriores consumieron cuota. Para mostrar una comparació
 foreach ($ambiente in @('Prueba', 'Produccion')) {
     $cabecerasDemo = if ($ambiente -eq 'Prueba') { $hPrueba } else { $hProduccion }
     $resultados = foreach ($i in 1..31) {
-        $r = Invoke-WebRequest "$base/api/v1/envios?tamanoPagina=1" `
-            -Headers $cabecerasDemo -SkipHttpErrorCheck
+        $r = Invoke-DemoWebRequest "$base/api/v1/envios?tamanoPagina=1" -Headers $cabecerasDemo
         [pscustomobject]@{
             Ambiente = $ambiente
             Solicitud = $i
@@ -182,7 +225,7 @@ En una ejecución rápida que permanezca dentro de la ventana de cada cuota y si
 
 El contador implementado es local a cada instancia de la API. Presentar esta comprobación como una demostración sobre una instancia.
 
-## 9. Mostrar último uso y revocación — CU-80
+### Comprobar último uso y revocación — CU-80
 
 1. Después de la prueba de límites, esperar los segundos de `Retry-After` antes de continuar.
 2. Volver al Portal, pulsar **Actualizar** y mostrar que las claves registran último uso.
@@ -191,14 +234,12 @@ El contador implementado es local a cada instancia de la API. Presentar esta com
 5. Ejecutar en la terminal:
 
 ```powershell
-(Invoke-WebRequest "$base/api/v1/envios" -Headers $hPrueba -SkipHttpErrorCheck).StatusCode
+(Invoke-DemoWebRequest "$base/api/v1/envios" -Headers $hPrueba).StatusCode
 ```
 
 Esperar 401 con la misma clave que antes funcionaba.
 
-**Cierre sugerido:** «Mostramos el contrato v1 y su documentación navegable, generación y revocación de claves por relación comercial, alta idempotente y consultas, separación de pruebas y producción, y cuotas diferentes con 429 y Retry-After».
-
-## Evidencia para registrar durante el ensayo
+### Evidencia para registrar durante el ensayo
 
 | Condición | Evidencia |
 | --- | --- |

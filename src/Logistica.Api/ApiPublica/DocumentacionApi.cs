@@ -15,7 +15,7 @@ internal static class DocumentacionApi
             opciones.ShouldInclude = descripcion => descripcion.GroupName == Version;
             opciones.AddDocumentTransformer((documento, _, _) =>
             {
-                documento.Info.Title = "API pública de Logística";
+                documento.Info.Title = "API pública de VoluptasExpress";
                 documento.Info.Version = Version;
                 documento.Info.Description =
                     $"""
