@@ -1251,7 +1251,7 @@ Valida, Incorrecta, Vencida, Agotada, Usada, OtraOpcion
 
 Email
 
-*sólo se implementa correo, por SMTP (Mailpit en desarrollo, Brevo en producción). SMS y WhatsApp quedan fuera de alcance*
+*sólo se implementa correo, por SMTP (Mailpit en desarrollo; en producción no se configura un servidor). SMS y WhatsApp quedan fuera de alcance*
 
 **TipoNotificacion**  *«enum»*
 

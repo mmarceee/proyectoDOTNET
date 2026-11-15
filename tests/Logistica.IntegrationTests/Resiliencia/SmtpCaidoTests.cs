@@ -16,7 +16,7 @@ using static Logistica.IntegrationTests.Resiliencia.Interrupciones;
 
 namespace Logistica.IntegrationTests.Resiliencia;
 
-// Caso 4 de docs/pruebas-de-resiliencia.md: el servidor de correo (Mailpit, en producción Brevo) detenido. El envío se
+// Caso 4 de docs/pruebas-de-resiliencia.md: el servidor de correo (Mailpit en desarrollo) detenido. El envío se
 // crea igual; el Worker intenta mandar el aviso al destinatario (CU-62), registra el intento fallido y la mensajería lo
 // reintenta (5 s, 30 s y 2 min, ADR-0003). Cuando el servidor vuelve, el reintento entrega el mismo correo.
 [Collection(ContenedoresPropios.Nombre)]

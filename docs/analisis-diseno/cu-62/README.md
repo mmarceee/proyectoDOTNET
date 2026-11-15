@@ -73,7 +73,7 @@ comparten con CU-64. Como allí, un evento que llega antes que el alta de su env
 - **Enlace:** `Aplicacion:UrlPublica` más `/seguimiento/{token}`, con el token firmado de CU-60. El Worker usa la misma
   `Seguimiento:ClaveToken` que la API.
 - **SMTP:** MailKit 4.18.1, el cliente que recomienda Microsoft. `ConnectionStrings:Smtp` acepta `smtp://` (STARTTLS si
-  el servidor lo ofrece: Mailpit, o Brevo en el 587) y `smtps://`, con usuario y contraseña opcionales en la dirección.
+  el servidor lo ofrece: Mailpit, o un servidor en el 587) y `smtps://`, con usuario y contraseña opcionales en la dirección.
   MimeKit trae `System.Security.Cryptography.Pkcs` 10.0.0, con avisos de seguridad: se fija la 10.0.13.
 - **Remitente:** `Seguimiento:Correo:Remitente` (por defecto, `avisos@logistica.local`). El nombre visible es el del
   operador, y la respuesta va a su correo de contacto si lo tiene.
@@ -97,8 +97,8 @@ que el Worker necesita para firmar los enlaces. En desarrollo los correos se ven
 
 ## Pendiente
 
-- **Producción:** la dirección pública de DigitalOcean, la cadena SMTP de Brevo y un remitente verificado. `infra/terraform`
-  todavía no tiene archivos.
+- **Producción:** por decisión del equipo (15/11) no se configura un servidor de correo: los correos quedan en mensajes
+  fallidos. Para enviarlos alcanza con completar `smtp` y `correo_remitente` en `infra/terraform`.
 - **Envíos anteriores a CU-64:** no tienen `EnvioSeguido`, así que sus eventos terminan en la cola de fallidos.
 - **Operadores sin identidad guardada:** usan la marca neutra hasta que el administrador guarde la de CU-07.
 - **CU-02:** la invitación (`UsuarioInvitado`) la manda el consumidor `EnviarInvitacion` (cola
@@ -120,3 +120,4 @@ que el Worker necesita para firmar los enlaces. En desarrollo los correos se ven
 | Versión | Fecha | Descripción | Responsable |
 | :---: | :---: | :---- | :---- |
 | 1.0 | 22/10/2026 | Versión inicial: diseño e implementación de CU-62. | Ezequiel Marcenal |
+| 1.1 | 15/11/2026 | Producción sin servidor de correo, por decisión del equipo; se quita el proveedor previsto. | Ezequiel Marcenal |

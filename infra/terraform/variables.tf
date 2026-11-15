@@ -50,14 +50,14 @@ variable "ghcr_token" {
 }
 
 variable "smtp" {
-  description = "Servidor de correo, como smtp://usuario:clave@smtp-relay.brevo.com:587. Sin cuenta de correo, smtp://localhost:25: los correos fallan y quedan en mensajes fallidos."
+  description = "Servidor de correo, como smtp://usuario:clave@servidor-smtp:587. Sin servidor, smtp://localhost:25: los correos fallan y quedan en mensajes fallidos."
   type        = string
   default     = "smtp://localhost:25"
   sensitive   = true
 }
 
 variable "correo_remitente" {
-  description = "Dirección desde la que salen los correos; con Brevo, tiene que estar verificada."
+  description = "Dirección desde la que salen los correos; algunos servidores exigen que esté verificada."
   type        = string
   default     = "avisos@logistica.local"
 }

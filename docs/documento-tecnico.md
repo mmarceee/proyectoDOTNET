@@ -2,7 +2,7 @@
 
 | Estado | Borrador para la entrega final, pendiente de revisión del equipo |
 | :---- | :---- |
-| **Versión** | 0.2 |
+| **Versión** | 0.5 |
 | **Fecha** | 14 de noviembre de 2026 |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigido por** | Letra del laboratorio, sección 8.4: «documento técnico que describa la implementación de los requerimientos no funcionales, las decisiones de diseño adoptadas, las configuraciones relevantes y los diagramas correspondientes» |
@@ -58,7 +58,7 @@ flowchart LR
     SEGW --- PG
     SEGW --- VK
     SEGW -- webhooks firmados --> EXT
-    SEGW -- SMTP --> MAIL[Mailpit / Brevo]
+    SEGW -- SMTP --> MAIL[Mailpit, en desarrollo]
     API & Worker -- OTLP --> ASP[Aspire Dashboard]
 ```
 
@@ -87,7 +87,6 @@ flowchart TB
     CA & WK --> VKC
     CA & WK --> MQC
     CA & WK -- OTLP --> AD
-    WK -- SMTP --> BREVO[Brevo]
 ```
 
 Localmente, el mismo conjunto corre con `docker compose up -d --build --wait` (PostgreSQL, Valkey, RabbitMQ, Aspire Dashboard, Mailpit, API y Worker).
@@ -296,7 +295,7 @@ Total: 9 puntos (mínimo exigido para equipos de tres: 8).
 | 0005 | Blazor WebAssembly para Portal, seguimiento y PWA | Lucas Ottonello | Aceptado |
 | 0006 | Cache-aside sobre `IDistributedCache` y Valkey, clave por operador, dos políticas | Cristian Reyes | Aceptado |
 | 0007 | Adaptación a la entrega parcial (registro del cambio) | Lucas Ottonello | Aceptado |
-| 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Aceptado (v0.1) |
+| 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Aceptado (v1.0) |
 
 Otras decisiones de diseño relevantes, sin ADR propio:
 
@@ -376,6 +375,7 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 
 | Tema | Situación |
 | :---- | :---- |
+| Correo en producción | Por decisión del equipo no se configura un servidor de correo en Azure: las invitaciones de usuarios y los avisos al destinatario fallan y quedan en mensajes fallidos. Los usuarios de demostración ya están activos. Para enviarlos alcanza con completar `smtp` y `correo_remitente` en Terraform |
 | Content-Security-Policy (6.3) | No restringe el origen de scripts y estilos: hacerlo exige nonces en las páginas con scripts en línea y servir Leaflet y SignalR desde el propio origen |
 | PWA: biometría, notificaciones con la app cerrada y posición en segundo plano (6.11) | No implementadas; la posición se sigue con la aplicación abierta |
 | Escalabilidad (6.13) | Eximida: una réplica, sin `/ready` ni `/live`, tareas programadas sin ejecución única garantizada |
@@ -394,3 +394,6 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | :---: | :---: | :---- | :---- |
 | 0.1 | 14/11/2026 | Borrador inicial para la entrega final, armado con IA a partir de los ADR, la documentación y el código, para revisión del equipo. | Ezequiel Marcenal |
 | 0.2 | 14/11/2026 | Serilog (6.12) y cabeceras seguras (6.3) implementados: pasan de limitaciones a implementación. | Ezequiel Marcenal |
+| 0.3 | 15/11/2026 | Producción sin servidor de correo, por decisión del equipo: se quita el proveedor de los diagramas y se agrega a las limitaciones. | Ezequiel Marcenal |
+| 0.4 | 15/11/2026 | ADR-0008 aceptado (v1.0). | Ezequiel Marcenal |
+| 0.5 | 15/11/2026 | ADR-0001 (v2.1), ADR-0002 y ADR-0005 aceptados; se quitan de las limitaciones la entrega parcial y los ADR pendientes. | Lucas Ottonello |

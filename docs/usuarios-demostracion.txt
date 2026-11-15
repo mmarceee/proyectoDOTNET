@@ -1,0 +1,35 @@
+USUARIOS DE DEMOSTRACIÓN
+Laboratorio .NET 2026 · Equipo 1
+
+Los crea la API al iniciar (datos iniciales), en el entorno local y en Azure.
+
+CONTRASEÑA
+- Local (Docker Compose): la de DEMO_CONTRASENA en .env. Si queda vacía, Demo-2026!
+- Azure: la genera Terraform. Se consulta en infra/terraform con:
+      terraform output -raw contrasena_demo
+  (no se guarda en el repositorio)
+
+DÓNDE SE INGRESA
+- Backoffice (personal del operador y administrador general): /cuenta/ingresar
+- Portal del comercio: /portal/ingresar
+- Aplicación del repartidor (PWA): /repartidor/ingresar
+Local: http://localhost:8080 · Azure: la URL de terraform output url
+
+PLATAFORMA
+  admin@plataforma.uy            Administrador general   Da de alta y gestiona operadores (sin operador)
+
+OPERADOR DEMO
+  admin@operador-demo.uy         Administrador           Configuración, usuarios, comercios, liquidaciones
+  despacho@operador-demo.uy      Despachador             Rutas, tablero, envíos, incidencias
+  deposito@operador-demo.uy      Operario de depósito    Recepción, rendiciones, devoluciones
+  repartidor@operador-demo.uy    Repartidor              PWA del repartidor
+
+ENVÍOS DEL ESTE (configuración distinta: tarifario, reglas, zonas y franjas)
+  admin@envios-del-este.uy       Administrador
+  despacho@envios-del-este.uy    Despachador
+  deposito@envios-del-este.uy    Operario de depósito
+  repartidor@envios-del-este.uy  Repartidor
+
+COMERCIO
+  comercio@tiendademo.uy         Usuario de comercio     Tienda Demo SA. Trabaja con los dos operadores:
+                                                         al ingresar elige con cuál (CU-03)
