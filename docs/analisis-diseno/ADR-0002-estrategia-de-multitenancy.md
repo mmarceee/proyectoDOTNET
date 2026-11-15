@@ -1,9 +1,9 @@
 # **ADR-0002 · Estrategia de multitenancy**
 
-| Estado | Pendiente de revisión por el equipo |
+| Estado | Aceptado — aprobado por el equipo el 15/11/2026. Las decisiones abiertas quedaron cerradas (sección 5) |
 | :---- | :---- |
-| **Versión** | 2.2 |
-| **Fecha** | 2 de octubre de 2026 (actualizado el 14 de noviembre de 2026) |
+| **Versión** | 2.3 |
+| **Fecha** | 2 de octubre de 2026 (actualizado el 15 de noviembre de 2026) |
 | **Responsable** | Cristian Reyes |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Decisión relacionada** | Estrategia de multitenancy |
@@ -177,22 +177,35 @@ Un intento de acceder a un recurso de otro inquilino responde igual que si el re
 
 La parte (a) detecta "me olvidé del marcador". La (b) detecta "tiene el marcador, pero el filtro no se aplicó"; por ejemplo, un OnModelCreating que no llama a la clase base.
 
-3. **Regla de arquitectura (a confirmar):** una prueba con ArchUnitNET que impida usar IgnoreQueryFilters, ExecuteUpdate, ExecuteDelete y SQL crudo fuera de los lugares autorizados. Se incorporará si la biblioteca permite expresarla; mientras tanto, se controla en la revisión de código.
+3. **Control de IgnoreQueryFilters, operaciones masivas y SQL crudo (decidido el 15/11/2026):** no se automatiza en este alcance. Los usos son pocos y están en la capa Infrastructure, así que el equipo prefirió controlarlos en la revisión de código antes que mantener una lista de excepciones en una prueba. Una prueba con ArchUnitNET que detecte las llamadas a esos métodos queda como mejora posible. En la revisión: cada uso lleva un comentario en el mismo lugar que lo justifica, y la tabla siguiente es el inventario cerrado al 15/11/2026. Un uso nuevo se agrega a esta tabla en el mismo PR.
+
+| **Uso** | **Dónde** | **Por qué cumple** |
+| :---- | :---- | :---- |
+| IgnoreQueryFilters("Tenant") | `OperadoresDelComercio` y `ClavesApiRepository.IdentificarPorHashAsync` (Administración) | Tercer y cuarto caso de la sección 2.4 |
+| IgnoreQueryFilters("Prueba") | `EnviosPorAmbiente` (Envíos) | Ignora sólo el filtro de envíos de prueba, no "Tenant" (sección 2.4) |
+| FromSql con FOR UPDATE | `ClavesApiRepository.RegistrarUsoPorHashAsync`, `ComerciosRepository.BloquearRelacionAsync`, `RecursosPlanificacionReader` (Administración); `ReenviosAvisoRepository` (Seguimiento) | Bloqueo de fila que LINQ no expresa. Parametrizado, con el OperadorId de ICurrentTenant explícito en el WHERE; EF compone además el filtro "Tenant" porque parte de un DbSet. `Operador` es global y se bloquea por el Id de la sesión |
+| FromSqlRaw del Outbox | `PublicadorOutbox` (BuildingBlocks) | La tabla del Outbox es infraestructura técnica, excepción de la sección 2.4; el nombre de la tabla no viene del usuario |
+| SqlQueryRaw de la secuencia | `EnvioRepository.SiguienteNumeroAsync` (Envíos) | SQL fijo sobre una secuencia; no lee datos de ningún operador |
+| ExecuteDelete | `PosicionRepository` (Ejecución) | Limpieza de posiciones viejas: pasa por el filtro "Tenant", no modifica OperadorId ni se combina con IgnoreQueryFilters |
+
+No hay usos de ExecuteUpdate ni de ExecuteSqlRaw.
 
 Todas estas pruebas tienen que existir desde el principio y correr en el pipeline, no agregarse al final.
 
 **Qué dificulta a futuro:** si algún día un operador exigiera aislamiento físico de sus datos (por un contrato o una norma), migrar de "por fila" a "por base de datos" para ese operador no es un cambio incremental: es prácticamente extraer sus datos a una base nueva y reescribir la resolución del tenant. Es una limitación real de esta decisión. El equipo la eligió por ser la adecuada para su tamaño y el tiempo disponible, no por ser la mejor opción en abstracto; frente a un requisito real de aislamiento físico, la decisión correcta habría sido database-per-tenant desde el principio.
 
-# **5\. Decisiones abiertas conectadas a este ADR**
+# **5\. Decisiones cerradas al 15/11/2026**
 
-| **Tema** | **Por qué importa** |
+Los seis temas que este ADR dejaba abiertos quedaron resueltos así:
+
+| **Tema** | **Resolución** |
 | :---- | :---- |
-| Reportes o consultas administrativas que necesiten ver todos los operadores (si los hubiera) | Tienen que ser un camino explícito y auditado, nunca el comportamiento por defecto. Mientras no exista ese caso de uso en el alcance actual, no hay excepciones a IgnoreQueryFilters() más allá de las de la sección 2.4. |
-| RelacionComercial con filtro de inquilino | El modelo de dominio la lista como excepción a la convención de OperadorId; este ADR propone que implemente IOperadorOwned e IComercioOwned (sección 2.6). Debe acordarse con el responsable del modelo de dominio. |
-| Outbox sin filtro de inquilino | Se confirma al implementar el Outbox en BuildingBlocks (ADR-0003). |
-| Regla de arquitectura sobre IgnoreQueryFilters y operaciones masivas | Depende de que ArchUnitNET permita expresarla (sección 4, punto 3). |
-| Correo único en todo el sistema | Identity exige por defecto que el correo sea único en toda la tabla, no por operador. Un repartidor o un empleado que trabaje para dos operadores necesita dos correos distintos. Los usuarios de comercio no tienen el problema: usan una sola cuenta para todos sus operadores (CU-01, decisión 4). Debe confirmarse con el equipo. |
-| Envíos de prueba (EsPrueba) de la API pública | Los envíos creados con una clave de prueba no deben verse en el Backoffice, las rutas ni las liquidaciones. Puede resolverse con un segundo filtro con nombre ("Prueba"), separado de "Tenant": ignorarlo está permitido (sección 2.4), así que la API con clave de prueba puede verlos sin tocar el aislamiento entre operadores. Se define junto con la implementación de la API pública. |
+| Reportes o consultas administrativas que necesiten ver todos los operadores | **Cerrado: no hay excepción.** El alcance final no tiene ningún caso de uso de este tipo. El administrador general (CU-00) no es un reporte transversal: lista `Operador`, que es global, y los administradores de un operador elegido (sección 2.4). Si apareciera un caso así, tendría que ser un camino explícito y auditado, y actualizar este ADR. |
+| RelacionComercial con filtro de inquilino | **Resuelto como se proponía:** `RelacionComercial` implementa IOperadorOwned e IComercioOwned (sección 2.6), y el modelo de dominio lo refleja. |
+| Outbox sin filtro de inquilino | **Confirmado:** `OutboxMessage` no implementa IOperadorOwned y figura como excepción en la prueba estructural (sección 2.4; ADR-0003). |
+| Regla de arquitectura sobre IgnoreQueryFilters y operaciones masivas | **Decidido:** se controla en la revisión de código, con el inventario de usos autorizados de la sección 4, punto 3. |
+| Correo único en todo el sistema | **Confirmado: único en toda la tabla** (`RequireUniqueEmail`). Un repartidor o un empleado que trabaje para dos operadores necesita dos correos distintos. Los usuarios de comercio no tienen el problema: usan una sola cuenta para todos sus operadores (CU-01, decisión 4). |
+| Envíos de prueba (EsPrueba) de la API pública | **Resuelto con un segundo filtro con nombre, "Prueba"**, separado de "Tenant" (`EnvioConfiguration`): los envíos de prueba no aparecen en el Backoffice, las rutas ni las liquidaciones, y la API con clave de prueba los ve ignorando sólo ese filtro (`EnviosPorAmbiente`), sin tocar el aislamiento entre operadores. |
 
 # **6\. Referencias**
 
@@ -211,5 +224,6 @@ Las versiones hasta la 2.1 no tienen historial propio. El repositorio registra l
 | :---: | :---: | :---- | :---- |
 | 2.1 | 02/10/2026 | Versión entregada con el análisis y diseño. | Cristian Reyes |
 | 2.2 | 14/11/2026 | Sección 2.4: el administrador general de la plataforma (CU-00), sesión sin inquilino y alta con `InquilinoTrabajo`. Se agrega este historial. | Ezequiel Marcenal |
+| 2.3 | 15/11/2026 | Aceptado por el equipo. Sección 5: se cierran los seis temas abiertos con lo implementado. Sección 4, punto 3: control en revisión de código con el inventario de usos de IgnoreQueryFilters, SQL crudo y operaciones masivas. | Cristian Reyes |
 
 *Equipo 1 · Laboratorio .NET 2026*

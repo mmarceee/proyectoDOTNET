@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 14 de noviembre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 15 de noviembre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal, Lucas Ottonello y Cristian Reyes |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -1638,6 +1638,21 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | **Descartado** | Ocultar el botón cuando no hay correo: preferí que el destinatario pueda reprogramar con el teléfono. Hacer vencer el token del enlace: no resuelve el reenvío del enlace dentro de su vigencia y rompería los enlaces de los correos ya enviados. Mandar el código por el Worker: llegaría con demora. |
 | **Verificación** | `VerificacionReprogramacionTests` (7) y las de CU-61 de `ReprogramacionPublicaTests` (9: las cinco anteriores adaptadas y cuatro nuevas, con correo, con teléfono, sin pedir el código y un código que reemplaza al anterior) pasan en Docker. También pasan las 56 de arquitectura, las 15 de aislamiento entre inquilinos (incluida la prueba estructural del filtro "Tenant") y todas las de Seguimiento (181 unitarias y 108 de integración). |
 
+## **3.109 ADR-0002 · Cierre de las decisiones abiertas y prueba estructural (a)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 15/11/2026 |
+| **Archivos** | `ADR-0002-estrategia-de-multitenancy.md` (v2.3); `tests/Logistica.IntegrationTests/Tenancy/AislamientoTests.cs`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Cerrar el ADR-0002 para la entrega final: Lucas revisó los ADR y marcó que seguía pendiente de revisión, con seis temas abiertos en la sección 5 y la regla de IgnoreQueryFilters, operaciones masivas y SQL crudo "a confirmar". |
+| **Cómo se trabajó** | Le pasé a la IA la revisión de Lucas. Comparó cada tema abierto con el código, me propuso cómo cerrarlo y la redacción, y la apliqué con su ayuda. |
+| **Aceptado sin modificaciones** | Los cuatro temas que el código ya resolvía quedan cerrados con su implementación: filtro de `RelacionComercial`, Outbox sin filtro, correo único global y filtro "Prueba" separado de "Tenant". Los reportes de todos los operadores se cierran sin excepción, porque no hay ese caso de uso. La regla de IgnoreQueryFilters, operaciones masivas y SQL crudo se controla en la revisión de código, con un inventario de los usos actuales; la IA revisó cada uno y todos cumplen. |
+| **Modificado** | Al revisar las pruebas apareció que la prueba estructural tenía sólo la parte (b), el filtro "Tenant" en toda entidad con marcador. Faltaba la (a), que la sección 4 marca como obligatoria: toda entidad con `OperadorId` implementa `IOperadorOwned`, salvo el Outbox. La agregamos en `AislamientoTests`. Un primer borrador justificaba no automatizar la regla de IgnoreQueryFilters diciendo que ArchUnitNET no podía expresarla; se corrigió porque no es cierto. |
+| **Descartado** | Escribir la prueba con ArchUnitNET para IgnoreQueryFilters y SQL crudo el día de la entrega: queda anotada como mejora posible. |
+| **Verificación** | Las 16 pruebas de aislamiento (`Tenancy`) pasan en Docker: las 15 anteriores y la nueva prueba estructural (a). |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -1696,3 +1711,4 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | 0.51 | 14/11/2026 | Entradas del 13 y 14/11: administrador general (3.100), fecha y franja en el alta (3.101), motivo de los errores del Portal (3.102), perfil e ícono del Backoffice (3.103), tablero y lecturas por bulto (3.104), liquidación según D8 (3.105) y revisión para la entrega (3.106). | Ezequiel Marcenal |
 | 0.52 | 14/11/2026 | Documento técnico en la entrada 3.106 y entrada de Serilog y cabeceras seguras (3.107). | Ezequiel Marcenal |
 | 0.53 | 14/11/2026 | Entrada de la verificación del destinatario antes de reprogramar (3.108). | Cristian Reyes |
+| 0.54 | 15/11/2026 | Entrada del cierre del ADR-0002 y la prueba estructural (a) (3.109). | Cristian Reyes |
