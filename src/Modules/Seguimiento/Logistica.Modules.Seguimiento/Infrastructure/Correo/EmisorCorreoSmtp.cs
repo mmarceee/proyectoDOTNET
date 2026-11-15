@@ -6,7 +6,7 @@ using MimeKit;
 namespace Logistica.Modules.Seguimiento.Infrastructure.Correo;
 
 // ConnectionStrings:Smtp, con la forma smtp://[usuario:contraseña@]host:puerto (STARTTLS cuando el servidor lo ofrece,
-// como Mailpit en desarrollo o Brevo en el 587) o smtps://... (TLS desde el inicio). Seguimiento:Correo:Remitente es la
+// como Mailpit en desarrollo o un servidor en el 587) o smtps://... (TLS desde el inicio). Seguimiento:Correo:Remitente es la
 // dirección desde la que salen los correos. Se validan al enviar, así la API y el Worker arrancan aunque falten.
 internal sealed class ServidorSmtp(string? conexion, string? remitente)
 {

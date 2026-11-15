@@ -10,9 +10,9 @@ azure_subscription_id = ""
 #   az policy assignment list --query "[].parameters.listOfAllowedLocations.value"
 # ubicacion = "chilecentral"
 
-# Correo (opcional). Sin cuenta de Brevo queda smtp://localhost:25 y los correos van a mensajes fallidos.
-# smtp             = "smtp://usuario:clave@smtp-relay.brevo.com:587"
-# correo_remitente = "avisos@dominio-verificado-en-brevo"
+# Correo (opcional). Sin servidor queda smtp://localhost:25 y los correos van a mensajes fallidos.
+# smtp             = "smtp://usuario:clave@servidor-smtp:587"
+# correo_remitente = "avisos@dominio-del-remitente"
 
 # Sólo si los paquetes de GHCR quedan privados: usuario de GitHub y token con read:packages.
 # ghcr_usuario = ""

@@ -96,7 +96,7 @@ La prueba tarda poco más de un minuto, porque espera ese vencimiento.
 
 ## 5. Caso 4: servicio externo (servidor de correo) detenido
 
-**Flujo probado:** crear un envío con correo del destinatario. El Worker le manda el aviso "Recibimos tu envío" por SMTP (CU-62); en desarrollo es Mailpit y en producción Brevo.
+**Flujo probado:** crear un envío con correo del destinatario. El Worker le manda el aviso "Recibimos tu envío" por SMTP (CU-62); en desarrollo, Mailpit.
 
 | | Comportamiento |
 | :---- | :---- |
@@ -135,3 +135,4 @@ Ensayado el 12/11/2026 con Docker Compose. Detalles a tener en cuenta:
 | 1.0 | 08/11/2026 | Versión inicial: los cuatro casos con su prueba de integración, el chequeo de PostgreSQL en `/health`, el 503 con la base caída y el backplane de SignalR en FailFast. |
 | 1.1 | 08/11/2026 | Caso 1: invalidación fallida, con el puntero del tarifario de 1 minuto. El precio viejo duró 59,6 s y la prueba falla con 10 minutos. |
 | 1.2 | 12/11/2026 | Sección 6: ensayo de los cuatro casos con Docker Compose, con el calentamiento previo, la demora del 503 por la resolución de nombres de Docker y la consulta de notificaciones. |
+| 1.3 | 15/11/2026 | Caso 4: se quita el proveedor de correo de producción, que no se configura (decisión del equipo). |

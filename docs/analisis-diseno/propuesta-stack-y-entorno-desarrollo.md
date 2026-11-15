@@ -34,7 +34,7 @@ La propuesta adopta un stack alineado con los requerimientos obligatorios del la
 | Mensajería | **RabbitMQ y RabbitMQ.Client** | Comunicación asíncrona entre la API y el worker con Outbox, reintentos y cola de fallidos. Cliente oficial, con implementación propia del Outbox (ADR-0003, propuesto). |
 | Tiempo real | **ASP.NET Core SignalR** | Actualización del tablero operativo y posiciones de la flota, exigida por la letra. |
 | Observabilidad | **Serilog, OpenTelemetry y Aspire Dashboard** | Logs estructurados, métricas, trazas y visualización centralizada. |
-| Correo | **SMTP: Mailpit y Brevo** | Invitaciones a usuarios y notificaciones al destinatario. Mailpit captura los correos en desarrollo; Brevo (plan gratuito, 300 correos por día) los envía en el ambiente desplegado. |
+| Correo | **SMTP: Mailpit** | Invitaciones a usuarios y notificaciones al destinatario. Mailpit captura los correos en desarrollo. En el ambiente desplegado no se configura un servidor de correo (decisión del equipo, 15/11): los correos quedan en mensajes fallidos. |
 | Archivos | **PostgreSQL** | Logos, fotos y firmas de entrega en una tabla de archivos, con límite de 1 MB y acceso detrás de una interfaz de Infrastructure. |
 | Pruebas | **xUnit, ArchUnitNET, WebApplicationFactory, Testcontainers, Respawn y Playwright** | Pruebas unitarias, de integración, aislamiento y arquitectura. La prueba de arquitectura usa ArchUnitNET, según el ADR-0001, addendum 3. Playwright, para las pruebas de extremo a extremo del requerimiento opcional 7.2. |
 | Contenedores | **Docker Desktop y Docker Compose** | Entorno completo reproducible: servicios de soporte, API y worker. |
@@ -98,7 +98,7 @@ Además, el equipo eligió tres requerimientos opcionales de pruebas (Plan de ca
 
 ## **3.9 Correo y archivos**
 
-La aplicación enviará los correos por SMTP, sin depender de un proveedor concreto: en desarrollo, Mailpit los captura y los muestra en una página web; en el ambiente desplegado se usará Brevo, cuyo plan gratuito permite 300 correos por día. Cambiar de proveedor sólo requiere cambiar la configuración.
+La aplicación enviará los correos por SMTP, sin depender de un proveedor concreto: en desarrollo, Mailpit los captura y los muestra en una página web; en el ambiente desplegado no se configura un servidor de correo, por decisión del equipo (15/11), y los correos quedan en mensajes fallidos. Usar un proveedor sólo requiere configurar su servidor SMTP.
 
 Los logos, las fotos y las firmas de entrega se guardarán en PostgreSQL, en una tabla de archivos con un límite de 1 MB por archivo y el mismo aislamiento por inquilino que el resto de los datos. El acceso pasará por una interfaz de Infrastructure, de modo que podría cambiarse a un almacenamiento de objetos sin modificar los casos de uso.
 
@@ -201,7 +201,7 @@ Container Apps administrará el enrutamiento público y HTTPS con certificado pr
 * ~~Estado de Terraform.~~ Resuelto el 03/11: local y fuera de Git, porque guarda secretos; lo administra el responsable del despliegue.  
 * ~~Biblioteca cliente de RabbitMQ.~~ Propuesta en el ADR-0003: RabbitMQ.Client.  
 * ~~Almacenamiento de fotografías, firmas y otros archivos de evidencia.~~ Resuelto: en PostgreSQL (sección 3.9).  
-* ~~Proveedor de correo.~~ Resuelto: SMTP, con Mailpit en desarrollo y Brevo en el ambiente desplegado (sección 3.9).
+* ~~Proveedor de correo.~~ Resuelto: SMTP, con Mailpit en desarrollo; en el ambiente desplegado no se configura un servidor de correo (sección 3.9).
 
 Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cerrarán antes de implementar o desplegar el componente correspondiente.
 
@@ -240,3 +240,4 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | 1.6 | 05/11/2026 | Cambio de proveedor: Azure Container Apps y PostgreSQL Flexible Server con Azure for Students en lugar de DigitalOcean, que retiró el crédito de estudiante; alternativas descartadas (secciones 2, 4, 6 y 7). Región Chile Central y RabbitMQ en un contenedor, por el límite de colas de CloudAMQP. |
 | 1.7 | 05/11/2026 | Aspire Dashboard desplegado en Azure, protegido con token y clave OTLP (sección 7). |
 | 1.8 | 09/11/2026 | ADR-0008 (despliegue) en la sección 8, que además se actualiza con el ADR-0005 y el ADR-0006; Terraform ya no define CloudAMQP; permiso del job `deploy` asignado por Terraform (sección 6). |
+| 1.9 | 15/11/2026 | Correo: en el ambiente desplegado no se configura un servidor de correo, por decisión del equipo; se quita el proveedor previsto (secciones 2, 3.9 y 7). |

@@ -147,8 +147,8 @@ public class NotificacionTests
         Assert.Throws<InvalidOperationException>(() => new DireccionPublica(null).Absoluta("/x"));
         Assert.Throws<InvalidOperationException>(() => new DireccionPublica("ftp://logistica.example").Absoluta("/x"));
 
-        var conCredenciales = new ServidorSmtp("smtp://usuario%40brevo:clave%2Fsecreta@smtp-relay.example:587", "avisos@logistica.uy");
-        Assert.Equal(("usuario@brevo", "clave/secreta"), conCredenciales.Credenciales!.Value);
+        var conCredenciales = new ServidorSmtp("smtp://usuario%40proveedor:clave%2Fsecreta@smtp-relay.example:587", "avisos@logistica.uy");
+        Assert.Equal(("usuario@proveedor", "clave/secreta"), conCredenciales.Credenciales!.Value);
         Assert.Null(new ServidorSmtp("smtp://mailpit:1025", "avisos@logistica.local").Credenciales);
         Assert.Throws<InvalidOperationException>(() => new ServidorSmtp("", "avisos@logistica.local").Uri);
         Assert.Throws<InvalidOperationException>(() => new ServidorSmtp("smtp://mailpit:1025", "").Remitente);

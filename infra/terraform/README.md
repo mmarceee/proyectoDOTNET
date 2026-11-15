@@ -63,8 +63,9 @@ Lo hace cada integrante en su cuenta; nada de esto va al repositorio.
 4. **Imágenes:** un push a `main` que pase el CI publica `api:latest` y `worker:latest` en GitHub Container Registry. La
    primera vez, en GitHub → *Packages*, cambiar la visibilidad de los dos paquetes a **Public** (*Package settings →
    Change visibility*). Si quedan privados, completar `ghcr_usuario` y `ghcr_token` (un token con `read:packages`).
-5. **Correo (opcional):** las credenciales SMTP de Brevo y un remitente verificado. Sin eso, los correos fallan y quedan en
-   mensajes fallidos; el resto funciona igual.
+5. **Correo (opcional):** por decisión del equipo (15/11) no se configura un servidor de correo en producción. Sin
+   `smtp`, los correos fallan y quedan en mensajes fallidos; el resto funciona igual. Para enviarlos alcanza con completar
+   `smtp` y `correo_remitente` con cualquier servidor SMTP.
 6. Copiar `terraform.tfvars.example` como `produccion.tfvars` y completarlo. Ese archivo está excluido de Git.
 
 ## Crear, actualizar y destruir
