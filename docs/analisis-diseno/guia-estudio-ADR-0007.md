@@ -1,6 +1,6 @@
 # ADR-0007 · Guía de estudio y defensa
 
-Leer primero esta guía, después la decisión del [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md#2-decisión-adoptada), su retrospectiva (4.5) y el [cierre técnico](cierre-tecnico-entrega-parcial.md). La [decisión funcional](decisiones-entrega-parcial.md) contiene los ejemplos de resumen y las reglas del operador. La guía explica esas fuentes; no agrega reglas propias.
+Leer primero esta guía, después la decisión del [ADR-0007](ADR-0007-adaptacion-a-entrega-parcial.md#2-decisión-adoptada), su retrospectiva (4.5) y el [cierre técnico](anexo-tecnico-ADR-0007-entrega-parcial.md). La [decisión funcional](decisiones-entrega-parcial.md) contiene los ejemplos de resumen y las reglas del operador. La guía explica esas fuentes; no agrega reglas propias.
 
 ## La explicación en un minuto
 
@@ -79,7 +79,7 @@ No alcanzaba con agregar EntregadoParcialmente al enum global: seguirían faltan
 
 **¿Cómo se cobra un cierre mixto?** En UYU, con importes finales en pesos enteros. Los cálculos se redondean al peso más cercano: 1500,49 queda 1500 y 1500,50 queda 1501. Al terminar todos los bultos se cobra la base una vez si alguno se entregó o devolvió. Dos entregados y uno devuelto pagan una base; todos extraviados/cancelados no pagan base. Las revisitas reales generan sus cargos separados, aunque fallen, sin repetirlos por bulto o reenvío. D8 especifica la unicidad también al liquidar.
 
-**¿Se recupera lo capturado antes de confirmar?** La decisión vigente exige conservar cifrados resultados, firma, foto y textos y recuperarlos para la misma identidad y visita. Cambiar entregados invalida la firma persistida. La implementación anterior sólo conserva evidencia en memoria y advierte al salir: sus pruebas no demuestran todavía la recuperación completa de D9.
+**¿Qué se recupera al recargar antes de confirmar?** Se recuperan los resultados y motivos por bulto del borrador cifrado. Se vuelven a capturar firma, foto, nombre y documento de quien recibe y observaciones. Al confirmar se guarda la visita completa con la evidencia cifrada. Si cambia el conjunto entregado se pide una firma nueva.
 
 **¿La arquitectura hizo fácil el cambio?** Facilitó localizar responsables y reutilizar mecanismos. Lo difícil fue el acoplamiento semántico: muchos consumidores decidían según el envío entero. Modularidad no significa que un cambio de negocio quede encerrado en un archivo.
 
@@ -101,6 +101,6 @@ No alcanzaba con agregar EntregadoParcialmente al enum global: seguirían faltan
 
 ## Cómo presentar el cierre con precisión
 
-El ADR cierra las decisiones D1 a D9 y explica la adaptación observada. Lucas confirmó expresamente moneda/redondeo, política de cobro mixto y persistencia de captura. La implementación se acepta por capacidades y pruebas: reservas individuales, conciliación, consumidores, tablero, liquidación y recuperación completa de captura tienen trabajo propio. La aceptación conjunta exige teléfono sin conexión, recuperación, sincronización y comprobación de backoffice, seguimiento y avisos.
+El ADR cierra las decisiones D1 a D9 y explica la adaptación observada. D9 documenta qué recupera el borrador y cuándo se guarda la evidencia. La sección 4.6 registra las aceptaciones y verificaciones pendientes para el resto del cambio.
 
 Para estudiar, ensayar los ejemplos de la tabla sin mirar el resultado, explicar una visita rechazada y justificar cada alternativa descartada. Después recorrer una fila de la retrospectiva y señalar un mecanismo reutilizado, una dificultad concreta y la prueba que lo respalda.

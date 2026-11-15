@@ -52,11 +52,11 @@ Las operaciones confirmadas son inmutables para el cliente: actualizar la hoja n
 
 ### Recuperación del formulario antes de confirmar
 
-**Decisión vigente de Lucas del 09/11/2026, confirmada al cerrar ADR-0007:** persistir toda la captura cifrada, incluidos firma, foto, receptor y observaciones, recuperarla al reabrir y exigir nueva firma si cambia el conjunto entregado. Sustituye la elección anterior de conservar evidencia sólo en memoria con advertencia. El diseño de identidad, revisión, errores y recuperación está en [D9](../cierre-tecnico-entrega-parcial.md); su implementación y pruebas siguen pendientes.
+**Decisión D9 del 15/11/2026.** Al recargar se recuperan los resultados y motivos por bulto del borrador cifrado. La firma, la foto, el nombre y documento de quien recibe y las observaciones permanecen en memoria hasta confirmar. Si se abandona o recarga la pantalla, se vuelven a capturar. Si cambia el conjunto de bultos entregados, se pide una firma nueva. Al confirmar, la operación completa y su evidencia se guardan cifradas para sincronizar. Véase [D9](../anexo-tecnico-ADR-0007-entrega-parcial.md#d9-borrador-de-visita-y-evidencia-al-confirmar).
 
-**Comportamiento anterior verificado:** la pantalla explica el límite de memoria y muestra cuándo hay captura sin confirmar. Una salida interna pide confirmación y permite cancelarla. Recargar, cerrar o navegar a otro sitio activa la advertencia nativa del navegador, sujeta a sus reglas de interacción y cierre. Esa advertencia no satisface por sí sola la recuperación persistida ahora decidida.
+La pantalla informa qué campos se conservan y pide confirmación al salir por navegación interna. Recargar, cerrar o navegar a otro sitio activa la advertencia nativa del navegador, sujeta a sus reglas de interacción y cierre.
 
-En ese comportamiento anterior no se advierte por resultados individuales ya persistidos ni después de guardar la visita completa. Si falla evidencia, ubicación o persistencia, se conserva la advertencia. Al borrar la firma o cambiar su conjunto se deja de contar la firma invalidada como captura pendiente; una foto o textos aún presentes siguen requiriendo advertencia. Durante el guardado se bloquea la navegación interna para evitar interrumpirlo. Con D9, sólo se informa captura guardada después de persistirla; una firma invalidada debe eliminarse también del borrador cifrado y no reaparecer al recargar.
+La advertencia se activa si hay evidencia o textos en memoria. Los resultados individuales ya guardados y una visita confirmada se pueden recuperar sin volver a capturarlos. Si falla la validación de evidencia o ubicación, o falla el guardado, se conserva la advertencia. Durante el guardado se bloquea la navegación interna.
 
 ## 5. Contrato HTTP
 

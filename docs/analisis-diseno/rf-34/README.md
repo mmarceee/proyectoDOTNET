@@ -4,7 +4,7 @@ Revisión: 10/11/2026 (America/Montevideo). Base revisada: `04ee4a4`, más los c
 
 ## Autoridad y alcance
 
-La letra original conserva RF 13–19 y sus restricciones de asignación, concurrencia, capacidad y carga. El documento docente de cambios, §2.1, incorpora independencia por bulto, reglas versionadas y RF 34. La interpretación vigente está cerrada en [decisiones, §4.2 y §6.3](../decisiones-entrega-parcial.md) y [ADR-0007 / D1–D7](../cierre-tecnico-entrega-parcial.md). Esta implementación aplica esas decisiones; no redefine disponibilidad como `Reprogramado` ni delega pertenencia a CU-42.
+La letra original conserva RF 13–19 y sus restricciones de asignación, concurrencia, capacidad y carga. El documento docente de cambios, §2.1, incorpora independencia por bulto, reglas versionadas y RF 34. La interpretación vigente está cerrada en [decisiones, §4.2 y §6.3](../decisiones-entrega-parcial.md) y [ADR-0007 / D1–D7](../anexo-tecnico-ADR-0007-entrega-parcial.md). Esta implementación aplica esas decisiones; no redefine disponibilidad como `Reprogramado` ni delega pertenencia a CU-42.
 
 Se implementan reserva, custodia y reasignación individual; selección y capacidad; carga; cierre de la reserva de los entregados; retorno físico al depósito y rendición. La devolución final de subconjuntos al comercio es el trabajo separado de D3/CU-31: retornar al depósito no declara un bulto `Devuelto`. Tampoco se amplían el extravío individual, las transferencias entre vehículos, D8 ni D9.
 
@@ -69,4 +69,4 @@ Las tres migraciones se aplicaron a las bases local y LAN tras ensayarlas sobre 
 
 La evidencia automatizada se registra en [verificacion.md](verificacion.md). Incluye concurrencia real PostgreSQL, última defensa del índice, selección/capacidad de subconjuntos, revisiones, idempotencia, retorno y bloqueo tras cierre, atomicidad, permisos/antiforgery/tenant, migración y regresiones. El ensayo distribuido usa hosts distintos de API y Worker, RabbitMQ y Valkey reales.
 
-La aceptación RF 32 ya documentada conserva su alcance. Esta implementación requiere su propio ensayo publicado de RF 34: localizar un faltante, confirmar retorno/presencia, planificarlo en otra ruta y comprobar ambas hojas y su sincronización. El despliegue verificado no acredita esa operación física ni D3/D8/D9 completos.
+La aceptación RF 32 ya documentada conserva su alcance. Esta implementación requiere su propio ensayo publicado de RF 34: localizar un faltante, confirmar retorno/presencia, planificarlo en otra ruta y comprobar ambas hojas y su sincronización. El despliegue verificado no acredita esa operación física ni los recorridos separados de D3 y D8.

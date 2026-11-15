@@ -1,9 +1,9 @@
 # **ADR-0005 · Modo de renderizado de Blazor**
 
-| Estado | Propuesto — pendiente de revisión por el equipo |
+| Estado | Aceptado e implementado |
 | :---- | :---- |
-| **Versión** | 1.0 |
-| **Fecha** | 12 de octubre de 2026 |
+| **Versión** | 1.1 |
+| **Fecha** | 15 de noviembre de 2026 |
 | **Responsable** | Lucas Ottonello |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Decisión relacionada** | Modo de renderizado de Blazor (obligatorio, letra 6.2 y 8.2) |
@@ -41,11 +41,11 @@ Este ADR complementa esas decisiones y fundamenta el modo de ejecución de las a
 
 ## **2.1 Ejecución de la interfaz en el navegador**
 
-Se utilizará **Blazor WebAssembly (client side)** en las tres aplicaciones, con capacidades de PWA para el repartidor. El navegador ejecuta los componentes de la interfaz; el servidor ejecuta los casos de uso y accede a la base de datos.
+El portal del comercio, el seguimiento público y la PWA del repartidor usan **Blazor WebAssembly**. El navegador ejecuta los componentes de la interfaz. El servidor ejecuta los casos de uso y accede a la base de datos. El Backoffice usa Razor Pages.
 
 Por ejemplo, al crear un envío, el portal mantiene el formulario en el navegador. Al guardar, envía una petición HTTP a la API, que valida la operación y persiste el envío. El navegador muestra el resultado recibido.
 
-Se mantendrán los proyectos WebAssembly separados y servidos por la API, sin renderizado de sus componentes en el servidor. Alojar sus archivos en ASP.NET Core no convierte su ejecución en Blazor Server. Esta distinción corresponde a los [modelos de alojamiento de Blazor](https://learn.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-10.0).
+Los tres proyectos WebAssembly se compilan por separado y `Logistica.Api` sirve sus archivos. Los componentes se renderizan en el navegador según el [modelo de alojamiento de Blazor WebAssembly](https://learn.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-10.0).
 
 ## **2.2 Manejo de estado y autoridad del servidor**
 
@@ -153,3 +153,4 @@ Las fechas de hitos provienen de la letra y del plan del equipo. No se presentan
 | Versión | Fecha | Descripción | Responsable |
 | :---- | :---- | :---- | :---- |
 | 1.0 | 12/10/2026 | Propuesta inicial: justificación de WebAssembly frente a Server y Auto, consecuencias y verificación prevista. | Lucas Ottonello |
+| 1.1 | 15/11/2026 | Cierre del ADR con el modo de renderizado verificado en los tres proyectos Blazor y en el host web. | Registro asistido por Codex |

@@ -289,14 +289,14 @@ Total: 9 puntos (mínimo exigido para equipos de tres: 8).
 
 | ADR | Decisión | Responsable | Estado |
 | :---- | :---- | :---- | :---- |
-| 0001 | Monolito modular por capacidades, vertical slices, dependencias hacia el dominio, host único y Worker aparte | Lucas Ottonello | Aceptado (v2.0) |
-| 0002 | Multitenancy por fila con filtro que falla cerrado, interceptor de escrituras y segundo nivel por comercio | Cristian Reyes | Pendiente de revisión (v2.2) |
+| 0001 | Monolito modular por capacidades, vertical slices, dependencias hacia el dominio, host único y Worker aparte | Lucas Ottonello | Aceptado (v2.1) |
+| 0002 | Multitenancy por fila con filtro que falla cerrado, interceptor de escrituras y segundo nivel por comercio | Cristian Reyes | Aceptado (v2.2) |
 | 0003 | Outbox e inbox por módulo, RabbitMQ con implementación propia, reintentos y fallidos | Ezequiel Marcenal | Aceptado |
 | 0004 | Sincronización por operaciones idempotentes; el servidor decide con la máquina de estados; atomicidad por visita | Ezequiel Marcenal | Aceptado |
-| 0005 | Blazor WebAssembly para Portal, seguimiento y PWA | Lucas Ottonello | Propuesto |
+| 0005 | Blazor WebAssembly para Portal, seguimiento y PWA | Lucas Ottonello | Aceptado |
 | 0006 | Cache-aside sobre `IDistributedCache` y Valkey, clave por operador, dos políticas | Cristian Reyes | Aceptado |
 | 0007 | Adaptación a la entrega parcial (registro del cambio) | Lucas Ottonello | Aceptado |
-| 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Propuesto (v0.1) |
+| 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Aceptado (v0.1) |
 
 Otras decisiones de diseño relevantes, sin ADR propio:
 
@@ -379,8 +379,6 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | Content-Security-Policy (6.3) | No restringe el origen de scripts y estilos: hacerlo exige nonces en las páginas con scripts en línea y servir Leaflet y SignalR desde el propio origen |
 | PWA: biometría, notificaciones con la app cerrada y posición en segundo plano (6.11) | No implementadas; la posición se sigue con la aplicación abierta |
 | Escalabilidad (6.13) | Eximida: una réplica, sin `/ready` ni `/live`, tareas programadas sin ejecución única garantizada |
-| Entrega parcial | Extravío de un bulto suelto, captura cifrada antes de confirmar (D9) y aceptaciones manuales pendientes; dos simplificaciones en la liquidación (ADR-0007, sección 4.6) |
-| ADR | 0002, 0005 y 0008 pendientes de aprobación del equipo |
 
 # **8\. Referencias**
 

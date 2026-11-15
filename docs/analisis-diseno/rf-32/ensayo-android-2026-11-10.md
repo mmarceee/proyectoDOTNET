@@ -1,6 +1,6 @@
 # RF 32 · Ensayo físico en Android del 10/11/2026
 
-**Circuito principal de visita confirmada validado en Android por Lucas:** reapertura sin red, sincronización y reenvío idempotente verificados contra el servidor demo. Este resultado no acredita la recuperación de captura sin confirmar de D9 ni la recepción externa de avisos.
+**Circuito principal de visita confirmada validado en Android por Lucas:** reapertura sin red, sincronización y reenvío idempotente verificados contra el servidor demo. La recepción externa de avisos se verificó en el ensayo integrado posterior.
 
 **Continuación posterior:** la [aceptación integrada](aceptacion-integrada-2026-11-10.md) completó conflicto, Backoffice/público y recepción externa con otros dos envíos, cerrando la aceptación del alcance original de RF 32. Los límites del primer ensayo descritos aquí se conservan como registro histórico.
 
@@ -16,7 +16,7 @@ Envío `ENV-000002`, tres bultos, parcial habilitada y foto/datos del receptor r
 | --- | --- |
 | Carga e inicio | Lucas confirmó escaneo de tres bultos, carga e inicio; servidor EnCurso con los tres EnTransito. |
 | Visita offline | Dos entregados, motivo para el tercero, firma y foto. Lucas confirmó guardado pendiente sin Wi-Fi/datos. |
-| Reapertura offline | Lucas recargó sin conexión y confirmó conservación del pendiente, resultados y motivo. Se comprueba una operación ya confirmada localmente, no el formulario sin confirmar de D9. |
+| Reapertura offline | Lucas recargó sin conexión y confirmó conservación del pendiente, resultados y motivo. La comprobación corresponde a una operación ya confirmada localmente. |
 | Antes de sincronizar | Consulta independiente: 0/3 entregados y tres EnTransito. |
 | Sincronización | Lucas recuperó Wi-Fi y confirmó el mensaje de aplicación; consulta independiente: 2/3 entregados, resumen Entregado parcialmente, Terminado=false. |
 | Tercero | Motivo «El destinatario rechazó el envío», no reprogramable. Quedó EnDevolucion con un intento fallido. |
@@ -43,9 +43,9 @@ No se publicó EnvioEntregado. No hay entregas de avisos para este envío: no se
 
 - **Lector:** tras informar Lucas códigos deformados, se comprobaron las tres etiquetas renderizadas con el lector incluido. Se restringió la cámara a CODE-128 y se agregó quitar lecturas erróneas del borrador, sin alterar confirmaciones. Cámara simulada con etiqueta real: código correcto. Lucas después confirmó carga de tres bultos desde Android. No se aisló la causa óptica exacta del texto deformado inicial.
 - **Ubicación:** el primer intento sin red falló aun con permiso habilitado. Se obtuvo posición con Wi-Fi y se volvió a desconectar para confirmar; el cliente acepta posición de hasta un minuto. Se valida guardado offline con posición reciente, **no adquisición de una posición nueva sin red o señal GPS**. No se omitió el requisito ni se inventaron coordenadas. El mensaje actual no distingue permiso, indisponibilidad y timeout.
-- **D9:** la decisión vigente exige recuperar firma/foto/textos también antes de confirmar. El recorrido ejecutado conserva la captura sin confirmar sólo en pantalla y advierte al salir; no satisface ni acredita D9.
+- **Alcance del ensayo.** La reapertura comprobó la visita ya confirmada. El comportamiento del borrador se documenta en D9.
 - **Otros:** pendientes conflicto físico durante desconexión, receptor de avisos y fallos/actualización del dispositivo. Atomicidad, parcial prohibida, concurrencia y compatibilidad tienen pruebas automatizadas, no ejecución física acreditada aquí.
 
 Evidencia local en `TestResults/lan` (ignorado por Git): `antes-sincronizar.json`, `despues-sincronizar.json`, `reenvio-verificado.json`, `rendicion-preparada.json`, `cierre-rf32.json`, `lector-tests.log`, `lector-ui.log`, `lector-build.log`. El reenvío no imprime ni guarda los archivos de evidencia recuperados transitoriamente en memoria. La comprobación del cierre consulta la rendición persistida: la hoja de ruta deja de estar disponible para el repartidor una vez finalizada.
 
-Referencias: [especificación](especificacion-tecnica.md), [verificación de cierre](verificacion-cierre.md), [D9](../cierre-tecnico-entrega-parcial.md), [guía LAN](../../../infra/lan/README.md).
+Referencias: [especificación](especificacion-tecnica.md), [verificación de cierre](verificacion-cierre.md), [D9](../anexo-tecnico-ADR-0007-entrega-parcial.md), [guía LAN](../../../infra/lan/README.md).

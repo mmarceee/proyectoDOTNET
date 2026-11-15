@@ -1,4 +1,4 @@
-# Entrega parcial · Cierre de decisiones técnicas del ADR-0007
+# Anexo técnico del ADR-0007 · Entrega parcial
 
 Fecha: 09/11/2026. Responsable del ADR: Lucas Ottonello. Registro preparado con asistencia de Codex a pedido de Lucas. Complementa la [decisión funcional](decisiones-entrega-parcial.md) sin atribuir nuevas aprobaciones a los demás integrantes. Los nombres de entidades, campos y operaciones **objetivo** de este documento son especificación para implementar, no APIs existentes.
 
@@ -100,14 +100,14 @@ Lucas confirmó el 09/11/2026 UYU, cargo único por visita y una única inclusi�
 
 Criterios: cierre 2 entregados/1 devuelto, cierre mixto con extravío, sólo cancelados/extraviados, revisita fallida, cargos anteriores al cierre, períodos superpuestos, dos generaciones concurrentes, borrador eliminado y reenvío sin duplicación. Son pruebas objetivo, no resultados de la suite anterior.
 
-## D9. Recuperación de captura · confirmado por Lucas
+## D9. Borrador de visita y evidencia al confirmar
 
-Lucas confirmó el 09/11/2026 persistir toda la captura cifrada y exigir nueva firma al cambiar entregados. Esta confirmación posterior sustituye para el diseño objetivo la opción de mantener evidencia sólo en memoria con advertencia al salir, registrada antes en RF 32. Se persisten resultados, firma, foto, receptor y observaciones antes de confirmar, con indicación visible de guardado y la revisión del borrador. Una foto se comprime antes de persistir; los errores de cuota/almacenamiento conservan la revisión anterior y no informan guardado correcto. La recolección de ubicación debe mantenerse válida para el momento de confirmación; reabrir una captura no autoriza reutilizar una posición caducada.
+Al recargar o reabrir una visita sin confirmar, la PWA recupera el borrador cifrado con los resultados y motivos ya guardados por bulto. La firma, la foto, el nombre y documento de quien recibe y las observaciones se mantienen en memoria y deben volver a capturarse tras recargar o salir. La interfaz advierte al abandonar una captura en curso. Si cambia el conjunto de bultos entregados, se invalida la firma y se pide una nueva.
 
-Al reabrir, recuperar la evidencia sólo para el mismo usuario/operador/repartidor, ruta, envío y conjunto entregado. Cualquier cambio del conjunto invalida y elimina la firma persistida; volver luego al conjunto inicial no la restaura. Dos pestañas usan revisión esperada. Confirmar sigue creando una operación completa e inmutable en una transacción; actualizar la hoja nunca modifica esa operación.
+Al confirmar, la PWA guarda la operación completa y su evidencia de forma cifrada en una única transacción local. La visita confirmada puede reabrirse sin conexión y queda disponible para sincronizar cuando se recupere la conectividad.
 
-Hasta implementar y verificar la recuperación completa, el código con evidencia en memoria y advertencia se registra como comportamiento anterior: no satisface D9. La decisión conserva intacta la durabilidad de una visita ya confirmada y no convierte las modificaciones concurrentes de otra tarea en código revisado o aceptado por este documento.
+Lucas confirmó este alcance el 15/11/2026. La recuperación completa de una captura sin confirmar, propuesta el 09/11, quedó fuera del alcance. El RF 32 y la sección 6.11 de la letra exigen captura offline, almacenamiento cifrado y sincronización de la operación registrada. El guardado de esos campos mientras se edita el formulario queda a criterio del equipo.
 
 ## Estado del cierre
 
-D1 a D9 quedan definidos para el alcance del ADR-0007. D8 y D9 incluyen confirmación expresa de Lucas en este chat. No queda una elección abierta de moneda, cobro mixto o recuperación del formulario. Las capacidades que aún faltan y sus pruebas son trabajo de implementación/aceptación registrado en 4.6 del ADR; una modificación futura de estas reglas debe quedar en su historial.
+D1 a D9 quedan definidos para el alcance del ADR-0007. La sección 4.6 del ADR reúne las verificaciones de la implementación.
