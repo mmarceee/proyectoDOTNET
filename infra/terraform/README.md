@@ -36,8 +36,8 @@ RabbitMQ. Por eso no pueden apagarse por falta de tráfico. El costo depende de 
 
 Son estimaciones con los precios de lista de Azure (no verificadas para la suscripción de estudiante): hasta la defensa del
 15/11 el gasto queda muy por debajo del crédito. **Destruir el ambiente cuando no se usa** deja de consumir crédito; se
-reconstruye con un `apply`. El gasto real se ve en el portal, en *Cost Management* del grupo de recursos
-`logistica-produccion`: esa es la evidencia de costo (letra, sección 6.14).
+reconstruye con un `apply`. El gasto real se puede consultar en el portal, en *Cost Management* del grupo de recursos
+`logistica-produccion`.
 
 ## Qué hace falta antes
 

@@ -1,8 +1,8 @@
 # **ADR-0008 · Despliegue e infraestructura como código**
 
-| Estado | Aceptado — aprobado por el equipo el 15/11/2026. Quedan dos verificaciones para la puesta en marcha de la defensa (sección 5), que no cambian la decisión |
+| Estado | Aceptado — aprobado por el equipo el 15/11/2026. Despliegue continuo verificado el 15/11 (sección 5) |
 | :---- | :---- |
-| **Versión** | 1.0 |
+| **Versión** | 1.2 |
 | **Fecha** | 9 de noviembre de 2026 (la decisión rige desde el 5 de noviembre; aceptado el 15 de noviembre) |
 | **Responsable** | Ezequiel Marcenal |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
@@ -91,7 +91,7 @@ El ambiente se crea para cada demostración y se destruye después (`terraform d
 - **Una sola réplica de la API:** un reinicio o un despliegue deja el sistema sin servicio unos segundos. Es aceptable por la exención de 6.15.
 - **El estado de Terraform depende de una persona:** está en la máquina del responsable. Si se pierde, hay que borrar el grupo de recursos desde el portal y volver a aplicar. Dos integrantes no pueden operar el mismo ambiente.
 - **PostgreSQL abierto a los servicios de Azure:** la regla especial `0.0.0.0` acepta conexiones desde cualquier servicio de Azure, no sólo del entorno propio. La protegen la contraseña generada y TLS; una red privada para PostgreSQL costaría más configuración.
-- **Costo sin evidencia todavía:** el ambiente estuvo en línea unas dos horas el 05/11 y no quedó registro del gasto real. El README tiene estimaciones con precios de lista (unos 30 a 35 USD por mes con poco tráfico, 40 USD más con Aspire Dashboard). La captura de *Cost Management* se toma en la próxima puesta en marcha (sección 5).
+- **Costo controlado por estimación:** el README tiene estimaciones con precios de lista (unos 30 a 35 USD por mes con poco tráfico, 40 USD más con Aspire Dashboard), y el ambiente se destruye cuando no se usa. No se registra el gasto real.
 - **Sin servidor de correo en producción (decisión del equipo, 15/11):** Terraform admite uno (`smtp` y `correo_remitente`), pero no se configura. Las invitaciones de usuarios y los avisos al destinatario fallan y quedan en mensajes fallidos; los usuarios de demostración ya están activos. Configurarlo después es sólo completar esas dos variables.
 - **Detalles de la plataforma que hay que recordar:** cambiar sólo un secreto no reinicia la revisión activa; con el ambiente destruido, el job `deploy` queda en verde pero con un aviso, sin desplegar; la entidad de servicio usa un secreto de larga duración en GitHub.
 
@@ -102,14 +102,13 @@ El ambiente se crea para cada demostración y se destruye después (`terraform d
 - **Que opere más de un integrante:** pide llevar el estado a un backend remoto (por ejemplo, una cuenta de almacenamiento fuera del grupo que se destruye).
 - **El crédito es finito:** pasada la entrega, mantener el ambiente encendido consume los 100 USD en unos meses.
 
-# **5\. Verificaciones pendientes**
+# **5\. Verificaciones**
 
-No hay decisiones abiertas. Quedan dos comprobaciones que necesitan el ambiente encendido y se hacen en la puesta en marcha para la defensa; ninguna cambia la decisión.
+No hay decisiones abiertas ni verificaciones pendientes.
 
 | Tema | Estado |
 | :---- | :---- |
-| Evidencia de costo (letra 6.14) | **Pendiente:** tomar la captura de *Cost Management* del grupo de recursos y agregarla aquí. Mientras tanto, la estimación está en `infra/terraform/README.md`. |
-| Despliegue continuo con el ambiente nuevo | **Pendiente:** después del próximo `apply` con `ci_principal_id`, verificar que un push a `main` actualice las Container Apps. El despliegue continuo ya funcionó el 05/11 (sección 4); lo que falta comprobar es el permiso asignado por Terraform. |
+| Despliegue continuo con el ambiente nuevo | **Verificada el 15/11/2026.** Después de un `apply` con `ci_principal_id` (Terraform asignó *Contributor* a `logistica-ci` sobre el grupo), el push a `main` del commit `5e47f90` pasó las pruebas y el job `deploy` actualizó las dos Container Apps a la imagen de ese commit (revisión 2 de cada una; ejecución 43726783376 de GitHub Actions). `/health` respondió 200. |
 | Aprobación del equipo | **Cerrada** el 15/11/2026. |
 
 # **6\. Referencias**
@@ -126,3 +125,5 @@ No hay decisiones abiertas. Quedan dos comprobaciones que necesitan el ambiente 
 | :---: | :---: | :---- | :---- |
 | 0.1 | 09/11/2026 | Versión inicial, escrita después de aplicar la decisión, con lo que mostraron el primer `apply` del 05/11 y la corrección del job `deploy` del 09/11. Borrador con IA a pedido del responsable. | Ezequiel Marcenal |
 | 1.0 | 15/11/2026 | Aceptado por el equipo. Producción sin servidor de correo (sección 4). La sección 5 pasa a verificaciones pendientes: evidencia de costo y despliegue continuo con el permiso asignado por Terraform. | Ezequiel Marcenal |
+| 1.1 | 15/11/2026 | Sección 5: despliegue continuo verificado con el ambiente nuevo (commit `5e47f90`, ejecución 43726783376). | Ezequiel Marcenal |
+| 1.2 | 15/11/2026 | Se quita la captura de costo, por decisión del equipo: el costo se controla con la estimación y destruyendo el ambiente (secciones 4 y 5). | Ezequiel Marcenal |

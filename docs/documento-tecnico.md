@@ -2,7 +2,7 @@
 
 | Estado | Borrador para la entrega final, pendiente de revisión del equipo |
 | :---- | :---- |
-| **Versión** | 0.5 |
+| **Versión** | 0.7 |
 | **Fecha** | 14 de noviembre de 2026 |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigido por** | Letra del laboratorio, sección 8.4: «documento técnico que describa la implementación de los requerimientos no funcionales, las decisiones de diseño adoptadas, las configuraciones relevantes y los diagramas correspondientes» |
@@ -62,7 +62,7 @@ flowchart LR
     API & Worker -- OTLP --> ASP[Aspire Dashboard]
 ```
 
-Los módulos se comunican en memoria por contratos (`I<Modulo>ModuleApi`), nunca por HTTP. Lo que no puede perderse, y todo lo que procesa el Worker, va por el outbox y RabbitMQ (sección 9).
+Los módulos se comunican en memoria por contratos (`I<Modulo>ModuleApi`), nunca por HTTP. Lo que no puede perderse, y todo lo que procesa el Worker, va por el outbox y RabbitMQ (sección 2.8).
 
 ## **1.2 Diagrama de despliegue**
 
@@ -252,7 +252,7 @@ No implementado: `/ready` y `/live`, más de una réplica, y una garantía de ej
 | Infraestructura como código | Terraform en `infra/terraform/`: entorno de Container Apps, API, Worker, Valkey, RabbitMQ, Aspire Dashboard y PostgreSQL Flexible Server B1ms. Variables por ambiente (`produccion.tfvars`, ignorado; `terraform.tfvars.example` versionado), secretos generados por Terraform. RabbitMQ corre como Container App porque el plan gratuito de CloudAMQP admite 150 colas y el sistema declara más |
 | Planificar, aplicar y destruir | Documentado y ejecutable (`terraform plan/apply/destroy "-var-file=produccion.tfvars"`); el ambiente se destruye cuando no se usa y se reconstruye con un `apply` (escenario 7) |
 | CI/CD | GitHub Actions (`.github/workflows/ci.yml`): restore, build y pruebas en Release con cobertura; pruebas de extremo a extremo con Playwright; imágenes de la API y el Worker en GHCR; en `main`, promoción a `latest` y actualización de las Container Apps con `AZURE_CREDENTIALS` |
-| Costo | Estimado en `infra/terraform/README.md` (≈ 30 a 35 USD por mes sin tráfico, más ≈ 40 USD con el tablero de observabilidad encendido). Evidencia: *Cost Management* del grupo `logistica-produccion` (pendiente de agregar la captura al ADR-0008) |
+| Costo | Estimado en `infra/terraform/README.md` (≈ 30 a 35 USD por mes sin tráfico, más ≈ 40 USD con el tablero de observabilidad encendido); se controla destruyendo el ambiente cuando no se usa |
 
 Decisión, alternativas (DigitalOcean, que retiró el crédito de estudiante; CloudAMQP) y consecuencias en el ADR-0008.
 
@@ -295,7 +295,7 @@ Total: 9 puntos (mínimo exigido para equipos de tres: 8).
 | 0005 | Blazor WebAssembly para Portal, seguimiento y PWA | Lucas Ottonello | Aceptado |
 | 0006 | Cache-aside sobre `IDistributedCache` y Valkey, clave por operador, dos políticas | Cristian Reyes | Aceptado |
 | 0007 | Adaptación a la entrega parcial (registro del cambio) | Lucas Ottonello | Aceptado |
-| 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Aceptado (v1.0) |
+| 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Aceptado (v1.2) |
 
 Otras decisiones de diseño relevantes, sin ADR propio:
 
@@ -397,3 +397,5 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | 0.3 | 15/11/2026 | Producción sin servidor de correo, por decisión del equipo: se quita el proveedor de los diagramas y se agrega a las limitaciones. | Ezequiel Marcenal |
 | 0.4 | 15/11/2026 | ADR-0008 aceptado (v1.0). | Ezequiel Marcenal |
 | 0.5 | 15/11/2026 | ADR-0001 (v2.1), ADR-0002 y ADR-0005 aceptados; se quitan de las limitaciones la entrega parcial y los ADR pendientes. | Lucas Ottonello |
+| 0.6 | 15/11/2026 | ADR-0008 v1.1: despliegue continuo verificado con el ambiente nuevo. | Ezequiel Marcenal |
+| 0.7 | 15/11/2026 | Costo: se quita la captura de *Cost Management*; se controla con la estimación y destruyendo el ambiente (ADR-0008 v1.2). | Ezequiel Marcenal |
