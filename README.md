@@ -17,14 +17,15 @@ El cambio de entrega parcial se documenta en las [decisiones cerradas](docs/anal
    ```bash
    docker compose up -d --build --wait
    ```
-   La aplicación queda en http://localhost:8080 (ver [Rutas](#rutas)).
+   La aplicación queda en http://localhost:8080 (ver [Rutas](#rutas)). Los usuarios para ingresar están en
+   [`docs/usuarios-demostracion.txt`](docs/usuarios-demostracion.txt).
 
 Para configurar suscripciones de avisos (CU-63), completar también `AVISOS_CLAVE_CIFRADO` en `.env` con
 una clave exclusiva de exactamente 32 bytes en Base64 (`openssl rand -base64 32`). API y Worker comparten
 el valor; debe conservarse entre reinicios y despliegues para poder descifrar los secretos guardados.
 El [avance de CU-63](docs/analisis-diseno/cu-63/README.md) detalla la configuración y el alcance implementado.
 
-### Desarrollo desde Visual 
+### Desarrollo desde Visual Studio
 
 Para depurar la Api o el Worker, levantar sólo los servicios de soporte y ejecutar la aplicación desde Visual Studio o con `dotnet run`:
 
@@ -101,9 +102,28 @@ en `TestResults/docker-*`.
 
 ## Despliegue
 
-El entorno productivo (Azure Container Apps con la Api, el Worker, Valkey y RabbitMQ, y PostgreSQL Flexible Server, en
-Chile Central y con el crédito de Azure for Students) se crea y se destruye con Terraform. Cada push a `main` que pasa el CI se despliega solo. Requisitos, comandos,
-costo y secretos en [`infra/terraform`](infra/terraform/README.md).
+El entorno productivo (Azure Container Apps con la Api, el Worker, Valkey, RabbitMQ y Aspire Dashboard, y PostgreSQL
+Flexible Server, en Chile Central y con el crédito de Azure for Students) se crea y se destruye con Terraform. Requisitos,
+costo, secretos y problemas conocidos en [`infra/terraform`](infra/terraform/README.md); la decisión, en el
+[ADR-0008](docs/analisis-diseno/ADR-0008-despliegue-e-infraestructura.md).
+
+Con la CLI de Azure con sesión iniciada (`az login`), desde `infra/terraform` y con `produccion.tfvars` copiado de
+`terraform.tfvars.example` (en PowerShell, el `-var-file` va entre comillas):
+
+```bash
+terraform init
+terraform plan "-var-file=produccion.tfvars"
+terraform apply "-var-file=produccion.tfvars"
+terraform output url
+terraform destroy "-var-file=produccion.tfvars"
+```
+
+- **Despliegue continuo:** cada push a `main` que pasa las pruebas publica las imágenes de la Api y el Worker en GHCR y
+  actualiza las dos Container Apps (job `deploy` de `.github/workflows/ci.yml`). El CI inicia sesión con el secreto
+  `AZURE_CREDENTIALS` de la entidad de servicio `logistica-ci`, y Terraform le da permiso sobre el grupo de recursos
+  (`ci_principal_id`). Con el ambiente destruido, el job no despliega y deja un aviso.
+- **Correo:** en producción no se configura un servidor de correo; los correos quedan en mensajes fallidos.
+- **Observabilidad:** `terraform output url_observabilidad` y `terraform output -raw acceso_observabilidad`.
 
 ## Rutas
 
@@ -123,6 +143,31 @@ costo y secretos en [`infra/terraform`](infra/terraform/README.md).
 | RabbitMQ Management | http://localhost:15672 |
 | Aspire Dashboard | http://localhost:18888 |
 | Mailpit (correos de desarrollo) | http://localhost:8025 |
+
+## Scripts
+
+| Script | Para qué |
+| --- | --- |
+| `scripts/configurar-secretos.sh` | Carga las cadenas de conexión de `.env` en `dotnet user-secrets` (Api y Worker), para depurar |
+| `scripts/test-en-docker.sh [filtro]` | Pruebas en un contenedor Linux, igual que el CI, con cobertura; con filtro, sólo las que coinciden |
+| `scripts/e2e-en-docker.sh` | Pruebas de extremo a extremo con Playwright en un contenedor que instala Chromium |
+| `scripts/migracion-en-docker.sh <Modulo> <Nombre>` | Genera una migración de EF Core en un contenedor (Smart App Control bloquea `dotnet ef` en Windows) |
+| `scripts/cu40-en-docker.sh [migrations\|test]` | Script histórico de CU-40: compila en el SDK de Docker y, con `migrations`, generó las migraciones `PlanificacionCU40`; con `test`, corre las pruebas |
+| `scripts/datos-demo-cu14.sql` | Datos ficticios para el detalle ampliado del envío (CU-14) |
+| `scripts/preparar-lan.ps1`, `scripts/habilitar-lan-firewall.ps1`, `scripts/servidor-certificado-lan.cjs` | Ambiente de ensayo en la red local, con HTTPS, para probar la PWA en un teléfono (`infra/lan`) |
+| `scripts/preparar-escenario-rf32.cjs` | Prepara el escenario de aceptación manual de la entrega por bulto (RF 32) en el ambiente LAN |
+| `scripts/tests/` | Pruebas JavaScript de la PWA (cámara, hoja de ruta, posición, service worker y visita) |
+
+## Documentación
+
+| Documento | Ubicación |
+| --- | --- |
+| Documento técnico (requerimientos no funcionales, decisiones y configuración) | [`docs/documento-tecnico.md`](docs/documento-tecnico.md) |
+| Registros de decisión de arquitectura (ADR-0001 a ADR-0008) | [`docs/analisis-diseno`](docs/analisis-diseno) |
+| Bitácora de uso de asistentes de IA | [`docs/bitacora-uso-de-ia.md`](docs/bitacora-uso-de-ia.md) |
+| Usuarios de demostración | [`docs/usuarios-demostracion.txt`](docs/usuarios-demostracion.txt) |
+| Pruebas de resiliencia | [`docs/pruebas-de-resiliencia.md`](docs/pruebas-de-resiliencia.md) |
+| Guías de demostración (API pública, avisos, worker independiente) | [`docs`](docs) |
 
 ## Estructura
 
@@ -146,6 +191,11 @@ tests/
   Logistica.IntegrationTests/
   Logistica.ArchitectureTests/   Reglas de dependencia del ADR-0001 y sus addenda
   Logistica.E2ETests/            Flujos críticos desde el navegador, con Playwright (fuera de Logistica.slnx)
-scripts/                         configurar-secretos.sh, test-en-docker.sh, e2e-en-docker.sh
-infra/terraform/
+tools/
+  Logistica.ReceptorDemo/        Receptor de avisos de prueba (responde 200 o 503) para demostrar reintentos y fallidos
+scripts/                         Ver la sección Scripts
+infra/
+  terraform/                     Entorno productivo en Azure
+  lan/                           Ambiente de ensayo en la red local
+docs/                            Documento técnico, ADR, análisis y diseño, guías y bitácora de IA
 ```
