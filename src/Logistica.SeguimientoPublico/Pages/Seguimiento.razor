@@ -98,7 +98,7 @@ else if (seguimiento is not null)
                     {
                         <p class="text-muted mb-0">No hay fechas disponibles en los próximos días. Comunicate con el comercio.</p>
                     }
-                    else
+                    else if (verificacion is null)
                     {
                         <select class="form-select mb-3" aria-label="Fecha y horario" @bind="elegida">
                             @foreach (var opcion in opciones)
@@ -106,8 +106,32 @@ else if (seguimiento is not null)
                                 <option value="@Clave(opcion)">@opcion.Texto</option>
                             }
                         </select>
+                        <button type="button" class="btn btn-primary" @onclick="PedirVerificacionAsync" disabled="@ocupado">Continuar</button>
+                        <button type="button" class="btn btn-link" @onclick="Cancelar">Cancelar</button>
+                    }
+                    else
+                    {
+                        @* Requerimiento especial 4: el enlace solo no alcanza; se confirma con un secreto del destinatario. *@
+                        <p class="mb-2">
+                            @if (verificacion.Medio == "Correo")
+                            {
+                                <span>Te mandamos un código de 6 dígitos a <strong>@verificacion.Destino</strong>. Vence en 10 minutos.</span>
+                            }
+                            else
+                            {
+                                <span>Para confirmar que sos vos, escribí los <strong>últimos 4 dígitos de tu teléfono</strong>.</span>
+                            }
+                        </p>
+                        <input class="form-control mb-3" inputmode="numeric" autocomplete="one-time-code"
+                               maxlength="@(verificacion.Medio == "Correo" ? 6 : 4)"
+                               aria-label="@(verificacion.Medio == "Correo" ? "Código" : "Últimos 4 dígitos del teléfono")"
+                               @bind="codigo" />
                         <button type="button" class="btn btn-primary" @onclick="ConfirmarAsync" disabled="@ocupado">Confirmar</button>
-                        <button type="button" class="btn btn-link" @onclick="() => opciones = null">Cancelar</button>
+                        @if (verificacion.Medio == "Correo")
+                        {
+                            <button type="button" class="btn btn-link" @onclick="PedirVerificacionAsync" disabled="@ocupado">Mandar otro código</button>
+                        }
+                        <button type="button" class="btn btn-link" @onclick="Cancelar">Cancelar</button>
                     }
                 </div>
             </section>
@@ -147,6 +171,8 @@ else if (seguimiento is not null)
     private string? error;
     private string? mensaje;
     private bool ocupado;
+    private VerificacionReprogramacionResponse? verificacion;
+    private string? codigo;
 
     private string Url => $"/api/seguimiento/{Uri.EscapeDataString(Token)}/reprogramacion";
 
@@ -154,7 +180,7 @@ else if (seguimiento is not null)
 
     private async Task VerOpcionesAsync()
     {
-        ocupado = true; error = null; mensaje = null;
+        ocupado = true; error = null; mensaje = null; verificacion = null; codigo = null;
         try
         {
             var respuesta = await Http.GetFromJsonAsync<OpcionesReprogramacionResponse>(Url);
@@ -169,28 +195,59 @@ else if (seguimiento is not null)
         finally { ocupado = false; }
     }
 
-    private async Task ConfirmarAsync()
+    private void Cancelar()
+    {
+        opciones = null; verificacion = null; codigo = null; error = null;
+    }
+
+    // Paso 3: con la fecha elegida, el servidor manda el código al correo o pide los dígitos del teléfono.
+    private async Task PedirVerificacionAsync()
     {
         var opcion = opciones?.SingleOrDefault(o => Clave(o) == elegida);
         if (opcion is null) return;
 
+        ocupado = true; error = null; codigo = null;
+        try
+        {
+            var respuesta = await Http.PostAsJsonAsync($"{Url}/verificacion",
+                new SolicitarVerificacionRequest(opcion.Fecha, opcion.FranjaId));
+            if (respuesta.IsSuccessStatusCode)
+            {
+                verificacion = await respuesta.Content.ReadFromJsonAsync<VerificacionReprogramacionResponse>();
+            }
+            else
+            {
+                error = await MotivoAsync(respuesta, "No pudimos continuar. Probá con otra fecha.");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            error = "No pudimos continuar. Probá de nuevo en unos minutos.";
+        }
+        finally { ocupado = false; }
+    }
+
+    // Paso 4: con el código, recién ahí se reprograma.
+    private async Task ConfirmarAsync()
+    {
+        var opcion = opciones?.SingleOrDefault(o => Clave(o) == elegida);
+        if (opcion is null || verificacion is null) return;
+
         ocupado = true; error = null;
         try
         {
-            var respuesta = await Http.PostAsJsonAsync(Url, new SolicitarReprogramacionRequest(opcion.Fecha, opcion.FranjaId));
+            var respuesta = await Http.PostAsJsonAsync(Url,
+                new SolicitarReprogramacionRequest(opcion.Fecha, opcion.FranjaId, codigo ?? ""));
             if (respuesta.IsSuccessStatusCode)
             {
-                opciones = null;
+                Cancelar();
                 mensaje = $"Listo: tu envío se va a entregar el {opcion.Texto}.";
                 await CargarAsync();
             }
             else
             {
-                // A1, A2 o A3: el servidor explica el motivo (ProblemDetails).
-                var problema = await respuesta.Content.ReadFromJsonAsync<ProblemaResponse>();
-                error = respuesta.StatusCode == HttpStatusCode.TooManyRequests
-                    ? "Demasiados intentos. Esperá un minuto y volvé a probar."
-                    : problema?.Detail ?? "No se pudo reprogramar. Probá con otra fecha.";
+                // Un código incorrecto, vencido o una regla rota (A1, A2, A3): el servidor explica el motivo.
+                error = await MotivoAsync(respuesta, "No se pudo reprogramar. Probá con otra fecha.");
             }
         }
         catch (HttpRequestException)
@@ -198,6 +255,14 @@ else if (seguimiento is not null)
             error = "No pudimos reprogramar. Probá de nuevo en unos minutos.";
         }
         finally { ocupado = false; }
+    }
+
+    private static async Task<string> MotivoAsync(HttpResponseMessage respuesta, string porDefecto)
+    {
+        if (respuesta.StatusCode == HttpStatusCode.TooManyRequests)
+            return "Demasiados intentos. Esperá un minuto y volvé a probar.";
+        var problema = await respuesta.Content.ReadFromJsonAsync<ProblemaResponse>();
+        return problema?.Detail ?? porDefecto;
     }
 
     private sealed record ProblemaResponse(string? Title, string? Detail);

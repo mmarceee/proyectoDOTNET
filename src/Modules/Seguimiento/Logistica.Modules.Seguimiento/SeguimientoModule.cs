@@ -178,10 +178,21 @@ public static class SeguimientoModule
             sp.GetRequiredService<Envios.Contracts.IEnviosModuleApi>(),
             sp.GetRequiredService<Administracion.Contracts.IAdministracionModuleApi>(),
             sp.GetRequiredService<SharedKernel.ICacheDistribuida>()));
-        // CU-61: con fábrica por el mismo motivo (el contrato de Envíos sólo está en la API).
+        // CU-61: con fábrica por el mismo motivo (el contrato de Envíos sólo está en la API). La verificación por correo
+        // o teléfono se guarda en Seguimiento (requerimiento especial 4).
+        services.AddScoped<Domain.Reprogramaciones.IVerificacionesReprogramacionRepository, VerificacionesReprogramacionRepository>();
+        services.AddSingleton<Application.Features.SolicitarReprogramacion.SecretoVerificacion>();
         services.AddScoped(sp => new Application.Features.SolicitarReprogramacion.SolicitarReprogramacionHandler(
             sp.GetRequiredService<Envios.Contracts.IEnviosModuleApi>(),
-            sp.GetRequiredService<SharedKernel.ICacheDistribuida>()));
+            sp.GetRequiredService<SharedKernel.ICacheDistribuida>(),
+            sp.GetRequiredService<Domain.Reprogramaciones.IVerificacionesReprogramacionRepository>(),
+            sp.GetRequiredService<Application.Features.SolicitarReprogramacion.SecretoVerificacion>(),
+            sp.GetRequiredService<IEmisorCorreo>(),
+            sp.GetRequiredService<IIdentidadesOperadorRepository>(),
+            sp.GetRequiredService<TokenSeguimiento>(),
+            sp.GetRequiredService<DireccionPublica>(),
+            sp.GetRequiredService<SharedKernel.ICurrentTenant>(),
+            sp.GetRequiredService<TimeProvider>()));
 
         // CU-60: cada cambio de estado de un envío borra su seguimiento de la caché; una cola por tipo de evento.
         foreach (var tipo in InvalidarSeguimiento.Tipos)

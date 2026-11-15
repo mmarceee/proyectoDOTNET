@@ -1492,7 +1492,7 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | **Aceptado sin modificaciones** | La API completa en un puerto real con `UseKestrel` de .NET 10 y un PostgreSQL de Testcontainers, en lugar de depender de `docker compose`, así la prueba es autónoma. `localhost` en lugar de `127.0.0.1`, porque Chromium sólo acepta la cookie `Secure` sin HTTPS en `localhost`. La contraseña de demostración la fija la prueba (`Demo:Contrasena`): mira la aplicación sólo desde afuera. Cada usuario en su propio contexto de navegador, lo que permite probar el aislamiento entre operadores. El proyecto fuera de `Logistica.slnx`, en un job propio. |
 | **Modificado** | La primera compilación falló porque `GetRequiredFeature` no existe para `IFeatureCollection`; se usó `Get<IServerAddressesFeature>()`. El registro de la API mostraba cada consulta SQL (unas 3200 líneas): se bajó a avisos y errores. Se agregó la traza de cada ventana, para ver qué hizo el robot si una prueba falla en el CI. |
 | **Descartado** | Correr las pruebas contra `docker compose`: el CI tendría que levantar los seis servicios y depender de un `.env`. Incluir el Worker y RabbitMQ: los flujos elegidos no dependen de mensajes, y la caída de esas dependencias la cubre el opcional de resiliencia. Agregar el proyecto a `Logistica.slnx`: rompería `dotnet test` y `test-en-docker.sh` en las máquinas sin Chromium. |
-| **Verificación** | `scripts/e2e-en-docker.sh`: 4 aprobadas y 0 fallidas en dos corridas seguidas, en unos 2 minutos, con las trazas guardadas. `actionlint` no marca errores en el job nuevo. Falta ver el job `e2e` en verde en GitHub Actions, en el próximo PR. |
+| **Verificación** | `scripts/e2e-en-docker.sh`: 4 aprobadas y 0 fallidas en dos corridas seguidas, en unos 2 minutos, con las trazas guardadas. `actionlint` no marca errores en el job nuevo. En GitHub Actions, el job `e2e` del PR #92 pasó en 3 minutos. |
 
 **Integración de main del 10/11/2026.** Lucas pidió traer main y resolver los dos conflictos documentales. Codex conservó el cierre y decisiones de ADR-0007 con el aporte retrospectivo de Cristian, y unió las entradas de CU-15/RF-32 con las nuevas de CU-22 y Playwright, renumerando estas últimas a 3.97/3.98 y ajustando su historial. Se preservaron los cambios de código entrantes y las fuentes de RF 32; la verificación de integración se registra en el resultado del merge, sin atribuir a esta tarea las pruebas históricas descritas por cada responsable.
 
@@ -1623,6 +1623,21 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | **Descartado** | Restringir scripts y estilos en la CSP: rompería el tablero (Leaflet y SignalR desde cdnjs, scripts en línea) y Blazor WebAssembly a un día de la entrega; queda anotado como mejora. |
 | **Verificación** | `CabecerasSeguridadTests` (página, Portal y error 404) y suite completa en Docker. |
 
+## **3.108 CU-61 · Verificación del destinatario antes de reprogramar**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 14/11/2026 |
+| **Archivos** | `Domain/Reprogramaciones/` (`VerificacionReprogramacion` y su repositorio); `SecretoVerificacion` y `SolicitarReprogramacionHandler`; `VerificacionesReprogramacion.cs` y migración `VerificacionReprogramacion` en Seguimiento; `SolicitarReprogramacionEndpoint`; `ContactoDestinatarioAsync` en `IEnviosModuleApi`; `ReprogramacionPublica.cs` (Http.Contracts); `Seguimiento.razor`; pruebas `VerificacionReprogramacionTests` y `ReprogramacionPublicaTests`; `casos-de-uso.md` (v2.10) y `modelo-de-dominio.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Responder a la observación del docente en el monitoreo: desde el seguimiento público, cualquiera que tuviera el enlace podía cambiar la entrega, porque el token firmado no vence y era la única credencial. |
+| **Cómo se trabajó** | Le planteé el problema a la IA, que propuso tres opciones (código por correo, dato del teléfono y aviso posterior). Elegí el código por correo con aviso del cambio y, para los envíos sin correo, los últimos 4 dígitos del teléfono. Lo dejamos para después del monitoreo del 12/11. Le pedí que lo implementara ella, archivo por archivo, explicándome cada capa. |
+| **Aceptado sin modificaciones** | La verificación vive en Seguimiento con filtro "Tenant" (sólo `OperadorId`, porque el seguimiento público no tiene sesión de comercio). El correo y el teléfono se piden a Envíos por su contrato. Se guarda un HMAC del secreto con la clave del token, nunca el secreto. Vence a los 10 minutos, admite 3 intentos, vale sólo para la fecha y franja elegidas y una sola vez. Pedir otra verificación anula la anterior, con 5 pedidos por hora por envío. El correo del código sale en el momento desde la API, sin pasar por el Worker, porque el destinatario lo espera con la página abierta. |
+| **Modificado** | La primera corrida de integración dio 500 en todas las reprogramaciones válidas: el aviso del cambio consultaba a Envíos después de que Envíos confirmara su transacción en la unidad de trabajo compartida (*Transaction is already completed*). Se leen los datos del aviso antes de reprogramar. Pedir verificación para una fecha que no está entre las opciones ahora se rechaza antes de mandar el código, y la prueba de A2 se adaptó a ese mensaje. |
+| **Descartado** | Ocultar el botón cuando no hay correo: preferí que el destinatario pueda reprogramar con el teléfono. Hacer vencer el token del enlace: no resuelve el reenvío del enlace dentro de su vigencia y rompería los enlaces de los correos ya enviados. Mandar el código por el Worker: llegaría con demora. |
+| **Verificación** | `VerificacionReprogramacionTests` (7) y las de CU-61 de `ReprogramacionPublicaTests` (9: las cinco anteriores adaptadas y cuatro nuevas, con correo, con teléfono, sin pedir el código y un código que reemplaza al anterior) pasan en Docker. También pasan las 56 de arquitectura, las 15 de aislamiento entre inquilinos (incluida la prueba estructural del filtro "Tenant") y todas las de Seguimiento (181 unitarias y 108 de integración). |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -1680,3 +1695,4 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | 0.50 | 10/11/2026 | Integración de main: conservación de las entradas de RF 32/CU-15 y CU-22/Playwright, renumeración 3.97/3.98 y resolución de ADR-0007 manteniendo decisiones y aceptación RF 32. | Lucas Ottonello |
 | 0.51 | 14/11/2026 | Entradas del 13 y 14/11: administrador general (3.100), fecha y franja en el alta (3.101), motivo de los errores del Portal (3.102), perfil e ícono del Backoffice (3.103), tablero y lecturas por bulto (3.104), liquidación según D8 (3.105) y revisión para la entrega (3.106). | Ezequiel Marcenal |
 | 0.52 | 14/11/2026 | Documento técnico en la entrada 3.106 y entrada de Serilog y cabeceras seguras (3.107). | Ezequiel Marcenal |
+| 0.53 | 14/11/2026 | Entrada de la verificación del destinatario antes de reprogramar (3.108). | Cristian Reyes |

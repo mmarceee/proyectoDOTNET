@@ -43,6 +43,11 @@ internal sealed partial class EnviosModuleApi(IEnvioRepository envios, TimeProvi
     public Task<bool> ReprogramarPorDestinatarioAsync(Guid envioId, DateOnly fecha, Guid franjaId, CancellationToken ct)
         => reprogramar.ReprogramarAsync(envioId, fecha, franjaId, ct);
 
+    public async Task<ContactoDestinatario?> ContactoDestinatarioAsync(Guid envioId, CancellationToken ct)
+        => await envios.ObtenerAsync(envioId, ct) is { } envio
+            ? new ContactoDestinatario(envio.Destinatario.Email, envio.Destinatario.Telefono)
+            : null;
+
     public async Task<IReadOnlyList<EnvioParaCarga>> ConsultarCargaAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
         // La nueva visita excluye los ya entregados; una carga en preparación conserva los todavía asignados
