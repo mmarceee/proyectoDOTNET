@@ -196,7 +196,34 @@ public sealed class AislamientoTests(PostgresApiFactory factory) : IClassFixture
         Assert.Equal(comercio, detalle?.ComercioId);
     }
 
-    // ---- Estructural: que el filtro esté aplicado ----
+    // ---- Estructural (a): que no falte el marcador ----
+
+    [Fact]
+    public void En_cada_DbContext_de_los_modulos_toda_entidad_con_OperadorId_implementa_IOperadorOwned()
+    {
+        using var scope = factory.Services.CreateScope();
+
+        // Excepciones del ADR-0002 (sección 2.4): el Outbox guarda el operador como metadato del mensaje.
+        // Usuario también es excepción, pero vive en el contexto de Identity y no en un ModuleDbContext.
+        string[] excepciones = [nameof(OutboxMessage)];
+
+        var entidades = scope.ServiceProvider.GetServices<ModuleDbContext>()
+            .SelectMany(db => db.Model.GetEntityTypes())
+            .Where(t => t.FindProperty(nameof(IOperadorOwned.OperadorId)) is not null)
+            .ToList();
+        var sinMarcador = entidades
+            .Where(t => !typeof(IOperadorOwned).IsAssignableFrom(t.ClrType))
+            .Select(t => t.ClrType.Name)
+            .Except(excepciones);
+
+        // Detecta "me olvidé del marcador": una entidad con OperadorId que el filtro no protegería.
+        Assert.Empty(sinMarcador);
+
+        // Y que la prueba no pase por vacía: el Outbox tiene OperadorId y queda excluido a propósito.
+        Assert.Contains(nameof(OutboxMessage), entidades.Select(t => t.ClrType.Name));
+    }
+
+    // ---- Estructural (b): que el filtro esté aplicado ----
 
     [Fact]
     public void En_cada_DbContext_de_los_modulos_toda_entidad_de_un_operador_tiene_el_filtro_Tenant()
