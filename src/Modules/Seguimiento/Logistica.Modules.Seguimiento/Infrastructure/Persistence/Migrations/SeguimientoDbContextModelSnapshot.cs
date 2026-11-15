@@ -18,7 +18,7 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("seguimiento")
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -429,6 +429,55 @@ namespace Logistica.Modules.Seguimiento.Infrastructure.Persistence.Migrations
                     b.HasIndex("OperadorId", "EnvioId");
 
                     b.ToTable("notificaciones", "seguimiento");
+                });
+
+            modelBuilder.Entity("Logistica.Modules.Seguimiento.Domain.Reprogramaciones.VerificacionReprogramacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Anulada")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Fecha")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("FranjaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("HashSecreto")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("Intentos")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Medio")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UsadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("VenceEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "EnvioId", "CreadaEn");
+
+                    b.ToTable("verificaciones_reprogramacion", "seguimiento");
                 });
 
             modelBuilder.Entity("Logistica.Modules.Seguimiento.Infrastructure.Persistence.MensajeRecibido", b =>

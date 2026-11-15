@@ -1113,6 +1113,46 @@ EntregadoEnCalle, DevueltoADeposito, Extraviado
 
 * actualizadaEn: DateTimeOffset (fecha del evento; uno anterior que llega tarde no la pisa)
 
+**VerificacionReprogramacion**
+
+*CU-61, requerimiento especial 4 — el destinatario confirma que es él antes de reprogramar desde el seguimiento público. Lleva operadorId (filtro "Tenant"), no comercioId: el seguimiento público no tiene sesión de comercio*
+
+**Atributos**
+
+* id: Guid
+
+* envioId: Guid (referencia por identificador al envío de Envíos)
+
+* fecha: DateOnly y franjaId: Guid (la opción elegida: el código no vale para otra)
+
+* medio: MedioVerificacion
+
+* hashSecreto: byte[] (HMAC del código o de los últimos 4 dígitos del teléfono; nunca el secreto)
+
+* creadaEn: DateTimeOffset y venceEn: DateTimeOffset (10 minutos después)
+
+* intentos: int (como máximo 3)
+
+* usadaEn: DateTimeOffset (opcional; se usa una sola vez)
+
+* anulada: bool (pedir otra verificación anula la anterior)
+
+**Métodos**
+
+* comprobar(fecha, franjaId, hash, ahora): ResultadoVerificacion — un secreto incorrecto consume un intento; otra fecha no
+
+* marcarUsada(ahora): void
+
+* anular(): void
+
+**MedioVerificacion**  *«enum»*
+
+Correo, Telefono
+
+**ResultadoVerificacion**  *«enum»*
+
+Valida, Incorrecta, Vencida, Agotada, Usada, OtraOpcion
+
 **SuscripcionAviso**
 
 *raíz de agregado — RNF 6.9, configuración del comercio*

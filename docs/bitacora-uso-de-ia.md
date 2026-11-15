@@ -1510,6 +1510,21 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | **Descartado** | Liberar por Reprogramado/cierre/ausencia de escaneo, suponer custodia desde el estado, elegir una ruta histórica ambigua, relajar la prueba arquitectónica o reescribir colas offline. |
 | **Verificación** | Compilación sin advertencias/errores; 498 unitarias, 56 de arquitectura y 225 integraciones seleccionadas aprobadas, incluido API/Worker/RabbitMQ/Valkey reales. [Guía y límites RF 34](analisis-diseno/rf-34/verificacion.md). No se aplicaron migraciones a la base del usuario ni se realizó aceptación física del nuevo recorrido publicado. |
 
+## **3.100 CU-61 · Verificación del destinatario antes de reprogramar**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Cristian Reyes |
+| **Fecha** | 14/11/2026 |
+| **Archivos** | `Domain/Reprogramaciones/` (`VerificacionReprogramacion` y su repositorio); `SecretoVerificacion` y `SolicitarReprogramacionHandler`; `VerificacionesReprogramacion.cs` y migración `VerificacionReprogramacion` en Seguimiento; `SolicitarReprogramacionEndpoint`; `ContactoDestinatarioAsync` en `IEnviosModuleApi`; `ReprogramacionPublica.cs` (Http.Contracts); `Seguimiento.razor`; pruebas `VerificacionReprogramacionTests` y `ReprogramacionPublicaTests`; `casos-de-uso.md` (v2.10) y `modelo-de-dominio.md`. |
+| **¿Se usó IA?** | Sí |
+| **Finalidad** | Responder a la observación del docente en el monitoreo: desde el seguimiento público, cualquiera que tuviera el enlace podía cambiar la entrega, porque el token firmado no vence y era la única credencial. |
+| **Cómo se trabajó** | Le planteé el problema a la IA, que propuso tres opciones (código por correo, dato del teléfono y aviso posterior). Elegí el código por correo con aviso del cambio y, para los envíos sin correo, los últimos 4 dígitos del teléfono. Lo dejamos para después del monitoreo del 12/11. Le pedí que lo implementara ella, archivo por archivo, explicándome cada capa. |
+| **Aceptado sin modificaciones** | La verificación vive en Seguimiento con filtro "Tenant" (sólo `OperadorId`, porque el seguimiento público no tiene sesión de comercio). El correo y el teléfono se piden a Envíos por su contrato. Se guarda un HMAC del secreto con la clave del token, nunca el secreto. Vence a los 10 minutos, admite 3 intentos, vale sólo para la fecha y franja elegidas y una sola vez. Pedir otra verificación anula la anterior, con 5 pedidos por hora por envío. El correo del código sale en el momento desde la API, sin pasar por el Worker, porque el destinatario lo espera con la página abierta. |
+| **Modificado** | La primera corrida de integración dio 500 en todas las reprogramaciones válidas: el aviso del cambio consultaba a Envíos después de que Envíos confirmara su transacción en la unidad de trabajo compartida (*Transaction is already completed*). Se leen los datos del aviso antes de reprogramar. Pedir verificación para una fecha que no está entre las opciones ahora se rechaza antes de mandar el código, y la prueba de A2 se adaptó a ese mensaje. |
+| **Descartado** | Ocultar el botón cuando no hay correo: preferí que el destinatario pueda reprogramar con el teléfono. Hacer vencer el token del enlace: no resuelve el reenvío del enlace dentro de su vigencia y rompería los enlaces de los correos ya enviados. Mandar el código por el Worker: llegaría con demora. |
+| **Verificación** | `VerificacionReprogramacionTests` (7) y las de CU-61 de `ReprogramacionPublicaTests` (9: las cinco anteriores adaptadas y cuatro nuevas, con correo, con teléfono, sin pedir el código y un código que reemplaza al anterior) pasan en Docker. También pasan las 56 de arquitectura, las 15 de aislamiento entre inquilinos (incluida la prueba estructural del filtro "Tenant") y todas las de Seguimiento (181 unitarias y 108 de integración). |
+
 # **4\. Historial de versiones**
 
 | Versión | Fecha | Descripción | Responsable |
@@ -1565,3 +1580,4 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | 0.48 | 10/11/2026 | Entrada de CU-22, gestionar incidencias (3.97). | Cristian Reyes |
 | 0.49 | 10/11/2026 | Entrada de las pruebas de extremo a extremo con Playwright (3.98). | Cristian Reyes |
 | 0.50 | 10/11/2026 | Integración de main: conservación de las entradas de RF 32/CU-15 y CU-22/Playwright, renumeración 3.97/3.98 y resolución de ADR-0007 manteniendo decisiones y aceptación RF 32. | Lucas Ottonello |
+| 0.51 | 14/11/2026 | Entrada de la verificación del destinatario antes de reprogramar (3.100). | Cristian Reyes |

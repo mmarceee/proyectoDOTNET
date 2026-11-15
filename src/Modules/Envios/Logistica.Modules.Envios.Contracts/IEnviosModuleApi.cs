@@ -105,6 +105,10 @@ public interface IEnviosModuleApi
     // (A1, A2, A3) lanza DomainException.
     Task<bool> ReprogramarPorDestinatarioAsync(Guid envioId, DateOnly fecha, Guid franjaId, CancellationToken ct);
 
+    // CU-61, verificación previa: el correo y el teléfono del destinatario. null si el envío no existe o es de otro
+    // operador (el inquilino sale del token del enlace).
+    Task<ContactoDestinatario?> ContactoDestinatarioAsync(Guid envioId, CancellationToken ct);
+
     // CU-32: los envíos del comercio que terminaron entre desde (inclusive) y hasta (exclusive) con algún bulto entregado
     // o devuelto, con la tarifa con que se admitieron (D8). Si todos sus bultos quedaron cancelados o extraviados, no se
     // cobran. El operador lo pone el filtro "Tenant".
