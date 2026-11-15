@@ -213,7 +213,7 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | Política de resolución de conflictos de sincronización de la PWA (obligatorio, letra 8.2) | Aceptado: ADR-0004 |
 | Casos de uso almacenados en caché y reglas de expiración e invalidación (obligatorio, letra 8.2) | Aceptado: ADR-0006 |
 | Garantía de consistencia entre persistencia y publicación de eventos mediante Outbox (obligatorio, letra 8.2) | Aceptado: ADR-0003 |
-| Despliegue en la nube, infraestructura como código y entrega continua (letra 6.14 y 8.2) | Propuesto: ADR-0008 |
+| Despliegue en la nube, infraestructura como código y entrega continua (letra 6.14 y 8.2) | Aceptado: ADR-0008 (15/11) |
 
 # **9 Referencias**
 
@@ -241,3 +241,4 @@ Estas decisiones no impiden presentar el stack ni comenzar el desarrollo. Se cer
 | 1.7 | 05/11/2026 | Aspire Dashboard desplegado en Azure, protegido con token y clave OTLP (sección 7). |
 | 1.8 | 09/11/2026 | ADR-0008 (despliegue) en la sección 8, que además se actualiza con el ADR-0005 y el ADR-0006; Terraform ya no define CloudAMQP; permiso del job `deploy` asignado por Terraform (sección 6). |
 | 1.9 | 15/11/2026 | Correo: en el ambiente desplegado no se configura un servidor de correo, por decisión del equipo; se quita el proveedor previsto (secciones 2, 3.9 y 7). |
+| 2.0 | 15/11/2026 | Sección 8: ADR-0008 aceptado por el equipo. |

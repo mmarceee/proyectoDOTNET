@@ -2,7 +2,7 @@
 
 | Estado | Borrador para la entrega final, pendiente de revisión del equipo |
 | :---- | :---- |
-| **Versión** | 0.3 |
+| **Versión** | 0.4 |
 | **Fecha** | 14 de noviembre de 2026 |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigido por** | Letra del laboratorio, sección 8.4: «documento técnico que describa la implementación de los requerimientos no funcionales, las decisiones de diseño adoptadas, las configuraciones relevantes y los diagramas correspondientes» |
@@ -295,7 +295,7 @@ Total: 9 puntos (mínimo exigido para equipos de tres: 8).
 | 0005 | Blazor WebAssembly para Portal, seguimiento y PWA | Lucas Ottonello | Propuesto |
 | 0006 | Cache-aside sobre `IDistributedCache` y Valkey, clave por operador, dos políticas | Cristian Reyes | Aceptado |
 | 0007 | Adaptación a la entrega parcial (registro del cambio) | Lucas Ottonello | Aceptado |
-| 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Propuesto (v0.1) |
+| 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Aceptado (v1.0) |
 
 Otras decisiones de diseño relevantes, sin ADR propio:
 
@@ -380,7 +380,7 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | PWA: biometría, notificaciones con la app cerrada y posición en segundo plano (6.11) | No implementadas; la posición se sigue con la aplicación abierta |
 | Escalabilidad (6.13) | Eximida: una réplica, sin `/ready` ni `/live`, tareas programadas sin ejecución única garantizada |
 | Entrega parcial | Extravío de un bulto suelto, captura cifrada antes de confirmar (D9) y aceptaciones manuales pendientes; dos simplificaciones en la liquidación (ADR-0007, sección 4.6) |
-| ADR | 0002, 0005 y 0008 pendientes de aprobación del equipo |
+| ADR | 0002 y 0005 pendientes de aprobación del equipo; el 0008 tiene dos verificaciones para la puesta en marcha de la defensa (captura de costo y despliegue continuo) |
 
 # **8\. Referencias**
 
@@ -397,3 +397,4 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | 0.1 | 14/11/2026 | Borrador inicial para la entrega final, armado con IA a partir de los ADR, la documentación y el código, para revisión del equipo. | Ezequiel Marcenal |
 | 0.2 | 14/11/2026 | Serilog (6.12) y cabeceras seguras (6.3) implementados: pasan de limitaciones a implementación. | Ezequiel Marcenal |
 | 0.3 | 15/11/2026 | Producción sin servidor de correo, por decisión del equipo: se quita el proveedor de los diagramas y se agrega a las limitaciones. | Ezequiel Marcenal |
+| 0.4 | 15/11/2026 | ADR-0008 aceptado (v1.0). | Ezequiel Marcenal |
