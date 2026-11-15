@@ -2,7 +2,7 @@
 
 | Estado | Borrador para la entrega final, pendiente de revisión del equipo |
 | :---- | :---- |
-| **Versión** | 0.4 |
+| **Versión** | 0.5 |
 | **Fecha** | 14 de noviembre de 2026 |
 | **Equipo** | Equipo 1 - Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigido por** | Letra del laboratorio, sección 8.4: «documento técnico que describa la implementación de los requerimientos no funcionales, las decisiones de diseño adoptadas, las configuraciones relevantes y los diagramas correspondientes» |
@@ -288,11 +288,11 @@ Total: 9 puntos (mínimo exigido para equipos de tres: 8).
 
 | ADR | Decisión | Responsable | Estado |
 | :---- | :---- | :---- | :---- |
-| 0001 | Monolito modular por capacidades, vertical slices, dependencias hacia el dominio, host único y Worker aparte | Lucas Ottonello | Aceptado (v2.0) |
-| 0002 | Multitenancy por fila con filtro que falla cerrado, interceptor de escrituras y segundo nivel por comercio | Cristian Reyes | Pendiente de revisión (v2.2) |
+| 0001 | Monolito modular por capacidades, vertical slices, dependencias hacia el dominio, host único y Worker aparte | Lucas Ottonello | Aceptado (v2.1) |
+| 0002 | Multitenancy por fila con filtro que falla cerrado, interceptor de escrituras y segundo nivel por comercio | Cristian Reyes | Aceptado (v2.2) |
 | 0003 | Outbox e inbox por módulo, RabbitMQ con implementación propia, reintentos y fallidos | Ezequiel Marcenal | Aceptado |
 | 0004 | Sincronización por operaciones idempotentes; el servidor decide con la máquina de estados; atomicidad por visita | Ezequiel Marcenal | Aceptado |
-| 0005 | Blazor WebAssembly para Portal, seguimiento y PWA | Lucas Ottonello | Propuesto |
+| 0005 | Blazor WebAssembly para Portal, seguimiento y PWA | Lucas Ottonello | Aceptado |
 | 0006 | Cache-aside sobre `IDistributedCache` y Valkey, clave por operador, dos políticas | Cristian Reyes | Aceptado |
 | 0007 | Adaptación a la entrega parcial (registro del cambio) | Lucas Ottonello | Aceptado |
 | 0008 | Azure Container Apps, Terraform y entrega continua | Ezequiel Marcenal | Aceptado (v1.0) |
@@ -379,8 +379,6 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | Content-Security-Policy (6.3) | No restringe el origen de scripts y estilos: hacerlo exige nonces en las páginas con scripts en línea y servir Leaflet y SignalR desde el propio origen |
 | PWA: biometría, notificaciones con la app cerrada y posición en segundo plano (6.11) | No implementadas; la posición se sigue con la aplicación abierta |
 | Escalabilidad (6.13) | Eximida: una réplica, sin `/ready` ni `/live`, tareas programadas sin ejecución única garantizada |
-| Entrega parcial | Extravío de un bulto suelto, captura cifrada antes de confirmar (D9) y aceptaciones manuales pendientes; dos simplificaciones en la liquidación (ADR-0007, sección 4.6) |
-| ADR | 0002 y 0005 pendientes de aprobación del equipo; el 0008 tiene dos verificaciones para la puesta en marcha de la defensa (captura de costo y despliegue continuo) |
 
 # **8\. Referencias**
 
@@ -398,3 +396,4 @@ Desde la entrega parcial, estas transiciones se aplican **por bulto** y el enví
 | 0.2 | 14/11/2026 | Serilog (6.12) y cabeceras seguras (6.3) implementados: pasan de limitaciones a implementación. | Ezequiel Marcenal |
 | 0.3 | 15/11/2026 | Producción sin servidor de correo, por decisión del equipo: se quita el proveedor de los diagramas y se agrega a las limitaciones. | Ezequiel Marcenal |
 | 0.4 | 15/11/2026 | ADR-0008 aceptado (v1.0). | Ezequiel Marcenal |
+| 0.5 | 15/11/2026 | ADR-0001 (v2.1), ADR-0002 y ADR-0005 aceptados; se quitan de las limitaciones la entrega parcial y los ADR pendientes. | Lucas Ottonello |

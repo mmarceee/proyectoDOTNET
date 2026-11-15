@@ -1,6 +1,6 @@
 # RF 32 · Análisis de alcance y faltantes antes de nuevos cambios
 
-> **Decisión posterior de cierre:** Lucas confirmó persistir toda la captura cifrada antes de confirmar (D9 del [cierre técnico](../cierre-tecnico-entrega-parcial.md)). Las consultas y la elección de advertencia registradas en este análisis son antecedentes; la decisión vigente requiere recuperación de firma/foto/textos y nuevas pruebas. No se declara implementada aquí.
+> **Alcance vigente desde el 15/11:** [D9](../anexo-tecnico-ADR-0007-entrega-parcial.md#d9-borrador-de-visita-y-evidencia-al-confirmar) documenta la recuperación de resultados y motivos del borrador. La firma, la foto y los datos de recepción se vuelven a capturar si se recarga antes de confirmar. Las consultas de este análisis se conservan como antecedentes.
 
 Fecha: 09/11/2026. Base revisada: `549c1ae`, con árbol de trabajo inicialmente limpio.
 

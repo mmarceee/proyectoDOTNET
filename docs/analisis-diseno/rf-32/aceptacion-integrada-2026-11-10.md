@@ -1,6 +1,6 @@
 # RF 32 · Aceptación integrada del 10/11/2026
 
-Continuación del [ensayo en Android](ensayo-android-2026-11-10.md). Lucas pidió terminar RF 32 con dos verificaciones: conflicto de sincronización y entrega parcial offline cotejada con Backoffice, seguimiento público y receptor externo. No se presenta D9 como texto literal del docente: recuperar la captura antes de confirmar sigue siendo una decisión interna pendiente, separada del alcance de esta aceptación.
+Continuación del [ensayo en Android](ensayo-android-2026-11-10.md). Lucas pidió terminar RF 32 con dos verificaciones: conflicto de sincronización y entrega parcial offline cotejada con Backoffice, seguimiento público y receptor externo. El ensayo cubre la visita confirmada y su sincronización. D9 documenta por separado el comportamiento antes de confirmar.
 
 **Resultado: los dos ensayos aprobados. Aceptación del alcance original de RF 32 completada.** Esto no declara implementadas todas las decisiones posteriores del ADR-0007 ni cerradas RF 31 a 36 en conjunto.
 
@@ -48,4 +48,4 @@ Archivos ignorados por Git en `TestResults/lan`: `aceptacion-rf32.json`, `acepta
 
 La ruta de este segundo ensayo permanece EnCurso: no se simula la declaración física del repartidor para cerrarla. La rendición y cierre del primer ensayo ya están acreditados en su registro. Las suscripciones temporales y el túnel del receptor se retiran después de registrar el resultado, conservando el historial.
 
-Esta aceptación no acredita D9, adquisición de una posición GPS nueva sin red, pruebas de almacenamiento lleno o actualización del dispositivo, ni un recargo positivo de revisita de RF 33. La distinción evita convertir verificaciones adicionales en nuevos requisitos literales de RF 32.
+Quedaron fuera del ensayo la adquisición de una posición GPS nueva sin red, las pruebas de almacenamiento lleno o actualización del dispositivo y un recargo positivo de revisita de RF 33.

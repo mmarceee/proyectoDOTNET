@@ -2,13 +2,13 @@
 
 Fecha: 09/11/2026. Revisión sobre `549c1ae` con cambios locales de RF 32. Sin commit nuevo ni despliegue desde esta tarea. [Especificación vigente](especificacion-tecnica.md).
 
-**Cierre posterior del 10/11:** completados los [dos ensayos integrados](aceptacion-integrada-2026-11-10.md): conflicto y recepción externa, con Backoffice, público y reenvío sin duplicados. Aceptación del alcance original de RF 32 completada. Los pasos y avances anteriores de este registro son históricos; D9 y las pruebas adicionales se mantienen separados de ese cierre.
+**Cierre posterior del 10/11:** completados los [dos ensayos integrados](aceptacion-integrada-2026-11-10.md): conflicto y recepción externa, con Backoffice, público y reenvío sin duplicados. Aceptación del alcance original de RF 32 completada. Los pasos y avances anteriores de este registro son históricos.
 
-> **Actualización posterior al cerrar ADR-0007:** Lucas confirmó persistir toda la captura cifrada antes de confirmar (D9 del [cierre técnico](../cierre-tecnico-entrega-parcial.md)). Este registro conserva la verificación histórica de la alternativa de advertencia, que no acredita la nueva recuperación. El paso 4 de aceptación debe sustituirse por reabrir sin red y recuperar firma/foto/textos persistidos, comprobar que un cambio de entregados elimina la firma y que errores de cuota/concurrencia no informan guardado correcto. Implementación y aceptación de D9 pendientes.
+> **Alcance confirmado el 15/11.** [D9](../anexo-tecnico-ADR-0007-entrega-parcial.md#d9-borrador-de-visita-y-evidencia-al-confirmar) define la recuperación de los resultados y motivos del borrador. La evidencia completa se guarda cifrada al confirmar la visita.
 
 ## Cambio autorizado
 
-En la revisión anterior Lucas había elegido mantener en memoria la captura sin confirmar y advertir antes de salir. Esa elección fue sustituida posteriormente por D9. En aquel alcance se incorporaron:
+En la revisión anterior Lucas había elegido mantener en memoria la captura sin confirmar y advertir antes de salir. El alcance confirmado en D9 recoge ese comportamiento. Se incorporaron las siguientes comprobaciones.
 
 - Explicación de qué se guarda y estado visible de captura pendiente.
 - Confirmación para abandonar la visita con firma, foto o textos; cancelar mantiene la pantalla.
@@ -60,7 +60,7 @@ También comprueba cancelación/aceptación de salida con texto, firma sola, bor
 
 ## Aceptación física que requiere dispositivo
 
-El circuito principal se ejecutó en Android el 10/11 con Lucas: carga/inicio, visita confirmada offline, reapertura sin red y sincronización. Se verificaron estado aplicado, evidencia, reenvío y preparación de rendición; ver [ensayo físico](ensayo-android-2026-11-10.md). Siguen pendientes D9 y los escenarios adicionales indicados allí. El resultado automatizado de Chrome no se registra como una prueba física ni acredita recepción externa de avisos.
+El circuito principal se ejecutó en Android el 10/11 con Lucas: carga/inicio, visita confirmada offline, reapertura sin red y sincronización. Se verificaron estado aplicado, evidencia, reenvío y preparación de rendición; ver [ensayo físico](ensayo-android-2026-11-10.md). El ensayo físico detalla los escenarios adicionales. El resultado automatizado de Chrome no se registra como una prueba física ni acredita recepción externa de avisos.
 
 **Preparación posterior del 09/11:** Lucas confirmó Android y eligió un entorno separado con datos demo. Se levantó `voluptasexpress-lan` con API/Worker actuales, base y mensajería independientes y HTTPS en `https://192.168.1.7:8443`. La CA pública se descarga en `http://192.168.1.7:8081/proyectoDOTNET-LAN.cer`. Se verificaron cadena/nombre TLS, login, sesión de repartidor y archivos publicados. La [guía LAN](../../../infra/lan/README.md) registra acceso, credenciales de demo, reinicio y certificado; esto prepara la prueba física, sin darla por ejecutada.
 
@@ -89,4 +89,4 @@ Preparar un ambiente de prueba HTTPS accesible desde el teléfono, con versión 
 | 11. Compatibilidad | Actualizar el shell con una cola pendiente sin borrar datos; comprobar que OperacionId, contenido y evidencia se conservan. |
 | 12. Rendición | Entregados no se solicitan como retorno físico. En una variante con dos cargados, el tercero no cargado queda fuera de visita y no consume intento. |
 
-Registrar resultado por paso y adjuntar evidencia de prueba en el repositorio o la tarjeta, sin copiar firma/documento reales a documentación pública. La implementación descrita corresponde al alcance anterior de advertencia. **Al cierre del 10/11, operación offline, conflicto y aceptación integrada con avisos externos están validados; D9 y escenarios físicos adicionales no se acreditan con este resultado.** RF 34, tablero y liquidación continúan en sus tarjetas.
+Registrar resultado por paso y adjuntar evidencia de prueba en el repositorio o la tarjeta, sin copiar firma/documento reales a documentación pública. **Al cierre del 10/11 se validaron la operación offline, el conflicto y la aceptación integrada con avisos externos.** RF 34, tablero y liquidación continúan en sus tarjetas.

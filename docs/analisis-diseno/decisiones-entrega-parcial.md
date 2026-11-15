@@ -3,7 +3,7 @@
 | Dato | Valor |
 | --- | --- |
 | Estado | **Aceptada: decisión funcional cerrada. Implementación parcial; evidencia y pendientes en ADR-0007, secciones 4.4 a 4.7.** |
-| Versión y fecha | 1.9 · 10/11/2026 (devolución de un bulto suelto) |
+| Versión y fecha | 1.10 · 15/11/2026 |
 | Responsable del registro | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Alcance del acuerdo | Decisiones comunicadas por el equipo en el documento de Cristian y definición de resumen del envío y reglas confirmadas por Lucas. La ampliación del 08/11 sobre alcance de visita, foto compartida, faltantes y reservas fue confirmada por Lucas en el chat; no registra aprobaciones individuales adicionales de otros integrantes. |
@@ -110,13 +110,13 @@ Un faltante de carga no consume un intento de entrega ni genera un recargo al co
 | Versión de reglas | Se conserva la del envío para las revisitas; no se toma silenciosamente la versión vigente al sincronizar. |
 | Recargo de revisita | Monto fijo por visita adicional de un envío efectivamente realizada, aunque falle, registrado una sola vez. No se cobra al planificar, por cada bulto ni por reenviar la sincronización. Liquidación consume el cargo registrado, no lo recalcula con tarifas futuras. |
 
-**Cierre confirmado por Lucas el 09/11/2026:** UYU en pesos enteros, sin centésimos, con redondeo al peso más cercano y 0,50 hacia arriba. La base se cobra una sola vez al terminar todos los bultos si al menos uno fue entregado o devuelto; se excluye si todos quedaron cancelados/extraviados. Los recargos por visitas realizadas se liquidan aparte. D8 del [cierre técnico](cierre-tecnico-entrega-parcial.md) define identidad de visita, unicidad por concepto, períodos, borradores y totales, sin duplicar la base. La decisión está cerrada; implementar el contrato sigue pendiente.
+**Cierre confirmado por Lucas el 09/11/2026:** UYU en pesos enteros, sin centésimos, con redondeo al peso más cercano y 0,50 hacia arriba. La base se cobra una sola vez al terminar todos los bultos si al menos uno fue entregado o devuelto; se excluye si todos quedaron cancelados/extraviados. Los recargos por visitas realizadas se liquidan aparte. D8 del [cierre técnico](anexo-tecnico-ADR-0007-entrega-parcial.md) define identidad de visita, unicidad por concepto, períodos, borradores y totales, sin duplicar la base. La decisión está cerrada; implementar el contrato sigue pendiente.
 
-**Captura confirmada por Lucas el 09/11/2026:** conservar cifrados también firma, foto, receptor y observaciones antes de confirmar, recuperarlos al reabrir y exigir nueva firma si cambia el conjunto entregado (D9). Esta confirmación posterior sustituye la opción anterior de conservar evidencia sólo en pantalla y advertir al salir; su implementación debe verificarse antes de aceptar recuperación completa.
+**Borrador de visita (D9, 15/11/2026).** La PWA conserva cifrados los resultados y motivos por bulto. La firma, la foto, el nombre y documento de quien recibe y las observaciones se vuelven a capturar si se recarga o se sale antes de confirmar. Una vez confirmada, la operación completa y su evidencia quedan cifradas para sincronizar. Si cambia el conjunto entregado, se pide una firma nueva. Véase el [cierre técnico](anexo-tecnico-ADR-0007-entrega-parcial.md#d9-borrador-de-visita-y-evidencia-al-confirmar).
 
 ## 6. Qué queda pendiente de especificación o implementación
 
-La decisión funcional anterior se complementa con el [cierre técnico del ADR-0007](cierre-tecnico-entrega-parcial.md). D1 a D9 especifican custodia, reservas, concurrencia, devolución, consumidores, progreso, migración, aceptación, liquidación y recuperación de captura. Los pendientes siguientes registran avance e implementación; no autorizan decisiones contradictorias con ese cierre.
+La decisión funcional anterior se complementa con el [cierre técnico del ADR-0007](anexo-tecnico-ADR-0007-entrega-parcial.md). D1 a D9 especifican custodia, reservas, concurrencia, devolución, consumidores, progreso, migración, aceptación, liquidación y guardado de captura. Los pendientes siguientes registran avance e implementación; no autorizan decisiones contradictorias con ese cierre.
 
 **Avance del 08/11/2026:** [RF 32 en la PWA](rf-32/README.md) implementa visita por bulto, foto única, guardado cifrado, diagnóstico de rechazos y adaptaciones de carga/hoja/rendición. La conciliación de custodia y las reservas/reasignación por bulto siguen siendo pendientes de RF 34; el avance no los da por implementados.
 
@@ -163,5 +163,6 @@ Este documento reemplaza las propuestas anteriores de derivar el envío con todo
 | 1.7 | 09/11/2026 | Lucas confirma moneda/redondeo, base de cierres mixtos y recargos separados, y recuperación completa cifrada de captura sin confirmar. Cierre técnico D1 a D9, con implementación pendiente diferenciada. | Lucas Ottonello, registro asistido por Codex |
 | 1.8 | 09/11/2026 | Ajuste de Lucas a pesos UYU enteros sin centésimos; redondeo al peso más cercano, 0,50 hacia arriba y una normalización por concepto, según D8. | Lucas Ottonello, registro asistido por Codex |
 | 1.9 | 10/11/2026 | Pendiente 2: la devolución de un bulto suelto al comercio está implementada (CU-31; varias devoluciones por envío, una sola abierta). | Ezequiel Marcenal |
+| 1.10 | 15/11/2026 | Se ajusta D9 al guardado del borrador y a la incorporación de la evidencia al confirmar. | Lucas Ottonello, registro asistido por Codex |
 | 2.0 | 13/11/2026 | Pendiente 7: el tablero recibe los eventos de bulto y muestra el avance por bulto. Pendiente 8: pendientes del comercio por `Terminado`, CU-61 ya migrada y distintivo por bulto en la hoja de la PWA; queda la liquidación (D8). | Ezequiel Marcenal |
 | 2.1 | 13/11/2026 | Pendiente 8: liquidación según D8 (base al cierre con `TerminadoEn`, cierre mixto, recargos en ajustes, una línea por concepto y pesos enteros), con sus simplificaciones. | Ezequiel Marcenal |
