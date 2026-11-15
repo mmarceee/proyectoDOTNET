@@ -1,9 +1,9 @@
 # **ADR-0001 · Estilo arquitectónico interno y organización del código**
 
-| Estado | Aceptado (versión 2.0). Incluye las decisiones de los addenda 1 a 5, revisadas y aceptadas por Lucas Ottonello el 2 de octubre de 2026 |
+| Estado | Aceptado (versión 2.1). Lucas Ottonello confirmó el cierre del ADR el 15 de noviembre de 2026. |
 | :---- | :---- |
-| **Versión** | 2.0 |
-| **Fecha** | 24 de septiembre de 2026 (versión 1.0) · 1 de octubre de 2026 (versión 2.0) |
+| **Versión** | 2.1 |
+| **Fecha** | 24 de septiembre de 2026 (versión 1.0) · 1 de octubre de 2026 (versión 2.0) · 12 de octubre de 2026 (versión 2.1) |
 | **Responsable** | Lucas Ottonello |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Decisión relacionada** | Organización interna del monolito modular |
@@ -442,5 +442,5 @@ Los puntos 1, 3, 6 y 7 ya están implementados en el esqueleto de la solución (
 | :---- | :---- | :---- | :---- |
 | 1.0 | 24/09/2026 | Versión inicial aceptada. | Lucas Ottonello |
 | 2.0 | 01/10/2026 | Incorpora en el texto los addenda 1 a 5: código compartido, ubicación de endpoints y contratos, comunicación entre módulos, ArchUnitNET, Backoffice y aplicaciones WebAssembly en el mismo host. Decisiones revisadas y aceptadas por Lucas Ottonello el 02/10/2026. | Ezequiel Marcenal |
-| 2.1 | 12/10/2026 | Sección 2.4: excepción para ASP.NET Core Identity en Infrastructure, con su prueba de arquitectura. Pendiente de revisión del equipo. | Cristian Reyes |
+| 2.1 | 12/10/2026 | Sección 2.4: excepción para ASP.NET Core Identity en Infrastructure, con su prueba de arquitectura. Versión aceptada por Lucas Ottonello el 15/11/2026. | Cristian Reyes |
 

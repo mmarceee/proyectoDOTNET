@@ -2,22 +2,22 @@
 
 | Dato | Valor |
 | --- | --- |
-| Estado | **Aceptado. Decisiones y evaluación retrospectiva cerradas para este alcance al 09/11/2026. Implementación y aceptación pendientes identificadas en 4.6.** |
-| Versión y fecha | 2.9 · 14/11/2026 |
+| Estado | **Aceptado. Decisiones y evaluación retrospectiva cerradas para este alcance al 09/11/2026.** |
+| Versión y fecha | 2.11 · 15/11/2026 |
 | Responsable | Lucas Ottonello |
 | Equipo | Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | Base de código inspeccionada | Inicial: `586f630` (CU-42). Cierre documental: `549c1ae`, con la prueba de caché agregada en esta revisión. |
 | Decisión funcional | [Decisiones cerradas de entrega parcial](decisiones-entrega-parcial.md) |
-| Cierre técnico y estudio | [Decisiones técnicas](cierre-tecnico-entrega-parcial.md) · [Guía de estudio y defensa](guia-estudio-ADR-0007.md) |
+| Anexo y guía de estudio | [Anexo técnico del ADR-0007](anexo-tecnico-ADR-0007-entrega-parcial.md) · [Guía de estudio y defensa](guia-estudio-ADR-0007.md) |
 | Relacionados | ADR-0001 a ADR-0006; RF 31 a 36; CU-06, CU-17/18/20/21/30/31/40/41/42/43/50/51/52/54/55/60/64/65/66 y liquidaciones. |
 
-**Continuación RF 34 · 10/11/2026:** se implementan D1/D2 y los consumidores de planificación/carga/visita/retorno/rendición, con custodia individual, reservas, migración conservadora e idempotencia. Las acciones entre módulos se mantienen en ModuleApi (ADR-0001). [Alcance RF 34](rf-34/README.md) y [evidencia/aceptación](rf-34/verificacion.md): compilación correcta, 498 unitarias, 56 de arquitectura y 225 integraciones seleccionadas aprobadas, incluido el circuito real API/Worker/RabbitMQ/Valkey. No se aplicaron migraciones a la base del usuario ni se extiende la aceptación física RF 32 a este recorrido. CU-31 incorpora la devolución individual al comercio. Quedan su aceptación integrada y los pendientes de D8 y D9.
+**Continuación RF 34 · 10/11/2026:** se implementan D1/D2 y los consumidores de planificación/carga/visita/retorno/rendición, con custodia individual, reservas, migración conservadora e idempotencia. Las acciones entre módulos se mantienen en ModuleApi (ADR-0001). [Alcance RF 34](rf-34/README.md) y [evidencia/aceptación](rf-34/verificacion.md): compilación correcta, 498 unitarias, 56 de arquitectura y 225 integraciones seleccionadas aprobadas, incluido el circuito real API/Worker/RabbitMQ/Valkey. No se aplicaron migraciones a la base del usuario ni se extiende la aceptación física RF 32 a este recorrido. CU-31 incorpora la devolución individual al comercio. En ese momento quedaban su aceptación integrada y los pendientes de D8 y D9.
 
-**Continuación · 13/11/2026:** el tablero recibe los eventos de bulto y muestra el avance por bulto (D5); los envíos pendientes del comercio se cuentan por `Terminado` y la hoja de la PWA muestra el avance por bulto (D4); la liquidación cobra la base al cierre (`TerminadoEn`, cierre mixto incluido), los recargos en ajustes y pesos enteros (D8, con dos simplificaciones). Detalle y pruebas en la sección 4.6. Quedan D9 y las aceptaciones manuales.
+**Continuación · 13/11/2026.** El tablero recibe los eventos de bulto y muestra el avance por bulto (D5). Los envíos pendientes del comercio se cuentan por `Terminado` y la hoja de la PWA muestra el avance por bulto (D4). La liquidación cobra la base al cierre (`TerminadoEn`, cierre mixto incluido) y los recargos como ajustes, en pesos enteros (D8). La sección 4.6 reúne las verificaciones registradas. El alcance de D9 se cerró el 15/11 en la sección 2.5.
 
 ## 1. Contexto y restricciones
 
-La letra original, sección 8.2, pide un responsable identificado y cuatro partes: contexto y restricciones, decisión, alternativas y consecuencias. El documento docente de cambio, sección 2.3, exige además analizar qué componentes hubo que modificar, qué resultó sencillo, qué no y por qué. Este ADR registra la decisión y la retrospectiva de la implementación disponible al 09/11. Su cierre documental no declara completadas RF 31 a 36: la sección 4.6 conserva los límites y la aceptación pendiente.
+La letra original, sección 8.2, pide un responsable identificado y cuatro partes: contexto y restricciones, decisión, alternativas y consecuencias. El documento docente de cambio, sección 2.3, exige además analizar qué componentes hubo que modificar, qué resultó sencillo, qué no y por qué. Este ADR registra la decisión, la retrospectiva de la implementación disponible al 09/11 y las verificaciones posteriores.
 
 Para el equipo de tres integrantes es obligatoria la entrega parcial (RF 31 a 36), no el retiro en domicilio. Debe demostrarse sin conexión el 12/11, sincronizar y comprobar backoffice, seguimiento público y aviso al comercio. La entrega final permanece el 15/11 a las 23:59 y la defensa el 19/11.
 
@@ -59,7 +59,7 @@ Seguimiento preserva el token público y no expone identificadores internos. Su 
 
 ### 2.4 Adaptación incremental y alcance por componente
 
-La tabla conserva el reparto y el alcance previstos al decidir el cambio. La ejecución real y sus límites están en 4.4 a 4.6.
+La tabla conserva el reparto y el alcance previstos al decidir el cambio. Las secciones 4.4 a 4.6 documentan la implementación y sus verificaciones.
 
 | Componente y responsable de referencia | Se reutiliza | Modificación prevista para el cambio |
 | --- | --- | --- |
@@ -75,11 +75,11 @@ El detalle de tareas y disponibilidad de cada integrante se coordina con el plan
 
 ### 2.5 Cierre de las decisiones técnicas
 
-El [cierre técnico](cierre-tecnico-entrega-parcial.md) forma parte de esta decisión y especifica el modelo objetivo. D1 separa estado, custodia y reserva; D2 fija transacción, revisión e índice único por bulto; D3 conserva atomicidad y define devolución de subconjuntos; D4 migra consumidores y reprogramación; D5 cubre progreso, tablero y compatibilidad; D6 fija migración conservadora y retirada gradual del puente; D7 define aceptación observable; D8 fija el contrato monetario y D9 la recuperación de captura, ambas confirmadas expresamente por Lucas el 09/11.
+El [anexo técnico](anexo-tecnico-ADR-0007-entrega-parcial.md) forma parte de esta decisión y especifica el modelo objetivo. D1 separa estado, custodia y reserva; D2 fija transacción, revisión e índice único por bulto; D3 conserva atomicidad y define devolución de subconjuntos; D4 migra consumidores y reprogramación; D5 cubre progreso, tablero y compatibilidad; D6 fija migración conservadora y retirada gradual del puente; D7 define aceptación observable; D8 fija el contrato monetario y D9 define qué se guarda en el borrador de la visita y qué se incorpora al confirmar.
 
-Se usa UYU en pesos enteros, sin centésimos, con redondeo al peso más cercano y 0,50 hacia arriba. La tarifa base se cobra una vez al terminar todos los bultos, si al menos uno fue entregado o devuelto; no se cobra si todos quedaron cancelados/extraviados. Los recargos de visitas reales se liquidan aparte, una vez cada uno. La captura sin confirmar debe conservar también firma, foto y textos cifrados; cambiar entregados invalida la firma. D8/D9 concretan unicidad, períodos, concurrencia y recuperación. Estas reglas cierran las elecciones pendientes, sin declarar implementadas sus capacidades objetivo.
+Se usa UYU en pesos enteros, sin centésimos, con redondeo al peso más cercano y 0,50 hacia arriba. La tarifa base se cobra una vez al terminar todos los bultos, si al menos uno fue entregado o devuelto; no se cobra si todos quedaron cancelados/extraviados. Los recargos de visitas reales se liquidan aparte, una vez cada uno. Según D9, el borrador cifrado recupera los resultados y motivos por bulto al recargar. Firma, foto, nombre y documento de quien recibe y observaciones quedan en memoria hasta confirmar. Al confirmar, la PWA guarda la visita completa y su evidencia cifrada para sincronizarla después.
 
-Las capacidades pendientes se implementan con esos criterios. No se acepta resolverlas relajando guardas, suponiendo custodia por falta de escaneo, interpretando Terminado como Entregado o reescribiendo una operación offline confirmada. La sección 4.6 identifica ejecución pendiente; no delega decisiones de diseño a quien implemente cada pantalla.
+Las operaciones deben validar la custodia, distinguir `Terminado` de `Entregado` y conservar las operaciones offline ya confirmadas.
 
 ## 3. Alternativas consideradas y motivo del descarte
 
@@ -120,11 +120,11 @@ El cierre resumido no reemplaza la custodia física, la rendición ni el cierre 
 
 Se deben actualizar [modelo de dominio](modelo-de-dominio.md), [tabla de transiciones](tabla-de-transiciones-de-estados.md), [casos de uso](casos-de-uso.md), ADR-0004, ADR-0006, contratos de avisos y manuales de prueba. Los vínculos añadidos ahora señalan la decisión nueva; no convierten automáticamente sus tablas históricas en el diseño ya implementado.
 
-La sección 6 de [decisiones de entrega parcial](decisiones-entrega-parcial.md) registra el avance incremental: la matriz por bulto, el alcance del extravío, la migración y los avisos v1/v2 están resueltos dentro de sus límites. RF 34 incorpora custodia y exclusividad individual. Quedan su aceptación publicada, parte de los consumidores operativos, el tablero y el cobro del recargo. La sección 4.6 concreta esas deudas.
+La sección 6 de [decisiones de entrega parcial](decisiones-entrega-parcial.md) registra el avance incremental. RF 34 incorpora custodia y exclusividad individual. La sección 4.6 reúne las verificaciones de la implementación.
 
 ### 4.4 Verificación de la implementación al 09/11/2026
 
-**Actualización del 10/11:** la tabla conserva el estado histórico del 09/11. La [aceptación integrada de RF 32](rf-32/aceptacion-integrada-2026-11-10.md) completó después el ensayo Android offline, conflicto, Backoffice/público, receptor externo v1/v2 y reenvío sin duplicados. Ese cierre no acredita D9, actualización de datos/colas anteriores ni el resto de las deudas de 4.6.
+**Actualización del 10/11:** la tabla conserva el estado histórico del 09/11. La [aceptación integrada de RF 32](rf-32/aceptacion-integrada-2026-11-10.md) completó después el ensayo Android offline, conflicto, Backoffice/público, receptor externo v1/v2 y reenvío sin duplicados. Ese cierre cubre la reapertura de la visita ya confirmada. La actualización de datos y colas anteriores y las verificaciones de la sección 4.6 tienen su propia evidencia.
 
 «Verificado» refiere al alcance de las pruebas citadas. No convierte una prueba de aplicación o de IndexedDB en una demostración del circuito publicado con teléfono, Worker y receptor externo.
 
@@ -155,21 +155,20 @@ La revisión incorpora el aporte de Cristian registrado en `d698eb7` (RF 31/33/3
 | RF 36 · avisos versionados · Ezequiel | `0ffd81a`: suscripción v1/v2, eventos individuales, entrega persistida con versión/bulto y serialización/firma correspondientes. | Se reutilizaron Outbox, Worker, inbox, suscripciones, reintentos y reenvíos; no fue necesario otro canal de mensajería. | La compatibilidad exigía conservar los bytes v1 y evitar una entrega completa falsa. El cierre mixto no tiene traducción fiel a v1; se omite para esa versión. La entrega debe preservar cuerpo/firma en reintentos. | `AvisosVersionadosTests`, `EntregarAvisosTests` y `EventosDeBultoTests`. El comercio necesita v2 para recibir hechos de bulto/cierres mixtos; v1 conserva su semántica. |
 | Migración, regresiones y despliegue | Migraciones de dominio, reglas, recargos y avisos en los commits anteriores; CI en `.github/workflows/ci.yml`. Verificación local en 4.7. | La infraestructura existente permitió ejecutar la solución y probar contra bases PostgreSQL aisladas. Se usaron artefactos separados de los binarios de desarrollo. | Copiar sólo el estado del envío habría perdido recepciones parciales. La cola antigua y los contratos externos obligaron a conservar traducciones y formatos. Una base recién migrada no prueba toda actualización histórica. | Pruebas de compatibilidad y suites de dominio, arquitectura e integración. No se aplicaron migraciones a la base del usuario ni se desplegó desde esta revisión; siguen pendientes actualización representativa y circuito publicado. |
 
-### 4.6 Decisiones especificadas y ejecución que continúa
+### 4.6 Verificaciones de la implementación
 
-La adaptación confirma que los límites del monolito, los contratos y los mecanismos de consistencia existentes fueron reutilizables. También demuestra un coste transversal: el resultado por envío estaba incorporado en guardas, consultas, evidencia y pertenencia a rutas. La arquitectura localizó propietarios y evitó nueva infraestructura, pero no evitó esos cambios semánticos. Con la retrospectiva y la verificación registradas se cierra la evaluación del ADR a esta fecha; la aceptación integral continúa abierta.
+La adaptación reutilizó los contratos y los mecanismos de consistencia del monolito. Pasar del resultado por envío al resultado por bulto requirió cambios en las guardas, las consultas, la evidencia y la pertenencia a rutas.
 
-| Pendiente real | Condición verificable para cerrarlo | Referencia de coordinación |
+| Tema | Resultado registrado | Evidencia |
 | --- | --- | --- |
-| Aceptación publicada y actualización de RF 34 | Reserva/custodia y reasignación individuales implementadas y verificadas automáticamente el 10/11. Falta el ensayo manual del build publicado y la actualización de una copia de la base real conforme a D6. | [Verificación RF 34](rf-34/verificacion.md), decisión 4.2 y pendiente 3. |
-| Aceptación integrada de la devolución individual al comercio | Verificar en el build publicado el recorrido de CU-31 con un bulto devuelto al comercio y otro reprogramado. | D3 y decisión, pendiente 2. |
-| Consumidores de estado global | Hecho el 13/11: envíos activos del comercio por Terminado, CU-61 por bultos pendientes, distintivo por bulto en la hoja de la PWA y liquidables por `TerminadoEn` (fila siguiente). Retirar el puente sólo tras verificar cada consumidor. | Decisión, pendiente 8; `ProgresoPorBultoTests`. |
-| Cargo y liquidación | Implementado el 13/11: base una vez al cierre elegible (`TerminadoEn`, cierre mixto incluido), recargos en ajustes por la fecha de la visita, una línea por concepto con índice único `(OperadorId, Origen, IdDeOrigen)` y pesos enteros al peso más cercano (0,50 hacia arriba). Quedan dos simplificaciones: se redondea al liquidar y no al registrar, y no se agregó la identidad de visita `(OperadorId, VisitaId)`. | Decisión 5 y D8; `LiquidacionTests`, `GenerarLiquidacionTests`. |
-| Tablero y circuito de mensajería | Progreso por bulto implementado el 13/11: el tablero se suscribe a los eventos de bulto y la foto suma bultos entregados/total por ruta (`NovedadesTableroTests`, `ProgresoPorBultoTests`). Falta comprobar 1/3 → 2/3 con Worker, RabbitMQ y Valkey reales. | Decisión, pendiente 7; Seguimiento. |
-| Aceptación y actualización | Registrar escenario docente publicado con teléfono sin conexión, evidencia, conflicto, reenvío, backoffice, público y receptor v2/v1; comprobar aislamiento de evidencia nueva y actualización desde datos/cola anteriores. | Prueba manual RF 32 y ADR-0004; equipo; objetivo de demostración 12/11. |
-| Captura completa y documentación | Implementar D9, confirmado por Lucas: persistir cifrados firma/foto/textos antes de confirmar, recuperar por identidad y alcance, invalidar firma al cambiar entregados y verificar concurrencia/cuota. La advertencia anterior no sustituye esa recuperación. Actualizar las partes históricas de modelo/casos de uso conforme se retiren consumidores antiguos. | D9, [especificación RF 32](rf-32/especificacion-tecnica.md) y [verificación anterior](rf-32/verificacion-cierre.md). |
+| Reserva, custodia y migración de RF 34 | Se verificaron de forma automatizada la reserva, la custodia y la reasignación por bulto. El 10/11 se ensayaron las migraciones en copias de las bases reales local y LAN, se aplicaron a las bases originales y se verificó el arranque. | [Despliegue local y LAN](rf-34/despliegue-2026-11-10.md), [verificación RF 34](rf-34/verificacion.md), D6. |
+| Devolución individual al comercio (CU-31) | La prueba automatizada de devolver un bulto y dejar el otro reprogramado pasó el 11/11. | `ConfirmarDevolucionTests`, D3. |
+| Consultas por bulto | Los envíos activos del comercio se cuentan por `Terminado`, CU-61 usa los bultos pendientes, la hoja de la PWA muestra el avance por bulto y la liquidación usa `TerminadoEn`. | D4, `ProgresoPorBultoTests`. |
+| Cargo y liquidación | La base se cobra una sola vez al cierre elegible, incluido el cierre mixto. Los recargos se registran como ajustes por fecha de visita. La liquidación genera una línea por concepto con índice único `(OperadorId, Origen, IdDeOrigen)` y redondea los importes a pesos enteros. | D8, `LiquidacionTests`, `GenerarLiquidacionTests`. |
+| Tablero | Las pruebas verifican la suscripción a eventos de bulto y el cálculo de progreso por ruta. | D5, `NovedadesTableroTests`, `ProgresoPorBultoTests`. |
+| Aceptación de RF 32 | La aceptación integrada del 10/11 en Android y LAN cubrió visita parcial sin conexión, evidencia, conflicto, reenvío sin duplicados, Backoffice, seguimiento público y avisos v1/v2. | [Aceptación integrada RF 32](rf-32/aceptacion-integrada-2026-11-10.md), ADR-0004. |
 
-Los diseños de custodia/reservas, concurrencia, devolución, consumidores, eventos/tablero, actualización, liquidación y captura quedan especificados en D1 a D9 del cierre técnico. La [especificación técnica RF 32](rf-32/especificacion-tecnica.md) consolida los contratos de la PWA y distingue D9 del comportamiento anterior. Las pruebas nuevas y la demostración siguen siendo actividades de aceptación: su resultado no puede cerrarse mediante una decisión documental.
+Los diseños de custodia/reservas, concurrencia, devolución, consumidores, eventos/tablero, actualización, liquidación y captura quedan especificados en D1 a D9 del [anexo técnico](anexo-tecnico-ADR-0007-entrega-parcial.md). La [especificación técnica RF 32](rf-32/especificacion-tecnica.md) documenta el guardado del borrador y de la visita confirmada según D9.
 
 ### 4.7 Ejecución reproducible de esta revisión
 
@@ -213,3 +212,5 @@ Este registro es el ADR-0007 del catálogo numerado actual. El documento docente
 | 2.7 | 13/11/2026 | Sección 4.6: tablero con progreso por bulto y eventos de bulto; consumidores de estado global migrados salvo la liquidación (pendientes 7 y 8 de la decisión). | Ezequiel Marcenal |
 | 2.8 | 13/11/2026 | Sección 4.6: liquidación según D8 implementada (cargo y liquidación, consumidores de estado global), con sus dos simplificaciones. | Ezequiel Marcenal |
 | 2.9 | 14/11/2026 | Encabezado actualizado a la última versión del historial y resumen de la continuación del 13/11 (tablero, lecturas por bulto y liquidación). | Ezequiel Marcenal |
+| 2.10 | 15/11/2026 | Lucas confirma el alcance de D9. Se conservan resultados y motivos del borrador y la evidencia completa se guarda al confirmar. Se elimina el pendiente de guardar la evidencia antes de confirmar. | Lucas Ottonello, registro asistido por Codex |
+| 2.11 | 15/11/2026 | La sección 4.6 incorpora la migración de RF 34 en local y LAN, la aceptación integrada de RF 32 y la prueba automatizada de CU-31. | Registro asistido por Codex |
