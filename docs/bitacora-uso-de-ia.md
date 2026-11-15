@@ -2,7 +2,7 @@
 
 | Estado | En curso: se agrega una entrada por cada componente trabajado con asistencia de IA |
 | :---- | :---- |
-| **Fecha** | 10 de noviembre de 2026 (creada el 09/10/2026) |
+| **Fecha** | 14 de noviembre de 2026 (creada el 09/10/2026) |
 | **Autores** | Ezequiel Marcenal, Lucas Ottonello y Cristian Reyes |
 | **Equipo** | Equipo 1 \- Lucas Ottonello, Ezequiel Marcenal y Cristian Reyes |
 | **Exigida por** | Letra del laboratorio, secciones 2 y 9.5, y entregables finales (sección 8) |
@@ -1510,7 +1510,120 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | **Descartado** | Liberar por Reprogramado/cierre/ausencia de escaneo, suponer custodia desde el estado, elegir una ruta histórica ambigua, relajar la prueba arquitectónica o reescribir colas offline. |
 | **Verificación** | Compilación sin advertencias/errores; 498 unitarias, 56 de arquitectura y 225 integraciones seleccionadas aprobadas, incluido API/Worker/RabbitMQ/Valkey reales. [Guía y límites RF 34](analisis-diseno/rf-34/verificacion.md). No se aplicaron migraciones a la base del usuario ni se realizó aceptación física del nuevo recorrido publicado. |
 
-## **3.100 CU-61 · Verificación del destinatario antes de reprogramar**
+## **3.100 CU-00 · Administrador general de la plataforma**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal (toca Administración e Identity, área de Cristian, que debe revisarlo) |
+| **Fecha** | 13/11/2026 |
+| **Archivos** | `Perfil.cs`, `Politicas.cs`, `Usuario.cs`, `UsuariosIniciales.cs`, `ServicioSesion.cs`, `Operador.cs`, `OperadorRepository.cs`, `Application/Features/GestionarOperadores/`, `Infrastructure/Identity/ServicioPlataforma.cs`, `Presentation/Features/GestionarOperadores/` (Index, Nuevo y Detalle), `SeccionesBackoffice.cs`, `AccesoAplicacionesMiddleware.cs`; pruebas `GestionarOperadoresTests` |
+| **¿Se usó IA?** | Sí, Claude Code. A pedido mío, el asistente escribió el código, las pruebas y la documentación; yo elegí el alcance y revisé. |
+| **Finalidad** | Un perfil que no pertenece a ningún operador y da de alta operadores con su primer administrador, los suspende o activa y gestiona sus administradores. |
+| **Aceptado sin modificaciones** | El perfil `AdministradorGeneral` sin operador ni comercio (el filtro "Tenant" no le muestra datos); el alta en un ámbito propio con `InquilinoTrabajo`, como el cierre diario, porque el outbox exige un operador en la sesión; la invitación del administrador igual que en CU-02; suspender bloquea el inicio de sesión del personal. |
+| **Modificado** | Al correr las pruebas apareció un 403: `AccesoAplicacionesMiddleware` sólo dejaba entrar al Backoffice a los perfiles del operador. Se agregó el admin general, sólo para `/backoffice` y sin operador en la sesión. |
+| **Descartado** | Que el admin general sólo gestione administradores de los operadores sembrados (lo elegí yo: alta completa de operadores). Escribir el outbox con un operador pasado por parámetro, porque contradice el ADR-0002. Exigir la regla A5 de CU-02 (no dejar al operador sin administradores): el admin general puede invitar otro. |
+| **Verificación** | `GestionarOperadoresTests` (alta e invitación de punta a punta con el outbox del operador nuevo, slug y correo repetidos, suspender y activar, agregar y desactivar administradores, autorización). Suite completa en Docker. Límite: las sesiones abiertas de un operador suspendido siguen hasta que vencen. |
+
+## **3.101 CU-10 y CU-40 · Fecha y franja de entrega en el alta, y su filtro en Armar ruta**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 13/11/2026 |
+| **Archivos** | `CrearEnvioRequest.cs`, `CrearEnvioCommand.cs`, `CrearEnvioHandler.cs`, `CrearEnvioEndpoint.cs` (`GET /api/envios/franjas`), `NuevoEnvio.razor`, `NuevoEnvioFormulario.cs`, `SeleccionEnvios.cshtml`; pruebas `FranjaEnAltaTests` |
+| **¿Se usó IA?** | Sí, Claude Code. El asistente revisó cómo estaban la franja y el filtro, y escribió el código y las pruebas a pedido mío. |
+| **Finalidad** | Que el comercio elija fecha y franja de entrega en el Portal, y verificar que Armar ruta filtre por esa franja. |
+| **Aceptado sin modificaciones** | Fecha y franja opcionales y juntas; el servidor valida como CU-19 (la franja rige ese día y es de la zona del código postal) y que la fecha sea desde mañana en el día del operador. El filtro de Armar ruta ya existía y funciona: el envío aparece sólo ese día y en esa franja. |
+| **Modificado** | En Armar ruta, el selector mostraba sólo horarios (ambiguo entre zonas): ahora nombra la zona, y la tabla muestra la franja de cada envío. |
+| **Descartado** | Elegir sólo la franja sin fecha (lo decidí yo: fecha y franja). |
+| **Verificación** | `FranjaEnAltaTests` (franjas por código postal y día, guardado, disponibilidad por día y franja, validaciones). Suite completa en Docker. |
+
+## **3.102 Portal · Motivo de los errores al crear o importar envíos**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 13/11/2026 |
+| **Archivos** | `PortalComercio/MotivoDeError.cs`, `NuevoEnvio.razor`, `ImportarEnvios.razor` |
+| **¿Se usó IA?** | Sí, Claude Code: diagnóstico, código y prueba en el navegador integrado. |
+| **Finalidad** | Reporté que el alta "a veces falla sin decir por qué". |
+| **Aceptado sin modificaciones** | El diagnóstico: el Portal sólo leía `detail`, que traen las reglas de negocio; los 401, 403 y 500 llegaban sin cuerpo, el timeout no se capturaba, y el aviso estaba arriba del formulario, fuera de la vista al confirmar. La solución: un ayudante que siempre da un motivo (por código, con la referencia `traceId` ante un 500) y el aviso junto al botón. |
+| **Modificado** | La carga de franjas pasó a usar el mismo ayudante, porque `GetFromJsonAsync` convertía un 401 en "no se pudo conectar". |
+| **Descartado** | Mostrar detalles internos de un 500. |
+| **Verificación** | En la app con Docker: código postal sin cobertura y sesión cerrada en otra pestaña muestran su motivo. Sin prueba automática (el proyecto de pruebas no referencia el Portal). |
+
+## **3.103 Backoffice · Perfil de la sesión, ícono de la pestaña y nombre de la marca**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 13 y 14/11/2026 |
+| **Archivos** | `PerfilesBackoffice.cs`, `_Layout.cshtml`, `Index.cshtml`, `site.css`, layouts del Portal y de la PWA; pruebas `PerfilEnBackofficeTests` |
+| **¿Se usó IA?** | Sí, Claude Code: código, íconos SVG dibujados por el asistente y verificación en el navegador. |
+| **Finalidad** | Distinguir administración, despacho y depósito con un SVG propio, y corregir "VoluptasExpress" en headers y footers. |
+| **Aceptado sin modificaciones** | Distintivo con ícono y color por perfil en la barra, con fondo blanco para leerse sobre el color de cualquier operador. |
+| **Modificado** | Pedí cambiar "Entraste con el perfil…" por "Bienvenido a …". Aclaré que el SVG era para el ícono de la pestaña: se agregó como data URI con el color del perfil, conservando el distintivo. |
+| **Descartado** | — |
+| **Verificación** | `PerfilEnBackofficeTests` (cada perfil, su saludo y su ícono) y revisión en el navegador con cada perfil, en escritorio y celular. |
+
+## **3.104 Entrega parcial · Tablero y lecturas por bulto (pendientes 7 y 8)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal (toca Seguimiento y la PWA, áreas que deben revisar Cristian y Lucas) |
+| **Fecha** | 13/11/2026 |
+| **Archivos** | `NotificarNovedadTablero.cs`, `ConsultarTableroHandler.cs`, `Tablero.cshtml`, `EnvioParaTablero.cs`, `TableroResponse.cs`, `Envio.cs` (`TieneEntregaPendiente`), `EnviosDeComercio.cs`, `HojaDeRuta.razor`; pruebas `NovedadesTableroTests` y `ProgresoPorBultoTests` |
+| **¿Se usó IA?** | Sí, Claude Code: contrastó la sección 6 de la decisión y el ADR-0007 con el código, propuso el orden y escribió código, pruebas y documentación. |
+| **Finalidad** | Cerrar los pendientes 7 y 8 de la decisión de entrega parcial (D4 y D5). |
+| **Aceptado sin modificaciones** | El tablero se suscribe a los eventos de bulto y suma bultos entregados sobre el total por ruta; "entregado" sale del resumen y "entrega pendiente" de los bultos. Los pendientes del comercio se cuentan por `Terminado`. La hoja de la PWA muestra "N de M bultos entregados". |
+| **Modificado** | La revisión mostró que CU-61 ya decidía por bultos desde RF 34: sólo se actualizó el documento. |
+| **Descartado** | Reemplazar los contadores por envío del tablero por contadores de bultos con el mismo nombre (D5 lo prohíbe). |
+| **Verificación** | `NovedadesTableroTests` y `ProgresoPorBultoTests` (1/3 y 2/3), más tablero, comercios, PWA y arquitectura en Docker. Pendiente: el ensayo con Worker, RabbitMQ y Valkey reales. |
+
+## **3.105 CU-32 · Liquidación según D8 (entrega parcial)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 13/11/2026 |
+| **Archivos** | `Envio.cs` (`TerminadoEn`), `EnvioRepository.cs`, `EnvioCerrado.cs`, `EnvioLiquidable.cs`, `Liquidacion.cs`, `LiquidacionConfiguration.cs`, `LiquidacionRepository.cs`, `GenerarLiquidacionHandler.cs`, `DepositoModuleApi.cs`; migraciones `TerminadoEnvio` y `ConceptosLiquidacion`; pruebas `LiquidacionTests`, `ResumenEnvioTests` y `GenerarLiquidacionTests` |
+| **¿Se usó IA?** | Sí, Claude Code: leyó D8, diseñó, escribió código, migraciones (con el script de Docker) y pruebas. |
+| **Finalidad** | Cobrar la base al cerrar el envío (cierre mixto incluido), cobrar los recargos de nueva visita y usar pesos enteros. |
+| **Aceptado sin modificaciones** | `TerminadoEn` al pasar Terminado a verdadero, con relleno de los ya terminados desde su último evento; una línea por concepto (`BaseEnvio` o `RecargoVisita`) con índice único; recargos en `TotalAjustes` por la fecha de la visita; redondeo al peso más cercano con 0,50 hacia arriba. |
+| **Modificado** | Las filas del historial de los documentos ya estaban commiteadas: se agregaron filas nuevas en lugar de modificarlas. |
+| **Descartado** | Deducir el cierre del historial sin columna nueva (los cambios de bulto no siempre generan un evento del envío). **Simplificaciones aceptadas:** redondear al liquidar y no al registrar (las tarifas ya son enteras) y no agregar la identidad de visita `(OperadorId, VisitaId)`. |
+| **Verificación** | Unitarias de totales, recargos y redondeo; integración con cierre mixto (450 una vez), cancelado y extraviado sin cobro, recargo de 120,50 → 121 y regeneración sin duplicar. Suite completa en Docker: 507 unitarias, 56 de arquitectura, 680 de integración, 95 % de cobertura. |
+
+## **3.106 Revisión de la documentación para la entrega final**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 14/11/2026 |
+| **Archivos** | Esta bitácora, `ADR-0002`, `ADR-0007`; comentario de cierre en la tarjeta de Trello de la especificación técnica |
+| **¿Se usó IA?** | Sí, Claude Code: leyó la letra (8.2, 8.4 y 9.5) y el cambio de requerimientos, revisó el estado de los 8 ADR y de los entregables, y redactó estas entradas y los ajustes. |
+| **Finalidad** | Saber qué falta para la entrega del 15/11. |
+| **Aceptado sin modificaciones** | El inventario: faltan el documento técnico, el registro de horas y la presentación; los ADR 0002, 0005 y 0008 esperan la aprobación del equipo. |
+| **Modificado** | — |
+| **Descartado** | Dar por aprobados los ADR pendientes: lo decide el equipo. |
+| **Verificación** | Revisión del responsable antes de entregar. |
+| **Documento técnico** | Borrador de `docs/documento-tecnico.md` escrito por el asistente a partir de los ADR, la documentación y el código; al revisar el código encontró que faltaban Serilog y las cabeceras seguras (entrada 3.107). Se corrigieron dos afirmaciones al verificarlas (tiempos del caché de configuración y perfiles del hub). |
+
+## **3.107 Serilog y cabeceras seguras (letra 6.12 y 6.3)**
+
+| Campo | Detalle |
+| :---- | :---- |
+| **Responsable** | Ezequiel Marcenal |
+| **Fecha** | 14/11/2026 |
+| **Archivos** | `BuildingBlocks/.../Observabilidad/RegistroEstructurado.cs`, `Directory.Packages.props` (Serilog.AspNetCore 10.0.0), `Logistica.Api/Program.cs`, `Logistica.Worker/Program.cs`, `Logistica.Api/Seguridad/CabecerasSeguridadMiddleware.cs`; prueba `CabecerasSeguridadTests` |
+| **¿Se usó IA?** | Sí, Claude Code: detectó los dos huecos al armar el documento técnico y escribió el código y la prueba a pedido mío. |
+| **Finalidad** | Cumplir dos exigencias de la letra que no estaban: Serilog para el registro estructurado y cabeceras seguras. |
+| **Aceptado sin modificaciones** | Serilog configurado en un solo lugar de BuildingBlocks para la API y el Worker, con JSON compacto en consola, el `TraceId` de cada evento y reenvío a Aspire Dashboard por OTLP cuando está configurado. Cabeceras `nosniff`, `DENY`, `strict-origin-when-cross-origin`, `Permissions-Policy`, HSTS fuera de Development y una CSP acotada. |
+| **Modificado** | La prueba no podía usar la constante del middleware, que es interna de la API: compara el valor literal. |
+| **Descartado** | Restringir scripts y estilos en la CSP: rompería el tablero (Leaflet y SignalR desde cdnjs, scripts en línea) y Blazor WebAssembly a un día de la entrega; queda anotado como mejora. |
+| **Verificación** | `CabecerasSeguridadTests` (página, Portal y error 404) y suite completa en Docker. |
+
+## **3.108 CU-61 · Verificación del destinatario antes de reprogramar**
 
 | Campo | Detalle |
 | :---- | :---- |
@@ -1580,4 +1693,6 @@ En la aceptación final, Lucas mantuvo una visita offline mientras Codex provoc�
 | 0.48 | 10/11/2026 | Entrada de CU-22, gestionar incidencias (3.97). | Cristian Reyes |
 | 0.49 | 10/11/2026 | Entrada de las pruebas de extremo a extremo con Playwright (3.98). | Cristian Reyes |
 | 0.50 | 10/11/2026 | Integración de main: conservación de las entradas de RF 32/CU-15 y CU-22/Playwright, renumeración 3.97/3.98 y resolución de ADR-0007 manteniendo decisiones y aceptación RF 32. | Lucas Ottonello |
-| 0.51 | 14/11/2026 | Entrada de la verificación del destinatario antes de reprogramar (3.100). | Cristian Reyes |
+| 0.51 | 14/11/2026 | Entradas del 13 y 14/11: administrador general (3.100), fecha y franja en el alta (3.101), motivo de los errores del Portal (3.102), perfil e ícono del Backoffice (3.103), tablero y lecturas por bulto (3.104), liquidación según D8 (3.105) y revisión para la entrega (3.106). | Ezequiel Marcenal |
+| 0.52 | 14/11/2026 | Documento técnico en la entrada 3.106 y entrada de Serilog y cabeceras seguras (3.107). | Ezequiel Marcenal |
+| 0.53 | 14/11/2026 | Entrada de la verificación del destinatario antes de reprogramar (3.108). | Cristian Reyes |

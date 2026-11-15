@@ -1,6 +1,7 @@
 using Logistica.BuildingBlocks.Infrastructure.Caching;
 using Logistica.BuildingBlocks.Infrastructure.Configuracion;
 using Logistica.BuildingBlocks.Infrastructure.Messaging;
+using Logistica.BuildingBlocks.Infrastructure.Observabilidad;
 using Logistica.Modules.Seguimiento;
 using Logistica.SharedKernel;
 using Npgsql;
@@ -9,6 +10,9 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 var builder = Host.CreateApplicationBuilder(args);
+
+// Registro estructurado con Serilog, igual que en la API: cada evento lleva la traza del mensaje (letra 6.12).
+builder.Services.AddRegistroEstructurado(builder.Configuration, "logistica-worker");
 
 // Trazas (ADR-0003, sección 2.9) y métricas de la caché (ADR-0006, sección 2.7): cada mensaje continúa la traza de su
 // publicación en la API, y las invalidaciones del seguimiento cuentan en el mismo tablero que las lecturas de la API.

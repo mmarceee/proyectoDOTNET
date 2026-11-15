@@ -25,8 +25,12 @@ using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Registro estructurado con Serilog, con la traza de cada evento y, si hay OTLP, enviado a Aspire Dashboard (letra 6.12).
+builder.Services.AddRegistroEstructurado(builder.Configuration, "logistica-api");
 
 // /health chequea sólo PostgreSQL, con un límite de 3 s para que una base colgada no lo deje esperando (PostgresHealthCheck).
 builder.Services.AddHealthChecks()
@@ -173,6 +177,13 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 
 // Primero de la cadena, para medir la solicitud completa con su código de respuesta final (MetricasHttp).
 app.UseMetricasHttp();
+
+// Cabeceras seguras en todas las respuestas, también en los errores y los archivos estáticos (letra 6.3).
+app.UseMiddleware<CabecerasSeguridadMiddleware>();
+
+// Una línea estructurada por request (método, ruta, código y duración), con su TraceId (Serilog). Usa el logger de la
+// aplicación y no el estático, que queda sin configurar (RegistroEstructurado preserva el estático).
+app.UseSerilogRequestLogging(opciones => opciones.Logger = app.Services.GetRequiredService<Serilog.ILogger>());
 
 // En Development las Minimal APIs lanzan BadHttpRequestException ante un body inválido, en lugar de
 // responder 400. Se respeta su código para que no termine en un 500.
