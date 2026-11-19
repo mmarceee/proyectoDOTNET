@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Hosting;
@@ -53,6 +54,35 @@ public class AplicacionesWebAssemblyTests(WebApplicationFactory<Program> factory
         var response = await client.GetAsync("/repartidor/service-worker.js");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task El_ingreso_del_repartidor_enlaza_recursos_de_instalacion_publicos()
+    {
+        using var host = factory.WithWebHostBuilder(b => b.UseSetting("Identity:PermitirTenantProvisorio", "false"));
+        using var client = host.CreateClient(new WebApplicationFactoryClientOptions
+            { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        const string rutaManifiesto = "/repartidor/manifest.webmanifest";
+        var ingreso = await client.GetStringAsync("/repartidor/ingresar");
+        Assert.Contains($"rel=\"manifest\" href=\"{rutaManifiesto}\"", ingreso);
+
+        using var respuesta = await client.GetAsync(rutaManifiesto);
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        using var manifiesto = JsonDocument.Parse(await respuesta.Content.ReadAsStringAsync());
+        var iconos = manifiesto.RootElement.GetProperty("icons").EnumerateArray().ToArray();
+        Assert.Equal(2, iconos.Length);
+        foreach (var icono in iconos)
+        {
+            using var recurso = await client.GetAsync($"/repartidor/{icono.GetProperty("src").GetString()}");
+            Assert.Equal(HttpStatusCode.OK, recurso.StatusCode);
+            Assert.Equal("image/png", recurso.Content.Headers.ContentType?.MediaType);
+        }
+
+        using var app = await client.GetAsync("/repartidor/");
+        Assert.Equal(HttpStatusCode.Redirect, app.StatusCode);
+        Assert.Equal("/repartidor/ingresar", app.Headers.Location?.OriginalString);
+        using var worker = await client.GetAsync("/repartidor/service-worker.js");
+        Assert.Equal(HttpStatusCode.Redirect, worker.StatusCode);
     }
 
     [Theory]

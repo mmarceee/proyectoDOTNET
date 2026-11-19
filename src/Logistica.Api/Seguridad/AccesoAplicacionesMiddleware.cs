@@ -13,12 +13,12 @@ internal sealed class AccesoAplicacionesMiddleware(RequestDelegate next)
         var repartidor = http.Request.Path.StartsWithSegments("/repartidor");
         var personal = http.Request.Path.StartsWithSegments("/backoffice")
             || http.Request.Path.StartsWithSegments("/api/deposito");
-        // El ingreso del Portal tiene que poder abrirse sin sesión.
+        // El ingreso y los metadatos de instalación se cargan antes de iniciar sesión.
         if (http.Request.Path.Equals(new PathString("/portal/ingresar"))
             || http.Request.Path.Equals(new PathString("/repartidor/ingresar"))
-            // El navegador solicita el manifiesto sin credenciales por defecto.
-            // Sólo contiene metadatos públicos; la app y las APIs conservan su protección.
-            || http.Request.Path.Equals(new PathString("/repartidor/manifest.webmanifest")))
+            || http.Request.Path.Equals(new PathString("/repartidor/manifest.webmanifest"))
+            || http.Request.Path.Equals(new PathString("/repartidor/icon-192.png"))
+            || http.Request.Path.Equals(new PathString("/repartidor/icon-512.png")))
         {
             await next(http);
             return;

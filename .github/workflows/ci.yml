@@ -31,12 +31,31 @@ jobs:
       - name: Test
         id: test
         timeout-minutes: 20
-        run: >
-          dotnet test Logistica.slnx --no-build --configuration Release
-          --settings coverage.runsettings --collect "XPlat Code Coverage"
-          --logger trx
-          --blame-hang --blame-hang-timeout 3m --blame-hang-dump-type none
-          --results-directory TestResults
+        run: |
+          ejecutar_pruebas() {
+            local proyecto="$1" grupo="$2"
+            shift 2
+            dotnet test "$proyecto" --no-build --configuration Release \
+              --settings coverage.runsettings --collect "XPlat Code Coverage" \
+              --logger trx \
+              --blame-hang --blame-hang-timeout 3m --blame-hang-dump-type none \
+              --results-directory "TestResults/$grupo" "$@"
+          }
+
+          # Cada grupo de integración arranca un testhost nuevo para liberar la memoria acumulada entre grupos.
+          integracion=tests/Logistica.IntegrationTests
+          envios_identidad='FullyQualifiedName~Logistica.IntegrationTests.Envios.|FullyQualifiedName~Logistica.IntegrationTests.Identidad.|FullyQualifiedName~Logistica.IntegrationTests.Tenancy.'
+          seguimiento_resiliencia='FullyQualifiedName~Logistica.IntegrationTests.Seguimiento.|FullyQualifiedName~Logistica.IntegrationTests.Resiliencia.|FullyQualifiedName~Logistica.IntegrationTests.BuildingBlocks.|FullyQualifiedName~Logistica.IntegrationTests.Deposito.'
+          resto="${envios_identidad//~/!~}&${seguimiento_resiliencia//~/!~}"
+          resto="${resto//|/\&}"
+
+          resultado=0
+          ejecutar_pruebas tests/Logistica.UnitTests unitarias || resultado=1
+          ejecutar_pruebas tests/Logistica.ArchitectureTests arquitectura || resultado=1
+          ejecutar_pruebas "$integracion" envios-identidad --filter "$envios_identidad" || resultado=1
+          ejecutar_pruebas "$integracion" seguimiento-resiliencia --filter "$seguimiento_resiliencia" || resultado=1
+          ejecutar_pruebas "$integracion" otras-integraciones --filter "$resto" || resultado=1
+          exit "$resultado"
 
       # TRX y secuencia de ejecución aunque falle una prueba o se detecte un bloqueo.
       - name: Upload test results
@@ -47,7 +66,7 @@ jobs:
           path: TestResults
           if-no-files-found: warn
 
-      # Une los resultados de los tres proyectos de prueba en un solo reporte.
+      # Une la cobertura de todos los grupos en un solo reporte.
       - name: Coverage report
         if: ${{ !cancelled() && steps.test.outcome != 'skipped' }}
         run: |
